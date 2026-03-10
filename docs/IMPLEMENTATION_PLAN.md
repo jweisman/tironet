@@ -701,6 +701,21 @@ tironet/
 
 **Deliverable:** Deployable skeleton. Auth works (Google + Magic Link), RTL renders correctly, tabs navigate, PWA installs on mobile.
 
+**Validation checklist:**
+- [ ] `docker compose up -d` — Postgres, Mailpit, and PowerSync containers start with no errors
+- [ ] `npm run db:migrate` — migration runs to completion, no errors
+- [ ] `npm run db:seed` — seeds 7 activity types; confirm via Prisma Studio (`npm run db:studio`)
+- [ ] `npm run dev` — dev server starts with no TypeScript or compilation errors
+- [ ] `npm run build` — production build succeeds; all pages listed in output; no TS errors
+- [ ] Visit `http://localhost:3000` — landing page renders in Hebrew, text is right-aligned (RTL)
+- [ ] Visit `http://localhost:3000/home` while logged out — redirects to `/login`
+- [ ] Google OAuth: click "כניסה עם Google" → complete OAuth flow → redirected to `/home`
+- [ ] Magic link: enter email → submit → email appears in Mailpit (`http://localhost:8026`) → click link → lands on `/home`
+- [ ] Visit `/login` while already logged in → redirects to `/home`
+- [ ] Resize browser to mobile width — bottom `TabBar` is visible; resize to desktop — `Sidebar` is visible
+- [ ] Admin link is NOT visible for a non-admin user
+- [ ] Admin link IS visible for a user with `isAdmin = true` in the DB
+
 ---
 
 ### Phase 2: Admin Foundation
@@ -737,6 +752,27 @@ tironet/
    - `prisma/seed.ts` optionally creates a dev cycle, company, platoon, and squad when `NODE_ENV=development`.
 
 **Deliverable:** Admin can fully configure a training cycle before inviting users.
+
+**Validation checklist:**
+- [x] Non-admin user visits `/admin` → redirected to `/home`
+- [x] Admin user visits `/admin` → redirected to `/admin/cycles`
+- [x] Admin sub-nav shows three tabs: מחזורים, מבנה פיקוד, סוגי פעילות
+- [x] **Cycles:** add a new cycle → appears at top of list with "פעיל" badge
+- [x] **Cycles:** toggle active/inactive switch → badge updates immediately
+- [x] **Cycles:** click edit (pencil) → rename cycle → name updates in list
+- [x] **Cycles:** click delete → confirmation dialog appears → confirm → cycle removed from list
+- [x] **Structure:** cycle selector populates from existing cycles
+- [x] **Structure:** add company → appears as collapsed row under selected cycle
+- [x] **Structure:** expand company → add platoon → appears under company
+- [x] **Structure:** expand platoon → add squad → appears under platoon
+- [x] **Structure:** rename company, platoon, squad inline → name updates
+- [x] **Structure:** delete squad (with confirmation) → removed; delete platoon cascades squads; delete company cascades all
+- [x] **Activity types:** add type with a valid Lucide icon name (e.g. `Dumbbell`) → icon preview renders correctly
+- [x] **Activity types:** invalid icon name → renders `?` placeholder
+- [x] **Activity types:** toggle active/inactive → badge updates
+- [x] **Activity types:** edit name and icon → updates in list
+- [x] **Activity types:** delete (with confirmation) → removed from list
+- [x] Calling any admin API without an admin session (e.g. via DevTools `fetch`) → returns `403`
 
 ---
 
@@ -785,6 +821,24 @@ tironet/
 
 **Deliverable:** Full invite → auth → role assignment flow. Users land in the app with correct permissions.
 
+**Validation checklist:**
+- [ ] Admin creates an invitation → confirmation shown; email delivered to recipient's inbox (Mailpit in dev)
+- [ ] Invitation email is in Hebrew; contains role label, unit name, cycle name, and a working CTA link
+- [ ] Recipient clicks invite link → sees role/unit summary page → logs in → lands on `/home` with the assigned role
+- [ ] Accessing the same invite link a second time (already accepted) → shows "already used" error
+- [ ] Manually set `expires_at` in the past in DB → visit invite link → shows expired error with "contact your commander" message
+- [ ] Inviter (platoon commander) cannot invite a role above their own (e.g. company commander) — form does not offer that role option
+- [ ] Inviter cannot select units outside their hierarchy in the invite form
+- [ ] `/admin/users` shows table with name, rank, email, role, unit, cycle for all users
+- [ ] Admin edits a user's role and unit → changes saved and reflected in table
+- [ ] User with **0** active cycle assignments → redirected to `/not-authorized` after login
+- [ ] User with **1** active cycle → cycle auto-selected; lands directly on `/home`
+- [ ] User with **2+** active cycles → cycle picker shown; selecting one proceeds to `/home`
+- [ ] Reload page after selecting a cycle → same cycle still selected (persisted in `localStorage`)
+- [ ] "Change Cycle" control accessible from app header → cycle picker re-opens
+- [ ] Profile page: edit given name, family name, rank → saved and reflected in sidebar/avatar
+- [ ] Profile page: upload and crop a profile picture → avatar updated throughout the app
+
 ---
 
 ### Phase 4: Soldiers
@@ -823,6 +877,25 @@ tironet/
    - Save static file at `public/templates/soldiers-template.xlsx`.
 
 **Deliverable:** Soldiers can be added individually or in bulk. Soldier profiles show gaps. Search and filter work.
+
+**Validation checklist:**
+- [ ] Squad commander: soldier list shows only their squad's soldiers
+- [ ] Platoon commander: list is grouped by squad with section headers
+- [ ] Company commander: list is grouped by platoon → squad
+- [ ] Search bar: type a Hebrew name → list filters in real time (case-insensitive)
+- [ ] "Show gaps only" toggle: list reduces to soldiers with at least one missing or failed activity report
+- [ ] Add soldier (individually): all required fields validated; soldier appears in list after save
+- [ ] Add soldier: squad field hidden for squad commander (defaults to their squad automatically)
+- [ ] Add soldier when active activities exist for the squad → late-joiner dialog appears asking about N/A
+- [ ] Late-joiner: confirm "N/A" → `activity_reports` rows created with `result = na` for all existing active activities; verify in Prisma Studio
+- [ ] Late-joiner: decline → soldier added with no activity reports created
+- [ ] Soldier profile page: shows avatar, name, rank, status, squad
+- [ ] Soldier profile: gap summary lists all activities with missing or failed result
+- [ ] Soldier profile: edit button opens form in edit mode; changes saved correctly
+- [ ] Bulk import: "Download Template" → downloads `.xlsx` with correct Hebrew column headers
+- [ ] Bulk import: upload filled template → preview table shows rows; invalid rows highlighted with error description
+- [ ] Bulk import: confirm → valid soldiers imported; verify count in DB via Prisma Studio
+- [ ] Bulk import: file with no valid rows → helpful error message; nothing imported
 
 ---
 
@@ -865,6 +938,22 @@ tironet/
 
 **Deliverable:** Complete activity lifecycle from creation to reporting. 30-second squad update target is achievable with bulk update + exceptions pattern.
 
+**Validation checklist:**
+- [ ] Activity list: sorted by date descending by default
+- [ ] Filters: "השבוע" shows only activities from the last 7 days; "עם פערים" shows only activities with missing/failed reports; "טיוטה" shows only draft activities
+- [ ] Create activity: form is accessible to platoon commander; squad commander does not see the create button
+- [ ] Create activity: submit with all fields → activity appears in list with correct type icon, date, and status badge
+- [ ] Draft activity: NOT visible to squad commanders in the list
+- [ ] Change status draft → active: activity becomes visible to squad commanders
+- [ ] "Notify squad commanders" after creation → emails delivered (check Mailpit in dev); email is in Hebrew with activity name, type, date, and a working link
+- [ ] Activity detail (view mode): table shows all squad soldiers with result icons (✓ passed, ✗ failed, — N/A, blank = missing); gap rows highlighted
+- [ ] Switch to edit mode: bulk "סמן הכל כ: עבר" → only fills soldiers with no existing result; soldiers with existing results unchanged
+- [ ] Edit mode: set individual result, grade, note for a soldier → auto-saved on blur; verify in Prisma Studio without manually saving
+- [ ] Edit mode: change result → row updates immediately (optimistic UI)
+- [ ] Platoon commander: can edit activity metadata (name, date, type, required, status)
+- [ ] Squad commander: cannot edit activity metadata; can only fill reports for their own squad
+- [ ] Activity reports API: `POST /api/activities/[id]/reports/bulk` with `soldierIds` that already have results → existing results untouched; only empty ones filled
+
 ---
 
 ### Phase 6: Dashboard
@@ -897,6 +986,16 @@ tironet/
    - Role label (מ״כ / מ״מ / מ״פ).
 
 **Deliverable:** Dashboard provides the "at-a-glance" view described in the PRD.
+
+**Validation checklist:**
+- [ ] Squad commander: dashboard shows exactly one squad summary card
+- [ ] Platoon commander: dashboard shows one card per squad plus a platoon-level aggregate row
+- [ ] Company commander: cards grouped by platoon; platoon aggregate visible; squads expandable
+- [ ] Each card shows correct soldier count, completed/missing/failed activity counts
+- [ ] Tapping/clicking the "missing" or "failed" count navigates to `/activities` with the correct squad filter pre-applied
+- [ ] Top gaps list shows up to 3 activities with the highest gap count; tapping one navigates to `/activities/[id]`
+- [ ] User context header shows: rank + given name, current cycle name, role label (מ״כ / מ״מ / מ״פ)
+- [ ] Add a new activity report and return to dashboard — counts update to reflect the change
 
 ---
 
@@ -972,6 +1071,17 @@ tironet/
 
 **Deliverable:** App functions in airplane mode. All mutations are queued and synced on reconnect.
 
+**Validation checklist:**
+- [ ] Open app while online; then disable network in Chrome DevTools (Network → Offline)
+- [ ] Navigate between pages — app renders from local PowerSync DB without any network requests
+- [ ] Create or edit an activity report while offline → offline banner appears; pending upload badge increments
+- [ ] Re-enable network → pending changes upload automatically; verify data persisted in Postgres via Prisma Studio
+- [ ] Open app in airplane mode from scratch (no prior cache) → app shell loads; cached data visible
+- [ ] Lighthouse PWA audit (DevTools → Lighthouse → Progressive Web App) — passes installability checks
+- [ ] Install app as PWA on Android Chrome (or iOS Safari) → opens as standalone without browser chrome
+- [ ] Sync status indicator: shows "מסונכרן" when online and in sync; shows pending count when changes are queued
+- [ ] PowerSync JWT endpoint (`/api/powersync/token`) returns 401 for unauthenticated requests
+
 ---
 
 ### Phase 8: Polish & QA
@@ -1023,6 +1133,27 @@ tironet/
    - Keyboard navigation works for all interactive elements.
 
 **Deliverable:** Production-ready app passing Lighthouse audits, security review, and cross-device testing.
+
+**Validation checklist:**
+- [ ] Every form submission shows a loading spinner on the button during the request
+- [ ] Successful mutation → Hebrew success toast appears and auto-dismisses
+- [ ] Failed mutation → Hebrew error toast with the relevant message
+- [ ] Activity report row updates result icon immediately on change before the server response (optimistic UI)
+- [ ] Skeleton loaders appear on first list load before data arrives
+- [ ] Lighthouse (DevTools → Lighthouse, Slow 4G, Mobile): Performance ≥ 90, PWA passes
+- [ ] All tappable targets measure ≥ 44×44px in DevTools device emulation (use "Show rulers" overlay)
+- [ ] `BulkUpdateBar` positioned above the `TabBar` on mobile — reachable with thumb without scrolling
+- [ ] Tab through all form fields with keyboard — focus order is logical; Enter submits the active form
+- [ ] All icon-only buttons have a Hebrew `aria-label` (inspect in DevTools Accessibility panel)
+- [ ] Enable a colour-blind simulation in DevTools (Rendering → Emulate vision deficiency) — gap indicators still distinguishable by icon, not colour alone
+- [ ] Chrome Android: full feature test; install as PWA; use camera for profile picture upload
+- [ ] Safari iOS: install to home screen; open offline; edit a report; reconnect — report synced
+- [ ] Firefox (desktop): navigate all major flows; no JS errors in console
+- [ ] Unauthenticated `fetch` to any `/api/admin/*` route → `403`; to any `/api/*` route → `401`
+- [ ] Rapid requests to `/api/auth/*` (>threshold) → `429 Too Many Requests`
+- [ ] Invitation token: expired → error page; already accepted → error page; wrong email → sign-in blocked
+- [ ] Profile image upload larger than 250 KB (after decode) → server rejects with a clear error
+- [ ] `npm run build` → zero TypeScript errors, zero ESLint errors, all pages in build output
 
 ---
 

@@ -82,7 +82,7 @@ const tironetAdapter: Adapter = {
         tokenType: data.token_type ?? null,
         scope: data.scope ?? null,
         idToken: data.id_token ?? null,
-        sessionState: data.session_state ?? null,
+        sessionState: (data.session_state as string | undefined) ?? null,
       },
     });
   },
@@ -133,6 +133,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       // On first sign-in `user` is populated; on subsequent calls only `token`
       if (user?.id) {
+        // Full load on initial sign-in (handled below)
         token.sub = user.id;
 
         // Load full user record + cycle assignments
@@ -166,6 +167,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             unitId: a.unitId,
           })) as CycleAssignment[];
         }
+      } else if (token.sub) {
+        // On subsequent token refreshes, re-read isAdmin from DB so that
+        // changes made after login (e.g. make-admin script) take effect
+        // without requiring a full sign-out/sign-in.
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { isAdmin: true },
+        });
+        if (fresh) token.isAdmin = fresh.isAdmin;
       }
       return token;
     },

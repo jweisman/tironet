@@ -99,6 +99,7 @@ model Company {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   cycleId   String   @map("cycle_id") @db.Uuid
   name      String
+  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -112,6 +113,7 @@ model Platoon {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId String   @map("company_id") @db.Uuid
   name      String
+  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -126,6 +128,7 @@ model Squad {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   platoonId String   @map("platoon_id") @db.Uuid
   name      String
+  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
