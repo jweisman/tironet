@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, Settings, LogOut } from "lucide-react";
+import { Home, Users, Activity, Settings, LogOut, UserCog } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
+import { useCycle } from "@/contexts/CycleContext";
+import { CyclePicker } from "./CyclePicker";
 
 const navItems = [
   { href: "/home", icon: Home, labelKey: "home" },
@@ -19,7 +21,16 @@ export function Sidebar() {
   const pathname = usePathname();
   const t = useTranslations("nav");
   const { data: session } = useSession();
+  const { activeCycles } = useCycle();
   const isAdmin = session?.user?.isAdmin;
+  const isCommander = session?.user?.cycleAssignments?.some(
+    (a) => a.role === "company_commander" || a.role === "platoon_commander"
+  );
+
+  // Deduplicate cycles by id
+  const uniqueCycles = activeCycles.filter(
+    (a, i, arr) => arr.findIndex((b) => b.cycleId === a.cycleId) === i
+  );
 
   return (
     <aside className="hidden md:flex flex-col fixed inset-y-0 end-0 w-64 border-s border-border bg-background z-40">
@@ -27,6 +38,13 @@ export function Sidebar() {
       <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
         <span className="text-xl font-bold">טירונט</span>
       </div>
+
+      {/* Cycle picker — only when multiple active cycles */}
+      {uniqueCycles.length > 1 && (
+        <div className="px-3 py-3 border-b border-border">
+          <CyclePicker />
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
@@ -48,6 +66,21 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {!isAdmin && isCommander && (
+          <Link
+            href="/users"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+              pathname.startsWith("/users")
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <UserCog size={18} />
+            <span>מפקדים</span>
+          </Link>
+        )}
 
         {isAdmin && (
           <Link

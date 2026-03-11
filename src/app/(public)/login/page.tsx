@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
-export default function LoginPage() {
+function LoginForm() {
   const t = useTranslations("auth");
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/home";
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -18,7 +21,7 @@ export default function LoginPage() {
     e.preventDefault();
     if (!email) return;
     setSending(true);
-    await signIn("nodemailer", { email, redirect: false });
+    await signIn("nodemailer", { email, callbackUrl, redirect: false });
     setSent(true);
     setSending(false);
   }
@@ -42,7 +45,7 @@ export default function LoginPage() {
             <Button
               className="w-full"
               variant="outline"
-              onClick={() => signIn("google", { callbackUrl: "/home" })}
+              onClick={() => signIn("google", { callbackUrl })}
             >
               {t("signInWithGoogle")}
             </Button>
@@ -75,5 +78,13 @@ export default function LoginPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -141,7 +141,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { id: user.id },
           include: {
             cycleAssignments: {
-              include: { cycle: { select: { name: true } } },
+              include: { cycle: { select: { name: true, isActive: true } } },
             },
           },
         });
@@ -151,31 +151,60 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.familyName = dbUser.familyName;
           token.rank = dbUser.rank;
           token.isAdmin = dbUser.isAdmin;
-          token.profileImage = dbUser.profileImage;
           token.cycleAssignments = dbUser.cycleAssignments.map(
             (a: {
               cycleId: string;
-              cycle: { name: string };
+              cycle: { name: string; isActive: boolean };
               role: string;
               unitType: string;
               unitId: string;
             }) => ({
             cycleId: a.cycleId,
             cycleName: a.cycle.name,
+            cycleIsActive: a.cycle.isActive,
             role: a.role,
             unitType: a.unitType,
             unitId: a.unitId,
           })) as CycleAssignment[];
         }
       } else if (token.sub) {
-        // On subsequent token refreshes, re-read isAdmin from DB so that
-        // changes made after login (e.g. make-admin script) take effect
-        // without requiring a full sign-out/sign-in.
+        // On subsequent token refreshes, re-read isAdmin and cycleAssignments
+        // from DB so that changes (make-admin, accepting invitations) take
+        // effect without requiring a full sign-out/sign-in.
         const fresh = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { isAdmin: true },
+          select: {
+            isAdmin: true,
+            cycleAssignments: {
+              select: {
+                cycleId: true,
+                role: true,
+                unitType: true,
+                unitId: true,
+                cycle: { select: { name: true, isActive: true } },
+              },
+            },
+          },
         });
-        if (fresh) token.isAdmin = fresh.isAdmin;
+        if (fresh) {
+          token.isAdmin = fresh.isAdmin;
+          token.cycleAssignments = fresh.cycleAssignments.map(
+            (a: {
+              cycleId: string;
+              cycle: { name: string; isActive: boolean };
+              role: string;
+              unitType: string;
+              unitId: string;
+            }) => ({
+              cycleId: a.cycleId,
+              cycleName: a.cycle.name,
+              cycleIsActive: a.cycle.isActive,
+              role: a.role,
+              unitType: a.unitType,
+              unitId: a.unitId,
+            })
+          ) as CycleAssignment[];
+        }
       }
       return token;
     },
@@ -186,7 +215,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.familyName = token.familyName as string;
       session.user.rank = token.rank as string | null;
       session.user.isAdmin = (token.isAdmin as boolean) ?? false;
-      session.user.profileImage = token.profileImage as string | null;
       session.user.cycleAssignments =
         (token.cycleAssignments as CycleAssignment[]) ?? [];
       return session;

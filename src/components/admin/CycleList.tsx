@@ -1,7 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { PlusCircle, Pencil, Trash2, Check, X } from "lucide-react";
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { PlusCircle, Pencil, Trash2, Check, X, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +45,42 @@ type Props = {
   initialCycles: Cycle[];
 };
 
+function SortableCycleRow({
+  cycle,
+  children,
+}: {
+  cycle: Cycle;
+  children: (dragHandle: React.ReactNode) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: cycle.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const handle = (
+    <button
+      {...attributes}
+      {...listeners}
+      className="touch-none cursor-grab text-muted-foreground hover:text-foreground p-1"
+      tabIndex={-1}
+      aria-label="גרור לסידור מחדש"
+    >
+      <GripVertical className="w-4 h-4" />
+    </button>
+  );
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children(handle)}
+    </div>
+  );
+}
+
 export default function CycleList({ initialCycles }: Props) {
   const [cycles, setCycles] = useState<Cycle[]>(initialCycles);
   const [newName, setNewName] = useState("");
@@ -35,6 +88,27 @@ export default function CycleList({ initialCycles }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = cycles.findIndex((c) => c.id === active.id);
+    const newIndex = cycles.findIndex((c) => c.id === over.id);
+    const reordered = arrayMove(cycles, oldIndex, newIndex);
+    setCycles(reordered);
+
+    await fetch("/api/admin/cycles/reorder", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: reordered.map((c) => c.id) }),
+    });
+  }
 
   async function handleAdd() {
     if (!newName.trim()) return;
@@ -120,81 +194,87 @@ export default function CycleList({ initialCycles }: Props) {
         </div>
       )}
 
-      <div className="space-y-2">
-        {cycles.length === 0 && (
-          <p className="text-muted-foreground text-sm text-center py-8">אין מחזורים עדיין</p>
-        )}
-        {cycles.map((cycle) => (
-          <div
-            key={cycle.id}
-            className="flex items-center gap-3 p-3 border rounded-lg"
-          >
-            {editingId === cycle.id ? (
-              <>
-                <Input
-                  autoFocus
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleEdit(cycle.id);
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
-                  className="max-w-xs"
-                />
-                <Button size="sm" onClick={() => handleEdit(cycle.id)} disabled={loading}>
-                  <Check className="w-4 h-4" />
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <span className="flex-1 font-medium">{cycle.name}</span>
-                <Badge variant={cycle.isActive ? "default" : "secondary"}>
-                  {cycle.isActive ? "פעיל" : "לא פעיל"}
-                </Badge>
-                <Switch
-                  checked={cycle.isActive}
-                  onCheckedChange={() => handleToggleActive(cycle)}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => { setEditingId(cycle.id); setEditName(cycle.name); }}
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger
-                    render={<Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" />}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>מחיקת מחזור</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        האם אתה בטוח שברצונך למחוק את המחזור &quot;{cycle.name}&quot;?
-                        פעולה זו תמחק את כל הפלוגות, המחלקות והכיתות הקשורות אליו.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>ביטול</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleDelete(cycle.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        מחק
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={cycles.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-2">
+            {cycles.length === 0 && (
+              <p className="text-muted-foreground text-sm text-center py-8">אין מחזורים עדיין</p>
             )}
+            {cycles.map((cycle) => (
+              <SortableCycleRow key={cycle.id} cycle={cycle}>
+                {(dragHandle) => (
+                  <div className="flex items-center gap-3 p-3 border rounded-lg">
+                    {dragHandle}
+                    {editingId === cycle.id ? (
+                      <>
+                        <Input
+                          autoFocus
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleEdit(cycle.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          className="max-w-xs"
+                        />
+                        <Button size="sm" onClick={() => handleEdit(cycle.id)} disabled={loading}>
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 font-medium">{cycle.name}</span>
+                        <Badge variant={cycle.isActive ? "default" : "secondary"}>
+                          {cycle.isActive ? "פעיל" : "לא פעיל"}
+                        </Badge>
+                        <Switch
+                          checked={cycle.isActive}
+                          onCheckedChange={() => handleToggleActive(cycle)}
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => { setEditingId(cycle.id); setEditName(cycle.name); }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger
+                            render={<Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" />}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>מחיקת מחזור</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                האם אתה בטוח שברצונך למחוק את המחזור &quot;{cycle.name}&quot;?
+                                פעולה זו תמחק את כל הפלוגות, המחלקות והכיתות הקשורות אליו.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>ביטול</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(cycle.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                מחק
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
+                    )}
+                  </div>
+                )}
+              </SortableCycleRow>
+            ))}
           </div>
-        ))}
-      </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }

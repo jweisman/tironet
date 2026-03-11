@@ -8,6 +8,7 @@ const links = [
   { href: "/admin/cycles", label: "מחזורים" },
   { href: "/admin/structure", label: "מבנה פיקוד" },
   { href: "/admin/activity-types", label: "סוגי פעילות" },
+  { href: "/admin/users", label: "משתמשים" },
 ];
 
 export default function AdminNav() {

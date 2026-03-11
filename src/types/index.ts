@@ -19,6 +19,7 @@ export type ActivityResult = "passed" | "failed" | "na";
 export interface CycleAssignment {
   cycleId: string;
   cycleName: string;
+  cycleIsActive: boolean;
   role: Role;
   unitType: UnitType;
   unitId: string;
@@ -32,7 +33,6 @@ export interface SessionUser {
   familyName: string;
   rank?: string | null;
   isAdmin: boolean;
-  profileImage?: string | null;
   cycleAssignments: CycleAssignment[];
 }
 

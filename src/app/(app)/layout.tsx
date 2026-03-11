@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth/auth";
 import { AppShell } from "@/components/layout/AppShell";
+import { CycleProvider } from "@/contexts/CycleContext";
 
 export default async function AppLayout({
   children,
@@ -16,7 +17,9 @@ export default async function AppLayout({
 
   return (
     <SessionProvider session={session}>
-      <AppShell>{children}</AppShell>
+      <CycleProvider>
+        <AppShell>{children}</AppShell>
+      </CycleProvider>
     </SessionProvider>
   );
 }

@@ -822,22 +822,22 @@ tironet/
 **Deliverable:** Full invite → auth → role assignment flow. Users land in the app with correct permissions.
 
 **Validation checklist:**
-- [ ] Admin creates an invitation → confirmation shown; email delivered to recipient's inbox (Mailpit in dev)
-- [ ] Invitation email is in Hebrew; contains role label, unit name, cycle name, and a working CTA link
-- [ ] Recipient clicks invite link → sees role/unit summary page → logs in → lands on `/home` with the assigned role
-- [ ] Accessing the same invite link a second time (already accepted) → shows "already used" error
+- [x] Admin creates an invitation → confirmation shown; email delivered to recipient's inbox
+- [x] Invitation email is in Hebrew; contains role label, unit name, cycle name, and a working CTA link
+- [x] Recipient clicks invite link → sees role/unit summary page → logs in → lands on `/home` with the assigned role
+- [x] Accessing the same invite link a second time (already accepted) → shows "already used" error
 - [ ] Manually set `expires_at` in the past in DB → visit invite link → shows expired error with "contact your commander" message
-- [ ] Inviter (platoon commander) cannot invite a role above their own (e.g. company commander) — form does not offer that role option
-- [ ] Inviter cannot select units outside their hierarchy in the invite form
+- [x] Inviter (platoon commander) cannot invite a role above their own (e.g. company commander) — form does not offer that role option
+- [x] Inviter cannot select units outside their hierarchy in the invite form
 - [ ] `/admin/users` shows table with name, rank, email, role, unit, cycle for all users
-- [ ] Admin edits a user's role and unit → changes saved and reflected in table
-- [ ] User with **0** active cycle assignments → redirected to `/not-authorized` after login
-- [ ] User with **1** active cycle → cycle auto-selected; lands directly on `/home`
+- [x] Admin edits a user's role and unit → changes saved and reflected in table
+- [x] User with **0** active cycle assignments → redirected to `/not-authorized` after login
+- [x] User with **1** active cycle → cycle auto-selected; lands directly on `/home`
 - [ ] User with **2+** active cycles → cycle picker shown; selecting one proceeds to `/home`
-- [ ] Reload page after selecting a cycle → same cycle still selected (persisted in `localStorage`)
-- [ ] "Change Cycle" control accessible from app header → cycle picker re-opens
-- [ ] Profile page: edit given name, family name, rank → saved and reflected in sidebar/avatar
-- [ ] Profile page: upload and crop a profile picture → avatar updated throughout the app
+- [x] Reload page after selecting a cycle → same cycle still selected (persisted in `localStorage`)
+- [x] "Change Cycle" control accessible from app header → cycle picker re-opens
+- [x] Profile page: edit given name, family name, rank → saved and reflected in sidebar/avatar
+- [x] Profile page: upload and crop a profile picture → avatar updated throughout the app
 
 ---
 
