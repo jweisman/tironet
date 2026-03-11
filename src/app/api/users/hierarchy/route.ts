@@ -101,14 +101,19 @@ export async function GET() {
     },
   });
 
-  // Build unit name map for display
-  const allUnits = await prisma.$transaction([
-    prisma.company.findMany({ where: { id: { in: uniqueSubUnitIds } }, select: { id: true, name: true } }),
-    prisma.platoon.findMany({ where: { id: { in: uniqueSubUnitIds } }, select: { id: true, name: true } }),
-    prisma.squad.findMany({ where: { id: { in: uniqueSubUnitIds } }, select: { id: true, name: true } }),
-  ]);
+  // Build full-path unit name map from structureByCycle: "פלוגה א / כיתה א" etc.
   const unitMap = new Map<string, string>();
-  for (const u of [...allUnits[0], ...allUnits[1], ...allUnits[2]]) unitMap.set(u.id, u.name);
+  for (const companies of Object.values(structureByCycle)) {
+    for (const co of companies) {
+      unitMap.set(co.id, co.name);
+      for (const pl of co.platoons) {
+        unitMap.set(pl.id, `${co.name} / ${pl.name}`);
+        for (const sq of pl.squads) {
+          unitMap.set(sq.id, `${co.name} / ${pl.name} / ${sq.name}`);
+        }
+      }
+    }
+  }
 
   // Group assignments by user
   const userMap = new Map<

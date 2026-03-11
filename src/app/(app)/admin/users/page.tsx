@@ -49,11 +49,17 @@ export default async function UsersPage() {
     }),
   ]);
 
-  // Build unit name lookup
-  const allPlatoons = companies.flatMap((c) => c.platoons);
-  const allSquads = allPlatoons.flatMap((p) => p.squads);
+  // Build full-path unit name lookup: "פלוגה א / כיתה א" etc.
   const unitMap = new Map<string, string>();
-  for (const u of [...companies, ...allPlatoons, ...allSquads]) unitMap.set(u.id, u.name);
+  for (const co of companies) {
+    unitMap.set(co.id, co.name);
+    for (const pl of co.platoons) {
+      unitMap.set(pl.id, `${co.name} / ${pl.name}`);
+      for (const sq of pl.squads) {
+        unitMap.set(sq.id, `${co.name} / ${pl.name} / ${sq.name}`);
+      }
+    }
+  }
 
   const annotatedUsers = users.map((u) => ({
     ...u,

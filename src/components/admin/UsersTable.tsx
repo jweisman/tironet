@@ -203,7 +203,9 @@ export function UsersTable({
                         user.cycleAssignments.map((a) => (
                           <div key={a.id} className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs">
-                              {ROLE_LABELS[a.role as Role]} — {a.unitName} ({a.cycle.name})
+                              <span className="font-medium">{ROLE_LABELS[a.role as Role]}</span>
+                              <span className="text-muted-foreground"> — {a.unitName}</span>
+                              <span className="text-muted-foreground/60"> ({a.cycle.name})</span>
                             </span>
                             {!a.cycle.isActive && (
                               <Badge variant="outline" className="text-xs py-0">לא פעיל</Badge>
@@ -323,7 +325,8 @@ export function UsersTable({
                   <tr key={inv.id} className="hover:bg-muted/20">
                     <td className="px-3 py-2" dir="ltr">{inv.email}</td>
                     <td className="px-3 py-2 hidden sm:table-cell">
-                      {inv.roleLabel} — {inv.unitName}
+                      <span className="font-medium">{inv.roleLabel}</span>
+                      <span className="text-muted-foreground"> — {inv.unitName}</span>
                     </td>
                     <td className="px-3 py-2 hidden sm:table-cell text-muted-foreground">
                       {inv.cycleName}

@@ -879,22 +879,22 @@ tironet/
 **Deliverable:** Soldiers can be added individually or in bulk. Soldier profiles show gaps. Search and filter work.
 
 **Validation checklist:**
-- [ ] Squad commander: soldier list shows only their squad's soldiers
-- [ ] Platoon commander: list is grouped by squad with section headers
+- [x] Squad commander: soldier list shows only their squad's soldiers
+- [x] Platoon commander: list is grouped by squad with section headers
 - [ ] Company commander: list is grouped by platoon → squad
-- [ ] Search bar: type a Hebrew name → list filters in real time (case-insensitive)
+- [x] Search bar: type a Hebrew name → list filters in real time (case-insensitive)
 - [ ] "Show gaps only" toggle: list reduces to soldiers with at least one missing or failed activity report
-- [ ] Add soldier (individually): all required fields validated; soldier appears in list after save
+- [x] Add soldier (individually): all required fields validated; soldier appears in list after save
 - [ ] Add soldier: squad field hidden for squad commander (defaults to their squad automatically)
 - [ ] Add soldier when active activities exist for the squad → late-joiner dialog appears asking about N/A
 - [ ] Late-joiner: confirm "N/A" → `activity_reports` rows created with `result = na` for all existing active activities; verify in Prisma Studio
 - [ ] Late-joiner: decline → soldier added with no activity reports created
-- [ ] Soldier profile page: shows avatar, name, rank, status, squad
+- [x] Soldier profile page: shows avatar, name, rank, status, squad
 - [ ] Soldier profile: gap summary lists all activities with missing or failed result
-- [ ] Soldier profile: edit button opens form in edit mode; changes saved correctly
-- [ ] Bulk import: "Download Template" → downloads `.xlsx` with correct Hebrew column headers
-- [ ] Bulk import: upload filled template → preview table shows rows; invalid rows highlighted with error description
-- [ ] Bulk import: confirm → valid soldiers imported; verify count in DB via Prisma Studio
+- [x] Soldier profile: edit button opens form in edit mode; changes saved correctly
+- [x] Bulk import: "Download Template" → downloads `.xlsx` with correct Hebrew column headers
+- [x] Bulk import: upload filled template → preview table shows rows; invalid rows highlighted with error description
+- [x] Bulk import: confirm → valid soldiers imported; verify count in DB via Prisma Studio
 - [ ] Bulk import: file with no valid rows → helpful error message; nothing imported
 
 ---

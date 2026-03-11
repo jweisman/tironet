@@ -203,7 +203,8 @@ export function CommanderUsersPanel({
                           .filter((a) => a.cycleId === selectedCycleId)
                           .map((a) => (
                             <div key={a.id} className="text-xs">
-                              {ROLE_LABELS[a.role as Role]} — {a.unitName}
+                              <span className="font-medium">{ROLE_LABELS[a.role as Role]}</span>
+                              <span className="text-muted-foreground"> — {a.unitName}</span>
                               {!a.cycle.isActive && (
                                 <Badge variant="outline" className="text-xs py-0 ms-1">לא פעיל</Badge>
                               )}
@@ -241,7 +242,8 @@ export function CommanderUsersPanel({
                     <tr key={inv.id} className="hover:bg-muted/20">
                       <td className="px-3 py-2" dir="ltr">{inv.email}</td>
                       <td className="px-3 py-2 hidden sm:table-cell">
-                        {inv.roleLabel} — {inv.unitName}
+                        <span className="font-medium">{inv.roleLabel}</span>
+                        <span className="text-muted-foreground"> — {inv.unitName}</span>
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1 justify-end">

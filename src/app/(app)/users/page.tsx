@@ -115,14 +115,19 @@ export default async function UsersPage() {
     },
   });
 
-  // Build unit name lookup
-  const [companies, platoons, squads] = await Promise.all([
-    prisma.company.findMany({ where: { id: { in: uniqueSubUnitIds } }, select: { id: true, name: true } }),
-    prisma.platoon.findMany({ where: { id: { in: uniqueSubUnitIds } }, select: { id: true, name: true } }),
-    prisma.squad.findMany({ where: { id: { in: uniqueSubUnitIds } }, select: { id: true, name: true } }),
-  ]);
+  // Build full-path unit name map from structureByCycle: "פלוגה א / כיתה א" etc.
   const unitMap = new Map<string, string>();
-  for (const u of [...companies, ...platoons, ...squads]) unitMap.set(u.id, u.name);
+  for (const cos of Object.values(structureByCycle)) {
+    for (const co of cos) {
+      unitMap.set(co.id, co.name);
+      for (const pl of co.platoons) {
+        unitMap.set(pl.id, `${co.name} / ${pl.name}`);
+        for (const sq of pl.squads) {
+          unitMap.set(sq.id, `${co.name} / ${pl.name} / ${sq.name}`);
+        }
+      }
+    }
+  }
 
   // Group by user
   const userMap = new Map<

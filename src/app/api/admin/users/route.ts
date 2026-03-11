@@ -29,15 +29,29 @@ export async function GET() {
     orderBy: [{ familyName: "asc" }, { givenName: "asc" }],
   });
 
-  // Build unit name lookup across all unit types
-  const [allCompanies, allPlatoons, allSquads] = await Promise.all([
-    prisma.company.findMany({ select: { id: true, name: true } }),
-    prisma.platoon.findMany({ select: { id: true, name: true } }),
-    prisma.squad.findMany({ select: { id: true, name: true } }),
-  ]);
+  // Build full-path unit name lookup: "פלוגה א / כיתה א" etc.
+  const allCompanies = await prisma.company.findMany({
+    select: {
+      id: true,
+      name: true,
+      platoons: {
+        select: {
+          id: true,
+          name: true,
+          squads: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
   const unitMap = new Map<string, string>();
-  for (const u of [...allCompanies, ...allPlatoons, ...allSquads]) {
-    unitMap.set(u.id, u.name);
+  for (const co of allCompanies) {
+    unitMap.set(co.id, co.name);
+    for (const pl of co.platoons) {
+      unitMap.set(pl.id, `${co.name} / ${pl.name}`);
+      for (const sq of pl.squads) {
+        unitMap.set(sq.id, `${co.name} / ${pl.name} / ${sq.name}`);
+      }
+    }
   }
 
   return NextResponse.json(
