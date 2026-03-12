@@ -72,20 +72,23 @@ In addition, there should be a way to reach a user profile (perhaps clicking on 
 ## Home/Dashboard
 The dashboard is personalized and shows appropriate data for each user role. The user's rank and name are displayed, along with their role for the selected cycle. 
 
-A squad summary is shown for each squad in the user's hierarchy. Tapping the activities section brings the user to the activities tab. Tapping the gaps section brings the user to the activity report in view mode filtered on gaps (missing reports or failed) for the selected squad.
+A squad summary is shown for each squad in the user's hierarchy. It has three sections:
+* _Soldiers_: Total and with gaps. Tapping total bring the user to the soldiers screen. Tapping with gaps brings the user to the Soldiers screen filtered on Gaps.
+* _Activities_: Reported activities shows the number of activities for which all reports have been provided (even if there are failures. Tapping bring the user to the activities screen. Missing reports shows *required* activities for which reports are missing. Tapping brings the user to the activities screen filtered on gaps.
+* _Gaps_: 3 activities with the highest number of gaps. Clicking the activity brings the user to the activity detail screen filtered on gaps.
 
-_Gaps_ are defined as any *required* activity for which a soldier has either not completed (missing activity report record) or has failed.
+*Gaps* are defined as any *required* activity for which a soldier has either not completed (missing activity report record) or has failed.
 
 For example:
 ````
 Squad Overview
 
-Soldiers: 12
+Soldiers: 12 total
+2 with gaps
 
 Activities
-✓ Completed: 34
-⚠ Missing: 6
-✗ Failed: 3
+✓ Reported Completed: 4
+⚠ Missing Reports: 1
 
 Top gaps
 ירי מטווח 2 – 5 missing

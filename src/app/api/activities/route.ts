@@ -46,35 +46,46 @@ export async function GET(request: NextRequest) {
         },
       },
       reports: {
-        select: { result: true },
+        select: { result: true, soldierId: true },
       },
       _count: false,
     },
     orderBy: { date: "desc" },
   });
 
-  // For each activity, compute soldier counts
-  // Get unique platoon ids to fetch soldier counts
-  const platoonIdSet = new Set(activities.map((a) => a.platoonId));
+  // For squad_commander: scope to their squad's soldiers only
+  let scopedSoldierIds: Set<string> | null = null;
+  if (scope.role === "squad_commander" && scope.squadId) {
+    const squadSoldiers = await prisma.soldier.findMany({
+      where: { squadId: scope.squadId, status: "active" },
+      select: { id: true },
+    });
+    scopedSoldierIds = new Set(squadSoldiers.map((s) => s.id));
+  }
 
-  // Count active soldiers per platoon
+  // Count active soldiers per platoon (or per squad for squad_commander)
+  const platoonIdSet = new Set(activities.map((a) => a.platoonId));
   const soldierCountsByPlatoon = new Map<string, number>();
   for (const platoonId of platoonIdSet) {
-    const count = await prisma.soldier.count({
-      where: {
-        cycleId,
-        status: "active",
-        squad: { platoonId },
-      },
-    });
-    soldierCountsByPlatoon.set(platoonId, count);
+    if (scopedSoldierIds !== null) {
+      // Squad commander: soldier count is fixed to their squad
+      soldierCountsByPlatoon.set(platoonId, scopedSoldierIds.size);
+    } else {
+      const count = await prisma.soldier.count({
+        where: { cycleId, status: "active", squad: { platoonId } },
+      });
+      soldierCountsByPlatoon.set(platoonId, count);
+    }
   }
 
   const result = activities.map((activity) => {
     const totalSoldiers = soldierCountsByPlatoon.get(activity.platoonId) ?? 0;
-    const passedCount = activity.reports.filter((r) => r.result === "passed").length;
-    const failedCount = activity.reports.filter((r) => r.result === "failed").length;
-    const naCount = activity.reports.filter((r) => r.result === "na").length;
+    const scopedReports = scopedSoldierIds
+      ? activity.reports.filter((r) => scopedSoldierIds!.has(r.soldierId))
+      : activity.reports;
+    const passedCount = scopedReports.filter((r) => r.result === "passed").length;
+    const failedCount = scopedReports.filter((r) => r.result === "failed").length;
+    const naCount = scopedReports.filter((r) => r.result === "na").length;
     const missingCount = Math.max(0, totalSoldiers - passedCount - failedCount - naCount);
 
     return {

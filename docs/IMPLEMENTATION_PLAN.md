@@ -988,14 +988,14 @@ tironet/
 **Deliverable:** Dashboard provides the "at-a-glance" view described in the PRD.
 
 **Validation checklist:**
-- [ ] Squad commander: dashboard shows exactly one squad summary card
-- [ ] Platoon commander: dashboard shows one card per squad plus a platoon-level aggregate row
+- [x] Squad commander: dashboard shows exactly one squad summary card
+- [x] Platoon commander: dashboard shows one card per squad plus a platoon-level aggregate row
 - [ ] Company commander: cards grouped by platoon; platoon aggregate visible; squads expandable
-- [ ] Each card shows correct soldier count, completed/missing/failed activity counts
-- [ ] Tapping/clicking the "missing" or "failed" count navigates to `/activities` with the correct squad filter pre-applied
-- [ ] Top gaps list shows up to 3 activities with the highest gap count; tapping one navigates to `/activities/[id]`
-- [ ] User context header shows: rank + given name, current cycle name, role label (מ״כ / מ״מ / מ״פ)
-- [ ] Add a new activity report and return to dashboard — counts update to reflect the change
+- [x] Each card shows correct soldier count, completed/missing/failed activity counts
+- [x] Tapping/clicking the "missing" or "failed" count navigates to `/activities` with the correct squad filter pre-applied
+- [x] Top gaps list shows up to 3 activities with the highest gap count; tapping one navigates to `/activities/[id]`
+- [x] User context header shows: rank + given name, current cycle name, role label (מ״כ / מ״מ / מ״פ)
+- [x] Add a new activity report and return to dashboard — counts update to reflect the change
 
 ---
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronDown } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
@@ -52,10 +52,16 @@ const SORT_LABELS: Record<SortMode, string> = {
 export default function ActivitiesPage() {
   const { selectedCycleId, selectedAssignment } = useCycle();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [data, setData] = useState<ActivitiesResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<FilterPill>("all");
+  const initialFilter = (searchParams.get("filter") as FilterPill | null) ?? "all";
+  const [filter, setFilter] = useState<FilterPill>(
+    (["all", "week", "gaps", "draft"] as FilterPill[]).includes(initialFilter)
+      ? initialFilter
+      : "all"
+  );
   const [sortMode, setSortMode] = useState<SortMode>("date-desc");
   const [sortOpen, setSortOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);

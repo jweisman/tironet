@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, AlertCircle, FileUp } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
 import { SoldierCard, type SoldierSummary } from "@/components/soldiers/SoldierCard";
@@ -61,12 +61,15 @@ const STATUS_FILTERS: StatusFilter[] = [
 export default function SoldiersPage() {
   const { selectedCycleId } = useCycle();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [data, setData] = useState<SoldiersResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [showGapsOnly, setShowGapsOnly] = useState(false);
+  const [showGapsOnly, setShowGapsOnly] = useState(
+    searchParams.get("filter") === "gaps"
+  );
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 

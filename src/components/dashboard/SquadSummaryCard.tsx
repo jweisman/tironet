@@ -1,0 +1,128 @@
+"use client";
+
+import { ChevronLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+import type { SquadSummary } from "@/app/api/dashboard/route";
+
+interface Props {
+  squad: SquadSummary;
+}
+
+function StatButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center justify-between -mx-1 px-1 py-0.5 rounded-md hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer group"
+    >
+      <div className="flex items-baseline gap-1.5">{children}</div>
+      <ChevronLeft
+        size={12}
+        className="shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors"
+      />
+    </button>
+  );
+}
+
+export function SquadSummaryCard({ squad }: Props) {
+  const router = useRouter();
+  const hasGaps = squad.soldiersWithGaps > 0 || squad.missingReportActivities > 0;
+
+  return (
+    <div
+      className={`rounded-xl border bg-card overflow-hidden ${
+        hasGaps ? "border-amber-200" : "border-border"
+      }`}
+    >
+      {/* Header */}
+      <div
+        className={`px-4 py-3 border-b border-border ${
+          hasGaps ? "bg-amber-50/50 dark:bg-amber-950/20" : "bg-muted/30"
+        }`}
+      >
+        <h3 className="font-semibold text-sm">{squad.squadName}</h3>
+        {squad.commanders.length > 0 && (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {squad.commanders.join(", ")}
+          </p>
+        )}
+      </div>
+
+      {/* Stats — 2 columns */}
+      <div className="grid grid-cols-2 divide-x divide-border border-b border-border rtl:divide-x-reverse">
+        {/* Soldiers */}
+        <div className="px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold text-muted-foreground mb-1.5">חיילים</p>
+          <StatButton onClick={() => router.push("/soldiers")}>
+            <span className="text-xl font-bold">{squad.soldierCount}</span>
+            <span className="text-xs text-muted-foreground">סה״כ</span>
+          </StatButton>
+          {squad.soldiersWithGaps > 0 ? (
+            <StatButton onClick={() => router.push("/soldiers?filter=gaps")}>
+              <span className="text-base font-bold text-amber-600">
+                {squad.soldiersWithGaps}
+              </span>
+              <span className="text-xs text-muted-foreground">עם פערים</span>
+            </StatButton>
+          ) : (
+            <p className="text-xs text-green-600 font-medium py-0.5">ללא פערים</p>
+          )}
+        </div>
+
+        {/* Activities */}
+        <div className="px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold text-muted-foreground mb-1.5">פעילויות</p>
+          <StatButton onClick={() => router.push("/activities")}>
+            <span className="text-xl font-bold text-green-600">
+              {squad.reportedActivities}
+            </span>
+            <span className="text-xs text-muted-foreground">דווחו</span>
+          </StatButton>
+          {squad.missingReportActivities > 0 ? (
+            <StatButton onClick={() => router.push("/activities?filter=gaps")}>
+              <span className="text-base font-bold text-amber-600">
+                {squad.missingReportActivities}
+              </span>
+              <span className="text-xs text-muted-foreground">חסרות דיווח</span>
+            </StatButton>
+          ) : (
+            <p className="text-xs text-green-600 font-medium py-0.5">הכל דווח</p>
+          )}
+        </div>
+      </div>
+
+      {/* Top gap activities */}
+      {squad.topGapActivities.length > 0 && (
+        <div>
+          <p className="px-4 pt-2.5 pb-1 text-xs font-semibold text-muted-foreground">
+            פערים
+          </p>
+          <div className="divide-y divide-border/60">
+            {squad.topGapActivities.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => router.push(`/activities/${a.id}?gaps=1`)}
+                className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 active:bg-muted transition-colors cursor-pointer text-start"
+              >
+                <span className="text-sm truncate flex-1">{a.name}</span>
+                <div className="flex items-center gap-1.5 shrink-0 ms-3">
+                  <span className="text-xs text-amber-700 font-semibold">
+                    {a.gapCount} פערים
+                  </span>
+                  <ChevronLeft size={12} className="text-muted-foreground/50" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

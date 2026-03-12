@@ -119,6 +119,7 @@ export async function GET(req: NextRequest) {
       cycleId,
       platoonId: { in: platoonIds },
       status: "active",
+      isRequired: true,
     },
     select: {
       id: true,
