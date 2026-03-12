@@ -32,7 +32,7 @@ For example:
 
 When users are invited they are associated with a cycle and their level in the hierarchy. I.e. a מ״כ is invited to כיתה 2 of מחלקה 1 in פלוגה בולדוג for אוג 2025. 
 
-An invitation email is sent to the user which includes the role and association. When the user clicks the link in the email, they are taken to the site where they can log in (via Google and Magic Link in Phase 1). After authentication, they enter the application with the appropriate permissions.
+Once the invitation record is created, the admin or commander can choose to send the invitation link via email or to copy the invitation link to be sent manually. When the user clicks the link, they are taken to the site where they can log in (via Google, Magic Link, and OTP via SMS in Phase 1). After authentication, they enter the application with the appropriate permissions.
 
 Users can be associated with multiple cycles, and in each cycle they can have a different role / association. I.e. דן was a מ״כ for כיתה 2 in מרץ 25 and a מ״מ for מחלקה 1 in אוג 25.
 
@@ -49,6 +49,7 @@ User records contain the following properties:
 * Type (user or admin)
 * Profile picture (upload image or take picture on mobile, ability to zoom/pan/crop image)
 * Email (used to log in via Google or Magic Link)
+* Phone (used for OTP login), Israeli format (i.e. 05x-xxx-xxxx)
 * Cycles
   * Cycle
   * Role (company, platoon, or squad commander)
@@ -207,5 +208,6 @@ Only the latest result is saved (i.e. if a test was failed and then passed, only
   * Next.js and TS for website (NextAuth for authentication)
   * Postgres for DB (hosted service for production)
   * SMTP for email sending
+  * Twilio Verify for OTP via SMS authentication flow
 * Pages load in < 2 seconds
 * Site should be built to be cloud deployed (sensitive data in environment, etc.)

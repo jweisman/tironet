@@ -95,7 +95,7 @@ export async function GET() {
       unitId: true,
       cycleId: true,
       user: {
-        select: { id: true, givenName: true, familyName: true, rank: true, email: true, isAdmin: true },
+        select: { id: true, givenName: true, familyName: true, rank: true, email: true, phone: true, isAdmin: true },
       },
       cycle: { select: { name: true, isActive: true } },
     },
@@ -124,6 +124,7 @@ export async function GET() {
       familyName: string;
       rank: string | null;
       email: string;
+      phone: string | null;
       isAdmin: boolean;
       cycleAssignments: {
         id: string;
@@ -165,11 +166,13 @@ export async function GET() {
   const annotatedInvitations = invitations.map((inv) => ({
     id: inv.id,
     email: inv.email,
+    phone: inv.phone,
     role: inv.role,
     roleLabel: ROLE_LABELS[inv.role as Role],
     unitName: unitMap.get(inv.unitId) ?? "",
     cycleName: inv.cycle.name,
     expiresAt: inv.expiresAt.toISOString(),
+    token: inv.token,
   }));
 
   const cycles = Object.entries(cycleMap).map(([id, name]) => ({ id, name }));

@@ -12,6 +12,7 @@ export async function GET() {
       givenName: true,
       familyName: true,
       email: true,
+      phone: true,
       rank: true,
       isAdmin: true,
       profileImage: true,

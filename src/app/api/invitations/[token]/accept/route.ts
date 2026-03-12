@@ -24,8 +24,21 @@ export async function POST(
   if (invitation.expiresAt < new Date()) {
     return NextResponse.json({ error: "expired" }, { status: 410 });
   }
-  if (invitation.email.toLowerCase() !== (session.user.email ?? "").toLowerCase()) {
-    return NextResponse.json({ error: "email_mismatch" }, { status: 403 });
+
+  // Verify the session user matches the invitation contact
+  if (invitation.email) {
+    if (invitation.email.toLowerCase() !== (session.user.email ?? "").toLowerCase()) {
+      return NextResponse.json({ error: "email_mismatch" }, { status: 403 });
+    }
+  } else if (invitation.phone) {
+    // Phone-only invitation: verify the logged-in user owns this phone
+    const userWithPhone = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { phone: true },
+    });
+    if (userWithPhone?.phone !== invitation.phone) {
+      return NextResponse.json({ error: "phone_mismatch" }, { status: 403 });
+    }
   }
 
   // Build profile update from invitation fields (only overwrite non-empty values)
@@ -34,6 +47,7 @@ export async function POST(
   if (invitation.familyName) profileUpdate.familyName = invitation.familyName;
   if (invitation.rank !== undefined) profileUpdate.rank = invitation.rank;
   if (invitation.profileImage !== undefined) profileUpdate.profileImage = invitation.profileImage;
+  if (invitation.phone) profileUpdate.phone = invitation.phone;
 
   await prisma.$transaction([
     prisma.userCycleAssignment.create({

@@ -9,6 +9,7 @@ declare module "next-auth" {
       familyName: string;
       rank?: string | null;
       isAdmin: boolean;
+      phone?: string | null;
       profileImageVersion?: string;
       cycleAssignments: CycleAssignment[];
     } & DefaultSession["user"];

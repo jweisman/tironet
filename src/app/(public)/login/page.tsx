@@ -8,14 +8,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { toE164 } from "@/lib/phone";
+
+type WhatsAppStep = "idle" | "phone" | "code" | "sent";
 
 function LoginForm() {
   const t = useTranslations("auth");
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/home";
+
+  // Magic link state
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+
+  // WhatsApp OTP state
+  const [waStep, setWaStep] = useState<WhatsAppStep>("idle");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [waSending, setWaSending] = useState(false);
+  const [waVerifying, setWaVerifying] = useState(false);
+  const [waError, setWaError] = useState<string | null>(null);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,6 +37,60 @@ function LoginForm() {
     await signIn("nodemailer", { email, callbackUrl, redirect: false });
     setSent(true);
     setSending(false);
+  }
+
+  async function handlePhoneSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setWaError(null);
+    const e164 = toE164(phone);
+    if (!e164) {
+      setWaError("מספר טלפון לא תקין. הזן מספר ישראלי (לדוגמה: 050-123-4567)");
+      return;
+    }
+    setWaSending(true);
+    try {
+      const res = await fetch("/api/auth/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: e164 }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setWaError(data.error ?? "שגיאה בשליחת הקוד");
+        return;
+      }
+      setPhone(e164); // store in E.164 for verification
+      setWaStep("sent");
+    } catch {
+      setWaError("שגיאה בשליחת הקוד");
+    } finally {
+      setWaSending(false);
+    }
+  }
+
+  async function handleCodeSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setWaError(null);
+    if (!code.trim()) return;
+    setWaVerifying(true);
+    try {
+      const result = await signIn("whatsapp-otp", {
+        phone,
+        code: code.trim(),
+        callbackUrl,
+        redirect: false,
+      });
+      if (result?.error) {
+        setWaError("קוד שגוי או שפג תוקפו. נסה שנית.");
+        setCode("");
+      } else {
+        window.location.href = callbackUrl;
+      }
+    } catch {
+      setWaError("שגיאה באימות. נסה שנית.");
+    } finally {
+      setWaVerifying(false);
+    }
   }
 
   return (
@@ -74,6 +141,92 @@ function LoginForm() {
                 {sending ? "שולח..." : t("sendMagicLink")}
               </Button>
             </form>
+
+            <div className="flex items-center gap-3">
+              <Separator className="flex-1" />
+              <span className="text-sm text-muted-foreground">או</span>
+              <Separator className="flex-1" />
+            </div>
+
+            {/* WhatsApp OTP */}
+            {waStep === "idle" && (
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => { setWaStep("phone"); setWaError(null); }}
+              >
+                כניסה עם קוד SMS
+              </Button>
+            )}
+
+            {waStep === "phone" && (
+              <form onSubmit={handlePhoneSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="wa-phone">מספר טלפון</Label>
+                  <Input
+                    id="wa-phone"
+                    type="tel"
+                    placeholder="050-123-4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                    dir="ltr"
+                    autoFocus
+                  />
+                </div>
+                {waError && <p className="text-sm text-destructive">{waError}</p>}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => { setWaStep("idle"); setPhone(""); setWaError(null); }}
+                  >
+                    ביטול
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={waSending}>
+                    {waSending ? "שולח..." : "שלח קוד"}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {waStep === "sent" && (
+              <form onSubmit={handleCodeSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="wa-code">קוד SMS</Label>
+                  <p className="text-sm text-muted-foreground">
+                    קוד אימות נשלח ב-SMS לטלפון שלך
+                  </p>
+                  <Input
+                    id="wa-code"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="123456"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    required
+                    dir="ltr"
+                    autoFocus
+                  />
+                </div>
+                {waError && <p className="text-sm text-destructive">{waError}</p>}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => { setWaStep("phone"); setCode(""); setWaError(null); }}
+                  >
+                    חזרה
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={waVerifying}>
+                    {waVerifying ? "מאמת..." : "כניסה"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         )}
       </div>

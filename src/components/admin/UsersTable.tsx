@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, Trash2, Plus, RefreshCw, Send, Pencil } from "lucide-react";
+import { UserPlus, Trash2, Plus, RefreshCw, Send, Pencil, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,6 +26,7 @@ import { InviteUserForm } from "./InviteUserForm";
 import { AssignUserForm } from "./AssignUserForm";
 import { EditUserForm } from "./EditUserForm";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { toIsraeliDisplay } from "@/lib/phone";
 import type { Role } from "@/types";
 
 type Assignment = {
@@ -43,6 +44,7 @@ type User = {
   givenName: string;
   familyName: string;
   email: string;
+  phone: string | null;
   rank: string | null;
   isAdmin: boolean;
   cycleAssignments: Assignment[];
@@ -50,12 +52,14 @@ type User = {
 
 type Invitation = {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   role: string;
   roleLabel: string;
   unitName: string;
   cycleName: string;
   expiresAt: string;
+  token: string;
 };
 
 type Squad = { id: string; name: string };
@@ -82,9 +86,13 @@ export function UsersTable({
   const [invitations, setInvitations] = useState(initialInvitations);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [assigningUserId, setAssigningUserId] = useState<string | null>(null);
-  const [resending, setResending] = useState<string | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Per-invitation action states
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
+  const [sentEmailId, setSentEmailId] = useState<string | null>(null);
 
   async function reloadUsers() {
     const res = await fetch("/api/admin/users");
@@ -121,10 +129,40 @@ export function UsersTable({
     await reloadInvitations();
   }
 
-  async function resendInvitation(id: string) {
-    setResending(id);
-    await fetch(`/api/admin/invitations/${id}`, { method: "POST" });
-    setResending(null);
+  async function copyInviteLink(inv: Invitation) {
+    setCopyingId(inv.id);
+    try {
+      // Refresh token to get a fresh link
+      const res = await fetch(`/api/admin/invitations/${inv.id}`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        await navigator.clipboard.writeText(data.inviteUrl);
+        // Update local token so subsequent copy uses the fresh one
+        setInvitations((prev) =>
+          prev.map((i) => (i.id === inv.id ? { ...i, token: data.token } : i))
+        );
+      }
+    } finally {
+      setCopyingId(null);
+    }
+    setCopiedId(inv.id);
+    setTimeout(() => setCopiedId(null), 2500);
+  }
+
+  async function resendEmail(inv: Invitation) {
+    if (!inv.email) return;
+    setSendingEmailId(inv.id);
+    try {
+      await fetch("/api/invitations/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId: inv.id }),
+      });
+      setSentEmailId(inv.id);
+      setTimeout(() => setSentEmailId(null), 2500);
+    } finally {
+      setSendingEmailId(null);
+    }
   }
 
   const assigningUser = users.find((u) => u.id === assigningUserId) ?? null;
@@ -314,16 +352,23 @@ export function UsersTable({
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-start px-3 py-2 font-medium">אימייל</th>
+                  <th className="text-start px-3 py-2 font-medium">אימייל / טלפון</th>
                   <th className="text-start px-3 py-2 font-medium hidden sm:table-cell">תפקיד / יחידה</th>
                   <th className="text-start px-3 py-2 font-medium hidden sm:table-cell">מחזור</th>
-                  <th className="px-3 py-2 w-24" />
+                  <th className="px-3 py-2 w-28" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {invitations.map((inv) => (
                   <tr key={inv.id} className="hover:bg-muted/20">
-                    <td className="px-3 py-2" dir="ltr">{inv.email}</td>
+                    <td className="px-3 py-2" dir="ltr">
+                      {inv.email && <div>{inv.email}</div>}
+                      {inv.phone && (
+                        <div className="text-muted-foreground">
+                          {toIsraeliDisplay(inv.phone)}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-2 hidden sm:table-cell">
                       <span className="font-medium">{inv.roleLabel}</span>
                       <span className="text-muted-foreground"> — {inv.unitName}</span>
@@ -333,20 +378,45 @@ export function UsersTable({
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1 justify-end">
+                        {/* Copy invite link */}
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7"
-                          title="שלח שוב"
-                          disabled={resending === inv.id}
-                          onClick={() => resendInvitation(inv.id)}
+                          title="העתק קישור הזמנה"
+                          disabled={copyingId === inv.id}
+                          onClick={() => copyInviteLink(inv)}
                         >
-                          {resending === inv.id ? (
+                          {copiedId === inv.id ? (
+                            <Check className="w-3.5 h-3.5 text-green-600" />
+                          ) : copyingId === inv.id ? (
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                           ) : (
-                            <Send className="w-3.5 h-3.5" />
+                            <Copy className="w-3.5 h-3.5" />
                           )}
                         </Button>
+
+                        {/* Send / resend email — only shown when invitation has email */}
+                        {inv.email && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="שלח הזמנה במייל"
+                            disabled={sendingEmailId === inv.id}
+                            onClick={() => resendEmail(inv)}
+                          >
+                            {sentEmailId === inv.id ? (
+                              <Check className="w-3.5 h-3.5 text-green-600" />
+                            ) : sendingEmailId === inv.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Send className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Cancel invitation */}
                         <AlertDialog>
                           <AlertDialogTrigger
                             render={
@@ -363,7 +433,8 @@ export function UsersTable({
                             <AlertDialogHeader>
                               <AlertDialogTitle>ביטול הזמנה</AlertDialogTitle>
                               <AlertDialogDescription>
-                                האם אתה בטוח שברצונך לבטל את ההזמנה ל-{inv.email}?
+                                האם אתה בטוח שברצונך לבטל את ההזמנה
+                                {inv.email ? ` ל-${inv.email}` : inv.phone ? ` ל-${toIsraeliDisplay(inv.phone)}` : ""}?
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -400,7 +471,7 @@ export function UsersTable({
           </DialogHeader>
           {editingUser && (
             <EditUserForm
-              user={editingUser}
+              user={{ ...editingUser, phone: editingUser.phone ?? null }}
               onSuccess={async () => {
                 setEditingUserId(null);
                 await reloadUsers();

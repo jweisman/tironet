@@ -27,6 +27,7 @@ export async function GET() {
     invitations.map((inv) => ({
       id: inv.id,
       email: inv.email,
+      phone: inv.phone,
       role: inv.role,
       roleLabel: ROLE_LABELS[inv.role as Role],
       unitName: unitMap.get(inv.unitId) ?? "",

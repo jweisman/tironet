@@ -2,8 +2,10 @@ import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import Google from "next-auth/providers/google";
 import Nodemailer from "next-auth/providers/nodemailer";
+import Credentials from "next-auth/providers/credentials";
 import type { Adapter, AdapterUser, AdapterAccount } from "next-auth/adapters";
 import { prisma } from "@/lib/db/prisma";
+import { verifyWhatsAppOtp } from "@/lib/twilio";
 import type { CycleAssignment } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -122,6 +124,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       server: process.env.EMAIL_SERVER,
       from: process.env.FROM_EMAIL ?? "Tironet <noreply@localhost>",
     }),
+    Credentials({
+      id: "whatsapp-otp",
+      name: "WhatsApp OTP",
+      credentials: {
+        phone: { label: "Phone", type: "text" },
+        code: { label: "Code", type: "text" },
+      },
+      async authorize(credentials) {
+        const phone = credentials?.phone as string | undefined;
+        const code = credentials?.code as string | undefined;
+        if (!phone || !code) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { phone },
+          select: { id: true, email: true, givenName: true, familyName: true },
+        });
+        if (!user) return null;
+
+        let approved = false;
+        try {
+          approved = await verifyWhatsAppOtp(phone, code);
+        } catch {
+          return null;
+        }
+        if (!approved) return null;
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: `${user.givenName} ${user.familyName}`.trim(),
+        };
+      },
+    }),
   ],
 
   pages: {
@@ -151,6 +186,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.familyName = dbUser.familyName;
           token.rank = dbUser.rank;
           token.isAdmin = dbUser.isAdmin;
+          token.phone = dbUser.phone;
           token.profileImageVersion = dbUser.updatedAt.toISOString();
           token.cycleAssignments = dbUser.cycleAssignments.map(
             (a: {
@@ -218,6 +254,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.familyName = token.familyName as string;
       session.user.rank = token.rank as string | null;
       session.user.isAdmin = (token.isAdmin as boolean) ?? false;
+      session.user.phone = (token.phone as string | null | undefined) ?? null;
       session.user.profileImageVersion = token.profileImageVersion as string | undefined;
       session.user.cycleAssignments =
         (token.cycleAssignments as CycleAssignment[]) ?? [];

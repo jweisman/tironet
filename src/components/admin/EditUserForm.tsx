@@ -14,6 +14,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { RANKS } from "@/lib/auth/permissions";
+import { toIsraeliDisplay } from "@/lib/phone";
 
 type User = {
   id: string;
@@ -21,6 +22,7 @@ type User = {
   familyName: string;
   rank: string | null;
   isAdmin: boolean;
+  phone: string | null;
 };
 
 type Props = {
@@ -34,6 +36,9 @@ export function EditUserForm({ user, onSuccess, onCancel }: Props) {
   const [familyName, setFamilyName] = useState(user.familyName);
   const [rank, setRank] = useState(user.rank ?? "");
   const [isAdmin, setIsAdmin] = useState(user.isAdmin);
+  const [phone, setPhone] = useState(
+    user.phone ? toIsraeliDisplay(user.phone) : ""
+  );
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null | undefined>(undefined);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -48,7 +53,7 @@ export function EditUserForm({ user, onSuccess, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!givenName.trim() || !familyName.trim()) return;
     setLoading(true);
@@ -59,6 +64,7 @@ export function EditUserForm({ user, onSuccess, onCancel }: Props) {
         familyName: familyName.trim(),
         rank: rank.trim() || null,
         isAdmin,
+        phone: phone.trim() || null,
       };
       if (imageBase64 !== undefined) {
         body.profileImage = imageBase64;
@@ -118,6 +124,18 @@ export function EditUserForm({ user, onSuccess, onCancel }: Props) {
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="edit-phone">טלפון (SMS)</Label>
+        <Input
+          id="edit-phone"
+          type="tel"
+          placeholder="050-123-4567"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          dir="ltr"
+        />
       </div>
 
       <div className="flex items-center justify-between">

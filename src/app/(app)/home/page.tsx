@@ -82,7 +82,7 @@ export default function HomePage() {
 
   const user = session?.user;
   const role = dashData?.role ?? selectedAssignment?.role ?? (isAdmin ? "admin" : null);
-  const cycleName = selectedAssignment?.cycleName ?? activeCycles[0]?.name ?? "";
+  const cycleName = selectedAssignment?.cycleName ?? activeCycles[0]?.cycleName ?? "";
 
   // Group squads by platoon for company/admin view
   const squads = dashData?.squads ?? [];

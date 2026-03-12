@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/api/admin-guard";
 import { auth } from "@/lib/auth/auth";
+import { toE164 } from "@/lib/phone";
 
 const schema = z.object({
   givenName: z.string().min(1).optional(),
@@ -10,6 +11,7 @@ const schema = z.object({
   rank: z.string().nullable().optional(),
   isAdmin: z.boolean().optional(),
   profileImage: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
 });
 
 export async function GET(
@@ -41,7 +43,36 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  await prisma.user.update({ where: { id }, data: parsed.data });
+  const { phone: rawPhone, ...rest } = parsed.data;
+
+  // Normalize phone to E.164 if provided
+  const update: Record<string, unknown> = { ...rest };
+  if (rawPhone !== undefined) {
+    if (rawPhone === null || rawPhone === "") {
+      update.phone = null;
+    } else {
+      const e164 = toE164(rawPhone);
+      if (!e164) {
+        return NextResponse.json({ error: "מספר טלפון לא תקין" }, { status: 400 });
+      }
+      update.phone = e164;
+    }
+  }
+
+  try {
+    await prisma.user.update({ where: { id }, data: update });
+  } catch (err: unknown) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code: string }).code === "P2002"
+    ) {
+      return NextResponse.json({ error: "מספר הטלפון כבר קיים במערכת" }, { status: 409 });
+    }
+    throw err;
+  }
+
   return new NextResponse(null, { status: 204 });
 }
 

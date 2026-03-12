@@ -13,6 +13,7 @@ export default async function UsersPage() {
         givenName: true,
         familyName: true,
         email: true,
+        phone: true,
         rank: true,
         isAdmin: true,
         cycleAssignments: {
@@ -72,11 +73,13 @@ export default async function UsersPage() {
   const annotatedInvitations = invitations.map((inv) => ({
     id: inv.id,
     email: inv.email,
+    phone: inv.phone,
     role: inv.role,
     roleLabel: ROLE_LABELS[inv.role as Role],
     unitName: unitMap.get(inv.unitId) ?? "",
     cycleName: inv.cycle.name,
     expiresAt: inv.expiresAt.toISOString(),
+    token: inv.token,
   }));
 
   const structureByCycle: Record<string, typeof companies> = {};

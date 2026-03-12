@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/layout/UserAvatar";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { toIsraeliDisplay } from "@/lib/phone";
 import type { Role } from "@/types";
 
 export default function ProfilePage() {
@@ -127,6 +128,12 @@ export default function ProfilePage() {
           <Label>אימייל</Label>
           <Input value={session?.user?.email ?? ""} disabled dir="ltr" />
         </div>
+        {session?.user?.phone && (
+          <div className="space-y-1.5">
+            <Label>טלפון</Label>
+            <Input value={toIsraeliDisplay(session.user.phone)} disabled dir="ltr" />
+          </div>
+        )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
         {saved && <p className="text-sm text-green-600">הפרטים נשמרו בהצלחה</p>}

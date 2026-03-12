@@ -29,11 +29,18 @@ type Props = {
   onCancel: () => void;
 };
 
+type CreatedInvitation = {
+  id: string;
+  inviteUrl: string;
+  hasEmail: boolean;
+};
+
 const ALL_ROLES: Role[] = ["company_commander", "platoon_commander", "squad_commander"];
 
 export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSuccess, onCancel }: Props) {
   const roles = allowedRoles ?? ALL_ROLES;
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
   const [rank, setRank] = useState("");
@@ -45,12 +52,15 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
   const [unitId, setUnitId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<CreatedInvitation | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const companies = structureByCycle[cycleId] ?? [];
   const unitType = UNIT_TYPE_FOR_ROLE[role];
 
-  // Derive flat list of selectable units based on role
   const unitOptions: { id: string; name: string }[] = (() => {
     if (unitType === "company") {
       return companies.map((c) => ({ id: c.id, name: c.name }));
@@ -58,7 +68,6 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
     if (unitType === "platoon") {
       return companies.flatMap((c) => c.platoons.map((p) => ({ id: p.id, name: `${c.name} / ${p.name}` })));
     }
-    // squad
     return companies.flatMap((c) =>
       c.platoons.flatMap((p) =>
         p.squads.map((s) => ({ id: s.id, name: `${c.name} / ${p.name} / ${s.name}` }))
@@ -66,9 +75,11 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
     );
   })();
 
-  async function submit(e: React.FormEvent) {
+  const hasContact = email.trim() || phone.trim();
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!email.trim() || !cycleId || !unitId) return;
+    if (!hasContact || !cycleId || !unitId) return;
     setLoading(true);
     setError(null);
     try {
@@ -76,7 +87,8 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: email.trim(),
+          email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
           cycleId,
           role,
           unitType,
@@ -89,15 +101,74 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "שגיאה בשליחת ההזמנה");
+        setError(data.error ?? "שגיאה ביצירת ההזמנה");
         return;
       }
-      onSuccess();
+      const data = await res.json();
+      setCreated({ id: data.id, inviteUrl: data.inviteUrl, hasEmail: !!email.trim() });
     } catch {
-      setError("שגיאה בשליחת ההזמנה");
+      setError("שגיאה ביצירת ההזמנה");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function copyLink() {
+    if (!created) return;
+    await navigator.clipboard.writeText(created.inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
+
+  async function sendEmail() {
+    if (!created) return;
+    setEmailSending(true);
+    try {
+      await fetch("/api/invitations/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId: created.id }),
+      });
+      setEmailSent(true);
+    } finally {
+      setEmailSending(false);
+    }
+  }
+
+  // Post-creation screen: choose send email or copy link
+  if (created) {
+    return (
+      <div className="space-y-5">
+        <div className="rounded-lg border bg-muted/30 p-4 text-sm space-y-1">
+          <p className="font-medium">ההזמנה נוצרה בהצלחה</p>
+          <p className="text-muted-foreground break-all" dir="ltr">{created.inviteUrl}</p>
+        </div>
+
+        <div className="space-y-2">
+          <Button
+            className="w-full"
+            variant="outline"
+            onClick={copyLink}
+          >
+            {copied ? "הקישור הועתק ✓" : "העתק קישור הזמנה"}
+          </Button>
+
+          {created.hasEmail && (
+            <Button
+              className="w-full"
+              onClick={sendEmail}
+              disabled={emailSending || emailSent}
+            >
+              {emailSent ? "המייל נשלח ✓" : emailSending ? "שולח..." : "שלח הזמנה במייל"}
+            </Button>
+          )}
+        </div>
+
+        <Button variant="ghost" className="w-full" onClick={onSuccess}>
+          סיום
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -110,10 +181,25 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
           placeholder="user@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
           dir="ltr"
         />
       </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="invite-phone">טלפון (לכניסה עם SMS)</Label>
+        <Input
+          id="invite-phone"
+          type="tel"
+          placeholder="050-123-4567"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          dir="ltr"
+        />
+      </div>
+
+      {!hasContact && (
+        <p className="text-xs text-muted-foreground">יש לספק אימייל או מספר טלפון</p>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
@@ -222,8 +308,8 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
           ביטול
         </Button>
-        <Button type="submit" disabled={loading || !email.trim() || !unitId}>
-          {loading ? "שולח..." : "שלח הזמנה"}
+        <Button type="submit" disabled={loading || !hasContact || !unitId}>
+          {loading ? "יוצר..." : "צור הזמנה"}
         </Button>
       </div>
 
