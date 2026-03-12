@@ -19,7 +19,9 @@ export function UserAvatar({ size = 36 }: { size?: number }) {
       .then((r) => r.json())
       .then((data) => setProfileImage(data.profileImage ?? null))
       .catch(() => {});
-  }, [session?.user?.id]);
+  // Re-fetch whenever the user record is updated (profileImageVersion changes on save)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id, session?.user?.profileImageVersion]);
 
   return (
     <Link href="/profile" aria-label="פרופיל משתמש">

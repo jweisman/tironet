@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { ArrowRight, Pencil, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,13 +54,23 @@ function getAvatarColor(name: string): string {
 interface ActivityReport {
   id: string;
   result: string;
+  grade: number | null;
+  note: string | null;
   activity: {
     id: string;
     name: string;
     date: string;
     status: string;
+    isRequired: boolean;
     activityType: { name: string };
   };
+}
+
+interface MissingActivity {
+  id: string;
+  name: string;
+  date: string;
+  activityType: { name: string };
 }
 
 interface SoldierDetail {
@@ -78,6 +89,7 @@ interface SoldierDetail {
     platoon: { id: string; name: string };
   };
   activityReports: ActivityReport[];
+  missingActivities: MissingActivity[];
 }
 
 export default function SoldierDetailPage() {
@@ -126,17 +138,16 @@ export default function SoldierDetailPage() {
   const colorClass = getAvatarColor(soldier.givenName + soldier.familyName);
   const statusVariant = STATUS_VARIANT[soldier.status];
 
-  // Compute gaps: active activities with no report or report.result === 'failed'
-  const gapReports = soldier.activityReports.filter(
-    (r) =>
-      r.activity.status === "active" &&
-      (r.result === "failed")
+  const failedReports = soldier.activityReports.filter(
+    (r) => r.activity.status === "active" && r.activity.isRequired && r.result === "failed"
   );
 
-  // Also need to show activities with no report at all — but we only have reports here.
-  // So gaps = only from reports with result === 'failed' (no-report gaps aren't returned here)
-  // We'll show failed reports as gap activities
-  const gapCount = gapReports.length;
+  const gapCount = failedReports.length + soldier.missingActivities.length;
+
+  function formatDate(dateStr: string) {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
+  }
 
   return (
     <div className="space-y-4">
@@ -220,19 +231,42 @@ export default function SoldierDetailPage() {
             <span>אין חסרים</span>
           </div>
         ) : (
-          <div className="rounded-xl border border-border bg-card divide-y divide-border">
-            {gapReports.map((r) => (
-              <div key={r.id} className="px-4 py-3 space-y-0.5">
-                <p className="text-sm font-medium">{r.activity.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {r.activity.activityType.name} ·{" "}
-                  {new Date(r.activity.date).toLocaleDateString("he-IL", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
+          <div className="rounded-xl border border-amber-200 bg-card divide-y divide-border overflow-hidden">
+            {failedReports.map((r) => (
+              <Link
+                key={r.id}
+                href={`/activities/${r.activity.id}?gaps=1`}
+                className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <p className="text-sm font-medium">{r.activity.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {r.activity.activityType.name} · {formatDate(r.activity.date)}
+                  </p>
+                  {r.grade !== null && (
+                    <p className="text-xs text-muted-foreground">ציון: {r.grade}</p>
+                  )}
+                  {r.note && (
+                    <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
+                  )}
+                </div>
+                <Badge variant="destructive" className="shrink-0 mt-0.5 text-xs">נכשל</Badge>
+              </Link>
+            ))}
+            {soldier.missingActivities.map((a) => (
+              <Link
+                key={a.id}
+                href={`/activities/${a.id}?gaps=1`}
+                className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <p className="text-sm font-medium">{a.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {a.activityType.name} · {formatDate(a.date)}
+                  </p>
+                </div>
+                <Badge variant="outline" className="shrink-0 mt-0.5 text-xs text-amber-700 border-amber-300">חסר</Badge>
+              </Link>
             ))}
           </div>
         )}

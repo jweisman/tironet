@@ -1,0 +1,174 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { getActivityScope } from "@/lib/api/activity-scope";
+import { z } from "zod";
+
+const createSchema = z.object({
+  cycleId: z.string().uuid(),
+  platoonId: z.string().uuid(),
+  activityTypeId: z.string().uuid(),
+  name: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  isRequired: z.boolean().optional().default(true),
+  status: z.enum(["draft", "active"]).optional().default("draft"),
+});
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
+  const cycleId = searchParams.get("cycleId");
+
+  if (!cycleId) {
+    return NextResponse.json({ error: "cycleId is required" }, { status: 400 });
+  }
+
+  const { scope, error, user } = await getActivityScope(cycleId);
+  if (error || !scope || !user) return error!;
+
+  // Build filter
+  const statusFilter =
+    scope.role === "squad_commander"
+      ? { status: "active" as const }
+      : {};
+
+  const activities = await prisma.activity.findMany({
+    where: {
+      cycleId,
+      platoonId: { in: scope.platoonIds },
+      ...statusFilter,
+    },
+    include: {
+      activityType: { select: { id: true, name: true, icon: true } },
+      platoon: {
+        select: {
+          id: true,
+          name: true,
+          company: { select: { name: true } },
+        },
+      },
+      reports: {
+        select: { result: true },
+      },
+      _count: false,
+    },
+    orderBy: { date: "desc" },
+  });
+
+  // For each activity, compute soldier counts
+  // Get unique platoon ids to fetch soldier counts
+  const platoonIdSet = new Set(activities.map((a) => a.platoonId));
+
+  // Count active soldiers per platoon
+  const soldierCountsByPlatoon = new Map<string, number>();
+  for (const platoonId of platoonIdSet) {
+    const count = await prisma.soldier.count({
+      where: {
+        cycleId,
+        status: "active",
+        squad: { platoonId },
+      },
+    });
+    soldierCountsByPlatoon.set(platoonId, count);
+  }
+
+  const result = activities.map((activity) => {
+    const totalSoldiers = soldierCountsByPlatoon.get(activity.platoonId) ?? 0;
+    const passedCount = activity.reports.filter((r) => r.result === "passed").length;
+    const failedCount = activity.reports.filter((r) => r.result === "failed").length;
+    const naCount = activity.reports.filter((r) => r.result === "na").length;
+    const missingCount = Math.max(0, totalSoldiers - passedCount - failedCount - naCount);
+
+    return {
+      id: activity.id,
+      name: activity.name,
+      date: activity.date.toISOString(),
+      status: activity.status,
+      isRequired: activity.isRequired,
+      activityType: activity.activityType,
+      platoon: {
+        id: activity.platoon.id,
+        name: activity.platoon.name,
+        companyName: activity.platoon.company.name,
+      },
+      passedCount,
+      failedCount,
+      naCount,
+      missingCount,
+      totalSoldiers,
+    };
+  });
+
+  return NextResponse.json({
+    role: scope.role,
+    canCreate: scope.canCreate,
+    activities: result,
+  });
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  const parsed = createSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const { cycleId, platoonId, activityTypeId, name, date, isRequired, status } = parsed.data;
+
+  const { scope, error, user } = await getActivityScope(cycleId);
+  if (error || !scope || !user) return error!;
+
+  // Only platoon_commander for their own platoon or admin can create
+  if (!scope.canCreate) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Platoon commander can only create for their own platoon
+  if (scope.role === "platoon_commander" && !scope.platoonIds.includes(platoonId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Verify platoon belongs to this cycle
+  const platoon = await prisma.platoon.findFirst({
+    where: { id: platoonId, company: { cycleId } },
+  });
+  if (!platoon) {
+    return NextResponse.json({ error: "Platoon not found" }, { status: 404 });
+  }
+
+  const activity = await prisma.activity.create({
+    data: {
+      cycleId,
+      platoonId,
+      activityTypeId,
+      name,
+      date: new Date(date),
+      isRequired,
+      status,
+      createdByUserId: user.id,
+    },
+    include: {
+      activityType: { select: { id: true, name: true, icon: true } },
+      platoon: {
+        select: {
+          id: true,
+          name: true,
+          company: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  return NextResponse.json(
+    {
+      activity: {
+        ...activity,
+        date: activity.date.toISOString(),
+        platoon: {
+          id: activity.platoon.id,
+          name: activity.platoon.name,
+          companyName: activity.platoon.company.name,
+        },
+      },
+    },
+    { status: 201 }
+  );
+}

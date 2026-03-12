@@ -883,19 +883,19 @@ tironet/
 - [x] Platoon commander: list is grouped by squad with section headers
 - [ ] Company commander: list is grouped by platoon → squad
 - [x] Search bar: type a Hebrew name → list filters in real time (case-insensitive)
-- [ ] "Show gaps only" toggle: list reduces to soldiers with at least one missing or failed activity report
+- [x] "Show gaps only" toggle: list reduces to soldiers with at least one missing or failed activity report
 - [x] Add soldier (individually): all required fields validated; soldier appears in list after save
-- [ ] Add soldier: squad field hidden for squad commander (defaults to their squad automatically)
-- [ ] Add soldier when active activities exist for the squad → late-joiner dialog appears asking about N/A
-- [ ] Late-joiner: confirm "N/A" → `activity_reports` rows created with `result = na` for all existing active activities; verify in Prisma Studio
+- [x] Add soldier: squad field hidden for squad commander (defaults to their squad automatically)
+- [x] Add soldier when active activities exist for the squad → late-joiner dialog appears asking about N/A
+- [x] Late-joiner: confirm "N/A" → `activity_reports` rows created with `result = na` for all existing active activities; verify in Prisma Studio
 - [ ] Late-joiner: decline → soldier added with no activity reports created
 - [x] Soldier profile page: shows avatar, name, rank, status, squad
-- [ ] Soldier profile: gap summary lists all activities with missing or failed result
+- [x] Soldier profile: gap summary lists all activities with missing or failed result
 - [x] Soldier profile: edit button opens form in edit mode; changes saved correctly
 - [x] Bulk import: "Download Template" → downloads `.xlsx` with correct Hebrew column headers
 - [x] Bulk import: upload filled template → preview table shows rows; invalid rows highlighted with error description
 - [x] Bulk import: confirm → valid soldiers imported; verify count in DB via Prisma Studio
-- [ ] Bulk import: file with no valid rows → helpful error message; nothing imported
+- [x] Bulk import: file with no valid rows → helpful error message; nothing imported
 
 ---
 
@@ -939,19 +939,19 @@ tironet/
 **Deliverable:** Complete activity lifecycle from creation to reporting. 30-second squad update target is achievable with bulk update + exceptions pattern.
 
 **Validation checklist:**
-- [ ] Activity list: sorted by date descending by default
-- [ ] Filters: "השבוע" shows only activities from the last 7 days; "עם פערים" shows only activities with missing/failed reports; "טיוטה" shows only draft activities
-- [ ] Create activity: form is accessible to platoon commander; squad commander does not see the create button
-- [ ] Create activity: submit with all fields → activity appears in list with correct type icon, date, and status badge
-- [ ] Draft activity: NOT visible to squad commanders in the list
-- [ ] Change status draft → active: activity becomes visible to squad commanders
+- [x] Activity list: sorted by date descending by default
+- [x] Filters: "השבוע" shows only activities from the last 7 days; "עם פערים" shows only activities with missing/failed reports; "טיוטה" shows only draft activities
+- [x] Create activity: form is accessible to platoon commander; squad commander does not see the create button
+- [x] Create activity: submit with all fields → activity appears in list with correct type icon, date, and status badge
+- [x] Draft activity: NOT visible to squad commanders in the list
+- [x] Change status draft → active: activity becomes visible to squad commanders
 - [ ] "Notify squad commanders" after creation → emails delivered (check Mailpit in dev); email is in Hebrew with activity name, type, date, and a working link
-- [ ] Activity detail (view mode): table shows all squad soldiers with result icons (✓ passed, ✗ failed, — N/A, blank = missing); gap rows highlighted
-- [ ] Switch to edit mode: bulk "סמן הכל כ: עבר" → only fills soldiers with no existing result; soldiers with existing results unchanged
-- [ ] Edit mode: set individual result, grade, note for a soldier → auto-saved on blur; verify in Prisma Studio without manually saving
-- [ ] Edit mode: change result → row updates immediately (optimistic UI)
-- [ ] Platoon commander: can edit activity metadata (name, date, type, required, status)
-- [ ] Squad commander: cannot edit activity metadata; can only fill reports for their own squad
+- [x] Activity detail (view mode): table shows all squad soldiers with result icons (✓ passed, ✗ failed, — N/A, blank = missing); gap rows highlighted
+- [x] Switch to edit mode: bulk "סמן הכל כ: עבר" → only fills soldiers with no existing result; soldiers with existing results unchanged
+- [x] Edit mode: set individual result, grade, note for a soldier → auto-saved on blur; verify in Prisma Studio without manually saving
+- [x] Edit mode: change result → row updates immediately (optimistic UI)
+- [x] Platoon commander: can edit activity metadata (name, date, type, required, status)
+- [x] Squad commander: cannot edit activity metadata; can only fill reports for their own squad
 - [ ] Activity reports API: `POST /api/activities/[id]/reports/bulk` with `soldierIds` that already have results → existing results untouched; only empty ones filled
 
 ---

@@ -59,12 +59,17 @@ export async function GET(
         },
       },
       activityReports: {
-        include: {
+        select: {
+          id: true,
+          result: true,
+          grade: true,
+          note: true,
           activity: {
             select: {
               id: true,
               name: true,
               date: true,
+              isRequired: true,
               activityType: { select: { name: true } },
               status: true,
             },
@@ -97,7 +102,24 @@ export async function GET(
     }
   }
 
-  return NextResponse.json(soldier);
+  // Active activities in the soldier's platoon with no report (missing gaps)
+  const missingActivities = await prisma.activity.findMany({
+    where: {
+      platoonId: soldier.squad.platoonId,
+      status: "active",
+      isRequired: true,
+      reports: { none: { soldierId: soldier.id } },
+    },
+    select: {
+      id: true,
+      name: true,
+      date: true,
+      activityType: { select: { name: true } },
+    },
+    orderBy: { date: "desc" },
+  });
+
+  return NextResponse.json({ ...soldier, missingActivities });
 }
 
 export async function PATCH(

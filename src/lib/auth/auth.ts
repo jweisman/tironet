@@ -151,6 +151,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.familyName = dbUser.familyName;
           token.rank = dbUser.rank;
           token.isAdmin = dbUser.isAdmin;
+          token.profileImageVersion = dbUser.updatedAt.toISOString();
           token.cycleAssignments = dbUser.cycleAssignments.map(
             (a: {
               cycleId: string;
@@ -175,6 +176,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { id: token.sub },
           select: {
             isAdmin: true,
+            updatedAt: true,
             cycleAssignments: {
               select: {
                 cycleId: true,
@@ -188,6 +190,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
         if (fresh) {
           token.isAdmin = fresh.isAdmin;
+          token.profileImageVersion = fresh.updatedAt.toISOString();
           token.cycleAssignments = fresh.cycleAssignments.map(
             (a: {
               cycleId: string;
@@ -215,6 +218,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.familyName = token.familyName as string;
       session.user.rank = token.rank as string | null;
       session.user.isAdmin = (token.isAdmin as boolean) ?? false;
+      session.user.profileImageVersion = token.profileImageVersion as string | undefined;
       session.user.cycleAssignments =
         (token.cycleAssignments as CycleAssignment[]) ?? [];
       return session;
