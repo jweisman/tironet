@@ -181,6 +181,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
           placeholder="user@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="off"
           dir="ltr"
         />
       </div>
@@ -193,6 +194,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
           placeholder="050-123-4567"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          autoComplete="off"
           dir="ltr"
         />
       </div>

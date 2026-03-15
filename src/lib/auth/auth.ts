@@ -44,7 +44,7 @@ const tironetAdapter: Adapter = {
     return {
       ...user,
       name: `${user.givenName} ${user.familyName}`.trim(),
-      image: user.profileImage,
+      image: null,
       emailVerified: null,
     } as AdapterUser;
   },
@@ -55,7 +55,7 @@ const tironetAdapter: Adapter = {
     return {
       ...user,
       name: `${user.givenName} ${user.familyName}`.trim(),
-      image: user.profileImage,
+      image: null,
       emailVerified: null,
     } as AdapterUser;
   },
@@ -66,7 +66,7 @@ const tironetAdapter: Adapter = {
     return {
       ...user,
       name: `${user.givenName} ${user.familyName}`.trim(),
-      image: user.profileImage,
+      image: null,
       emailVerified: null,
     } as AdapterUser;
   },
@@ -104,7 +104,7 @@ const tironetAdapter: Adapter = {
     return {
       ...user,
       name: `${user.givenName} ${user.familyName}`.trim(),
-      image: user.profileImage,
+      image: null,
       emailVerified: null,
     } as AdapterUser;
   },
@@ -211,6 +211,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const fresh = await prisma.user.findUnique({
           where: { id: token.sub },
           select: {
+            givenName: true,
+            familyName: true,
+            rank: true,
+            phone: true,
             isAdmin: true,
             updatedAt: true,
             cycleAssignments: {
@@ -225,6 +229,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
         });
         if (fresh) {
+          token.givenName = fresh.givenName;
+          token.familyName = fresh.familyName;
+          token.rank = fresh.rank;
+          token.phone = fresh.phone;
           token.isAdmin = fresh.isAdmin;
           token.profileImageVersion = fresh.updatedAt.toISOString();
           token.cycleAssignments = fresh.cycleAssignments.map(

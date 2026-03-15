@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 interface ActivitiesResponse {
   role: string;
   canCreate: boolean;
+  platoonIds: string[];
   activities: ActivitySummary[];
 }
 
@@ -126,9 +127,9 @@ export default function ActivitiesPage() {
 
   // Determine platoon options for create form
   const platoonOptions = useMemo(() => {
-    if (!selectedAssignment) return [];
     if (role === "platoon_commander") {
-      return [{ id: selectedAssignment.unitId, name: "המחלקה שלי" }];
+      const platoonIds = data?.platoonIds ?? [];
+      return platoonIds.map((id) => ({ id, name: "המחלקה שלי" }));
     }
     if (role === "admin") {
       const seen = new Map<string, string>();
@@ -138,7 +139,7 @@ export default function ActivitiesPage() {
       return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
     }
     return [];
-  }, [selectedAssignment, role, allActivities]);
+  }, [data?.platoonIds, role, allActivities]);
 
   function handleCreateSuccess(activityId: string) {
     // We need to know the status of the created activity

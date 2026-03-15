@@ -125,7 +125,7 @@ export default async function InvitePage({
                 ? `כדי לקבל את ההזמנה, יש להתחבר עם מספר הטלפון ${displayPhone}.`
                 : `כדי לקבל את ההזמנה, יש להתחבר עם האימייל ${invitation.email}.`}
             </p>
-            <Button render={<Link href={`/login?callbackUrl=/invite/${token}`} />} className="w-full">
+            <Button render={<Link href={`/login?callbackUrl=/invite/${token}`} />} nativeButton={false} className="w-full">
               התחבר וקבל הזמנה
             </Button>
           </div>
@@ -141,7 +141,7 @@ function InviteError({ message }: { message: string }) {
       <div className="text-center space-y-3">
         <h1 className="text-xl font-bold">טירונט</h1>
         <p className="text-muted-foreground">{message}</p>
-        <Button render={<Link href="/home" />} variant="outline">
+        <Button render={<Link href="/home" />} nativeButton={false} variant="outline">
           חזרה לדף הבית
         </Button>
       </div>

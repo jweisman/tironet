@@ -165,6 +165,8 @@ export async function GET() {
 
   const annotatedInvitations = invitations.map((inv) => ({
     id: inv.id,
+    givenName: inv.givenName,
+    familyName: inv.familyName,
     email: inv.email,
     phone: inv.phone,
     role: inv.role,

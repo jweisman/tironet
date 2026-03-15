@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -165,6 +166,15 @@ export default function ProfilePage() {
           </div>
         </>
       )}
+
+      <Separator className="md:hidden" />
+      <Button
+        variant="outline"
+        className="w-full md:hidden text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+        onClick={() => signOut({ callbackUrl: "/" })}
+      >
+        התנתק
+      </Button>
 
       <ImageCropDialog
         file={pendingFile}

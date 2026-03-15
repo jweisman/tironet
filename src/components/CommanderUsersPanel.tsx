@@ -50,6 +50,8 @@ type User = {
 
 type Invitation = {
   id: string;
+  givenName: string | null;
+  familyName: string | null;
   email: string | null;
   phone: string | null;
   role: string;
@@ -84,7 +86,6 @@ export function CommanderUsersPanel({
   const [invitations, setInvitations] = useState(initialInvitations);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedCycleId, setSelectedCycleId] = useState(cycles[0]?.id ?? "");
-  const [copyingId, setCopyingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const [sentEmailId, setSentEmailId] = useState<string | null>(null);
@@ -104,19 +105,8 @@ export function CommanderUsersPanel({
   }
 
   async function copyInviteLink(inv: Invitation) {
-    setCopyingId(inv.id);
-    try {
-      const res = await fetch(`/api/admin/invitations/${inv.id}`, { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
-        await navigator.clipboard.writeText(data.inviteUrl);
-        setInvitations((prev) =>
-          prev.map((i) => (i.id === inv.id ? { ...i, token: data.token } : i))
-        );
-      }
-    } finally {
-      setCopyingId(null);
-    }
+    const inviteUrl = `${window.location.origin}/invite/${inv.token}`;
+    await navigator.clipboard.writeText(inviteUrl);
     setCopiedId(inv.id);
     setTimeout(() => setCopiedId(null), 2500);
   }
@@ -266,7 +256,8 @@ export function CommanderUsersPanel({
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b">
                   <tr>
-                    <th className="text-start px-3 py-2 font-medium">אימייל / טלפון</th>
+                    <th className="text-start px-3 py-2 font-medium">שם</th>
+                    <th className="text-start px-3 py-2 font-medium hidden sm:table-cell">אימייל / טלפון</th>
                     <th className="text-start px-3 py-2 font-medium hidden sm:table-cell">תפקיד / יחידה</th>
                     <th className="px-3 py-2 w-28" />
                   </tr>
@@ -274,7 +265,13 @@ export function CommanderUsersPanel({
                 <tbody className="divide-y">
                   {visibleInvitations.map((inv) => (
                     <tr key={inv.id} className="hover:bg-muted/20">
-                      <td className="px-3 py-2" dir="ltr">
+                      <td className="px-3 py-2">
+                        {inv.givenName || inv.familyName
+                          ? <div className="font-medium">{[inv.givenName, inv.familyName].filter(Boolean).join(" ")}</div>
+                          : <div className="text-muted-foreground text-xs">—</div>
+                        }
+                      </td>
+                      <td className="px-3 py-2 hidden sm:table-cell" dir="ltr">
                         {inv.email && <div>{inv.email}</div>}
                         {inv.phone && (
                           <div className="text-muted-foreground">{toIsraeliDisplay(inv.phone)}</div>
@@ -292,13 +289,10 @@ export function CommanderUsersPanel({
                             variant="ghost"
                             className="h-7 w-7"
                             title="העתק קישור הזמנה"
-                            disabled={copyingId === inv.id}
                             onClick={() => copyInviteLink(inv)}
                           >
                             {copiedId === inv.id ? (
                               <Check className="w-3.5 h-3.5 text-green-600" />
-                            ) : copyingId === inv.id ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                             ) : (
                               <Copy className="w-3.5 h-3.5" />
                             )}
