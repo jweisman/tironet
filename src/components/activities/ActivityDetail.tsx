@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -87,6 +89,7 @@ function formatDate(isoString: string): string {
 }
 
 export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) {
+  const router = useRouter();
   const [data, setData] = useState<ActivityDetailData>(initialData);
   const [editingReports, setEditingReports] = useState(false);
   const [editingMetadata, setEditingMetadata] = useState(false);
@@ -94,6 +97,9 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [saveError, setSaveError] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showGapsOnly, setShowGapsOnly] = useState(initialGapsOnly);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Local reports state: Map<soldierId, SoldierReport>
   const [reports, setReports] = useState<Map<string, SoldierReport>>(() => {
@@ -320,6 +326,24 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     }
   }
 
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/activities/${data.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setDeleteError(err.error ?? "שגיאה במחיקה");
+        return;
+      }
+      router.push("/activities");
+    } catch {
+      setDeleteError("שגיאה במחיקה");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const isGap = (soldierId: string) => {
     if (!data.isRequired) return false;
     const r = reports.get(soldierId);
@@ -372,20 +396,30 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           <div className="flex-1" />
 
           {data.canEditMetadata && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setMetaName(data.name);
-                setMetaDate(data.date.split("T")[0]);
-                setMetaActivityTypeId(data.activityType.id);
-                setMetaIsRequired(data.isRequired);
-                setMetaStatus(data.status);
-                setEditingMetadata(true);
-              }}
-            >
-              ערוך פרטים
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setMetaName(data.name);
+                  setMetaDate(data.date.split("T")[0]);
+                  setMetaActivityTypeId(data.activityType.id);
+                  setMetaIsRequired(data.isRequired);
+                  setMetaStatus(data.status);
+                  setEditingMetadata(true);
+                }}
+              >
+                ערוך פרטים
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setConfirmDelete(true)}
+              >
+                מחק
+              </Button>
+            </>
           )}
 
           {data.canEditReports && (
@@ -490,6 +524,37 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           );
         })}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>מחיקת פעילות</DialogTitle>
+            <DialogDescription>
+              האם למחוק את הפעילות &quot;{data.name}&quot;? פעולה זו תמחק גם את כל הדיווחים הקשורים אליה ולא ניתן לבטלה.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+            >
+              ביטול
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "מוחק..." : "מחק"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Metadata edit dialog */}
       <Dialog open={editingMetadata} onOpenChange={setEditingMetadata}>
