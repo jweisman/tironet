@@ -3,6 +3,7 @@ import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth/auth";
 import { AppShell } from "@/components/layout/AppShell";
 import { CycleProvider } from "@/contexts/CycleContext";
+import { TironetPowerSyncProvider } from "@/components/providers/PowerSyncProvider";
 
 export default async function AppLayout({
   children,
@@ -18,7 +19,9 @@ export default async function AppLayout({
   return (
     <SessionProvider session={session}>
       <CycleProvider>
-        <AppShell>{children}</AppShell>
+        <TironetPowerSyncProvider>
+          <AppShell>{children}</AppShell>
+        </TironetPowerSyncProvider>
       </CycleProvider>
     </SessionProvider>
   );

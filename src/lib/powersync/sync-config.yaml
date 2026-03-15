@@ -1,0 +1,63 @@
+# PowerSync sync config — Sync Streams (edition 3, recommended for all new apps).
+# auth.parameter('key') reads JWT claims set by /api/powersync/token.
+# Claims: cycle_ids (array), platoon_ids (array), squad_id (string|null)
+# See: https://docs.powersync.com/sync/streams/overview
+
+config:
+  edition: 3
+
+streams:
+  activity_types:
+    auto_subscribe: true
+    query: SELECT id, name, icon, is_active, sort_order FROM activity_types
+
+  cycles:
+    auto_subscribe: true
+    query: >
+      SELECT id, name, is_active, sort_order
+      FROM cycles
+      WHERE id IN auth.parameter('cycle_ids')
+
+  companies:
+    auto_subscribe: true
+    query: >
+      SELECT id, cycle_id, name, sort_order
+      FROM companies
+      WHERE cycle_id IN auth.parameter('cycle_ids')
+
+  soldiers:
+    auto_subscribe: true
+    query: >
+      SELECT id, cycle_id, squad_id, given_name, family_name, rank, status, profile_image
+      FROM soldiers
+      WHERE cycle_id IN auth.parameter('cycle_ids')
+
+  platoons:
+    auto_subscribe: true
+    query: >
+      SELECT id, company_id, name, sort_order
+      FROM platoons
+      WHERE id IN auth.parameter('platoon_ids')
+
+  squads:
+    auto_subscribe: true
+    query: >
+      SELECT id, platoon_id, name, sort_order
+      FROM squads
+      WHERE platoon_id IN auth.parameter('platoon_ids')
+
+  activities:
+    auto_subscribe: true
+    query: >
+      SELECT id, platoon_id, cycle_id, activity_type_id, name, date, is_required, status
+      FROM activities
+      WHERE platoon_id IN auth.parameter('platoon_ids')
+
+  activity_reports:
+    auto_subscribe: true
+    query: |
+      SELECT activity_reports.id, activity_reports.activity_id, activity_reports.soldier_id,
+             activity_reports.result, activity_reports.grade, activity_reports.note
+      FROM activity_reports
+      JOIN activities ON activities.id = activity_reports.activity_id
+      WHERE activities.platoon_id IN auth.parameter('platoon_ids')

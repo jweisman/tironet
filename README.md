@@ -29,6 +29,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 | Drag & drop | dnd-kit |
 | Excel import | xlsx |
 | PWA | @ducanh2912/next-pwa |
+| Offline sync | PowerSync (Sync Streams, self-hosted via Docker) |
 | Deployment | Vercel (production), Docker Compose (local dev) |
 
 ## Local Development
@@ -49,10 +50,13 @@ npm install
 ### 2. Configure environment variables
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env        # Docker Compose reads .env
+cp .env.example .env.local  # Next.js reads .env.local
 ```
 
-Edit `.env.local` and fill in the values (see [Environment Variables](#environment-variables) below).
+Edit both files and fill in the values (see [Environment Variables](#environment-variables) below).
+
+> **Note:** Docker Compose reads `.env` (not `.env.local`). Next.js reads `.env.local`. Keep them in sync for variables shared between the app and the Docker services (e.g. `POWERSYNC_JWT_SECRET`).
 
 ### 3. Start services
 
@@ -61,25 +65,43 @@ docker compose up -d
 ```
 
 This starts:
-- **PostgreSQL** on port `5434` (maps to container port 5432)
+- **PostgreSQL** on port `5434`
+- **MongoDB** on port `27017` (PowerSync storage, runs as a replica set)
+- **PowerSync** on port `8080` (offline sync service)
 - **Mailhog** SMTP on port `1026`, web UI at `http://localhost:8026`
 
-### 4. Run database migrations and seed
+### 4. One-time infrastructure setup
+
+These two commands are required on first run (or after wiping Docker volumes).
+
+**Create the PostgreSQL logical replication publication** (required by PowerSync WAL streaming):
+```bash
+docker compose exec postgres psql -U tironet -d tironet -c "CREATE PUBLICATION powersync FOR ALL TABLES;"
+```
+
+**Initialise the MongoDB replica set** (PowerSync requires a replica set, even single-node):
+```bash
+docker compose exec mongo mongosh --eval "rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]})"
+```
+
+You should see `{ ok: 1 }`. The PowerSync container will automatically connect and begin replication.
+
+### 5. Run database migrations and seed
 
 ```bash
 npm run db:migrate   # run Prisma migrations
 npm run db:seed      # seed activity types and a sample cycle
 ```
 
-### 5. Start the dev server
+### 6. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-App runs at `http://localhost:3001`.
+App runs at `http://localhost:3001` (see `NEXTAUTH_URL` in `.env.example`).
 
-### 6. Create the first admin user
+### 7. Create the first admin user
 
 Sign in with Google or magic link, then run:
 
@@ -91,7 +113,7 @@ npm run make-admin -- --email you@example.com
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start dev server on port 3001 |
+| `npm run dev` | Start dev server on port 3000 |
 | `npm run db:migrate` | Run pending Prisma migrations |
 | `npm run db:seed` | Seed reference data |
 | `npm run db:studio` | Open Prisma Studio at localhost:5555 |
@@ -100,14 +122,19 @@ npm run make-admin -- --email you@example.com
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in:
+Copy `.env.example` to both `.env` (Docker) and `.env.local` (Next.js) and fill in:
 
 ```bash
-# PostgreSQL connection string
+# PostgreSQL — host-accessible URL (used by Next.js / Prisma)
 DATABASE_URL="postgresql://tironet:tironet@127.0.0.1:5434/tironet"
+
+# PostgreSQL — Docker-internal URL (used by PowerSync container)
+# sslmode=disable is required; the local Postgres container does not support SSL
+PS_DATABASE_URL="postgresql://tironet:tironet@postgres:5432/tironet?sslmode=disable"
 
 # NextAuth — generate with: openssl rand -base64 32
 AUTH_SECRET="..."
+NEXTAUTH_URL="http://localhost:3001"
 
 # Google OAuth (https://console.cloud.google.com/apis/credentials)
 AUTH_GOOGLE_ID="..."
@@ -122,6 +149,17 @@ FROM_EMAIL="Tironet <noreply@yourdomain.com>"
 TWILIO_ACCOUNT_SID="..."
 TWILIO_AUTH_TOKEN="..."
 TWILIO_VERIFY_SERVICE_SID="..."
+
+# PowerSync — offline sync service
+POWERSYNC_URL="http://localhost:8080"
+NEXT_PUBLIC_POWERSYNC_URL="http://localhost:8080"
+
+# Shared JWT secret for PowerSync token signing/verification
+# Generate with: openssl rand -base64 32
+POWERSYNC_JWT_SECRET="..."
+# base64url of the raw secret bytes (used in powersync.config.yaml via !env)
+# Derive with: echo -n "$POWERSYNC_JWT_SECRET" | base64 | tr '+/' '-_' | tr -d '='
+POWERSYNC_JWT_SECRET_B64URL="..."
 
 # Public app URL (used in invitation emails)
 NEXT_PUBLIC_APP_URL="http://localhost:3001"
@@ -160,6 +198,7 @@ Set all of the following in your Vercel project settings (Settings → Environme
 |---|---|
 | `DATABASE_URL` | Neon / Supabase connection string (with `?sslmode=require`) |
 | `AUTH_SECRET` | Same secret used locally (or regenerate) |
+| `NEXTAUTH_URL` | `https://yourdomain.com` |
 | `AUTH_GOOGLE_ID` | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
 | `EMAIL_SERVER` | Production SMTP URL |
@@ -167,6 +206,8 @@ Set all of the following in your Vercel project settings (Settings → Environme
 | `TWILIO_ACCOUNT_SID` | Twilio account SID |
 | `TWILIO_AUTH_TOKEN` | Twilio auth token |
 | `TWILIO_VERIFY_SERVICE_SID` | Twilio Verify service SID |
+| `NEXT_PUBLIC_POWERSYNC_URL` | PowerSync Cloud instance URL |
+| `POWERSYNC_JWT_SECRET` | Random secret shared with PowerSync |
 | `NEXT_PUBLIC_APP_URL` | `https://yourdomain.com` |
 
 ### 6. Deploy
@@ -195,7 +236,8 @@ src/
 │   ├── auth/                # NextAuth config & permissions
 │   ├── db/                  # Prisma client
 │   ├── api/                 # Server-side helpers (hierarchy, scoping)
-│   └── email/               # Email templates
+│   ├── email/               # Email templates
+│   └── powersync/           # PowerSync schema, connector, database singleton, sync-config.yaml
 ├── hooks/                   # React hooks
 └── types/                   # TypeScript type definitions
 prisma/

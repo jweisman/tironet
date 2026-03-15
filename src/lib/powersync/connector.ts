@@ -1,0 +1,104 @@
+import {
+  AbstractPowerSyncDatabase,
+  PowerSyncBackendConnector,
+  UpdateType,
+} from "@powersync/web";
+
+interface TokenResponse {
+  token: string;
+  powersync_url: string;
+}
+
+export class TironetConnector implements PowerSyncBackendConnector {
+  private cachedToken: TokenResponse | null = null;
+  private tokenExpiry = 0;
+
+  async fetchCredentials() {
+    // Return cached token if still valid (with 30s buffer)
+    if (this.cachedToken && Date.now() < this.tokenExpiry - 30_000) {
+      return {
+        endpoint: this.cachedToken.powersync_url,
+        token: this.cachedToken.token,
+      };
+    }
+
+    const res = await fetch("/api/powersync/token");
+    if (!res.ok) throw new Error("Failed to fetch PowerSync token");
+
+    const data: TokenResponse = await res.json();
+    this.cachedToken = data;
+    // Tokens are issued with 5m expiry
+    this.tokenExpiry = Date.now() + 5 * 60 * 1000;
+
+    return {
+      endpoint: data.powersync_url,
+      token: data.token,
+    };
+  }
+
+  async uploadData(database: AbstractPowerSyncDatabase): Promise<void> {
+    const transaction = await database.getNextCrudTransaction();
+    if (!transaction) return;
+
+    try {
+      for (const op of transaction.crud) {
+        const { table, op: opType, id, opData } = op;
+
+        if (table === "activity_reports") {
+          if (opType === UpdateType.PUT) {
+            await fetch(`/api/activity-reports`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, ...opData }),
+            });
+          } else if (opType === UpdateType.PATCH) {
+            await fetch(`/api/activity-reports/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(opData),
+            });
+          } else if (opType === UpdateType.DELETE) {
+            await fetch(`/api/activity-reports/${id}`, { method: "DELETE" });
+          }
+        } else if (table === "activities") {
+          if (opType === UpdateType.PUT) {
+            await fetch(`/api/activities`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, ...opData }),
+            });
+          } else if (opType === UpdateType.PATCH) {
+            await fetch(`/api/activities/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(opData),
+            });
+          } else if (opType === UpdateType.DELETE) {
+            await fetch(`/api/activities/${id}`, { method: "DELETE" });
+          }
+        } else if (table === "soldiers") {
+          if (opType === UpdateType.PUT) {
+            await fetch(`/api/soldiers`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, ...opData }),
+            });
+          } else if (opType === UpdateType.PATCH) {
+            await fetch(`/api/soldiers/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(opData),
+            });
+          } else if (opType === UpdateType.DELETE) {
+            await fetch(`/api/soldiers/${id}`, { method: "DELETE" });
+          }
+        }
+      }
+
+      await transaction.complete();
+    } catch (err) {
+      console.error("[PowerSync] uploadData error:", err);
+      // Do not call transaction.complete() — PowerSync will retry
+    }
+  }
+}

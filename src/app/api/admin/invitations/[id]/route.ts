@@ -34,7 +34,7 @@ export async function POST(
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await prisma.invitation.update({ where: { id }, data: { token, expiresAt } });
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3001";
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const inviteUrl = `${baseUrl}/invite/${token}`;
 
   return NextResponse.json({ inviteUrl, token });

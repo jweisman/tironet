@@ -25,16 +25,35 @@ services:
       - "1026:1025"
       - "8026:8025"
 
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    command: mongod --replSet rs0 --bind_ip_all
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
   powersync:
     image: journeyapps/powersync-service:latest
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      POWERSYNC_JWT_SECRET: ${POWERSYNC_JWT_SECRET}
-      DATABASE_URL: postgresql://tironet:tironet@postgres:5432/tironet
+      POWERSYNC_CONFIG_PATH: /config/powersync.config.yaml
+      PS_DATABASE_URL: ${PS_DATABASE_URL}
+      PS_JWT_SECRET_B64URL: ${POWERSYNC_JWT_SECRET_B64URL}
+    volumes:
+      - ./powersync.config.yaml:/config/powersync.config.yaml
+      - ./src/lib/powersync/sync-config.yaml:/config/sync-config.yaml
     depends_on:
       - postgres
+      - mongo
 
 volumes:
   postgres_data:
+  mongo_data:

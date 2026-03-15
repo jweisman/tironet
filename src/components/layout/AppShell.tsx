@@ -4,10 +4,12 @@ import { TabBar } from "./TabBar";
 import { Sidebar } from "./Sidebar";
 import { UserAvatar } from "./UserAvatar";
 import { CyclePicker } from "./CyclePicker";
+import { OfflineBanner } from "./OfflineBanner";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
+      <OfflineBanner />
       {/* Desktop: sidebar on the end (right in RTL) */}
       <Sidebar />
 

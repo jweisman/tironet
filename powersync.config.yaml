@@ -1,0 +1,28 @@
+# PowerSync service configuration — local development only.
+# This file is mounted into the Docker container at /config/powersync.config.yaml.
+# See: https://docs.powersync.com/self-hosting/configuration
+
+replication:
+  connections:
+    - type: postgresql
+      uri: !env PS_DATABASE_URL
+      sslmode: disable
+      # Enable logical replication (wal_level=logical required)
+      slot_name: powersync_slot
+
+storage:
+  type: mongodb
+  uri: mongodb://mongo:27017/powersync
+
+client_auth:
+  # HS256 shared secret — must start with PS_ for the !env tag to work.
+  # Both this service and the /api/powersync/token endpoint use the same secret.
+  jwks:
+    keys:
+      - kty: oct
+        alg: HS256
+        kid: tironet-dev
+        k: !env PS_JWT_SECRET_B64URL
+
+sync_config:
+  path: /config/sync-config.yaml

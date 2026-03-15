@@ -111,6 +111,51 @@ const tironetAdapter: Adapter = {
 };
 
 // ---------------------------------------------------------------------------
+// PowerSync JWT claim helpers
+//
+// Resolves flat arrays of cycle/platoon IDs that the sync rules consume.
+// Called inside the JWT callback after cycleAssignments are loaded.
+// ---------------------------------------------------------------------------
+
+type RawAssignment = {
+  cycleId: string;
+  role: string;
+  unitType: string;
+  unitId: string;
+};
+
+async function resolvePowerSyncClaims(assignments: RawAssignment[]): Promise<{
+  cycle_ids: string[];
+  platoon_ids: string[];
+  squad_id: string | null;
+}> {
+  const cycle_ids = [...new Set(assignments.map((a) => a.cycleId))];
+  const platoon_ids = new Set<string>();
+  let squad_id: string | null = null;
+
+  for (const a of assignments) {
+    if (a.role === "company_commander") {
+      const platoons = await prisma.platoon.findMany({
+        where: { companyId: a.unitId },
+        select: { id: true },
+      });
+      platoons.forEach((p) => platoon_ids.add(p.id));
+    } else if (a.role === "platoon_commander") {
+      platoon_ids.add(a.unitId);
+    } else if (a.role === "squad_commander") {
+      squad_id = a.unitId;
+      const squad = await prisma.squad.findUnique({
+        where: { id: a.unitId },
+        select: { platoonId: true },
+      });
+      if (squad) platoon_ids.add(squad.platoonId);
+    }
+  }
+
+  return { cycle_ids, platoon_ids: Array.from(platoon_ids), squad_id };
+}
+
+// ---------------------------------------------------------------------------
 // NextAuth config
 // ---------------------------------------------------------------------------
 
@@ -196,13 +241,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               unitType: string;
               unitId: string;
             }) => ({
-            cycleId: a.cycleId,
+              cycleId: a.cycleId,
             cycleName: a.cycle.name,
             cycleIsActive: a.cycle.isActive,
             role: a.role,
             unitType: a.unitType,
             unitId: a.unitId,
           })) as CycleAssignment[];
+
+          // PowerSync sync-rule claims
+          const ps = await resolvePowerSyncClaims(dbUser.cycleAssignments);
+          token.cycle_ids = ps.cycle_ids;
+          token.platoon_ids = ps.platoon_ids;
+          token.squad_id = ps.squad_id;
         }
       } else if (token.sub) {
         // On subsequent token refreshes, re-read isAdmin and cycleAssignments
@@ -243,6 +294,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               unitId: a.unitId,
             })
           ) as CycleAssignment[];
+
+          // PowerSync sync-rule claims
+          const ps = await resolvePowerSyncClaims(fresh.cycleAssignments);
+          token.cycle_ids = ps.cycle_ids;
+          token.platoon_ids = ps.platoon_ids;
+          token.squad_id = ps.squad_id;
         }
       }
       return token;
@@ -258,6 +315,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.profileImageVersion = token.profileImageVersion as string | undefined;
       session.user.cycleAssignments =
         (token.cycleAssignments as CycleAssignment[]) ?? [];
+      session.user.cycle_ids = (token.cycle_ids as string[]) ?? [];
+      session.user.platoon_ids = (token.platoon_ids as string[]) ?? [];
+      session.user.squad_id = (token.squad_id as string | null) ?? null;
       return session;
     },
 

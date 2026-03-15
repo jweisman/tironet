@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, AlertCircle, FileUp } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
+import { useSession } from "next-auth/react";
+import { useQuery } from "@powersync/react";
 import { SoldierCard, type SoldierSummary } from "@/components/soldiers/SoldierCard";
 import { AddSoldierForm } from "@/components/soldiers/AddSoldierForm";
 import { BulkImportDialog } from "@/components/soldiers/BulkImportDialog";
@@ -58,13 +60,127 @@ const STATUS_FILTERS: StatusFilter[] = [
   "injured",
 ];
 
+// ---------------------------------------------------------------------------
+// SQL queries (PowerSync local SQLite)
+// ---------------------------------------------------------------------------
+
+const SOLDIERS_QUERY = `
+  SELECT
+    s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
+    s.squad_id,
+    (
+      SELECT COUNT(*)
+      FROM activities a
+      WHERE a.platoon_id = (SELECT platoon_id FROM squads WHERE id = s.squad_id)
+        AND a.cycle_id = s.cycle_id
+        AND a.is_required = 1
+        AND a.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM activity_reports ar
+          WHERE ar.activity_id = a.id AND ar.soldier_id = s.id AND ar.result = 'passed'
+        )
+    ) AS gap_count
+  FROM soldiers s
+  WHERE s.cycle_id = ?
+  ORDER BY s.family_name ASC, s.given_name ASC
+`;
+
+const SQUADS_QUERY = `
+  SELECT sq.id, sq.name, sq.platoon_id,
+         p.name AS platoon_name
+  FROM squads sq
+  JOIN platoons p ON p.id = sq.platoon_id
+  JOIN companies c ON c.id = p.company_id
+  WHERE c.cycle_id = ?
+  ORDER BY p.sort_order ASC, sq.sort_order ASC
+`;
+
+interface RawSoldier {
+  id: string;
+  given_name: string;
+  family_name: string;
+  rank: string | null;
+  status: string;
+  profile_image: string | null;
+  squad_id: string;
+  gap_count: number;
+}
+
+interface RawSquad {
+  id: string;
+  name: string;
+  platoon_id: string;
+  platoon_name: string;
+}
+
+function mapSoldier(raw: RawSoldier): SoldierSummary {
+  return {
+    id: raw.id,
+    givenName: raw.given_name,
+    familyName: raw.family_name,
+    rank: raw.rank ?? null,
+    status: raw.status as SoldierStatus,
+    profileImage: raw.profile_image ?? null,
+    gapCount: Number(raw.gap_count ?? 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
 export default function SoldiersPage() {
-  const { selectedCycleId } = useCycle();
+  const { selectedCycleId, selectedAssignment } = useCycle();
+  const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [data, setData] = useState<SoldiersResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const isAdmin = session?.user?.isAdmin ?? false;
+  const role = isAdmin ? "admin" : (selectedAssignment?.role ?? "");
+
+  // -------- Admin: API fallback --------
+  const [apiData, setApiData] = useState<SoldiersResponse | null>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin || !selectedCycleId) { setApiData(null); return; }
+    setApiLoading(true);
+    fetch(`/api/soldiers?cycleId=${selectedCycleId}`)
+      .then((r) => r.json())
+      .then((d: SoldiersResponse) => setApiData(d))
+      .catch(() => setApiData(null))
+      .finally(() => setApiLoading(false));
+  }, [isAdmin, selectedCycleId]);
+
+  // -------- PowerSync queries (non-admin) --------
+  const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
+  const { data: rawSoldiers } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
+  const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
+
+  // -------- Resolve data source --------
+  const allSquads: SquadData[] = useMemo(() => {
+    if (isAdmin) return apiData?.squads ?? [];
+
+    const squadMap = new Map<string, SquadData>();
+    for (const sq of rawSquads ?? []) {
+      squadMap.set(sq.id, {
+        id: sq.id,
+        name: sq.name,
+        platoonId: sq.platoon_id,
+        platoonName: sq.platoon_name,
+        soldiers: [],
+      });
+    }
+    for (const s of rawSoldiers ?? []) {
+      const squad = squadMap.get(s.squad_id);
+      if (squad) squad.soldiers.push(mapSoldier(s));
+    }
+    return Array.from(squadMap.values()).filter((sq) => sq.soldiers.length > 0);
+  }, [isAdmin, apiData, rawSoldiers, rawSquads]);
+
+  const loading = isAdmin ? apiLoading : false;
+
+  // -------- UI state --------
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [showGapsOnly, setShowGapsOnly] = useState(
@@ -73,28 +189,11 @@ export default function SoldiersPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
-  // Late-joiner dialog state
   const [lateJoinerInfo, setLateJoinerInfo] = useState<{
     count: number;
     soldierId: string;
   } | null>(null);
   const [markingNa, setMarkingNa] = useState(false);
-
-  useEffect(() => {
-    if (!selectedCycleId) {
-      setData(null);
-      return;
-    }
-    setLoading(true);
-    fetch(`/api/soldiers?cycleId=${selectedCycleId}`)
-      .then((r) => r.json())
-      .then((d: SoldiersResponse) => setData(d))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, [selectedCycleId]);
-
-  const allSquads: SquadData[] = data?.squads ?? [];
-  const role = data?.role ?? "";
 
   const filteredSquads = useMemo(() => {
     return allSquads
@@ -119,34 +218,30 @@ export default function SoldiersPage() {
     0
   );
 
-  // Group by platoon for company_commander
   const squadsByPlatoon = useMemo(() => {
     if (role !== "company_commander") return null;
-    const map = new Map<
-      string,
-      { platoonName: string; squads: SquadData[] }
-    >();
+    const map = new Map<string, { platoonName: string; squads: SquadData[] }>();
     for (const squad of filteredSquads) {
       if (!map.has(squad.platoonId)) {
-        map.set(squad.platoonId, {
-          platoonName: squad.platoonName,
-          squads: [],
-        });
+        map.set(squad.platoonId, { platoonName: squad.platoonName, squads: [] });
       }
       map.get(squad.platoonId)!.squads.push(squad);
     }
     return Array.from(map.values());
   }, [filteredSquads, role]);
 
-  function handleImportSuccess(created: number, activeActivityCount: number) {
-    setImportOpen(false);
-    if (selectedCycleId) {
+  function refreshApiData() {
+    if (isAdmin && selectedCycleId) {
       fetch(`/api/soldiers?cycleId=${selectedCycleId}`)
         .then((r) => r.json())
-        .then((d: SoldiersResponse) => setData(d))
+        .then((d: SoldiersResponse) => setApiData(d))
         .catch(() => {});
     }
-    // If there are active activities, show late-joiner prompt (use a synthetic id)
+  }
+
+  function handleImportSuccess(created: number, activeActivityCount: number) {
+    setImportOpen(false);
+    refreshApiData();
     if (activeActivityCount > 0 && created > 0) {
       setLateJoinerInfo({ count: activeActivityCount, soldierId: "__bulk__" });
     }
@@ -154,13 +249,7 @@ export default function SoldiersPage() {
 
   function handleAddSuccess(activeActivityCount: number, soldierId: string) {
     setAddOpen(false);
-    // Refresh data
-    if (selectedCycleId) {
-      fetch(`/api/soldiers?cycleId=${selectedCycleId}`)
-        .then((r) => r.json())
-        .then((d: SoldiersResponse) => setData(d))
-        .catch(() => {});
-    }
+    refreshApiData();
     if (activeActivityCount > 0) {
       setLateJoinerInfo({ count: activeActivityCount, soldierId });
     }
@@ -170,19 +259,12 @@ export default function SoldiersPage() {
     if (!lateJoinerInfo) return;
     setMarkingNa(true);
     try {
-      // bulk import: no single soldier to mark — just dismiss
       if (lateJoinerInfo.soldierId !== "__bulk__") {
         await fetch(`/api/soldiers/${lateJoinerInfo.soldierId}/mark-na`, {
           method: "POST",
         });
       }
-      // Refresh
-      if (selectedCycleId) {
-        fetch(`/api/soldiers?cycleId=${selectedCycleId}`)
-          .then((r) => r.json())
-          .then((d: SoldiersResponse) => setData(d))
-          .catch(() => {});
-      }
+      refreshApiData();
     } catch {
       // ignore
     } finally {
@@ -225,7 +307,6 @@ export default function SoldiersPage() {
               className="pe-8"
             />
           </div>
-          {/* Desktop action buttons */}
           <div className="hidden md:flex items-center gap-2 shrink-0">
             <button
               type="button"
@@ -246,7 +327,6 @@ export default function SoldiersPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Status pills */}
           <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
             {STATUS_FILTERS.map((f) => (
               <button
@@ -264,7 +344,6 @@ export default function SoldiersPage() {
               </button>
             ))}
           </div>
-          {/* Gaps only toggle */}
           <button
             type="button"
             onClick={() => setShowGapsOnly((v) => !v)}
@@ -293,14 +372,11 @@ export default function SoldiersPage() {
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
             {(search || statusFilter !== "all" || showGapsOnly) && (
-              <p className="text-sm text-muted-foreground">
-                נסה לשנות את הסינון
-              </p>
+              <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>
             )}
           </div>
         )}
 
-        {/* squad_commander: flat list */}
         {!loading && role === "squad_commander" && (
           <div className="divide-y divide-border">
             {filteredSquads.flatMap((sq) =>
@@ -315,7 +391,6 @@ export default function SoldiersPage() {
           </div>
         )}
 
-        {/* platoon_commander: section header per squad */}
         {!loading && role === "platoon_commander" && (
           <div>
             {filteredSquads.map((squad) => (
@@ -342,7 +417,6 @@ export default function SoldiersPage() {
           </div>
         )}
 
-        {/* company_commander: platoon header + squad sub-header */}
         {!loading && role === "company_commander" && squadsByPlatoon && (
           <div>
             {squadsByPlatoon.map((platoonGroup) => (
@@ -378,7 +452,6 @@ export default function SoldiersPage() {
           </div>
         )}
 
-        {/* admin: flat by squad with platoon/squad label */}
         {!loading && role === "admin" && (
           <div>
             {filteredSquads.map((squad) => (
@@ -424,7 +497,6 @@ export default function SoldiersPage() {
         <Plus size={24} />
       </button>
 
-      {/* Add Soldier Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -442,7 +514,6 @@ export default function SoldiersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Import Dialog */}
       {selectedCycleId && (
         <BulkImportDialog
           open={importOpen}
@@ -454,25 +525,19 @@ export default function SoldiersPage() {
         />
       )}
 
-      {/* Late-joiner AlertDialog */}
       <AlertDialog
         open={!!lateJoinerInfo}
-        onOpenChange={(open) => {
-          if (!open) setLateJoinerInfo(null);
-        }}
+        onOpenChange={(open) => { if (!open) setLateJoinerInfo(null); }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>פעילויות קיימות</AlertDialogTitle>
             <AlertDialogDescription>
-              קיימות {lateJoinerInfo?.count} פעילויות פעילות לחייל. לסמן
-              כ-לא רלוונטי?
+              קיימות {lateJoinerInfo?.count} פעילויות פעילות לחייל. לסמן כ-לא רלוונטי?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setLateJoinerInfo(null)}>
-              לא
-            </AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setLateJoinerInfo(null)}>לא</AlertDialogCancel>
             <AlertDialogAction onClick={handleMarkNa} disabled={markingNa}>
               {markingNa ? "מסמן..." : "כן, סמן כ-לא רלוונטי"}
             </AlertDialogAction>

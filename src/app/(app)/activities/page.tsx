@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronDown } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
+import { useSession } from "next-auth/react";
+import { useQuery } from "@powersync/react";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
 import { CreateActivityForm } from "@/components/activities/CreateActivityForm";
 import {
@@ -24,7 +26,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
-interface ActivitiesResponse {
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ActivitiesApiResponse {
   role: string;
   canCreate: boolean;
   activities: ActivitySummary[];
@@ -39,7 +45,6 @@ const FILTER_LABELS: Record<FilterPill, string> = {
   gaps: "עם פערים",
   draft: "טיוטה",
 };
-
 const FILTER_PILLS: FilterPill[] = ["all", "week", "gaps", "draft"];
 
 const SORT_LABELS: Record<SortMode, string> = {
@@ -49,66 +54,143 @@ const SORT_LABELS: Record<SortMode, string> = {
   "name-desc": "שם (ת-א)",
 };
 
+// ---------------------------------------------------------------------------
+// SQL queries (PowerSync local SQLite)
+// ---------------------------------------------------------------------------
+
+const ACTIVITIES_QUERY = `
+  SELECT
+    a.id, a.name, a.date, a.status, a.is_required,
+    at.name AS activity_type_name, at.icon AS activity_type_icon,
+    p.id AS platoon_id, p.name AS platoon_name,
+    c.name AS company_name,
+    (
+      SELECT COUNT(*) FROM soldiers s
+      JOIN squads sq ON sq.id = s.squad_id
+      WHERE sq.platoon_id = a.platoon_id
+        AND s.status = 'active' AND s.cycle_id = a.cycle_id
+    ) AS total_soldiers,
+    (SELECT COUNT(*) FROM activity_reports ar WHERE ar.activity_id = a.id AND ar.result = 'passed') AS passed_count,
+    (SELECT COUNT(*) FROM activity_reports ar WHERE ar.activity_id = a.id AND ar.result = 'failed') AS failed_count,
+    (SELECT COUNT(*) FROM activity_reports ar WHERE ar.activity_id = a.id AND ar.result = 'na') AS na_count,
+    (SELECT COUNT(*) FROM activity_reports ar WHERE ar.activity_id = a.id) AS reported_count
+  FROM activities a
+  JOIN activity_types at ON at.id = a.activity_type_id
+  JOIN platoons p ON p.id = a.platoon_id
+  JOIN companies c ON c.id = p.company_id
+  WHERE a.cycle_id = ?
+  ORDER BY a.date DESC
+`;
+
+const COMPANY_PLATOONS_QUERY = `
+  SELECT id, name FROM platoons WHERE company_id = ? ORDER BY sort_order ASC
+`;
+
+// ---------------------------------------------------------------------------
+// Data mapping
+// ---------------------------------------------------------------------------
+
+interface RawActivity {
+  id: string; name: string; date: string; status: string;
+  is_required: number;
+  activity_type_name: string; activity_type_icon: string;
+  platoon_id: string; platoon_name: string; company_name: string;
+  total_soldiers: number;
+  passed_count: number; failed_count: number; na_count: number; reported_count: number;
+}
+
+function mapActivity(raw: RawActivity): ActivitySummary {
+  const reported = Number(raw.reported_count ?? 0);
+  const total = Number(raw.total_soldiers ?? 0);
+  return {
+    id: raw.id,
+    name: raw.name,
+    date: raw.date,
+    status: raw.status as "draft" | "active",
+    isRequired: Number(raw.is_required) === 1,
+    activityType: { name: raw.activity_type_name, icon: raw.activity_type_icon },
+    platoon: { id: raw.platoon_id, name: raw.platoon_name, companyName: raw.company_name },
+    passedCount: Number(raw.passed_count ?? 0),
+    failedCount: Number(raw.failed_count ?? 0),
+    naCount: Number(raw.na_count ?? 0),
+    missingCount: Math.max(0, total - reported),
+    totalSoldiers: total,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
 export default function ActivitiesPage() {
   const { selectedCycleId, selectedAssignment } = useCycle();
+  const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [data, setData] = useState<ActivitiesResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const isAdmin = session?.user?.isAdmin ?? false;
+  const role = isAdmin ? "admin" : (selectedAssignment?.role ?? "");
+  const canCreate = role !== "squad_commander" && !!role;
+
+  // -------- Admin: API fallback --------
+  const [apiData, setApiData] = useState<ActivitiesApiResponse | null>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin || !selectedCycleId) { setApiData(null); return; }
+    setApiLoading(true);
+    fetch(`/api/activities?cycleId=${selectedCycleId}`)
+      .then((r) => r.json())
+      .then((d: ActivitiesApiResponse) => setApiData(d))
+      .catch(() => setApiData(null))
+      .finally(() => setApiLoading(false));
+  }, [isAdmin, selectedCycleId]);
+
+  // -------- PowerSync queries (non-admin) --------
+  const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
+  const { data: rawActivities } = useQuery<RawActivity>(ACTIVITIES_QUERY, queryParams);
+
+  const companyId = selectedAssignment?.unitType === "company" ? selectedAssignment.unitId : "";
+  const platoonParams = useMemo(() => [companyId], [companyId]);
+  const { data: companyPlatoons } = useQuery<{ id: string; name: string }>(
+    COMPANY_PLATOONS_QUERY,
+    platoonParams
+  );
+
+  // -------- Resolve data source --------
+  const allActivities: ActivitySummary[] = useMemo(() => {
+    if (isAdmin) return apiData?.activities ?? [];
+    return (rawActivities ?? []).map(mapActivity);
+  }, [isAdmin, apiData, rawActivities]);
+
+  const loading = isAdmin ? apiLoading : false;
+
+  // -------- UI state --------
   const initialFilter = (searchParams.get("filter") as FilterPill | null) ?? "all";
   const [filter, setFilter] = useState<FilterPill>(
-    (["all", "week", "gaps", "draft"] as FilterPill[]).includes(initialFilter)
-      ? initialFilter
-      : "all"
+    (["all", "week", "gaps", "draft"] as FilterPill[]).includes(initialFilter) ? initialFilter : "all"
   );
   const [sortMode, setSortMode] = useState<SortMode>("date-desc");
   const [sortOpen, setSortOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
-  const [pendingStatus, setPendingStatus] = useState<"draft" | "active">("draft");
   const [notifying, setNotifying] = useState(false);
-
-  function fetchActivities(cycleId: string) {
-    setLoading(true);
-    fetch(`/api/activities?cycleId=${cycleId}`)
-      .then((r) => r.json())
-      .then((d: ActivitiesResponse) => setData(d))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    if (!selectedCycleId) {
-      setData(null);
-      return;
-    }
-    fetchActivities(selectedCycleId);
-  }, [selectedCycleId]);
 
   const todayStr = new Date().toISOString().split("T")[0];
   const weekAgoStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
+    const d = new Date(); d.setDate(d.getDate() - 7);
     return d.toISOString().split("T")[0];
   }, []);
 
-  const allActivities = data?.activities ?? [];
-
   const filtered = useMemo(() => {
     let list = [...allActivities];
-
     if (filter === "week") {
-      list = list.filter((a) => {
-        const d = a.date.split("T")[0];
-        return d >= weekAgoStr && d <= todayStr;
-      });
+      list = list.filter((a) => { const d = a.date.split("T")[0]; return d >= weekAgoStr && d <= todayStr; });
     } else if (filter === "gaps") {
       list = list.filter((a) => a.isRequired && (a.missingCount > 0 || a.failedCount > 0));
     } else if (filter === "draft") {
       list = list.filter((a) => a.status === "draft");
     }
-
     list.sort((a, b) => {
       if (sortMode === "date-desc") return b.date.localeCompare(a.date);
       if (sortMode === "date-asc") return a.date.localeCompare(b.date);
@@ -116,57 +198,40 @@ export default function ActivitiesPage() {
       if (sortMode === "name-desc") return b.name.localeCompare(a.name, "he");
       return 0;
     });
-
     return list;
   }, [allActivities, filter, sortMode, weekAgoStr, todayStr]);
 
-  const canCreate = data?.canCreate ?? false;
-  const role = data?.role ?? "";
   const showPlatoon = role === "company_commander" || role === "admin";
 
-  // Determine platoon options for create form
   const platoonOptions = useMemo(() => {
     if (!selectedAssignment) return [];
-    if (role === "platoon_commander") {
-      return [{ id: selectedAssignment.unitId, name: "המחלקה שלי" }];
-    }
+    if (role === "platoon_commander") return [{ id: selectedAssignment.unitId, name: "המחלקה שלי" }];
+    if (role === "company_commander") return companyPlatoons ?? [];
     if (role === "admin") {
       const seen = new Map<string, string>();
-      for (const a of allActivities) {
-        seen.set(a.platoon.id, a.platoon.name);
-      }
+      for (const a of allActivities) seen.set(a.platoon.id, a.platoon.name);
       return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
     }
     return [];
-  }, [selectedAssignment, role, allActivities]);
+  }, [selectedAssignment, role, companyPlatoons, allActivities]);
 
   function handleCreateSuccess(activityId: string) {
-    // We need to know the status of the created activity
-    // Re-fetch to find out
     setCreateOpen(false);
-    if (selectedCycleId) fetchActivities(selectedCycleId);
-    // Check if status is active by looking at the refreshed list
-    // For now, store the id and check after fetch
+    if (isAdmin && selectedCycleId) {
+      fetch(`/api/activities?cycleId=${selectedCycleId}`)
+        .then((r) => r.json()).then((d: ActivitiesApiResponse) => setApiData(d)).catch(() => {});
+    }
     setPendingActivityId(activityId);
   }
 
   async function handleNotify() {
     if (!pendingActivityId) return;
     setNotifying(true);
-    try {
-      await fetch(`/api/activities/${pendingActivityId}/notify`, { method: "POST" });
-    } catch {
-      // ignore
-    } finally {
-      setNotifying(false);
-      setPendingActivityId(null);
-    }
+    try { await fetch(`/api/activities/${pendingActivityId}/notify`, { method: "POST" }); }
+    catch { /* ignore */ } finally { setNotifying(false); setPendingActivityId(null); }
   }
 
-  // Find if the pending activity is active (after data refresh)
-  const pendingActivity = pendingActivityId
-    ? allActivities.find((a) => a.id === pendingActivityId)
-    : null;
+  const pendingActivity = pendingActivityId ? allActivities.find((a) => a.id === pendingActivityId) : null;
   const showNotifyDialog = !!pendingActivity && pendingActivity.status === "active";
 
   if (!selectedCycleId) {
@@ -183,41 +248,31 @@ export default function ActivitiesPage() {
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2">
         <div className="flex items-center gap-2">
-          {/* Filter pills */}
           <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
             {FILTER_PILLS.map((f) => (
               <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
+                key={f} type="button" onClick={() => setFilter(f)}
                 className={cn(
                   "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                  filter === f
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:text-foreground"
+                  filter === f ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
                 )}
               >
                 {FILTER_LABELS[f]}
               </button>
             ))}
           </div>
-
-          {/* Sort button */}
           <div className="relative shrink-0">
             <button
-              type="button"
-              onClick={() => setSortOpen((v) => !v)}
+              type="button" onClick={() => setSortOpen((v) => !v)}
               className="flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              מיין
-              <ChevronDown size={12} />
+              מיין <ChevronDown size={12} />
             </button>
             {sortOpen && (
               <div className="absolute end-0 top-full mt-1 z-30 min-w-[160px] rounded-lg border border-border bg-background shadow-md">
                 {(Object.entries(SORT_LABELS) as [SortMode, string][]).map(([mode, label]) => (
                   <button
-                    key={mode}
-                    type="button"
+                    key={mode} type="button"
                     onClick={() => { setSortMode(mode); setSortOpen(false); }}
                     className={cn(
                       "flex w-full items-center px-3 py-2 text-xs text-start hover:bg-muted transition-colors",
@@ -230,16 +285,12 @@ export default function ActivitiesPage() {
               </div>
             )}
           </div>
-
-          {/* Desktop create button */}
           {canCreate && (
             <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
+              type="button" onClick={() => setCreateOpen(true)}
               className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
             >
-              <Plus size={15} />
-              הוסף פעילות
+              <Plus size={15} /> הוסף פעילות
             </button>
           )}
         </div>
@@ -248,25 +299,15 @@ export default function ActivitiesPage() {
       {/* Content */}
       <div className="pb-32">
         {loading && (
-          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
-            טוען...
-          </div>
+          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">טוען...</div>
         )}
-
         {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין פעילויות</p>
-            {filter !== "all" && (
-              <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>
-            )}
-            {filter === "all" && canCreate && (
-              <p className="text-sm text-muted-foreground">
-                לחץ על + כדי ליצור פעילות חדשה
-              </p>
-            )}
+            {filter !== "all" && <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>}
+            {filter === "all" && canCreate && <p className="text-sm text-muted-foreground">לחץ על + כדי ליצור פעילות חדשה</p>}
           </div>
         )}
-
         {!loading && filtered.length > 0 && (
           <div className="divide-y divide-border">
             {filtered.map((activity) => (
@@ -284,8 +325,7 @@ export default function ActivitiesPage() {
       {/* Mobile FAB */}
       {canCreate && (
         <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
+          type="button" onClick={() => setCreateOpen(true)}
           className="md:hidden fixed bottom-20 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
           aria-label="הוסף פעילות"
         >
@@ -293,12 +333,9 @@ export default function ActivitiesPage() {
         </button>
       )}
 
-      {/* Create Activity Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>הוסף פעילות</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>הוסף פעילות</DialogTitle></DialogHeader>
           {selectedCycleId && platoonOptions.length > 0 && (
             <CreateActivityForm
               cycleId={selectedCycleId}
@@ -313,11 +350,7 @@ export default function ActivitiesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Notify AlertDialog */}
-      <AlertDialog
-        open={showNotifyDialog}
-        onOpenChange={(open) => { if (!open) setPendingActivityId(null); }}
-      >
+      <AlertDialog open={showNotifyDialog} onOpenChange={(open) => { if (!open) setPendingActivityId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>הודע למ&quot;כים?</AlertDialogTitle>
@@ -326,9 +359,7 @@ export default function ActivitiesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingActivityId(null)}>
-              לא
-            </AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setPendingActivityId(null)}>לא</AlertDialogCancel>
             <AlertDialogAction onClick={handleNotify} disabled={notifying}>
               {notifying ? "שולח..." : "כן, שלח הודעה"}
             </AlertDialogAction>

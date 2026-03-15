@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     unitName = u?.name ?? "";
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3001";
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const inviteUrl = `${baseUrl}/invite/${invitation.token}`;
   const roleLabel = ROLE_LABELS[invitation.role as Role];
 

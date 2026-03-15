@@ -1,154 +1,204 @@
+"use client";
+
+import { useMemo, useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { ActivityDetail, type ActivityDetailData } from "@/components/activities/ActivityDetail";
-import { prisma } from "@/lib/db/prisma";
-import { getActivityScope } from "@/lib/api/activity-scope";
+import { useSession } from "next-auth/react";
+import { useQuery } from "@powersync/react";
+import { useCycle } from "@/contexts/CycleContext";
+import {
+  ActivityDetail,
+  type ActivityDetailData,
+} from "@/components/activities/ActivityDetail";
 import type { ActivityResult } from "@/types";
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ gaps?: string }>;
+// ---------------------------------------------------------------------------
+// SQL queries (PowerSync local SQLite)
+// ---------------------------------------------------------------------------
+
+const ACTIVITY_QUERY = `
+  SELECT
+    a.id, a.name, a.date, a.status, a.is_required,
+    a.platoon_id, a.cycle_id,
+    at.id AS activity_type_id, at.name AS activity_type_name, at.icon AS activity_type_icon,
+    p.name AS platoon_name,
+    c.name AS company_name
+  FROM activities a
+  JOIN activity_types at ON at.id = a.activity_type_id
+  JOIN platoons p ON p.id = a.platoon_id
+  JOIN companies c ON c.id = p.company_id
+  WHERE a.id = ?
+`;
+
+const SQUADS_QUERY = `
+  SELECT id, name, sort_order
+  FROM squads
+  WHERE platoon_id = ?
+  ORDER BY sort_order ASC
+`;
+
+const SOLDIERS_QUERY = `
+  SELECT id, given_name, family_name, rank, profile_image, status, squad_id
+  FROM soldiers
+  WHERE cycle_id = ? AND status = 'active'
+  ORDER BY family_name ASC, given_name ASC
+`;
+
+const REPORTS_QUERY = `
+  SELECT id, soldier_id, result, grade, note
+  FROM activity_reports
+  WHERE activity_id = ?
+`;
+
+interface RawActivity {
+  id: string; name: string; date: string; status: string; is_required: number;
+  platoon_id: string; cycle_id: string;
+  activity_type_id: string; activity_type_name: string; activity_type_icon: string;
+  platoon_name: string; company_name: string;
+}
+interface RawSquad { id: string; name: string; sort_order: number; }
+interface RawSoldier {
+  id: string; given_name: string; family_name: string;
+  rank: string | null; profile_image: string | null; status: string; squad_id: string;
+}
+interface RawReport {
+  id: string; soldier_id: string; result: string;
+  grade: number | null; note: string | null;
 }
 
-export default async function ActivityPage({ params, searchParams }: PageProps) {
-  const { id } = await params;
-  const { gaps } = await searchParams;
-  const initialGapsOnly = gaps === "1";
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
 
-  let data: ActivityDetailData | null = null;
-  let errorMessage: string | null = null;
+export default function ActivityPage() {
+  const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const initialGapsOnly = searchParams.get("gaps") === "1";
 
-  try {
-    const activity = await prisma.activity.findUnique({
-      where: { id },
-      include: {
-        activityType: { select: { id: true, name: true, icon: true } },
-        platoon: {
-          select: {
-            id: true,
-            name: true,
-            company: { select: { name: true } },
-            squads: {
-              orderBy: { sortOrder: "asc" },
-              select: {
-                id: true,
-                name: true,
-                soldiers: {
-                  where: { status: "active" },
-                  orderBy: [{ familyName: "asc" }, { givenName: "asc" }],
-                  select: {
-                    id: true,
-                    givenName: true,
-                    familyName: true,
-                    rank: true,
-                    profileImage: true,
-                    status: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        reports: {
-          select: {
-            id: true,
-            soldierId: true,
-            result: true,
-            grade: true,
-            note: true,
-          },
-        },
+  const { data: session } = useSession();
+  const { selectedAssignment } = useCycle();
+
+  const isAdmin = session?.user?.isAdmin ?? false;
+  const role = isAdmin ? "admin" : (selectedAssignment?.role ?? "");
+
+  // -------- Admin: API fallback --------
+  const [apiData, setApiData] = useState<ActivityDetailData | null>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    setApiLoading(true);
+    fetch(`/api/activities/${id}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("not found");
+        return r.json();
+      })
+      .then((d: ActivityDetailData) => setApiData(d))
+      .catch(() => setApiError("הפעילות לא נמצאה"))
+      .finally(() => setApiLoading(false));
+  }, [isAdmin, id]);
+
+  // -------- PowerSync queries (non-admin) --------
+  const activityParams = useMemo(() => [id], [id]);
+  const { data: activityRows } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
+  const activity = activityRows?.[0] ?? null;
+
+  const platoonParams = useMemo(
+    () => [activity?.platoon_id ?? ""],
+    [activity?.platoon_id]
+  );
+  const { data: squadsRows } = useQuery<RawSquad>(SQUADS_QUERY, platoonParams);
+
+  const cycleParams = useMemo(
+    () => [activity?.cycle_id ?? ""],
+    [activity?.cycle_id]
+  );
+  const { data: soldiersRows } = useQuery<RawSoldier>(SOLDIERS_QUERY, cycleParams);
+  const { data: reportsRows } = useQuery<RawReport>(REPORTS_QUERY, activityParams);
+
+  // -------- Build ActivityDetailData from local rows --------
+  const localData: ActivityDetailData | null = useMemo(() => {
+    if (isAdmin || !activity) return null;
+
+    const reportsMap = new Map<string, RawReport>();
+    for (const r of reportsRows ?? []) reportsMap.set(r.soldier_id, r);
+
+    const squadId = selectedAssignment?.unitType === "squad" ? selectedAssignment.unitId : null;
+
+    const squads = (squadsRows ?? [])
+      .filter((sq) => {
+        if (role === "squad_commander") return sq.id === squadId;
+        return true;
+      })
+      .map((sq) => {
+        const canEdit =
+          role === "admin" ||
+          role === "platoon_commander" ||
+          role === "company_commander" ||
+          (role === "squad_commander" && sq.id === squadId);
+
+        const soldiers = (soldiersRows ?? [])
+          .filter((s) => s.squad_id === sq.id)
+          .map((s) => {
+            const report = reportsMap.get(s.id);
+            return {
+              id: s.id,
+              givenName: s.given_name,
+              familyName: s.family_name,
+              rank: s.rank,
+              profileImage: s.profile_image,
+              status: s.status,
+              report: report
+                ? {
+                    id: report.id,
+                    result: report.result as ActivityResult,
+                    grade: report.grade != null ? Number(report.grade) : null,
+                    note: report.note,
+                  }
+                : { id: null, result: null, grade: null, note: null },
+            };
+          });
+
+        return { id: sq.id, name: sq.name, canEdit, soldiers };
+      });
+
+    const canEditMetadata =
+      role === "admin" ||
+      role === "platoon_commander" ||
+      role === "company_commander";
+    const canEditReports = role !== "";
+
+    return {
+      id: activity.id,
+      name: activity.name,
+      date: activity.date,
+      status: activity.status as "draft" | "active",
+      isRequired: Number(activity.is_required) === 1,
+      activityType: {
+        id: activity.activity_type_id,
+        name: activity.activity_type_name,
+        icon: activity.activity_type_icon,
       },
-    });
+      platoon: {
+        id: activity.platoon_id,
+        name: activity.platoon_name,
+        companyName: activity.company_name,
+      },
+      role,
+      canEditMetadata,
+      canEditReports,
+      squads,
+    };
+  }, [isAdmin, activity, squadsRows, soldiersRows, reportsRows, role, selectedAssignment]);
 
-    if (!activity) {
-      errorMessage = "הפעילות לא נמצאה";
-    } else {
-      const { scope, error } = await getActivityScope(activity.cycleId);
-
-      if (error || !scope) {
-        errorMessage = "אין לך הרשאה לצפות בפעילות זו";
-      } else {
-        const canSeePlatoon = scope.platoonIds.includes(activity.platoonId);
-        if (!canSeePlatoon) {
-          errorMessage = "אין לך הרשאה לצפות בפעילות זו";
-        } else if (scope.role === "squad_commander" && activity.status === "draft") {
-          errorMessage = "אין לך הרשאה לצפות בפעילות זו";
-        } else {
-          const canEditMetadata = scope.canEditMetadataForPlatoon(activity.platoonId);
-          const canEditReports =
-            scope.role === "platoon_commander" ||
-            scope.role === "company_commander" ||
-            scope.role === "admin" ||
-            scope.role === "squad_commander";
-
-          const reportsMap = new Map(activity.reports.map((r) => [r.soldierId, r]));
-
-          const squads = activity.platoon.squads
-            .filter((squad) => {
-              if (scope.role === "squad_commander") return squad.id === scope.squadId;
-              return true;
-            })
-            .map((squad) => {
-              const canEdit =
-                scope.role === "admin" ||
-                scope.role === "platoon_commander" ||
-                scope.role === "company_commander" ||
-                (scope.role === "squad_commander" && squad.id === scope.squadId);
-
-              return {
-                id: squad.id,
-                name: squad.name,
-                canEdit,
-                soldiers: squad.soldiers.map((soldier) => {
-                  const report = reportsMap.get(soldier.id);
-                  return {
-                    id: soldier.id,
-                    givenName: soldier.givenName,
-                    familyName: soldier.familyName,
-                    rank: soldier.rank,
-                    profileImage: soldier.profileImage,
-                    status: soldier.status,
-                    report: report
-                      ? {
-                          id: report.id,
-                          result: report.result as ActivityResult,
-                          grade: report.grade ? Number(report.grade) : null,
-                          note: report.note,
-                        }
-                      : { id: null, result: null, grade: null, note: null },
-                  };
-                }),
-              };
-            });
-
-          data = {
-            id: activity.id,
-            name: activity.name,
-            date: activity.date.toISOString(),
-            status: activity.status as "draft" | "active",
-            isRequired: activity.isRequired,
-            activityType: activity.activityType,
-            platoon: {
-              id: activity.platoon.id,
-              name: activity.platoon.name,
-              companyName: activity.platoon.company.name,
-            },
-            role: scope.role,
-            canEditMetadata,
-            canEditReports,
-            squads,
-          };
-        }
-      }
-    }
-  } catch {
-    errorMessage = "שגיאה בטעינת הפעילות";
-  }
+  const data = isAdmin ? apiData : localData;
+  const loading = isAdmin ? apiLoading : false;
+  const errorMessage = isAdmin ? apiError : (!activity && !loading ? "הפעילות לא נמצאה" : null);
 
   return (
     <div>
-      {/* Back button */}
       <div className="mb-4">
         <Link
           href="/activities"
@@ -159,7 +209,13 @@ export default async function ActivityPage({ params, searchParams }: PageProps) 
         </Link>
       </div>
 
-      {errorMessage && (
+      {loading && (
+        <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+          טוען...
+        </div>
+      )}
+
+      {!loading && errorMessage && (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
           <p className="font-medium text-destructive">{errorMessage}</p>
           <Link
@@ -171,7 +227,9 @@ export default async function ActivityPage({ params, searchParams }: PageProps) 
         </div>
       )}
 
-      {data && <ActivityDetail initialData={data} initialGapsOnly={initialGapsOnly} />}
+      {!loading && data && (
+        <ActivityDetail initialData={data} initialGapsOnly={initialGapsOnly} />
+      )}
     </div>
   );
 }

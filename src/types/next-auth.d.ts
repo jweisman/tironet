@@ -12,6 +12,10 @@ declare module "next-auth" {
       phone?: string | null;
       profileImageVersion?: string;
       cycleAssignments: CycleAssignment[];
+      // PowerSync sync-rule claims (populated from JWT, used by /api/powersync/token)
+      cycle_ids: string[];
+      platoon_ids: string[];
+      squad_id: string | null;
     } & DefaultSession["user"];
   }
 }

@@ -53,7 +53,7 @@ export async function POST(
     return NextResponse.json({ notified: 0 });
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3001";
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const activityUrl = `${baseUrl}/activities/${activityId}`;
 
   const dateStr = activity.date instanceof Date
