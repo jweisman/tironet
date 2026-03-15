@@ -148,6 +148,34 @@ export async function GET(
   });
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const activity = await prisma.activity.findUnique({
+    where: { id },
+    select: { cycleId: true, platoonId: true },
+  });
+
+  if (!activity) {
+    return NextResponse.json({ error: "Activity not found" }, { status: 404 });
+  }
+
+  const { scope, error } = await getActivityScope(activity.cycleId);
+  if (error || !scope) return error!;
+
+  if (!scope.canEditMetadataForPlatoon(activity.platoonId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Reports are deleted automatically via cascade
+  await prisma.activity.delete({ where: { id } });
+
+  return new NextResponse(null, { status: 204 });
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

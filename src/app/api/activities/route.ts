@@ -111,6 +111,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     role: scope.role,
     canCreate: scope.canCreate,
+    platoonIds: scope.platoonIds,
+    platoons: scope.platoons,
     activities: result,
   });
 }

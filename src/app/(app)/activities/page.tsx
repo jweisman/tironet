@@ -33,6 +33,8 @@ import { cn } from "@/lib/utils";
 interface ActivitiesApiResponse {
   role: string;
   canCreate: boolean;
+  platoonIds: string[];
+  platoons: { id: string; name: string }[];
   activities: ActivitySummary[];
 }
 
