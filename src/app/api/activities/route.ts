@@ -112,6 +112,7 @@ export async function GET(request: NextRequest) {
     role: scope.role,
     canCreate: scope.canCreate,
     platoonIds: scope.platoonIds,
+    platoons: scope.platoons,
     activities: result,
   });
 }

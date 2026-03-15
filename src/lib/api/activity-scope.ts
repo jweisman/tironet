@@ -6,6 +6,7 @@ import type { SessionUser, CycleAssignment } from "@/types";
 export interface ActivityScope {
   role: "squad_commander" | "platoon_commander" | "company_commander" | "admin";
   platoonIds: string[];
+  platoons: { id: string; name: string }[]; // id + name for create form
   squadId?: string; // only for squad_commander
   canCreate: boolean; // platoon_commander or admin
   canEditMetadataForPlatoon: (platoonId: string) => boolean;
@@ -31,16 +32,16 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
 
   // Admin sees everything
   if (user.isAdmin) {
-    // Get all platoon ids for this cycle
+    // Get all platoons for this cycle
     const platoons = await prisma.platoon.findMany({
       where: { company: { cycleId } },
-      select: { id: true },
+      select: { id: true, name: true },
     });
-    const platoonIds = platoons.map((p) => p.id);
 
     const scope: ActivityScope = {
       role: "admin",
-      platoonIds,
+      platoonIds: platoons.map((p) => p.id),
+      platoons,
       canCreate: true,
       canEditMetadataForPlatoon: () => true,
     };
@@ -76,6 +77,7 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
     const scope: ActivityScope = {
       role: "squad_commander",
       platoonIds: [squad.platoonId],
+      platoons: [],
       squadId: assignment.unitId,
       canCreate: false,
       canEditMetadataForPlatoon: () => false,
@@ -86,9 +88,14 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
   if (assignment.role === "platoon_commander") {
     // unitId is a platoonId
     const platoonId = assignment.unitId;
+    const platoon = await prisma.platoon.findUnique({
+      where: { id: platoonId },
+      select: { id: true, name: true },
+    });
     const scope: ActivityScope = {
       role: "platoon_commander",
       platoonIds: [platoonId],
+      platoons: platoon ? [platoon] : [],
       canCreate: true,
       canEditMetadataForPlatoon: (pid: string) => pid === platoonId,
     };
@@ -99,12 +106,12 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
     // unitId is a companyId; get all platoons in that company
     const platoons = await prisma.platoon.findMany({
       where: { companyId: assignment.unitId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
-    const platoonIds = platoons.map((p) => p.id);
     const scope: ActivityScope = {
       role: "company_commander",
-      platoonIds,
+      platoonIds: platoons.map((p) => p.id),
+      platoons,
       canCreate: false,
       canEditMetadataForPlatoon: () => false,
     };
