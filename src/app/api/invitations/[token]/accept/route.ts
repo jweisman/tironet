@@ -36,7 +36,7 @@ export async function POST(
       where: { id: session.user.id },
       select: { phone: true },
     });
-    if (userWithPhone?.phone !== invitation.phone) {
+    if (userWithPhone?.phone !== null && userWithPhone?.phone !== invitation.phone) {
       return NextResponse.json({ error: "phone_mismatch" }, { status: 403 });
     }
   }
