@@ -111,7 +111,7 @@ export default async function InvitePage({
           ) : (
             <div className="text-center space-y-3">
               <p className="text-sm text-destructive">
-                אתה מחובר כ-{session.user.email} אך ההזמנה מיועדת ל-{invitation.email}.
+                אתה מחובר כ-{session.user.email ?? session.user.phone ?? "חשבון ללא מייל"} אך ההזמנה מיועדת ל-{invitation.email}.
               </p>
               <p className="text-xs text-muted-foreground">
                 התנתק והתחבר עם האימייל הנכון.

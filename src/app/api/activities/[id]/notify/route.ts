@@ -67,6 +67,7 @@ export async function POST(
   let notified = 0;
 
   for (const assignment of assignments) {
+    if (!assignment.user.email) continue;
     try {
       await sendEmail({
         to: assignment.user.email,

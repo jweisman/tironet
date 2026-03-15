@@ -16,14 +16,20 @@ export async function POST(req: NextRequest) {
 
   const { phone } = parsed.data;
 
-  // Verify the phone number belongs to a registered user
+  // Verify the phone belongs to a registered user OR a valid pending invitation
   const user = await prisma.user.findUnique({
     where: { phone },
     select: { id: true },
   });
   if (!user) {
-    // Return same response to avoid user enumeration
-    return NextResponse.json({ success: true });
+    const invitation = await prisma.invitation.findFirst({
+      where: { phone, acceptedAt: null, expiresAt: { gt: new Date() } },
+      select: { id: true },
+    });
+    if (!invitation) {
+      // Return same response to avoid user enumeration
+      return NextResponse.json({ success: true });
+    }
   }
 
   try {

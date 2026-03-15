@@ -123,7 +123,7 @@ export async function GET() {
       givenName: string;
       familyName: string;
       rank: string | null;
-      email: string;
+      email: string | null;
       phone: string | null;
       isAdmin: boolean;
       cycleAssignments: {

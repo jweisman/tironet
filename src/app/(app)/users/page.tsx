@@ -137,7 +137,7 @@ export default async function UsersPage() {
       givenName: string;
       familyName: string;
       rank: string | null;
-      email: string;
+      email: string | null;
       phone: string | null;
       isAdmin: boolean;
       cycleAssignments: {
