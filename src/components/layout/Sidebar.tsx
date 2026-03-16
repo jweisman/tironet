@@ -36,6 +36,7 @@ export function Sidebar() {
     <aside className="hidden md:flex flex-col fixed inset-y-0 end-0 w-64 border-s border-border bg-background z-40">
       {/* App name */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
+        <img src="/soldier.svg" alt="" className="h-9 w-auto" />
         <span className="text-xl font-bold">טירונט</span>
       </div>
 

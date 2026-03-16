@@ -175,6 +175,7 @@ export async function GET() {
     cycleName: inv.cycle.name,
     expiresAt: inv.expiresAt.toISOString(),
     token: inv.token,
+    invitedByUserId: inv.invitedByUserId,
   }));
 
   const cycles = Object.entries(cycleMap).map(([id, name]) => ({ id, name }));

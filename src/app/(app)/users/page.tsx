@@ -183,6 +183,7 @@ export default async function UsersPage() {
     cycleName: inv.cycle.name,
     expiresAt: inv.expiresAt.toISOString(),
     token: inv.token,
+    invitedByUserId: inv.invitedByUserId,
   }));
 
   const cycles = Object.entries(cycleMap).map(([id, name]) => ({ id, name }));
@@ -196,6 +197,8 @@ export default async function UsersPage() {
         cycles={cycles}
         structureByCycle={structureByCycle}
         invitableRoles={invitableRoles}
+        currentUserId={session.user.id}
+        isAdmin={session.user.isAdmin ?? false}
       />
     </div>
   );

@@ -199,7 +199,7 @@ export function UsersTable({
             <thead className="bg-muted/50 border-b">
               <tr>
                 <th className="text-start px-3 py-2.5 font-medium">שם</th>
-                <th className="text-start px-3 py-2.5 font-medium hidden sm:table-cell">אימייל</th>
+                <th className="text-start px-3 py-2.5 font-medium hidden sm:table-cell">אימייל / טלפון</th>
                 <th className="text-start px-3 py-2.5 font-medium">שיבוצים</th>
                 <th className="px-3 py-2.5 w-10" />
               </tr>
@@ -218,8 +218,9 @@ export function UsersTable({
                       <Badge variant="secondary" className="text-xs mt-0.5">מנהל</Badge>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground hidden sm:table-cell" dir="ltr">
-                    {user.email}
+                  <td className="px-3 py-2.5 hidden sm:table-cell" dir="ltr">
+                    {user.email && <div className="text-muted-foreground">{user.email}</div>}
+                    {user.phone && <div className="text-muted-foreground">{toIsraeliDisplay(user.phone)}</div>}
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="space-y-1">

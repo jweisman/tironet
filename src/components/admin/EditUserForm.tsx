@@ -23,15 +23,18 @@ type User = {
   rank: string | null;
   isAdmin: boolean;
   phone: string | null;
+  email?: string | null;
 };
 
 type Props = {
   user: User;
   onSuccess: () => void;
   onCancel: () => void;
+  showAdminToggle?: boolean;
+  endpoint?: string;
 };
 
-export function EditUserForm({ user, onSuccess, onCancel }: Props) {
+export function EditUserForm({ user, onSuccess, onCancel, showAdminToggle = true, endpoint }: Props) {
   const [givenName, setGivenName] = useState(user.givenName);
   const [familyName, setFamilyName] = useState(user.familyName);
   const [rank, setRank] = useState(user.rank ?? "");
@@ -39,17 +42,19 @@ export function EditUserForm({ user, onSuccess, onCancel }: Props) {
   const [phone, setPhone] = useState(
     user.phone ? toIsraeliDisplay(user.phone) : ""
   );
+  const [email, setEmail] = useState(user.email ?? "");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null | undefined>(undefined);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/admin/users/${user.id}/profile`)
+    const url = endpoint ?? `/api/admin/users/${user.id}/profile`;
+    fetch(url)
       .then((r) => r.json())
       .then((data) => { if (data.profileImage) setImagePreview(data.profileImage); })
       .catch(() => {});
-  }, [user.id]);
+  }, [user.id, endpoint]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,11 +70,13 @@ export function EditUserForm({ user, onSuccess, onCancel }: Props) {
         rank: rank.trim() || null,
         isAdmin,
         phone: phone.trim() || null,
+        email: email.trim() || null,
       };
       if (imageBase64 !== undefined) {
         body.profileImage = imageBase64;
       }
-      const res = await fetch(`/api/admin/users/${user.id}/profile`, {
+      const url = endpoint ?? `/api/admin/users/${user.id}/profile`;
+      const res = await fetch(url, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -138,14 +145,27 @@ export function EditUserForm({ user, onSuccess, onCancel }: Props) {
         />
       </div>
 
-      <div className="flex items-center justify-between">
-        <Label htmlFor="edit-admin">מנהל מערכת</Label>
-        <Switch
-          id="edit-admin"
-          checked={isAdmin}
-          onCheckedChange={setIsAdmin}
+      <div className="space-y-1.5">
+        <Label htmlFor="edit-email">אימייל</Label>
+        <Input
+          id="edit-email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          dir="ltr"
         />
       </div>
+
+      {showAdminToggle && (
+        <div className="flex items-center justify-between">
+          <Label htmlFor="edit-admin">מנהל מערכת</Label>
+          <Switch
+            id="edit-admin"
+            checked={isAdmin}
+            onCheckedChange={setIsAdmin}
+          />
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label>תמונת פרופיל</Label>
