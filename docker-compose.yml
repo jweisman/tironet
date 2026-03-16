@@ -46,7 +46,8 @@ services:
     environment:
       POWERSYNC_CONFIG_PATH: /config/powersync.config.yaml
       PS_DATABASE_URL: ${PS_DATABASE_URL}
-      PS_JWT_SECRET_B64URL: ${POWERSYNC_JWT_SECRET_B64URL}
+      PS_JWT_SECRET_B64URL: ${PS_JWT_SECRET_B64URL}
+      PS_JWT_AUDIENCE: ${PS_JWT_AUDIENCE}
     volumes:
       - ./powersync.config.yaml:/config/powersync.config.yaml
       - ./src/lib/powersync/sync-config.yaml:/config/sync-config.yaml

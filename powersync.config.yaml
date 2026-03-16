@@ -23,6 +23,10 @@ client_auth:
         alg: HS256
         kid: tironet-dev
         k: !env PS_JWT_SECRET_B64URL
+  # JWT aud claim — must be listed here. Field name is singular "audience", not "audiences".
+  # Source: compound-config-collector.js: baseConfig.client_auth?.audience ?? []
+  audience:
+    - !env PS_JWT_AUDIENCE
 
 sync_config:
   path: /config/sync-config.yaml

@@ -159,7 +159,9 @@ NEXT_PUBLIC_POWERSYNC_URL="http://localhost:8080"
 POWERSYNC_JWT_SECRET="..."
 # base64url of the raw secret bytes (used in powersync.config.yaml via !env)
 # Derive with: echo -n "$POWERSYNC_JWT_SECRET" | base64 | tr '+/' '-_' | tr -d '='
-POWERSYNC_JWT_SECRET_B64URL="..."
+PS_JWT_SECRET_B64URL="..."
+# JWT audience — must match NEXT_PUBLIC_POWERSYNC_URL (dev: http://localhost:8080)
+PS_JWT_AUDIENCE="http://localhost:8080"
 
 # Public app URL (used in invitation emails)
 NEXT_PUBLIC_APP_URL="http://localhost:3001"

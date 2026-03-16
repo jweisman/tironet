@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
-export function OfflineBanner() {
+// Inner component — only rendered client-side after PowerSync context is available.
+function OfflineBannerInner() {
   const { isConnected, hasPendingUploads } = useOnlineStatus();
 
   if (isConnected) return null;
@@ -17,4 +19,12 @@ export function OfflineBanner() {
       )}
     </div>
   );
+}
+
+// Outer shell — suppresses SSR render so useStatus() is never called without a context.
+export function OfflineBanner() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  return <OfflineBannerInner />;
 }

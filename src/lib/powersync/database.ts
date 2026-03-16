@@ -13,7 +13,12 @@ function createDatabase(): PowerSyncDatabase | null {
     },
   });
 
-  return new PowerSyncDatabase({ schema: AppSchema, database: factory });
+  return new PowerSyncDatabase({
+    schema: AppSchema,
+    database: factory,
+    // Use pre-built UMD sync worker — prevents Turbopack from trying to bundle it.
+    sync: { worker: "/@powersync/worker/SharedSyncImplementation.umd.js" },
+  });
 }
 
 export const db = createDatabase();

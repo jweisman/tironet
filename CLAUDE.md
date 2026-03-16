@@ -37,6 +37,37 @@ Sync streams use `auth.parameter('cycle_ids')` etc. to filter rows server-side. 
 - **PostgreSQL publication** must be created once: `CREATE PUBLICATION powersync FOR ALL TABLES`. Required for WAL logical replication.
 - **Docker Compose reads `.env`**, not `.env.local`. Next.js reads `.env.local`. Keep both files in sync for shared variables.
 - **`docker compose restart`** does not re-read `.env`. Use `docker compose up -d` to pick up env changes.
+- **`docker-compose.yml` `environment:` section is the source of truth** for what env vars reach the container. Variables in `.env` are only injected if explicitly listed there — `!env` in `powersync.config.yaml` reads from the container environment, not directly from `.env`.
+
+### JWT audience configuration
+
+The PowerSync service requires a valid `aud` claim in every JWT. The allowed values are configured via `client_auth.audience` (singular) in `powersync.config.yaml` — **not** `audiences` (plural). Source confirmed from `compound-config-collector.js`: `baseConfig.client_auth?.audience ?? []`.
+
+The `aud` value in tokens must match `NEXT_PUBLIC_POWERSYNC_URL` (e.g. `http://localhost:8080` in dev). Both the token endpoint and `powersync.config.yaml` must agree.
+
+### UMD worker setup for Next.js + Turbopack
+
+Both PowerSync workers must be pointed at the pre-built UMD files. Without this, Turbopack tries to bundle them from source and hangs:
+
+```typescript
+// database.ts
+new WASQLiteOpenFactory({
+  worker: "/@powersync/worker/WASQLiteDB.umd.js",  // DB worker
+  ...
+})
+new PowerSyncDatabase({
+  sync: { worker: "/@powersync/worker/SharedSyncImplementation.umd.js" },  // sync worker
+  ...
+})
+```
+
+The UMD files are served from `public/@powersync/` (copied by `postinstall`). There is a path bug in `@powersync/web`'s webpack bundle: `WASQLiteDB.umd.js` computes its chunk public path as `../` relative to its script URL, so chunk files land one level up from `worker/`. The postinstall `cp` step fixes this:
+
+```json
+"postinstall": "prisma generate && powersync-web copy-assets -o public && cp public/@powersync/worker/*.umd.js public/@powersync/"
+```
+
+`public/@powersync/` is gitignored — it is regenerated on every `npm install`.
 
 ## Data Model Constraints
 
@@ -62,5 +93,6 @@ Similarly, `Soldier.squadId` is write-once. The "transferred" status (`SoldierSt
 ## Environment Variable Naming
 
 - Variables used inside the PowerSync Docker container must be prefixed `PS_` to work with the `!env` tag in `powersync.config.yaml`
-- `POWERSYNC_JWT_SECRET` is the raw secret (used by Next.js to sign tokens)
-- `POWERSYNC_JWT_SECRET_B64URL` is its base64url encoding (used by PowerSync to verify tokens via JWKS)
+- `POWERSYNC_JWT_SECRET` is the raw secret (used by Next.js to sign tokens) — no `PS_` prefix needed since Next.js reads it directly
+- `PS_JWT_SECRET_B64URL` is its base64url encoding (used by PowerSync to verify tokens via JWKS) — needs `PS_` prefix
+- `PS_JWT_AUDIENCE` is the allowed JWT audience value (must match `NEXT_PUBLIC_POWERSYNC_URL`)

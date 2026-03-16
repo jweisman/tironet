@@ -23,10 +23,8 @@ export async function GET() {
 
   const { cycle_ids = [], platoon_ids = [], squad_id = null } = session.user;
 
-  // Audience: the PowerSync service URL (or a dev sentinel for localhost)
-  const audience = powersyncUrl.startsWith("http://localhost")
-    ? "powersync-dev"
-    : powersyncUrl;
+  // Audience must match client_auth.audience in powersync.config.yaml.
+  const audience = powersyncUrl;
 
   const secret = new TextEncoder().encode(jwtSecret);
   const token = await new jose.SignJWT({ cycle_ids, platoon_ids, squad_id })

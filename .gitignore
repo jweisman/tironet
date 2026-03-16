@@ -43,3 +43,7 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# PowerSync — WASM + worker assets copied from node_modules by postinstall.
+# Regenerated on every `npm install`; no need to commit.
+/public/@powersync
