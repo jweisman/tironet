@@ -47,26 +47,49 @@ export async function POST(
   if (invitation.familyName) profileUpdate.familyName = invitation.familyName;
   if (invitation.rank !== undefined) profileUpdate.rank = invitation.rank;
   if (invitation.profileImage !== undefined) profileUpdate.profileImage = invitation.profileImage;
-  if (invitation.phone) profileUpdate.phone = invitation.phone;
+  if (invitation.phone) {
+    // Only set phone if no other user already owns it (avoids unique constraint violation)
+    const phoneOwner = await prisma.user.findUnique({
+      where: { phone: invitation.phone },
+      select: { id: true },
+    });
+    if (!phoneOwner || phoneOwner.id === session.user.id) {
+      profileUpdate.phone = invitation.phone;
+    }
+  }
 
-  await prisma.$transaction([
-    prisma.userCycleAssignment.create({
-      data: {
-        userId: session.user.id,
-        cycleId: invitation.cycleId,
-        role: invitation.role,
-        unitType: invitation.unitType,
-        unitId: invitation.unitId,
-      },
-    }),
-    prisma.invitation.update({
-      where: { id: invitation.id },
-      data: { acceptedAt: new Date() },
-    }),
-    ...(Object.keys(profileUpdate).length > 0
-      ? [prisma.user.update({ where: { id: session.user.id }, data: profileUpdate })]
-      : []),
-  ]);
+  // Verify the session user actually exists in the DB (stale JWT guard)
+  const sessionUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true },
+  });
+  if (!sessionUser) {
+    return NextResponse.json({ error: "session_invalid" }, { status: 401 });
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.userCycleAssignment.create({
+        data: {
+          userId: session.user.id,
+          cycleId: invitation.cycleId,
+          role: invitation.role,
+          unitType: invitation.unitType,
+          unitId: invitation.unitId,
+        },
+      }),
+      prisma.invitation.update({
+        where: { id: invitation.id },
+        data: { acceptedAt: new Date() },
+      }),
+      ...(Object.keys(profileUpdate).length > 0
+        ? [prisma.user.update({ where: { id: session.user.id }, data: profileUpdate })]
+        : []),
+    ]);
+  } catch (err) {
+    console.error("Invitation accept transaction failed:", err);
+    return NextResponse.json({ error: "transaction_failed" }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }

@@ -28,7 +28,7 @@ export interface CycleAssignment {
 // Augmented session user (next-auth session.user)
 export interface SessionUser {
   id: string;
-  email: string;
+  email: string | null;
   givenName: string;
   familyName: string;
   rank?: string | null;

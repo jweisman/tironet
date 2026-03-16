@@ -181,12 +181,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const code = credentials?.code as string | undefined;
         if (!phone || !code) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { phone },
-          select: { id: true, email: true, givenName: true, familyName: true },
-        });
-        if (!user) return null;
-
+        // Verify OTP before touching the DB (don't create users on bad codes)
         let approved = false;
         try {
           approved = await verifyWhatsAppOtp(phone, code);
@@ -194,6 +189,53 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
         if (!approved) return null;
+
+        // Find user by phone
+        let user = await prisma.user.findUnique({
+          where: { phone },
+          select: { id: true, email: true, givenName: true, familyName: true },
+        });
+
+        if (!user) {
+          // No user with this phone yet — check for a valid pending invitation
+          const invitation = await prisma.invitation.findFirst({
+            where: { phone, acceptedAt: null, expiresAt: { gt: new Date() } },
+            select: { email: true, givenName: true, familyName: true },
+          });
+          if (!invitation) return null;
+
+          if (invitation.email) {
+            // Invitation has email — find or create user by email
+            const existing = await prisma.user.findUnique({
+              where: { email: invitation.email },
+              select: { id: true, email: true, givenName: true, familyName: true },
+            });
+            if (existing) {
+              await prisma.user.update({ where: { id: existing.id }, data: { phone } });
+              user = existing;
+            } else {
+              user = await prisma.user.create({
+                data: {
+                  email: invitation.email,
+                  phone,
+                  givenName: invitation.givenName ?? "",
+                  familyName: invitation.familyName ?? "",
+                },
+                select: { id: true, email: true, givenName: true, familyName: true },
+              });
+            }
+          } else {
+            // Phone-only invitation — create user without email
+            user = await prisma.user.create({
+              data: {
+                phone,
+                givenName: invitation.givenName ?? "",
+                familyName: invitation.familyName ?? "",
+              },
+              select: { id: true, email: true, givenName: true, familyName: true },
+            });
+          }
+        }
 
         return {
           id: user.id,

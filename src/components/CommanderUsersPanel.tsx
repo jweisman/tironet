@@ -41,7 +41,7 @@ type User = {
   id: string;
   givenName: string;
   familyName: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   rank: string | null;
   isAdmin: boolean;
