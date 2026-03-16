@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
 export function AcceptInviteButton({ token }: { token: string }) {
@@ -16,10 +16,16 @@ export function AcceptInviteButton({ token }: { token: string }) {
       const res = await fetch(`/api/invitations/${token}/accept`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (data.error === "session_invalid") {
+          // Stale JWT — sign out (clears cookie) then redirect back to this invite
+          await signOut({ redirectTo: `/login?callbackUrl=/invite/${token}` });
+          return;
+        }
         const msgs: Record<string, string> = {
           already_used: "הזמנה זו כבר נוצלה.",
           expired: "פג תוקפה של ההזמנה.",
           email_mismatch: "האימייל אינו תואם את ההזמנה.",
+          phone_mismatch: "מספר הטלפון אינו תואם את ההזמנה.",
         };
         setError(msgs[data.error] ?? "אירעה שגיאה. נסה שנית.");
         return;
