@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   title: "טירונט",
   description: "מערכת ניהול אימוני טירונות",
   manifest: "/manifest.json",
+  icons: { icon: "/icon.svg" },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1d4ed8",
+  themeColor: "#273617",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

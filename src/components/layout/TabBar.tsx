@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, UserCog } from "lucide-react";
+import { Home, Users, Activity, UserCog, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,9 @@ export function TabBar() {
     ...staticTabs,
     ...(!isAdmin && isCommander
       ? [{ href: "/users", icon: UserCog, label: "מפקדים" }]
+      : []),
+    ...(isAdmin
+      ? [{ href: "/admin", icon: Settings, label: "ניהול" }]
       : []),
   ];
 

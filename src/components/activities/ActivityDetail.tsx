@@ -512,6 +512,16 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                           </span>
                         )}
                       </div>
+                      {(report.grade != null || report.note) && (
+                        <div className="flex items-center gap-2 text-xs shrink-0 mx-2">
+                          {report.grade != null && (
+                            <span className="font-medium">{report.grade}</span>
+                          )}
+                          {report.note && (
+                            <span className="text-muted-foreground max-w-[140px] truncate">{report.note}</span>
+                          )}
+                        </div>
+                      )}
                       <div className="shrink-0 text-base w-6 text-center">
                         {getResultIcon(report.result)}
                       </div>

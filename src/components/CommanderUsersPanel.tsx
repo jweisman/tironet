@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, RefreshCw, Send, Trash2, Copy, Check } from "lucide-react";
+import { UserPlus, RefreshCw, Send, Trash2, Copy, Check, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { EditUserForm } from "@/components/admin/EditUserForm";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +61,7 @@ type Invitation = {
   cycleName: string;
   expiresAt: string;
   token: string;
+  invitedByUserId: string | null;
 };
 
 type Squad = { id: string; name: string };
@@ -73,6 +75,8 @@ type Props = {
   cycles: Cycle[];
   structureByCycle: Record<string, Company[]>;
   invitableRoles: Role[];
+  currentUserId: string;
+  isAdmin: boolean;
 };
 
 export function CommanderUsersPanel({
@@ -81,6 +85,8 @@ export function CommanderUsersPanel({
   cycles,
   structureByCycle,
   invitableRoles,
+  currentUserId,
+  isAdmin,
 }: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [invitations, setInvitations] = useState(initialInvitations);
@@ -89,6 +95,7 @@ export function CommanderUsersPanel({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const [sentEmailId, setSentEmailId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   async function reload() {
     const res = await fetch("/api/users/hierarchy");
@@ -203,8 +210,9 @@ export function CommanderUsersPanel({
               <thead className="bg-muted/50 border-b">
                 <tr>
                   <th className="text-start px-3 py-2.5 font-medium">שם</th>
-                  <th className="text-start px-3 py-2.5 font-medium hidden sm:table-cell">אימייל</th>
+                  <th className="text-start px-3 py-2.5 font-medium hidden sm:table-cell">אימייל / טלפון</th>
                   <th className="text-start px-3 py-2.5 font-medium">שיבוץ</th>
+                  <th className="px-3 py-2.5 w-10" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -218,8 +226,9 @@ export function CommanderUsersPanel({
                         <div className="text-xs text-muted-foreground">{user.rank}</div>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground hidden sm:table-cell" dir="ltr">
-                      {user.email}
+                    <td className="px-3 py-2.5 hidden sm:table-cell" dir="ltr">
+                      {user.email && <div className="text-muted-foreground">{user.email}</div>}
+                      {user.phone && <div className="text-muted-foreground">{toIsraeliDisplay(user.phone)}</div>}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="space-y-1">
@@ -236,6 +245,16 @@ export function CommanderUsersPanel({
                           ))}
                       </div>
                     </td>
+                    <td className="px-3 py-2.5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => setEditingUserId(user.id)}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -244,6 +263,29 @@ export function CommanderUsersPanel({
               <p className="text-center text-sm text-muted-foreground py-8">אין מפקדים בהיררכיה שלך</p>
             )}
           </div>
+
+          {/* Edit user dialog */}
+          {(() => {
+            const editingUser = users.find((u) => u.id === editingUserId);
+            return (
+              <Dialog open={editingUserId !== null} onOpenChange={(open) => { if (!open) setEditingUserId(null); }}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>עריכת משתמש</DialogTitle>
+                  </DialogHeader>
+                  {editingUser && (
+                    <EditUserForm
+                      user={{ ...editingUser, phone: editingUser.phone ?? null, email: editingUser.email ?? null }}
+                      showAdminToggle={false}
+                      endpoint={`/api/users/${editingUserId}/profile`}
+                      onSuccess={() => { setEditingUserId(null); reload(); }}
+                      onCancel={() => setEditingUserId(null)}
+                    />
+                  )}
+                </DialogContent>
+              </Dialog>
+            );
+          })()}
         </div>
 
         {/* Pending invitations */}
@@ -257,7 +299,7 @@ export function CommanderUsersPanel({
                 <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="text-start px-3 py-2 font-medium">שם</th>
-                    <th className="text-start px-3 py-2 font-medium hidden sm:table-cell">אימייל / טלפון</th>
+                    <th className="text-start px-3 py-2 font-medium">אימייל / טלפון</th>
                     <th className="text-start px-3 py-2 font-medium hidden sm:table-cell">תפקיד / יחידה</th>
                     <th className="px-3 py-2 w-28" />
                   </tr>
@@ -271,7 +313,7 @@ export function CommanderUsersPanel({
                           : <div className="text-muted-foreground text-xs">—</div>
                         }
                       </td>
-                      <td className="px-3 py-2 hidden sm:table-cell" dir="ltr">
+                      <td className="px-3 py-2" dir="ltr">
                         {inv.email && <div>{inv.email}</div>}
                         {inv.phone && (
                           <div className="text-muted-foreground">{toIsraeliDisplay(inv.phone)}</div>
@@ -318,8 +360,8 @@ export function CommanderUsersPanel({
                             </Button>
                           )}
 
-                          {/* Cancel */}
-                          <AlertDialog>
+                          {/* Cancel — only visible to the inviter or admins */}
+                          {(isAdmin || inv.invitedByUserId === currentUserId) && <AlertDialog>
                             <AlertDialogTrigger
                               render={
                                 <Button
@@ -349,7 +391,7 @@ export function CommanderUsersPanel({
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
-                          </AlertDialog>
+                          </AlertDialog>}
                         </div>
                       </td>
                     </tr>
