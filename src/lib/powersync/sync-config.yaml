@@ -55,9 +55,9 @@ streams:
 
   activity_reports:
     auto_subscribe: true
-    query: |
-      SELECT activity_reports.id, activity_reports.activity_id, activity_reports.soldier_id,
-             activity_reports.result, activity_reports.grade, activity_reports.note
+    query: >
+      SELECT id, activity_id, soldier_id, result, grade, note
       FROM activity_reports
-      JOIN activities ON activities.id = activity_reports.activity_id
-      WHERE activities.platoon_id IN auth.parameter('platoon_ids')
+      WHERE activity_id IN (
+        SELECT id FROM activities WHERE platoon_id IN auth.parameter('platoon_ids')
+      )

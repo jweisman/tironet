@@ -19,6 +19,11 @@ export function TironetPowerSyncProvider({
     const localDb = db;
     if (!localDb) return;
 
+    // Dev-only: expose db on window for browser console debugging.
+    if (process.env.NODE_ENV === "development") {
+      (window as unknown as Record<string, unknown>).__powersync = localDb;
+    }
+
     if (status === "authenticated") {
       localDb.connect(connector).catch((err: unknown) => {
         console.error("[PowerSync] connect error:", err);

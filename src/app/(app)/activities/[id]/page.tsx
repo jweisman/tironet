@@ -80,7 +80,6 @@ export default function ActivityPage() {
   const { selectedAssignment } = useCycle();
 
   const isAdmin = session?.user?.isAdmin ?? false;
-  const role = isAdmin ? "admin" : (selectedAssignment?.role ?? "");
 
   // -------- Admin: API fallback --------
   const [apiData, setApiData] = useState<ActivityDetailData | null>(null);
@@ -105,27 +104,38 @@ export default function ActivityPage() {
   const { data: activityRows } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
   const activity = activityRows?.[0] ?? null;
 
+  // Use the assignment for the activity's own cycle, not the globally selected one.
+  // A user may have assignments in multiple cycles (e.g. squad_commander in a past
+  // cycle, platoon_commander in the current one). Using the global context would
+  // produce the wrong role/squad when the selected cycle differs from the activity's.
+  const cycleAssignments = session?.user?.cycleAssignments ?? [];
+  const activityAssignment = activity
+    ? (cycleAssignments.find((a) => a.cycleId === activity.cycle_id) ?? null)
+    : selectedAssignment;
+
+  const role = isAdmin ? "admin" : (activityAssignment?.role ?? "");
+
   const platoonParams = useMemo(
     () => [activity?.platoon_id ?? ""],
     [activity?.platoon_id]
   );
-  const { data: squadsRows } = useQuery<RawSquad>(SQUADS_QUERY, platoonParams);
+  const { data: squadsRows, loading: squadsLoading } = useQuery<RawSquad>(SQUADS_QUERY, platoonParams);
 
   const cycleParams = useMemo(
     () => [activity?.cycle_id ?? ""],
     [activity?.cycle_id]
   );
-  const { data: soldiersRows } = useQuery<RawSoldier>(SOLDIERS_QUERY, cycleParams);
+  const { data: soldiersRows, loading: soldiersLoading } = useQuery<RawSoldier>(SOLDIERS_QUERY, cycleParams);
   const { data: reportsRows } = useQuery<RawReport>(REPORTS_QUERY, activityParams);
 
   // -------- Build ActivityDetailData from local rows --------
   const localData: ActivityDetailData | null = useMemo(() => {
-    if (isAdmin || !activity) return null;
+    if (isAdmin || !activity || squadsLoading || soldiersLoading) return null;
 
     const reportsMap = new Map<string, RawReport>();
     for (const r of reportsRows ?? []) reportsMap.set(r.soldier_id, r);
 
-    const squadId = selectedAssignment?.unitType === "squad" ? selectedAssignment.unitId : null;
+    const squadId = activityAssignment?.unitType === "squad" ? activityAssignment.unitId : null;
 
     const squads = (squadsRows ?? [])
       .filter((sq) => {
@@ -191,11 +201,11 @@ export default function ActivityPage() {
       canEditReports,
       squads,
     };
-  }, [isAdmin, activity, squadsRows, soldiersRows, reportsRows, role, selectedAssignment]);
+  }, [isAdmin, activity, squadsRows, squadsLoading, soldiersRows, soldiersLoading, reportsRows, role, activityAssignment]);
 
   const data = isAdmin ? apiData : localData;
-  const loading = isAdmin ? apiLoading : false;
-  const errorMessage = isAdmin ? apiError : (!activity && !loading ? "הפעילות לא נמצאה" : null);
+  const loading = isAdmin ? apiLoading : (squadsLoading || soldiersLoading);
+  const errorMessage = isAdmin ? apiError : (!activity && !squadsLoading && !soldiersLoading ? "הפעילות לא נמצאה" : null);
 
   return (
     <div>
@@ -228,7 +238,11 @@ export default function ActivityPage() {
       )}
 
       {!loading && data && (
-        <ActivityDetail initialData={data} initialGapsOnly={initialGapsOnly} />
+        <ActivityDetail
+          key={`${data.squads.map((s) => s.id).join(",")}-${data.squads.reduce((n, s) => n + s.soldiers.length, 0)}`}
+          initialData={data}
+          initialGapsOnly={initialGapsOnly}
+        />
       )}
     </div>
   );

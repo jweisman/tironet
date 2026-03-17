@@ -30,6 +30,31 @@ The `/api/powersync/token` endpoint signs a JWT with three custom claims resolve
 
 Sync streams use `auth.parameter('cycle_ids')` etc. to filter rows server-side. No client-side subscription parameters are needed — all streams use `auto_subscribe: true`.
 
+### Sync stream query patterns for `auth.parameter()`
+
+`IN auth.parameter('key')` works correctly when the filtered column is on the **primary (FROM) table**:
+
+```yaml
+query: >
+  SELECT id, name FROM activities
+  WHERE platoon_id IN auth.parameter('platoon_ids')
+```
+
+When the filtered column is on a **joined table** (not the primary table), use a **subquery** instead. The `json_each` JOIN pattern (e.g. `JOIN json_each(auth.parameter('platoon_ids')) AS p ON a.platoon_id = p.value`) appears valid per the docs but causes PowerSync to key buckets incorrectly (by the joined table's row ID instead of the parameter value), resulting in all rows being processed as REMOVE operations and 0 rows in the local DB.
+
+Correct pattern for `activity_reports`, which has no `platoon_id` of its own:
+
+```yaml
+query: >
+  SELECT id, activity_id, soldier_id, result, grade, note
+  FROM activity_reports
+  WHERE activity_id IN (
+    SELECT id FROM activities WHERE platoon_id IN auth.parameter('platoon_ids')
+  )
+```
+
+**Debugging tip:** if a stream appears in `ps_buckets` with non-zero `count_at_last` but the actual table is empty and `ps_oplog` is also empty after a full sync (`hasSynced: true`), the rows were received as REMOVE operations — likely a bucket keying mismatch from the wrong query pattern.
+
 ### Local Docker setup quirks
 
 - **`sslmode: disable`** must be set as a top-level field in `powersync.config.yaml` under the connection — NOT as a `?sslmode=disable` URL parameter. The pgwire library used by PowerSync ignores URL-embedded SSL params.
@@ -68,6 +93,31 @@ The UMD files are served from `public/@powersync/` (copied by `postinstall`). Th
 ```
 
 `public/@powersync/` is gitignored — it is regenerated on every `npm install`.
+
+## PowerSync + React Rendering Gotchas
+
+### `useQuery` loading state is unreliable for dependent queries
+
+`useQuery` from `@powersync/react` runs against local SQLite synchronously. When a query's params change (e.g. because a prior query's result resolved and updated the params), the `loading` flag may never transition through `true` — the new result is available immediately. Do not rely on `loading: true` to gate downstream rendering.
+
+### `ActivityDetail` uses `useState(initialData)` — key on data content, not just IDs
+
+`ActivityDetail` initializes its internal state with `useState(initialData)` and never syncs with prop changes. When the page builds `localData` from chained `useQuery` calls (activity → platoon params → squads → soldiers), React may mount `ActivityDetail` with partially-loaded data (correct squads, empty soldiers) before soldiers resolve in the next render cycle.
+
+**Fix:** key the component on both squad IDs AND total soldier count so it remounts when soldiers arrive:
+
+```tsx
+<ActivityDetail
+  key={`${data.squads.map(s => s.id).join(",")}-${data.squads.reduce((n, s) => n + s.soldiers.length, 0)}`}
+  initialData={data}
+/>
+```
+
+If you ever add another `useState(initialData)` component fed by chained `useQuery` params, apply the same pattern.
+
+### Activity detail page uses activity-cycle assignment, not global context
+
+The activity detail page (`/activities/[id]/page.tsx`) resolves the user's role and squad from the assignment matching `activity.cycle_id`, not from `selectedAssignment` in `CycleContext`. This handles users with assignments in multiple cycles correctly (e.g. squad_commander in a past cycle + platoon_commander in the current one).
 
 ## Data Model Constraints
 

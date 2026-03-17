@@ -60,7 +60,10 @@ const SORT_LABELS: Record<SortMode, string> = {
 // SQL queries (PowerSync local SQLite)
 // ---------------------------------------------------------------------------
 
+// squad_id param: pass the squad's ID to scope counts to that squad,
+// or '' to include all soldiers/reports in the platoon (for platoon/company/admin roles).
 const ACTIVITIES_QUERY = `
+  WITH sf AS (SELECT ? AS squad_id)
   SELECT
     a.id, a.name, a.date, a.status, a.is_required,
     at.name AS activity_type_name, at.icon AS activity_type_icon,
@@ -71,11 +74,24 @@ const ACTIVITIES_QUERY = `
       JOIN squads sq ON sq.id = s.squad_id
       WHERE sq.platoon_id = a.platoon_id
         AND s.status = 'active' AND s.cycle_id = a.cycle_id
+        AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))
     ) AS total_soldiers,
-    (SELECT COUNT(*) FROM activity_reports ar WHERE ar.activity_id = a.id AND ar.result = 'passed') AS passed_count,
-    (SELECT COUNT(*) FROM activity_reports ar WHERE ar.activity_id = a.id AND ar.result = 'failed') AS failed_count,
-    (SELECT COUNT(*) FROM activity_reports ar WHERE ar.activity_id = a.id AND ar.result = 'na') AS na_count,
-    (SELECT COUNT(*) FROM activity_reports ar WHERE ar.activity_id = a.id) AS reported_count
+    (SELECT COUNT(*) FROM activity_reports ar
+     JOIN soldiers s ON s.id = ar.soldier_id
+     WHERE ar.activity_id = a.id AND ar.result = 'passed'
+     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS passed_count,
+    (SELECT COUNT(*) FROM activity_reports ar
+     JOIN soldiers s ON s.id = ar.soldier_id
+     WHERE ar.activity_id = a.id AND ar.result = 'failed'
+     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS failed_count,
+    (SELECT COUNT(*) FROM activity_reports ar
+     JOIN soldiers s ON s.id = ar.soldier_id
+     WHERE ar.activity_id = a.id AND ar.result = 'na'
+     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS na_count,
+    (SELECT COUNT(*) FROM activity_reports ar
+     JOIN soldiers s ON s.id = ar.soldier_id
+     WHERE ar.activity_id = a.id
+     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS reported_count
   FROM activities a
   JOIN activity_types at ON at.id = a.activity_type_id
   JOIN platoons p ON p.id = a.platoon_id
@@ -149,7 +165,9 @@ export default function ActivitiesPage() {
   }, [isAdmin, selectedCycleId]);
 
   // -------- PowerSync queries (non-admin) --------
-  const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
+  // Squad commanders see only their squad's counts; everyone else gets platoon-wide counts (squadId = '').
+  const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
+  const queryParams = useMemo(() => [squadId, selectedCycleId ?? ""], [squadId, selectedCycleId]);
   const { data: rawActivities } = useQuery<RawActivity>(ACTIVITIES_QUERY, queryParams);
 
   const companyId = selectedAssignment?.unitType === "company" ? selectedAssignment.unitId : "";
