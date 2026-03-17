@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Pencil, CheckCircle } from "lucide-react";
+import { useQuery } from "@powersync/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { EditSoldierForm } from "@/components/soldiers/EditSoldierForm";
 import type { SoldierStatus } from "@/types";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const STATUS_LABEL: Record<SoldierStatus, string> = {
   active: "פעיל",
@@ -51,70 +56,100 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash];
 }
 
-interface ActivityReport {
-  id: string;
-  result: string;
-  grade: number | null;
-  note: string | null;
-  activity: {
-    id: string;
-    name: string;
-    date: string;
-    status: string;
-    isRequired: boolean;
-    activityType: { name: string };
-  };
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
 }
 
-interface MissingActivity {
-  id: string;
-  name: string;
-  date: string;
-  activityType: { name: string };
+// ---------------------------------------------------------------------------
+// SQL queries (PowerSync local SQLite)
+// ---------------------------------------------------------------------------
+
+const SOLDIER_QUERY = `
+  SELECT
+    s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
+    s.cycle_id, s.squad_id,
+    sq.name AS squad_name, sq.platoon_id,
+    p.id AS platoon_id, p.name AS platoon_name
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  JOIN platoons p ON p.id = sq.platoon_id
+  WHERE s.id = ?
+`;
+
+const REPORTS_QUERY = `
+  SELECT
+    ar.id, ar.result, ar.grade, ar.note,
+    a.id   AS activity_id,
+    a.name AS activity_name,
+    a.date AS activity_date,
+    a.status AS activity_status,
+    a.is_required,
+    at.name AS activity_type_name
+  FROM activity_reports ar
+  JOIN activities a    ON a.id  = ar.activity_id
+  JOIN activity_types at ON at.id = a.activity_type_id
+  WHERE ar.soldier_id = ?
+  ORDER BY a.date DESC
+`;
+
+// Activities in the soldier's platoon that are required+active with no report for this soldier.
+// Params: [soldierId, soldierId]
+const MISSING_QUERY = `
+  SELECT a.id, a.name, a.date, at.name AS activity_type_name
+  FROM activities a
+  JOIN activity_types at ON at.id = a.activity_type_id
+  WHERE a.platoon_id = (
+    SELECT sq.platoon_id FROM squads sq
+    JOIN soldiers s ON s.squad_id = sq.id
+    WHERE s.id = ?
+  )
+  AND a.status = 'active'
+  AND a.is_required = 1
+  AND NOT EXISTS (
+    SELECT 1 FROM activity_reports ar
+    WHERE ar.activity_id = a.id AND ar.soldier_id = ?
+  )
+  ORDER BY a.date DESC
+`;
+
+interface RawSoldier {
+  id: string; given_name: string; family_name: string;
+  rank: string | null; status: string; profile_image: string | null;
+  cycle_id: string; squad_id: string;
+  squad_name: string; platoon_id: string; platoon_name: string;
+}
+interface RawReport {
+  id: string; result: string; grade: number | null; note: string | null;
+  activity_id: string; activity_name: string; activity_date: string;
+  activity_status: string; is_required: number;
+  activity_type_name: string;
+}
+interface RawMissing {
+  id: string; name: string; date: string; activity_type_name: string;
 }
 
-interface SoldierDetail {
-  id: string;
-  givenName: string;
-  familyName: string;
-  rank: string | null;
-  status: SoldierStatus;
-  profileImage: string | null;
-  cycleId: string;
-  squadId: string;
-  squad: {
-    id: string;
-    name: string;
-    platoonId: string;
-    platoon: { id: string; name: string };
-  };
-  activityReports: ActivityReport[];
-  missingActivities: MissingActivity[];
-}
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
 
 export default function SoldierDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const soldierId = params.id;
 
-  const [soldier, setSoldier] = useState<SoldierDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
 
-  useEffect(() => {
-    if (!soldierId) return;
-    setLoading(true);
-    fetch(`/api/soldiers/${soldierId}`)
-      .then((r) => {
-        if (!r.ok) throw new Error("not found");
-        return r.json();
-      })
-      .then((d: SoldierDetail) => setSoldier(d))
-      .catch(() => setSoldier(null))
-      .finally(() => setLoading(false));
-  }, [soldierId]);
+  const soldierParams = useMemo(() => [soldierId], [soldierId]);
+  const missingParams = useMemo(() => [soldierId, soldierId], [soldierId]);
 
-  if (loading) {
+  const { data: soldierRows, loading: soldierLoading } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
+  const { data: reportRows } = useQuery<RawReport>(REPORTS_QUERY, soldierParams);
+  const { data: missingRows } = useQuery<RawMissing>(MISSING_QUERY, missingParams);
+
+  const raw = soldierRows?.[0] ?? null;
+
+  if (soldierLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
         טוען...
@@ -122,7 +157,7 @@ export default function SoldierDetailPage() {
     );
   }
 
-  if (!soldier) {
+  if (!raw) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
         <p className="font-medium">חייל לא נמצא</p>
@@ -133,21 +168,23 @@ export default function SoldierDetailPage() {
     );
   }
 
-  const initials =
-    (soldier.givenName[0] ?? "") + (soldier.familyName[0] ?? "");
-  const colorClass = getAvatarColor(soldier.givenName + soldier.familyName);
-  const statusVariant = STATUS_VARIANT[soldier.status];
+  const soldier = {
+    id: raw.id,
+    givenName: raw.given_name,
+    familyName: raw.family_name,
+    rank: raw.rank,
+    status: raw.status as SoldierStatus,
+    profileImage: raw.profile_image,
+  };
 
-  const failedReports = soldier.activityReports.filter(
-    (r) => r.activity.status === "active" && r.activity.isRequired && r.result === "failed"
+  const failedReports = (reportRows ?? []).filter(
+    (r) => r.activity_status === "active" && Number(r.is_required) === 1 && r.result === "failed"
   );
+  const gapCount = failedReports.length + (missingRows ?? []).length;
 
-  const gapCount = failedReports.length + soldier.missingActivities.length;
-
-  function formatDate(dateStr: string) {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
-  }
+  const initials = (raw.given_name[0] ?? "") + (raw.family_name[0] ?? "");
+  const colorClass = getAvatarColor(raw.given_name + raw.family_name);
+  const statusVariant = STATUS_VARIANT[raw.status as SoldierStatus];
 
   return (
     <div className="space-y-4">
@@ -168,11 +205,11 @@ export default function SoldierDetailPage() {
           <div
             className={`relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full text-white font-bold text-2xl ${colorClass}`}
           >
-            {soldier.profileImage ? (
+            {raw.profile_image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={soldier.profileImage}
-                alt={`${soldier.givenName} ${soldier.familyName}`}
+                src={raw.profile_image}
+                alt={`${raw.given_name} ${raw.family_name}`}
                 className="h-20 w-20 rounded-full object-cover"
               />
             ) : (
@@ -185,10 +222,10 @@ export default function SoldierDetailPage() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h1 className="text-lg font-bold leading-tight">
-                  {soldier.familyName} {soldier.givenName}
+                  {raw.family_name} {raw.given_name}
                 </h1>
-                {soldier.rank && (
-                  <p className="text-sm text-muted-foreground">{soldier.rank}</p>
+                {raw.rank && (
+                  <p className="text-sm text-muted-foreground">{raw.rank}</p>
                 )}
               </div>
               <Button
@@ -204,16 +241,16 @@ export default function SoldierDetailPage() {
             <Badge
               variant={statusVariant}
               className={
-                soldier.status === "injured"
+                raw.status === "injured"
                   ? "bg-amber-100 text-amber-800 border-amber-200 w-fit"
                   : "w-fit"
               }
             >
-              {STATUS_LABEL[soldier.status]}
+              {STATUS_LABEL[raw.status as SoldierStatus]}
             </Badge>
 
             <p className="text-sm text-muted-foreground">
-              {soldier.squad.platoon.name} / {soldier.squad.name}
+              {raw.platoon_name} / {raw.squad_name}
             </p>
           </div>
         </div>
@@ -222,26 +259,26 @@ export default function SoldierDetailPage() {
       {/* Gap activities section */}
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-muted-foreground">
-          פעילויות עם חסרים
+          פעילויות עם פערים
         </h2>
 
         {gapCount === 0 ? (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-emerald-600">
             <CheckCircle size={16} />
-            <span>אין חסרים</span>
+            <span>אין פערים</span>
           </div>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-card divide-y divide-border overflow-hidden">
             {failedReports.map((r) => (
               <Link
                 key={r.id}
-                href={`/activities/${r.activity.id}?gaps=1`}
+                href={`/activities/${r.activity_id}?gaps=1`}
                 className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex-1 min-w-0 space-y-0.5">
-                  <p className="text-sm font-medium">{r.activity.name}</p>
+                  <p className="text-sm font-medium">{r.activity_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {r.activity.activityType.name} · {formatDate(r.activity.date)}
+                    {r.activity_type_name} · {formatDate(r.activity_date)}
                   </p>
                   {r.grade !== null && (
                     <p className="text-xs text-muted-foreground">ציון: {r.grade}</p>
@@ -253,7 +290,7 @@ export default function SoldierDetailPage() {
                 <Badge variant="destructive" className="shrink-0 mt-0.5 text-xs">נכשל</Badge>
               </Link>
             ))}
-            {soldier.missingActivities.map((a) => (
+            {(missingRows ?? []).map((a) => (
               <Link
                 key={a.id}
                 href={`/activities/${a.id}?gaps=1`}
@@ -262,7 +299,7 @@ export default function SoldierDetailPage() {
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <p className="text-sm font-medium">{a.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {a.activityType.name} · {formatDate(a.date)}
+                    {a.activity_type_name} · {formatDate(a.date)}
                   </p>
                 </div>
                 <Badge variant="outline" className="shrink-0 mt-0.5 text-xs text-amber-700 border-amber-300">חסר</Badge>
@@ -280,21 +317,7 @@ export default function SoldierDetailPage() {
           </DialogHeader>
           <EditSoldierForm
             soldier={soldier}
-            onSuccess={(updated) => {
-              setSoldier((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      givenName: updated.givenName,
-                      familyName: updated.familyName,
-                      rank: updated.rank,
-                      status: updated.status,
-                      profileImage: updated.profileImage,
-                    }
-                  : prev
-              );
-              setEditOpen(false);
-            }}
+            onSuccess={() => setEditOpen(false)}
             onCancel={() => setEditOpen(false)}
           />
         </DialogContent>

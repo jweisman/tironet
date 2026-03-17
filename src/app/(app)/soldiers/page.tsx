@@ -316,7 +316,7 @@ export default function SoldiersPage() {
             )}
           >
             <AlertCircle size={12} />
-            <span>חסרים</span>
+            <span>פערים</span>
           </button>
         </div>
       </div>

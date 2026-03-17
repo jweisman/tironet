@@ -281,17 +281,14 @@ export default function ActivitiesPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {loading && (
-          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">טוען...</div>
-        )}
-        {!loading && filtered.length === 0 && (
+        {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין פעילויות</p>
             {filter !== "all" && <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>}
             {filter === "all" && canCreate && <p className="text-sm text-muted-foreground">לחץ על + כדי ליצור פעילות חדשה</p>}
           </div>
         )}
-        {!loading && filtered.length > 0 && (
+        {filtered.length > 0 && (
           <div className="divide-y divide-border">
             {filtered.map((activity) => (
               <ActivityCard
