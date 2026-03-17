@@ -1,22 +1,8 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import withPWA from "@ducanh2912/next-pwa";
+import { withSerwist } from "@serwist/turbopack";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
-
-const pwaConfig = withPWA({
-  dest: "public",
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
-  disable: process.env.NODE_ENV === "development",
-  workboxOptions: {
-    disableDevLogs: true,
-    // Exclude PowerSync worker assets — PowerSync manages its own worker lifecycle.
-    // Exclude API routes — they require live auth tokens and must never be served stale.
-    exclude: [/\/@powersync\//, /\/api\//],
-  },
-});
 
 const nextConfig: NextConfig = {
   // Allow external profile pictures from Google OAuth
@@ -43,4 +29,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default pwaConfig(withNextIntl(nextConfig));
+export default withSerwist(withNextIntl(nextConfig));

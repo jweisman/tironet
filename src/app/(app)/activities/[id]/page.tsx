@@ -98,18 +98,18 @@ export default function ActivityPage() {
     () => [activity?.platoon_id ?? ""],
     [activity?.platoon_id]
   );
-  const { data: squadsRows, loading: squadsLoading } = useQuery<RawSquad>(SQUADS_QUERY, platoonParams);
+  const { data: squadsRows } = useQuery<RawSquad>(SQUADS_QUERY, platoonParams);
 
   const cycleParams = useMemo(
     () => [activity?.cycle_id ?? ""],
     [activity?.cycle_id]
   );
-  const { data: soldiersRows, loading: soldiersLoading } = useQuery<RawSoldier>(SOLDIERS_QUERY, cycleParams);
+  const { data: soldiersRows } = useQuery<RawSoldier>(SOLDIERS_QUERY, cycleParams);
   const { data: reportsRows } = useQuery<RawReport>(REPORTS_QUERY, activityParams);
 
   // -------- Build ActivityDetailData from local rows --------
   const data: ActivityDetailData | null = useMemo(() => {
-    if (!activity || squadsLoading || soldiersLoading) return null;
+    if (!activity) return null;
 
     const reportsMap = new Map<string, RawReport>();
     for (const r of reportsRows ?? []) reportsMap.set(r.soldier_id, r);
@@ -178,10 +178,9 @@ export default function ActivityPage() {
       canEditReports,
       squads,
     };
-  }, [activity, squadsRows, squadsLoading, soldiersRows, soldiersLoading, reportsRows, role, activityAssignment]);
+  }, [activity, squadsRows, soldiersRows, reportsRows, role, activityAssignment]);
 
-  const loading = squadsLoading || soldiersLoading;
-  const errorMessage = !activity && !squadsLoading && !soldiersLoading ? "הפעילות לא נמצאה" : null;
+  const errorMessage = !activity ? "הפעילות לא נמצאה" : null;
 
   return (
     <div>
@@ -195,13 +194,7 @@ export default function ActivityPage() {
         </Link>
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
-          טוען...
-        </div>
-      )}
-
-      {!loading && errorMessage && (
+      {errorMessage && (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
           <p className="font-medium text-destructive">{errorMessage}</p>
           <Link
@@ -213,7 +206,7 @@ export default function ActivityPage() {
         </div>
       )}
 
-      {!loading && data && (
+      {data && (
         <ActivityDetail
           key={`${data.squads.map((s) => s.id).join(",")}-${data.squads.reduce((n, s) => n + s.soldiers.length, 0)}`}
           initialData={data}

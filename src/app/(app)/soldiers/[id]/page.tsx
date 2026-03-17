@@ -143,19 +143,11 @@ export default function SoldierDetailPage() {
   const soldierParams = useMemo(() => [soldierId], [soldierId]);
   const missingParams = useMemo(() => [soldierId, soldierId], [soldierId]);
 
-  const { data: soldierRows, loading: soldierLoading } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
+  const { data: soldierRows } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
   const { data: reportRows } = useQuery<RawReport>(REPORTS_QUERY, soldierParams);
   const { data: missingRows } = useQuery<RawMissing>(MISSING_QUERY, missingParams);
 
   const raw = soldierRows?.[0] ?? null;
-
-  if (soldierLoading) {
-    return (
-      <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
-        טוען...
-      </div>
-    );
-  }
 
   if (!raw) {
     return (

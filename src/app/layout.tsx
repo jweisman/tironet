@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Heebo } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
+import { SerwistProvider } from "./serwist-provider";
 import "./globals.css";
 
 const heebo = Heebo({
@@ -39,9 +40,11 @@ export default async function RootLayout({
   return (
     <html lang="he" dir="rtl">
       <body className={`${heebo.variable} font-sans antialiased`}>
-        <NextIntlClientProvider messages={messages}>
-          {children}
-        </NextIntlClientProvider>
+        <SerwistProvider>
+          <NextIntlClientProvider messages={messages}>
+            {children}
+          </NextIntlClientProvider>
+        </SerwistProvider>
       </body>
     </html>
   );
