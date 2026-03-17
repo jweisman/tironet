@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, AlertCircle, FileUp } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
-import { useSession } from "next-auth/react";
 import { useQuery } from "@powersync/react";
 import { SoldierCard, type SoldierSummary } from "@/components/soldiers/SoldierCard";
 import { AddSoldierForm } from "@/components/soldiers/AddSoldierForm";
@@ -35,11 +34,6 @@ interface SquadData {
   platoonId: string;
   platoonName: string;
   soldiers: SoldierSummary[];
-}
-
-interface SoldiersResponse {
-  role: string;
-  squads: SquadData[];
 }
 
 type StatusFilter = "all" | SoldierStatus;
@@ -131,36 +125,17 @@ function mapSoldier(raw: RawSoldier): SoldierSummary {
 
 export default function SoldiersPage() {
   const { selectedCycleId, selectedAssignment } = useCycle();
-  const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const isAdmin = session?.user?.isAdmin ?? false;
-  const role = isAdmin ? "admin" : (selectedAssignment?.role ?? "");
+  const role = selectedAssignment?.role ?? "";
 
-  // -------- Admin: API fallback --------
-  const [apiData, setApiData] = useState<SoldiersResponse | null>(null);
-  const [apiLoading, setApiLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isAdmin || !selectedCycleId) { setApiData(null); return; }
-    setApiLoading(true);
-    fetch(`/api/soldiers?cycleId=${selectedCycleId}`)
-      .then((r) => r.json())
-      .then((d: SoldiersResponse) => setApiData(d))
-      .catch(() => setApiData(null))
-      .finally(() => setApiLoading(false));
-  }, [isAdmin, selectedCycleId]);
-
-  // -------- PowerSync queries (non-admin) --------
+  // -------- PowerSync queries --------
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
   const { data: rawSoldiers } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
 
-  // -------- Resolve data source --------
   const allSquads: SquadData[] = useMemo(() => {
-    if (isAdmin) return apiData?.squads ?? [];
-
     const squadMap = new Map<string, SquadData>();
     for (const sq of rawSquads ?? []) {
       squadMap.set(sq.id, {
@@ -176,9 +151,7 @@ export default function SoldiersPage() {
       if (squad) squad.soldiers.push(mapSoldier(s));
     }
     return Array.from(squadMap.values()).filter((sq) => sq.soldiers.length > 0);
-  }, [isAdmin, apiData, rawSoldiers, rawSquads]);
-
-  const loading = isAdmin ? apiLoading : false;
+  }, [rawSoldiers, rawSquads]);
 
   // -------- UI state --------
   const [search, setSearch] = useState("");
@@ -230,18 +203,8 @@ export default function SoldiersPage() {
     return Array.from(map.values());
   }, [filteredSquads, role]);
 
-  function refreshApiData() {
-    if (isAdmin && selectedCycleId) {
-      fetch(`/api/soldiers?cycleId=${selectedCycleId}`)
-        .then((r) => r.json())
-        .then((d: SoldiersResponse) => setApiData(d))
-        .catch(() => {});
-    }
-  }
-
   function handleImportSuccess(created: number, activeActivityCount: number) {
     setImportOpen(false);
-    refreshApiData();
     if (activeActivityCount > 0 && created > 0) {
       setLateJoinerInfo({ count: activeActivityCount, soldierId: "__bulk__" });
     }
@@ -249,7 +212,6 @@ export default function SoldiersPage() {
 
   function handleAddSuccess(activeActivityCount: number, soldierId: string) {
     setAddOpen(false);
-    refreshApiData();
     if (activeActivityCount > 0) {
       setLateJoinerInfo({ count: activeActivityCount, soldierId });
     }
@@ -264,7 +226,6 @@ export default function SoldiersPage() {
           method: "POST",
         });
       }
-      refreshApiData();
     } catch {
       // ignore
     } finally {
@@ -362,13 +323,7 @@ export default function SoldiersPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {loading && (
-          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
-            טוען...
-          </div>
-        )}
-
-        {!loading && totalSoldiers === 0 && (
+        {totalSoldiers === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
             {(search || statusFilter !== "all" || showGapsOnly) && (
@@ -377,7 +332,7 @@ export default function SoldiersPage() {
           </div>
         )}
 
-        {!loading && role === "squad_commander" && (
+        {role === "squad_commander" && (
           <div className="divide-y divide-border">
             {filteredSquads.flatMap((sq) =>
               sq.soldiers.map((s) => (
@@ -391,7 +346,7 @@ export default function SoldiersPage() {
           </div>
         )}
 
-        {!loading && role === "platoon_commander" && (
+        {role === "platoon_commander" && (
           <div>
             {filteredSquads.map((squad) => (
               <div key={squad.id}>
@@ -417,7 +372,7 @@ export default function SoldiersPage() {
           </div>
         )}
 
-        {!loading && role === "company_commander" && squadsByPlatoon && (
+        {role === "company_commander" && squadsByPlatoon && (
           <div>
             {squadsByPlatoon.map((platoonGroup) => (
               <div key={platoonGroup.platoonName}>
@@ -452,31 +407,6 @@ export default function SoldiersPage() {
           </div>
         )}
 
-        {!loading && role === "admin" && (
-          <div>
-            {filteredSquads.map((squad) => (
-              <div key={squad.id}>
-                <div className="sticky top-[104px] z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between border-b border-border">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    {squad.platoonName} / {squad.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {squad.soldiers.length}
-                  </span>
-                </div>
-                <div className="divide-y divide-border">
-                  {squad.soldiers.map((s) => (
-                    <SoldierCard
-                      key={s.id}
-                      soldier={s}
-                      onClick={() => router.push(`/soldiers/${s.id}`)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* FABs — mobile only */}

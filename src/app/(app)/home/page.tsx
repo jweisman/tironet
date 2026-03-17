@@ -13,7 +13,6 @@ const ROLE_SHORT: Record<string, string> = {
   squad_commander: 'מ"כ',
   platoon_commander: 'מ"מ',
   company_commander: 'מ"פ',
-  admin: "מנהל",
 };
 
 function AggregateRow({ squads }: { squads: SquadSummary[] }) {
@@ -47,8 +46,6 @@ function AggregateRow({ squads }: { squads: SquadSummary[] }) {
 export default function HomePage() {
   const { data: session } = useSession();
   const { selectedCycleId, selectedAssignment, activeCycles } = useCycle();
-  const isAdmin = session?.user?.isAdmin;
-
   const [dashData, setDashData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -65,8 +62,8 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, [selectedCycleId]);
 
-  // No active cycles for non-admin
-  if (!isAdmin && activeCycles.length === 0) {
+  // No active cycles
+  if (activeCycles.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
         <p className="text-lg font-medium">אין לך גישה למחזור פעיל</p>
@@ -75,13 +72,13 @@ export default function HomePage() {
     );
   }
 
-  // Multiple cycles, none selected (non-admin)
-  if (!selectedAssignment && activeCycles.length > 1 && !isAdmin) {
+  // Multiple cycles, none selected
+  if (!selectedAssignment && activeCycles.length > 1) {
     return <CyclePicker />;
   }
 
   const user = session?.user;
-  const role = dashData?.role ?? selectedAssignment?.role ?? (isAdmin ? "admin" : null);
+  const role = dashData?.role ?? selectedAssignment?.role ?? null;
   const cycleName = selectedAssignment?.cycleName ?? activeCycles[0]?.cycleName ?? "";
 
   // Group squads by platoon for company/admin view
@@ -95,7 +92,7 @@ export default function HomePage() {
   }
   const platoons = Array.from(platoonMap.values());
 
-  const isCompanyOrAdmin = role === "company_commander" || role === "admin";
+  const isCompanyOrAdmin = role === "company_commander";
   const isPlatoon = role === "platoon_commander";
 
   return (

@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronDown } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
-import { useSession } from "next-auth/react";
 import { useQuery } from "@powersync/react";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
 import { CreateActivityForm } from "@/components/activities/CreateActivityForm";
@@ -29,14 +28,6 @@ import { cn } from "@/lib/utils";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface ActivitiesApiResponse {
-  role: string;
-  canCreate: boolean;
-  platoonIds: string[];
-  platoons: { id: string; name: string }[];
-  activities: ActivitySummary[];
-}
 
 type FilterPill = "all" | "week" | "gaps" | "draft";
 type SortMode = "date-desc" | "date-asc" | "name-asc" | "name-desc";
@@ -142,29 +133,13 @@ function mapActivity(raw: RawActivity): ActivitySummary {
 
 export default function ActivitiesPage() {
   const { selectedCycleId, selectedAssignment } = useCycle();
-  const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const isAdmin = session?.user?.isAdmin ?? false;
-  const role = isAdmin ? "admin" : (selectedAssignment?.role ?? "");
+  const role = selectedAssignment?.role ?? "";
   const canCreate = role !== "squad_commander" && !!role;
 
-  // -------- Admin: API fallback --------
-  const [apiData, setApiData] = useState<ActivitiesApiResponse | null>(null);
-  const [apiLoading, setApiLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isAdmin || !selectedCycleId) { setApiData(null); return; }
-    setApiLoading(true);
-    fetch(`/api/activities?cycleId=${selectedCycleId}`)
-      .then((r) => r.json())
-      .then((d: ActivitiesApiResponse) => setApiData(d))
-      .catch(() => setApiData(null))
-      .finally(() => setApiLoading(false));
-  }, [isAdmin, selectedCycleId]);
-
-  // -------- PowerSync queries (non-admin) --------
+  // -------- PowerSync queries --------
   // Squad commanders see only their squad's counts; everyone else gets platoon-wide counts (squadId = '').
   const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
   const queryParams = useMemo(() => [squadId, selectedCycleId ?? ""], [squadId, selectedCycleId]);
@@ -177,13 +152,10 @@ export default function ActivitiesPage() {
     platoonParams
   );
 
-  // -------- Resolve data source --------
-  const allActivities: ActivitySummary[] = useMemo(() => {
-    if (isAdmin) return apiData?.activities ?? [];
-    return (rawActivities ?? []).map(mapActivity);
-  }, [isAdmin, apiData, rawActivities]);
-
-  const loading = isAdmin ? apiLoading : false;
+  const allActivities: ActivitySummary[] = useMemo(
+    () => (rawActivities ?? []).map(mapActivity),
+    [rawActivities]
+  );
 
   // -------- UI state --------
   const initialFilter = (searchParams.get("filter") as FilterPill | null) ?? "all";
@@ -221,26 +193,17 @@ export default function ActivitiesPage() {
     return list;
   }, [allActivities, filter, sortMode, weekAgoStr, todayStr]);
 
-  const showPlatoon = role === "company_commander" || role === "admin";
+  const showPlatoon = role === "company_commander";
 
   const platoonOptions = useMemo(() => {
     if (!selectedAssignment) return [];
     if (role === "platoon_commander") return [{ id: selectedAssignment.unitId, name: "המחלקה שלי" }];
     if (role === "company_commander") return companyPlatoons ?? [];
-    if (role === "admin") {
-      const seen = new Map<string, string>();
-      for (const a of allActivities) seen.set(a.platoon.id, a.platoon.name);
-      return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-    }
     return [];
-  }, [selectedAssignment, role, companyPlatoons, allActivities]);
+  }, [selectedAssignment, role, companyPlatoons]);
 
   function handleCreateSuccess(activityId: string) {
     setCreateOpen(false);
-    if (isAdmin && selectedCycleId) {
-      fetch(`/api/activities?cycleId=${selectedCycleId}`)
-        .then((r) => r.json()).then((d: ActivitiesApiResponse) => setApiData(d)).catch(() => {});
-    }
     setPendingActivityId(activityId);
   }
 

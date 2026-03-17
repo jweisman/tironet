@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -79,27 +79,6 @@ export default function ActivityPage() {
   const { data: session } = useSession();
   const { selectedAssignment } = useCycle();
 
-  const isAdmin = session?.user?.isAdmin ?? false;
-
-  // -------- Admin: API fallback --------
-  const [apiData, setApiData] = useState<ActivityDetailData | null>(null);
-  const [apiLoading, setApiLoading] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    setApiLoading(true);
-    fetch(`/api/activities/${id}`)
-      .then((r) => {
-        if (!r.ok) throw new Error("not found");
-        return r.json();
-      })
-      .then((d: ActivityDetailData) => setApiData(d))
-      .catch(() => setApiError("הפעילות לא נמצאה"))
-      .finally(() => setApiLoading(false));
-  }, [isAdmin, id]);
-
-  // -------- PowerSync queries (non-admin) --------
   const activityParams = useMemo(() => [id], [id]);
   const { data: activityRows } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
   const activity = activityRows?.[0] ?? null;
@@ -113,7 +92,7 @@ export default function ActivityPage() {
     ? (cycleAssignments.find((a) => a.cycleId === activity.cycle_id) ?? null)
     : selectedAssignment;
 
-  const role = isAdmin ? "admin" : (activityAssignment?.role ?? "");
+  const role = activityAssignment?.role ?? "";
 
   const platoonParams = useMemo(
     () => [activity?.platoon_id ?? ""],
@@ -129,8 +108,8 @@ export default function ActivityPage() {
   const { data: reportsRows } = useQuery<RawReport>(REPORTS_QUERY, activityParams);
 
   // -------- Build ActivityDetailData from local rows --------
-  const localData: ActivityDetailData | null = useMemo(() => {
-    if (isAdmin || !activity || squadsLoading || soldiersLoading) return null;
+  const data: ActivityDetailData | null = useMemo(() => {
+    if (!activity || squadsLoading || soldiersLoading) return null;
 
     const reportsMap = new Map<string, RawReport>();
     for (const r of reportsRows ?? []) reportsMap.set(r.soldier_id, r);
@@ -144,7 +123,6 @@ export default function ActivityPage() {
       })
       .map((sq) => {
         const canEdit =
-          role === "admin" ||
           role === "platoon_commander" ||
           role === "company_commander" ||
           (role === "squad_commander" && sq.id === squadId);
@@ -175,7 +153,6 @@ export default function ActivityPage() {
       });
 
     const canEditMetadata =
-      role === "admin" ||
       role === "platoon_commander" ||
       role === "company_commander";
     const canEditReports = role !== "";
@@ -201,11 +178,10 @@ export default function ActivityPage() {
       canEditReports,
       squads,
     };
-  }, [isAdmin, activity, squadsRows, squadsLoading, soldiersRows, soldiersLoading, reportsRows, role, activityAssignment]);
+  }, [activity, squadsRows, squadsLoading, soldiersRows, soldiersLoading, reportsRows, role, activityAssignment]);
 
-  const data = isAdmin ? apiData : localData;
-  const loading = isAdmin ? apiLoading : (squadsLoading || soldiersLoading);
-  const errorMessage = isAdmin ? apiError : (!activity && !squadsLoading && !soldiersLoading ? "הפעילות לא נמצאה" : null);
+  const loading = squadsLoading || soldiersLoading;
+  const errorMessage = !activity && !squadsLoading && !soldiersLoading ? "הפעילות לא נמצאה" : null;
 
   return (
     <div>
