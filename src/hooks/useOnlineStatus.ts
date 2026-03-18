@@ -1,5 +1,5 @@
 import { useStatus } from "@powersync/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export function useOnlineStatus() {
   const status = useStatus();
@@ -21,11 +21,18 @@ export function useOnlineStatus() {
     };
   }, []);
 
-  // Consider "connected" if the browser is online and PowerSync either hasn't
-  // finished its first sync yet (still connecting) or is actively connected.
-  // This prevents the offline banner from flashing on page reload while the
-  // WebSocket is being established.
-  const isConnected = browserOnline && (status.connected || !status.hasSynced);
+  // Track whether PowerSync has connected at least once in THIS page session.
+  // `status.hasSynced` is persisted across sessions and is always true after
+  // the first-ever sync, so it can't distinguish "still booting" from
+  // "lost connection". This ref stays false until we see connected: true.
+  const hasConnectedRef = useRef(false);
+  if (status.connected) hasConnectedRef.current = true;
+
+  // Show offline banner only when:
+  // - Browser is offline, OR
+  // - PowerSync was connected this session but lost connection
+  // Don't show it while PowerSync is still establishing its initial connection.
+  const isConnected = browserOnline && (!hasConnectedRef.current || status.connected);
 
   return {
     isConnected,

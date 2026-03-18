@@ -100,31 +100,48 @@ function resolveShellRoute(pathname: string, origin: string): {
   }
 );
 
-// Fetch the actual page HTML, cache under the canonical shell key, serve it.
-// Uses the navigation-preload response when available (avoids a redundant fetch
-// since the browser already started the request alongside SW startup).
+// Stale-while-revalidate for HTML shells.
+//
+// If a cached shell exists, serve it immediately and refresh in the background.
+// This prevents iOS standalone PWA crashes: when iOS kills and resumes the app,
+// the server-side auth may redirect to /login (302). Serving the cached shell
+// avoids the redirect entirely — React boots from cache and PowerSync reconnects.
+//
+// On first visit (no cache), falls through to the network response.
 async function handleHtmlShell(
   event: FetchEvent,
   shellKey: string,
   cacheName: string
 ): Promise<Response> {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(new Request(shellKey));
+
+  // Background: fetch fresh shell and update cache (fire-and-forget).
+  const refreshCache = async () => {
+    const preload = await Promise.resolve(event.preloadResponse).catch(() => undefined);
+    const response = preload ?? (await fetch(event.request).catch(() => undefined));
+    if (response?.ok) {
+      await cache.put(new Request(shellKey), response);
+    }
+  };
+
+  if (cached) {
+    // Serve cache instantly, refresh in background.
+    refreshCache();
+    return cached;
+  }
+
+  // No cache yet — must go to network.
   const preload = await Promise.resolve(event.preloadResponse).catch(() => undefined);
   const response = preload ?? (await fetch(event.request).catch(() => undefined));
 
   if (response) {
-    // Only cache successful (200) responses — not redirects or errors.
-    // But always return whatever the server sent (redirects, 4xx, etc.)
-    // so the browser can handle auth redirects normally.
     if (response.ok) {
       const cloned = response.clone();
-      caches.open(cacheName).then((c) => c.put(new Request(shellKey), cloned));
+      cache.put(new Request(shellKey), cloned);
     }
     return response;
   }
-
-  // Network completely failed — serve cached shell if available.
-  const cached = await caches.open(cacheName).then((c) => c.match(new Request(shellKey)));
-  if (cached) return cached;
 
   return new Response(
     `<!doctype html>
@@ -156,26 +173,37 @@ async function handleHtmlShell(
   );
 }
 
-// Fetch the RSC payload for the route, cache under the canonical shell key.
-// /activities/[id] is a "use client" page so all UUIDs produce the same RSC
-// tree; useParams() on the client resolves the correct ID from the URL.
+// Stale-while-revalidate for RSC payloads.
+// Same strategy as HTML shells — serve cache first, refresh in background.
 async function handleRscShell(
   event: FetchEvent,
   shellKey: string,
   cacheName: string
 ): Promise<Response> {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(new Request(shellKey));
+
+  const refreshCache = async () => {
+    const response = await fetch(event.request).catch(() => undefined);
+    if (response?.ok) {
+      await cache.put(new Request(shellKey), response);
+    }
+  };
+
+  if (cached) {
+    refreshCache();
+    return cached;
+  }
+
   const response = await fetch(event.request).catch(() => undefined);
 
   if (response) {
     if (response.ok) {
       const cloned = response.clone();
-      caches.open(cacheName).then((c) => c.put(new Request(shellKey), cloned));
+      cache.put(new Request(shellKey), cloned);
     }
     return response;
   }
-
-  const cached = await caches.open(cacheName).then((c) => c.match(new Request(shellKey)));
-  if (cached) return cached;
 
   return new Response("", { status: 503 });
 }
