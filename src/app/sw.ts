@@ -111,12 +111,18 @@ async function handleHtmlShell(
   const preload = await Promise.resolve(event.preloadResponse).catch(() => undefined);
   const response = preload ?? (await fetch(event.request).catch(() => undefined));
 
-  if (response?.ok) {
-    const cloned = response.clone(); // clone synchronously before body is consumed
-    caches.open(cacheName).then((c) => c.put(new Request(shellKey), cloned));
+  if (response) {
+    // Only cache successful (200) responses — not redirects or errors.
+    // But always return whatever the server sent (redirects, 4xx, etc.)
+    // so the browser can handle auth redirects normally.
+    if (response.ok) {
+      const cloned = response.clone();
+      caches.open(cacheName).then((c) => c.put(new Request(shellKey), cloned));
+    }
     return response;
   }
 
+  // Network completely failed — serve cached shell if available.
   const cached = await caches.open(cacheName).then((c) => c.match(new Request(shellKey)));
   if (cached) return cached;
 
@@ -160,9 +166,11 @@ async function handleRscShell(
 ): Promise<Response> {
   const response = await fetch(event.request).catch(() => undefined);
 
-  if (response?.ok) {
-    const cloned = response.clone(); // clone synchronously before body is consumed
-    caches.open(cacheName).then((c) => c.put(new Request(shellKey), cloned));
+  if (response) {
+    if (response.ok) {
+      const cloned = response.clone();
+      caches.open(cacheName).then((c) => c.put(new Request(shellKey), cloned));
+    }
     return response;
   }
 
