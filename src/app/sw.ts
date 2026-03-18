@@ -117,10 +117,14 @@ async function handleHtmlShell(
   const cached = await cache.match(new Request(shellKey));
 
   // Background: fetch fresh shell and update cache (fire-and-forget).
+  // CRITICAL: only cache non-redirected 200 responses. If the server-side auth
+  // redirects to /login (302), fetch() follows it and returns a 200 for the
+  // login page. Without the redirected check, we'd cache the LOGIN PAGE HTML as
+  // the app shell — causing hydration crashes on the next reload.
   const refreshCache = async () => {
     const preload = await Promise.resolve(event.preloadResponse).catch(() => undefined);
     const response = preload ?? (await fetch(event.request).catch(() => undefined));
-    if (response?.ok) {
+    if (response?.ok && !response.redirected) {
       await cache.put(new Request(shellKey), response);
     }
   };
@@ -136,7 +140,7 @@ async function handleHtmlShell(
   const response = preload ?? (await fetch(event.request).catch(() => undefined));
 
   if (response) {
-    if (response.ok) {
+    if (response.ok && !response.redirected) {
       const cloned = response.clone();
       cache.put(new Request(shellKey), cloned);
     }
@@ -185,7 +189,7 @@ async function handleRscShell(
 
   const refreshCache = async () => {
     const response = await fetch(event.request).catch(() => undefined);
-    if (response?.ok) {
+    if (response?.ok && !response.redirected) {
       await cache.put(new Request(shellKey), response);
     }
   };
@@ -198,7 +202,7 @@ async function handleRscShell(
   const response = await fetch(event.request).catch(() => undefined);
 
   if (response) {
-    if (response.ok) {
+    if (response.ok && !response.redirected) {
       const cloned = response.clone();
       cache.put(new Request(shellKey), cloned);
     }
