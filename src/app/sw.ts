@@ -100,52 +100,40 @@ function resolveShellRoute(pathname: string, origin: string): {
   }
 );
 
-// Stale-while-revalidate for HTML shells.
+// Network-first with cache fallback for HTML shells.
 //
-// If a cached shell exists, serve it immediately and refresh in the background.
-// This prevents iOS standalone PWA crashes: when iOS kills and resumes the app,
-// the server-side auth may redirect to /login (302). Serving the cached shell
-// avoids the redirect entirely — React boots from cache and PowerSync reconnects.
+// Try the network; if it returns a valid (200, non-redirected) response, cache
+// it and serve it. If the network fails or returns a redirect/error, fall back
+// to the cached shell. This is critical for iOS standalone PWA: when iOS kills
+// and resumes the app, the cached shell lets React boot from IndexedDB without
+// hitting the server's auth redirect.
 //
-// On first visit (no cache), falls through to the network response.
+// No background refresh — iOS aggressively terminates SW async work after
+// respondWith(), which can corrupt cache entries.
 async function handleHtmlShell(
   event: FetchEvent,
   shellKey: string,
   cacheName: string
 ): Promise<Response> {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(new Request(shellKey));
 
-  // Background: fetch fresh shell and update cache (fire-and-forget).
-  // CRITICAL: only cache non-redirected 200 responses. If the server-side auth
-  // redirects to /login (302), fetch() follows it and returns a 200 for the
-  // login page. Without the redirected check, we'd cache the LOGIN PAGE HTML as
-  // the app shell — causing hydration crashes on the next reload.
-  const refreshCache = async () => {
-    const preload = await Promise.resolve(event.preloadResponse).catch(() => undefined);
-    const response = preload ?? (await fetch(event.request).catch(() => undefined));
-    if (response?.ok && !response.redirected) {
-      await cache.put(new Request(shellKey), response);
-    }
-  };
-
-  if (cached) {
-    // Serve cache instantly, refresh in background.
-    refreshCache();
-    return cached;
-  }
-
-  // No cache yet — must go to network.
+  // Try network first.
   const preload = await Promise.resolve(event.preloadResponse).catch(() => undefined);
   const response = preload ?? (await fetch(event.request).catch(() => undefined));
 
-  if (response) {
-    if (response.ok && !response.redirected) {
-      const cloned = response.clone();
-      cache.put(new Request(shellKey), cloned);
-    }
+  if (response?.ok && !response.redirected) {
+    const cloned = response.clone();
+    cache.put(new Request(shellKey), cloned);
     return response;
   }
+
+  // Network failed or returned redirect/error — serve cached shell.
+  const cached = await cache.match(new Request(shellKey));
+  if (cached) return cached;
+
+  // No network, no cache — return the response if we got one (e.g. redirect),
+  // otherwise show offline fallback.
+  if (response) return response;
 
   return new Response(
     `<!doctype html>
@@ -177,37 +165,27 @@ async function handleHtmlShell(
   );
 }
 
-// Stale-while-revalidate for RSC payloads.
-// Same strategy as HTML shells — serve cache first, refresh in background.
+// Network-first with cache fallback for RSC payloads.
+// Same strategy as HTML shells.
 async function handleRscShell(
   event: FetchEvent,
   shellKey: string,
   cacheName: string
 ): Promise<Response> {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(new Request(shellKey));
-
-  const refreshCache = async () => {
-    const response = await fetch(event.request).catch(() => undefined);
-    if (response?.ok && !response.redirected) {
-      await cache.put(new Request(shellKey), response);
-    }
-  };
-
-  if (cached) {
-    refreshCache();
-    return cached;
-  }
 
   const response = await fetch(event.request).catch(() => undefined);
 
-  if (response) {
-    if (response.ok && !response.redirected) {
-      const cloned = response.clone();
-      cache.put(new Request(shellKey), cloned);
-    }
+  if (response?.ok && !response.redirected) {
+    const cloned = response.clone();
+    cache.put(new Request(shellKey), cloned);
     return response;
   }
+
+  const cached = await cache.match(new Request(shellKey));
+  if (cached) return cached;
+
+  if (response) return response;
 
   return new Response("", { status: 503 });
 }

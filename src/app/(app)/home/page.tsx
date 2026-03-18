@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useCycle } from "@/contexts/CycleContext";
-import { useQuery, useStatus } from "@powersync/react";
+import { useQuery } from "@powersync/react";
 import { CyclePicker } from "@/components/CyclePicker";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import type { SquadSummary } from "@/app/api/dashboard/route";
@@ -193,7 +193,15 @@ interface RawTopGap {
 export default function HomePage() {
   const { data: session } = useSession();
   const { selectedCycleId, selectedAssignment, activeCycles } = useCycle();
-  const { hasSynced } = useStatus();
+
+  // Brief grace period before showing "no data" — gives PowerSync time to
+  // hydrate from IndexedDB on page load. Can't use useStatus() here because
+  // the PowerSync context isn't available during SSR.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   const role = selectedAssignment?.role ?? "";
   const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
@@ -336,13 +344,13 @@ export default function HomePage() {
             </div>
           )}
 
-          {squads.length === 0 && !hasSynced && (
+          {squads.length === 0 && !ready && (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
               <p className="text-sm text-muted-foreground">טוען נתונים...</p>
             </div>
           )}
 
-          {squads.length === 0 && hasSynced && (
+          {squads.length === 0 && ready && (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
               <p className="font-medium">אין נתונים להצגה</p>
               <p className="text-sm text-muted-foreground">אין כיתות מוגדרות למחזור זה.</p>
