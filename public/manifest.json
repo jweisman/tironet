@@ -3,6 +3,7 @@
   "short_name": "טירונט",
   "description": "מערכת ניהול אימוני טירונות",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#273617",
   "theme_color": "#273617",

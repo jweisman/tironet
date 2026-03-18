@@ -13,6 +13,8 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Invitation system** — Admins invite users by email; each invitation scopes the user to a specific unit and role
 - **Authentication** — Google OAuth, email magic link (Nodemailer), and WhatsApp OTP (Twilio Verify)
 - **Admin panel** — Manage cycles, companies, platoons, squads, activity types, and users
+- **Offline-first** — Activity reports can be recorded and bulk-updated without a network connection; changes sync automatically when connectivity is restored
+- **PWA** — Installable on iOS (Add to Home Screen) and Android; works as a standalone app with full offline support
 
 ## Tech Stack
 
@@ -28,9 +30,39 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 | Image processing | browser-image-compression, react-easy-crop |
 | Drag & drop | dnd-kit |
 | Excel import | xlsx |
-| PWA | @ducanh2912/next-pwa |
-| Offline sync | PowerSync (Sync Streams, self-hosted via Docker) |
+| PWA / Service Worker | @serwist/turbopack |
+| Offline sync | PowerSync (Sync Streams edition 3, self-hosted via Docker) |
 | Deployment | Vercel (production), Docker Compose (local dev) |
+
+## Offline Capabilities
+
+The app is designed to work reliably in low-connectivity field environments.
+
+### What works offline
+
+- **Activity detail pages** (`/activities/[id]`) — Fully accessible offline after visiting once while online. The page shell is cached by the service worker; data loads from the local PowerSync database (IndexedDB).
+- **Recording activity reports** — Pass/fail/N/A results, grades, and notes can be saved while offline. Writes go to local SQLite instantly; the connector uploads them to the server when connectivity is restored.
+- **Bulk squad updates** — The bulk "mark all" action also works offline under the same mechanism.
+- **Soldier detail pages** (`/soldiers/[id]`) — Same app-shell caching as activity pages.
+
+### What requires connectivity
+
+- Logging in (authentication is always server-side)
+- Creating new activities
+- Admin operations (structure changes, user management)
+- Dashboard (reads from the server-rendered page)
+
+### Offline indicator
+
+A banner appears at the top of every page when the connection is lost, including a "pending changes" pill when unsynced writes are queued. The banner uses `navigator.onLine` for immediate detection (appears within milliseconds of going offline), supplemented by PowerSync's WebSocket connection status.
+
+### Installing as a PWA
+
+**Android (Chrome):** An "Install app" banner appears automatically the first time the installability criteria are met. Tap "התקן" to install.
+
+**iOS (Safari):** A banner with instructions appears on first visit. Tap the Share button → "Add to Home Screen". Other iOS browsers (Chrome, Firefox) do not support PWA installation.
+
+Once installed, the app runs in standalone mode (no browser chrome) and the install prompt is permanently suppressed.
 
 ## Local Development
 
@@ -56,7 +88,7 @@ cp .env.example .env.local  # Next.js reads .env.local
 
 Edit both files and fill in the values (see [Environment Variables](#environment-variables) below).
 
-> **Note:** Docker Compose reads `.env` (not `.env.local`). Next.js reads `.env.local`. Keep them in sync for variables shared between the app and the Docker services (e.g. `POWERSYNC_JWT_SECRET`).
+> **Note:** Docker Compose reads `.env` (not `.env.local`). Next.js reads `.env.local`. Keep them in sync for variables shared between the app and the Docker services (e.g. `POWERSYNC_JWT_SECRET`). Running `docker compose up -d` after changing `.env` picks up the new values; `docker compose restart` does not.
 
 ### 3. Start services
 
@@ -101,6 +133,8 @@ npm run dev
 
 App runs at `http://localhost:3001` (see `NEXTAUTH_URL` in `.env.example`).
 
+> **Note:** The service worker is disabled in development to avoid stale-cache conflicts with hot module reloading. To test PWA and offline features, run a production build (`npm run build && npm start`) and open the app in a browser that supports service workers.
+
 ### 7. Create the first admin user
 
 Sign in with Google or magic link, then run:
@@ -113,12 +147,13 @@ npm run make-admin -- --email you@example.com
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start dev server on port 3000 |
+| `npm run dev` | Start dev server on port 3001 |
+| `npm run build` | Production build (runs migrations + prisma generate) |
+| `npm start` | Start production server (requires a prior build) |
 | `npm run db:migrate` | Run pending Prisma migrations |
 | `npm run db:seed` | Seed reference data |
 | `npm run db:studio` | Open Prisma Studio at localhost:5555 |
 | `npm run make-admin -- --email <email>` | Promote a user to admin |
-| `npm run build` | Production build (runs migrations + prisma generate) |
 
 ## Environment Variables
 
@@ -135,6 +170,7 @@ PS_DATABASE_URL="postgresql://tironet:tironet@postgres:5432/tironet?sslmode=disa
 # NextAuth — generate with: openssl rand -base64 32
 AUTH_SECRET="..."
 NEXTAUTH_URL="http://localhost:3001"
+AUTH_TRUST_HOST=true
 
 # Google OAuth (https://console.cloud.google.com/apis/credentials)
 AUTH_GOOGLE_ID="..."
@@ -178,21 +214,30 @@ Prisma migrations run automatically during the Vercel build via the `build` scri
 "build": "npx prisma migrate deploy && npx prisma generate && next build"
 ```
 
-### 2. Google OAuth
+### 2. PowerSync
+
+PowerSync can be self-hosted or run via [PowerSync Cloud](https://www.powersync.com). For production:
+
+- Self-hosted: expose the PowerSync Docker service behind a TLS-terminating reverse proxy and set `NEXT_PUBLIC_POWERSYNC_URL` to the public HTTPS URL.
+- PowerSync Cloud: create an instance, configure the JWT public key (derived from `POWERSYNC_JWT_SECRET`), and set `NEXT_PUBLIC_POWERSYNC_URL` to the instance URL.
+
+In either case, `PS_JWT_AUDIENCE` must match `NEXT_PUBLIC_POWERSYNC_URL` exactly, and the same `POWERSYNC_JWT_SECRET` must be shared between the Next.js app and the PowerSync service.
+
+### 3. Google OAuth
 
 In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
 - Add your production domain to **Authorised JavaScript origins**: `https://yourdomain.com`
 - Add the callback URL to **Authorised redirect URIs**: `https://yourdomain.com/api/auth/callback/google`
 
-### 3. Email
+### 4. Email
 
 Configure a production SMTP provider and set `EMAIL_SERVER` and `FROM_EMAIL` in Vercel environment variables. [Resend](https://resend.com) works well with the Nodemailer provider.
 
-### 4. Twilio Verify
+### 5. Twilio Verify
 
 Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID` in Vercel. The Verify service must have the **WhatsApp** or **SMS** channel enabled.
 
-### 5. Vercel environment variables
+### 6. Vercel environment variables
 
 Set all of the following in your Vercel project settings (Settings → Environment Variables):
 
@@ -201,6 +246,7 @@ Set all of the following in your Vercel project settings (Settings → Environme
 | `DATABASE_URL` | Neon / Supabase connection string (with `?sslmode=require`) |
 | `AUTH_SECRET` | Same secret used locally (or regenerate) |
 | `NEXTAUTH_URL` | `https://yourdomain.com` |
+| `AUTH_TRUST_HOST` | `true` |
 | `AUTH_GOOGLE_ID` | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
 | `EMAIL_SERVER` | Production SMTP URL |
@@ -208,16 +254,18 @@ Set all of the following in your Vercel project settings (Settings → Environme
 | `TWILIO_ACCOUNT_SID` | Twilio account SID |
 | `TWILIO_AUTH_TOKEN` | Twilio auth token |
 | `TWILIO_VERIFY_SERVICE_SID` | Twilio Verify service SID |
-| `NEXT_PUBLIC_POWERSYNC_URL` | PowerSync Cloud instance URL |
+| `NEXT_PUBLIC_POWERSYNC_URL` | PowerSync instance URL (HTTPS) |
 | `POWERSYNC_JWT_SECRET` | Random secret shared with PowerSync |
+| `PS_JWT_SECRET_B64URL` | base64url encoding of the secret |
+| `PS_JWT_AUDIENCE` | Must match `NEXT_PUBLIC_POWERSYNC_URL` |
 | `NEXT_PUBLIC_APP_URL` | `https://yourdomain.com` |
 
-### 6. Deploy
+### 7. Deploy
 
 Push to your main branch or trigger a deploy from the Vercel dashboard. The build will:
 1. Run `prisma migrate deploy` against the production database
 2. Generate the Prisma client
-3. Build the Next.js app
+3. Build the Next.js app (including compiling the service worker)
 
 ## Project Structure
 
@@ -232,7 +280,9 @@ src/
 │   │   ├── admin/           # Admin panel (cycles, structure, activity types)
 │   │   └── profile/         # User profile
 │   ├── (public)/            # Unauthenticated pages (login, invite)
-│   └── api/                 # API routes (auth, activities, soldiers, etc.)
+│   ├── api/                 # API routes (auth, activities, soldiers, etc.)
+│   ├── serwist/[path]/      # Service worker compilation route handler
+│   └── sw.ts                # Service worker source (compiled by esbuild)
 ├── components/              # Shared UI components
 ├── lib/
 │   ├── auth/                # NextAuth config & permissions
@@ -240,7 +290,7 @@ src/
 │   ├── api/                 # Server-side helpers (hierarchy, scoping)
 │   ├── email/               # Email templates
 │   └── powersync/           # PowerSync schema, connector, database singleton, sync-config.yaml
-├── hooks/                   # React hooks
+├── hooks/                   # React hooks (useOnlineStatus, etc.)
 └── types/                   # TypeScript type definitions
 prisma/
 ├── schema.prisma            # Database schema

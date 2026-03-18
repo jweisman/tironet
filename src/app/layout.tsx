@@ -14,7 +14,12 @@ export const metadata: Metadata = {
   title: "טירונט",
   description: "מערכת ניהול אימוני טירונות",
   manifest: "/manifest.json",
-  icons: { icon: "/icon.svg" },
+  icons: {
+    icon: "/icon.svg",
+    // apple-touch-icon — used by iOS for the home screen icon.
+    // appleWebApp alone does not emit this link tag.
+    apple: "/icons/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

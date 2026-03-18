@@ -5,11 +5,13 @@ import { Sidebar } from "./Sidebar";
 import { UserAvatar } from "./UserAvatar";
 import { CyclePicker } from "./CyclePicker";
 import { OfflineBanner } from "./OfflineBanner";
+import { InstallPrompt } from "./InstallPrompt";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <OfflineBanner />
+      <InstallPrompt />
       {/* Desktop: sidebar on the end (right in RTL) */}
       <Sidebar />
 
