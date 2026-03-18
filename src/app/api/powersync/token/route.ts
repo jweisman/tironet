@@ -3,9 +3,7 @@ import * as jose from "jose";
 import { auth } from "@/lib/auth/auth";
 
 const powersyncUrl =
-  process.env.NEXT_PUBLIC_POWERSYNC_URL ??
-  process.env.POWERSYNC_URL ??
-  "http://localhost:8080";
+  process.env.NEXT_PUBLIC_POWERSYNC_URL ?? "http://localhost:8080";
 
 export async function GET() {
   const session = await auth();

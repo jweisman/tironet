@@ -24,51 +24,78 @@ const precacheEntries = (self.__SW_MANIFEST ?? []).filter((entry) => {
   return url.startsWith("/_next/static/");
 });
 
-// App shell model for detail routes.
+// App shell caching for "use client" pages.
 //
-// /activities/[id] and /soldiers/[id] are "use client" pages. The server
-// returns the same generic shell for every UUID — React hydrates client-side
-// and PowerSync fills data from IndexedDB.
+// All app pages are client-rendered with data from PowerSync (IndexedDB).
+// The server returns the same HTML shell regardless of state, so we can cache
+// one copy per route pattern and serve it offline.
+//
+// This is critical for iOS standalone PWA: when iOS kills and resumes the app,
+// it reloads the URL. Without a cached shell, the server-side auth check may
+// redirect to /login, creating a loop that iOS shows as "A problem repeatedly
+// occurred". Serving the cached shell lets React boot and PowerSync reconnect.
 //
 // Two caches per route pattern:
 //   <name>-html  — the navigation HTML shell (hard refresh / direct URL)
 //   <name>-rsc   — the RSC payload (client-side navigation via Next.js router)
 //
-// On first visit (navigate OR RSC), the shell is stored under a canonical key
-// that ignores the specific UUID. Any subsequent detail page works offline.
-//
 // This listener runs BEFORE serwist.addEventListeners() so it calls
 // respondWith() first; unmatched requests fall through to Serwist.
+
+// Routes to cache as app shells. Detail routes use a canonical key so any UUID
+// shares the same cached shell.
+function resolveShellRoute(pathname: string, origin: string): {
+  htmlCacheName: string; htmlKey: string;
+  rscCacheName: string; rscKey: string;
+} | null {
+  // List pages (exact path)
+  const listRoutes: Record<string, string> = {
+    "/home": "home",
+    "/activities": "activities-list",
+    "/soldiers": "soldiers-list",
+  };
+  const listMatch = listRoutes[pathname];
+  if (listMatch) {
+    return {
+      htmlCacheName: `${listMatch}-html-shell-v1`,
+      htmlKey: `${origin}${pathname}`,
+      rscCacheName: `${listMatch}-rsc-shell-v1`,
+      rscKey: `${origin}${pathname}/__rsc_shell__`,
+    };
+  }
+
+  // Detail pages (UUID-parameterized — cache under a canonical key)
+  if (/^\/activities\/[^/]+$/.test(pathname)) {
+    return {
+      htmlCacheName: "activity-html-shell-v1",
+      htmlKey: `${origin}/activities/__html_shell__`,
+      rscCacheName: "activity-rsc-shell-v1",
+      rscKey: `${origin}/activities/__rsc_shell__`,
+    };
+  }
+  if (/^\/soldiers\/[^/]+$/.test(pathname)) {
+    return {
+      htmlCacheName: "soldier-html-shell-v1",
+      htmlKey: `${origin}/soldiers/__html_shell__`,
+      rscCacheName: "soldier-rsc-shell-v1",
+      rscKey: `${origin}/soldiers/__rsc_shell__`,
+    };
+  }
+
+  return null;
+}
+
 (self as unknown as { addEventListener(t: string, h: (e: FetchEvent) => void): void }).addEventListener(
   "fetch",
   (event) => {
     const url = new URL(event.request.url);
-    let htmlCacheName: string;
-    let htmlKey: string;
-    let rscCacheName: string;
-    let rscKey: string;
-
-    if (/^\/activities\/[^/]+$/.test(url.pathname)) {
-      htmlCacheName = "activity-html-shell-v1";
-      htmlKey = `${url.origin}/activities/__html_shell__`;
-      rscCacheName = "activity-rsc-shell-v1";
-      rscKey = `${url.origin}/activities/__rsc_shell__`;
-    } else if (/^\/soldiers\/[^/]+$/.test(url.pathname)) {
-      htmlCacheName = "soldier-html-shell-v1";
-      htmlKey = `${url.origin}/soldiers/__html_shell__`;
-      rscCacheName = "soldier-rsc-shell-v1";
-      rscKey = `${url.origin}/soldiers/__rsc_shell__`;
-    } else {
-      return; // Let Serwist handle everything else
-    }
+    const shell = resolveShellRoute(url.pathname, url.origin);
+    if (!shell) return; // Let Serwist handle everything else
 
     if (event.request.mode === "navigate") {
-      // Hard navigation (direct URL, refresh): serve the cached HTML shell.
-      event.respondWith(handleHtmlShell(event, htmlKey, htmlCacheName));
+      event.respondWith(handleHtmlShell(event, shell.htmlKey, shell.htmlCacheName));
     } else {
-      // Client-side navigation: Next.js fetches RSC payload for the route.
-      // Cache one canonical RSC shell per route pattern; serve it offline.
-      event.respondWith(handleRscShell(event, rscKey, rscCacheName));
+      event.respondWith(handleRscShell(event, shell.rscKey, shell.rscCacheName));
     }
   }
 );

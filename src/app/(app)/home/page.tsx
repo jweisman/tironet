@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useCycle } from "@/contexts/CycleContext";
-import { useQuery } from "@powersync/react";
+import { useQuery, useStatus } from "@powersync/react";
 import { CyclePicker } from "@/components/CyclePicker";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import type { SquadSummary } from "@/app/api/dashboard/route";
@@ -193,6 +193,7 @@ interface RawTopGap {
 export default function HomePage() {
   const { data: session } = useSession();
   const { selectedCycleId, selectedAssignment, activeCycles } = useCycle();
+  const { hasSynced } = useStatus();
 
   const role = selectedAssignment?.role ?? "";
   const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
@@ -335,7 +336,13 @@ export default function HomePage() {
             </div>
           )}
 
-          {squads.length === 0 && (
+          {squads.length === 0 && !hasSynced && (
+            <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+              <p className="text-sm text-muted-foreground">טוען נתונים...</p>
+            </div>
+          )}
+
+          {squads.length === 0 && hasSynced && (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
               <p className="font-medium">אין נתונים להצגה</p>
               <p className="text-sm text-muted-foreground">אין כיתות מוגדרות למחזור זה.</p>

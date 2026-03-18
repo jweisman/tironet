@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 
 const DISMISSED_KEY = "install-prompt-dismissed";
 
+function isMobile(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
 // Detect iOS Safari (the only iOS browser that supports Add to Home Screen).
 function isIOSSafari(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -35,6 +40,7 @@ function InstallPromptInner() {
 
   useEffect(() => {
     if (isStandalone()) return; // Already installed
+    if (!isMobile()) return; // Only prompt on mobile devices
     if (localStorage.getItem(DISMISSED_KEY)) return;
 
     if (isIOSSafari()) {
