@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { usePowerSync } from "@powersync/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,7 @@ function formatDate(isoString: string): string {
 
 export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) {
   const router = useRouter();
+  const db = usePowerSync();
   const [data, setData] = useState<ActivityDetailData>(initialData);
   const [editingReports, setEditingReports] = useState(false);
   const [editingMetadata, setEditingMetadata] = useState(false);
@@ -141,58 +143,28 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
       try {
         if (report.id) {
-          // PATCH existing report
-          const updateBody: Record<string, unknown> = {};
-          if (report.result !== undefined) updateBody.result = report.result;
-          updateBody.grade = report.grade;
-          updateBody.note = report.note;
-
-          const res = await fetch(`/api/activity-reports/${report.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updateBody),
-          });
-          if (!res.ok) throw new Error("Save failed");
-          const resData = await res.json();
-          const updatedReport = resData.report;
-          setReports((prev) => {
-            const next = new Map(prev);
-            next.set(soldierId, {
-              id: updatedReport.id,
-              result: updatedReport.result,
-              grade: updatedReport.grade,
-              note: updatedReport.note,
-            });
-            return next;
-          });
+          // Update existing report in local PowerSync DB.
+          // The connector will PATCH the server when online.
+          await db.execute(
+            "UPDATE activity_reports SET result = ?, grade = ?, note = ? WHERE id = ?",
+            [report.result, report.grade, report.note, report.id]
+          );
         } else if (report.result !== null) {
-          // POST new report
-          const res = await fetch("/api/activity-reports", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              activityId: data.id,
-              soldierId,
-              result: report.result,
-              grade: report.grade,
-              note: report.note,
-            }),
-          });
-          if (!res.ok) throw new Error("Save failed");
-          const resData = await res.json();
-          const updatedReport = resData.report;
+          // Create new report locally with a client-generated UUID.
+          // The connector will POST the server when online (sending the same id
+          // so the server record matches what's already in the local DB).
+          const newId = crypto.randomUUID();
+          await db.execute(
+            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade, note) VALUES (?, ?, ?, ?, ?, ?)",
+            [newId, data.id, soldierId, report.result, report.grade ?? null, report.note ?? null]
+          );
           setReports((prev) => {
             const next = new Map(prev);
-            next.set(soldierId, {
-              id: updatedReport.id,
-              result: updatedReport.result,
-              grade: updatedReport.grade,
-              note: updatedReport.note,
-            });
+            next.set(soldierId, { ...report, id: newId });
             return next;
           });
         }
-        // If result is null and no id, nothing to save
+        // result === null with no existing id: nothing to save
       } catch {
         setSaveError("שגיאה בשמירת הדיווח");
       } finally {
@@ -203,7 +175,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         });
       }
     },
-    [data.id]
+    [data.id, db]
   );
 
   const handleReportChange = useCallback(
@@ -237,46 +209,51 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     setBulkLoading(true);
     setSaveError(null);
 
-    // Collect all soldier ids from squads the user can edit
-    const editableSoldierIds: string[] = [];
+    // Collect soldiers without a report from squads the user can edit.
+    const targets: Array<{ soldierId: string; report: SoldierReport }> = [];
     for (const squad of data.squads) {
       if (squad.canEdit) {
         for (const soldier of squad.soldiers) {
-          const report = reports.get(soldier.id);
-          if (!report || report.result === null) {
-            editableSoldierIds.push(soldier.id);
+          const report = reports.get(soldier.id) ?? { id: null, result: null, grade: null, note: null };
+          if (!report.result) {
+            targets.push({ soldierId: soldier.id, report });
           }
         }
       }
     }
 
-    if (editableSoldierIds.length === 0) {
+    if (targets.length === 0) {
       setBulkLoading(false);
       return;
     }
 
     try {
-      const res = await fetch(`/api/activities/${data.id}/reports/bulk`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ result, soldierIds: editableSoldierIds }),
-      });
+      const updates = new Map<string, SoldierReport>();
 
-      if (!res.ok) throw new Error("Bulk update failed");
-
-      // Refresh the full activity to get updated reports
-      const refreshRes = await fetch(`/api/activities/${data.id}`);
-      if (refreshRes.ok) {
-        const refreshed: ActivityDetailData = await refreshRes.json();
-        setData(refreshed);
-        const newMap = new Map<string, SoldierReport>();
-        for (const squad of refreshed.squads) {
-          for (const soldier of squad.soldiers) {
-            newMap.set(soldier.id, { ...soldier.report });
-          }
+      for (const { soldierId, report } of targets) {
+        if (report.id) {
+          await db.execute(
+            "UPDATE activity_reports SET result = ? WHERE id = ?",
+            [result, report.id]
+          );
+          updates.set(soldierId, { ...report, result });
+        } else {
+          const newId = crypto.randomUUID();
+          await db.execute(
+            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade, note) VALUES (?, ?, ?, ?, ?, ?)",
+            [newId, data.id, soldierId, result, report.grade ?? null, report.note ?? null]
+          );
+          updates.set(soldierId, { ...report, result, id: newId });
         }
-        setReports(newMap);
       }
+
+      setReports((prev) => {
+        const next = new Map(prev);
+        for (const [soldierId, updated] of updates) {
+          next.set(soldierId, updated);
+        }
+        return next;
+      });
     } catch {
       setSaveError("שגיאה בעדכון כללי");
     } finally {

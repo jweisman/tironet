@@ -8,7 +8,7 @@ This file captures architectural decisions, constraints, and gotchas for Claude 
 - **NextAuth v5** JWT strategy, Google OAuth + email magic link + WhatsApp OTP (Twilio Verify)
 - **PostgreSQL** via Prisma ORM
 - **PowerSync** (`@powersync/web` + `@powersync/react`) for offline-first sync — Sync Streams edition 3
-- **PWA** via `@ducanh2912/next-pwa`
+- **PWA** via `@serwist/turbopack` (service worker compiled via esbuild route handler)
 
 ## PowerSync Architecture
 
@@ -119,6 +119,66 @@ If you ever add another `useState(initialData)` component fed by chained `useQue
 
 The activity detail page (`/activities/[id]/page.tsx`) resolves the user's role and squad from the assignment matching `activity.cycle_id`, not from `selectedAssignment` in `CycleContext`. This handles users with assignments in multiple cycles correctly (e.g. squad_commander in a past cycle + platoon_commander in the current one).
 
+## Offline-First Writes via PowerSync
+
+### Pattern: write to local DB, let the connector sync
+
+All user mutations that need to work offline must write to the local PowerSync SQLite DB via `db.execute()` rather than calling the API directly. PowerSync queues the write as a CRUD operation and the connector uploads it when connectivity is restored.
+
+```typescript
+// In a component:
+const db = usePowerSync(); // from @powersync/react
+
+// UPDATE existing row
+await db.execute(
+  "UPDATE activity_reports SET result = ?, grade = ?, note = ? WHERE id = ?",
+  [result, grade, note, id]
+);
+
+// INSERT new row — always generate the UUID client-side
+const newId = crypto.randomUUID();
+await db.execute(
+  "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade, note) VALUES (?, ?, ?, ?, ?, ?)",
+  [newId, activityId, soldierId, result, grade, note]
+);
+```
+
+Writes are **instant and optimistic** — no network round-trip, no loading state needed. `useQuery` on the same table reacts immediately. Update local component state manually when `useState` holds a derived copy (e.g. `reports` Map in `ActivityDetail`).
+
+### Connector: `uploadData` uploads the CRUD queue
+
+`src/lib/powersync/connector.ts` uploads queued writes via `uploadData()`. Key rules:
+
+1. **Do NOT call `transaction.complete()` on error** — PowerSync retries automatically. Only call it after all operations in the transaction succeed.
+2. **PowerSync CRUD `opData` uses snake_case** (matching the local schema column names). Transform to camelCase before calling the API. Example: `opData.activity_id` → `activityId`.
+3. **PUT operations must pass the client-generated `id`** to the server so the server creates the record with the same UUID the local DB already has. Without this, the server generates a new UUID and PowerSync syncs back a duplicate record with a mismatched ID.
+4. **Network errors during upload are expected when offline** — suppress `TypeError: Failed to fetch` in the catch block to avoid console noise. All other errors should still be logged.
+
+### API: accept client-generated `id` on POST (upsert)
+
+When the connector uploads a PUT (INSERT that was created offline), it sends the client UUID as `id`. The POST endpoint must accept an optional `id` field and pass it to the Prisma `create` body:
+
+```typescript
+// zod schema
+id: z.string().uuid().optional(),
+
+// Prisma upsert
+create: {
+  ...(clientId ? { id: clientId } : {}),
+  activityId, soldierId, result, ...
+},
+```
+
+The upsert `where` clause uses the composite unique key (e.g. `activityId_soldierId`), so if the record already exists the `id` is ignored and the row is updated in place.
+
+### Offline indicator
+
+`useOnlineStatus()` in `src/hooks/useOnlineStatus.ts` combines two signals:
+- `navigator.onLine` — flips **immediately** when the network drops
+- `status.connected` from PowerSync — can take 10–30s to flip (WebSocket timeout)
+
+Use `browserOnline && status.connected` so the banner appears instantly. `hasPendingUploads` is true when `status.dataFlowStatus.uploadError` is set (failed upload attempt while offline) — this drives the "שינויים ממתינים לסנכרון" pill in `OfflineBanner`.
+
 ## Data Model Constraints
 
 ### Squads cannot be reassigned between platoons
@@ -139,6 +199,49 @@ Similarly, `Soldier.squadId` is write-once. The "transferred" status (`SoldierSt
 - Admin routes use `requireAdmin()` from `@/lib/api/admin-guard`
 - Non-admin data access is scoped via `getActivityScope()` which resolves the user's role and unit IDs for a given cycle
 - Polymorphic FK: `UserCycleAssignment.unitId` points to `companies`, `platoons`, or `squads` depending on `unitType`. Referential integrity is enforced at the application layer, not by the DB.
+
+## PWA / Service Worker Architecture
+
+### Why `@serwist/turbopack` (not `@ducanh2912/next-pwa`)
+
+Next.js 16 uses Turbopack for production builds. `@ducanh2912/next-pwa` is webpack-based and its plugin never runs under Turbopack, so no service worker is generated. `@serwist/turbopack` compiles the SW via an esbuild-powered Next.js **route handler** at `/serwist/[path]`, which works regardless of bundler.
+
+Key files:
+- `src/app/sw.ts` — service worker source
+- `src/app/serwist/[path]/route.ts` — compiles and serves `sw.ts` at `/serwist/sw.js`
+- `src/app/serwist-provider.tsx` — client wrapper; disabled in development
+- `src/app/layout.tsx` — wraps app in `<SerwistProvider>`
+
+### Precache filtering
+
+Only `/_next/static/` assets (hashed filenames) are precached. Page HTML routes are excluded because they require SSR auth checks and would fail with 302 redirects during SW installation, breaking the entire SW.
+
+### App shell model for detail routes (`/activities/[id]`, `/soldiers/[id]`)
+
+These are `"use client"` pages — the server returns the **same HTML shell for every UUID**. Data comes entirely from PowerSync (IndexedDB). This enables caching one generic shell per route pattern so any detail page is accessible offline once a single detail was visited.
+
+Two caches per route pattern (both stored under a canonical UUID-independent key):
+
+| Cache | Trigger | Used for |
+|---|---|---|
+| `activity-html-shell-v1` | `navigate`-mode request (hard refresh, direct URL) | Offline hard navigation |
+| `activity-rsc-shell-v1` | Non-navigate request (Next.js client-side routing fetches RSC payload) | Offline client-side navigation |
+
+The custom `fetch` listener in `sw.ts` is registered **before** `serwist.addEventListeners()` so it calls `respondWith()` first; unmatched requests fall through to Serwist's handlers.
+
+**Critical gotcha:** call `response.clone()` synchronously (before any `await`) when caching. If you call it inside an async `.then()` callback, the response body may already be consumed by the time the clone runs, causing a "Response body is already used" error and an empty cache entry.
+
+### `navigationPreload: true`
+
+Required for Next.js. The browser pre-fetches the navigation target alongside SW startup; the SW uses `event.preloadResponse` instead of making its own navigation-mode fetch (which fails in some browser/config combinations). Without this, page navigation stalls while the SW boots.
+
+### `AUTH_TRUST_HOST=true`
+
+Required when the dev server runs on a non-standard port (e.g. 3001). NextAuth validates the `Host` header and throws `UntrustedHost` — crashing the server — unless this is set.
+
+### TypeScript in `sw.ts`
+
+The project tsconfig does not include the WebWorker lib, so `FetchEvent`, `ServiceWorkerGlobalScope.addEventListener`, etc. are not available as global types. `sw.ts` declares a minimal local `FetchEvent` type and casts `self` to access `addEventListener`. This is fine because `sw.ts` is compiled by esbuild (type-strips only — no type checking), so TypeScript errors in this file are IDE warnings only and do not block the build.
 
 ## Environment Variable Naming
 

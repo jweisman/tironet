@@ -1,5 +1,5 @@
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import { Serwist, NetworkOnly } from "serwist";
 import { defaultCache } from "@serwist/turbopack/worker";
 
 declare global {
@@ -10,19 +10,159 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Filter out PowerSync worker assets (PowerSync manages its own worker lifecycle)
-// and API routes (require live auth tokens, must never be served stale).
+// Minimal types — WebWorker lib isn't in this tsconfig.
+type FetchEvent = Event & {
+  readonly request: Request;
+  readonly preloadResponse?: Promise<Response | undefined>;
+  respondWith(response: Promise<Response>): void;
+};
+
+// Only precache Next.js static bundles (hashed, no auth needed).
+// Page HTML routes, API routes, and PowerSync workers are excluded.
 const precacheEntries = (self.__SW_MANIFEST ?? []).filter((entry) => {
   const url = typeof entry === "string" ? entry : entry.url;
-  return !url.startsWith("/@powersync/") && !url.startsWith("/api/");
+  return url.startsWith("/_next/static/");
 });
+
+// App shell model for detail routes.
+//
+// /activities/[id] and /soldiers/[id] are "use client" pages. The server
+// returns the same generic shell for every UUID — React hydrates client-side
+// and PowerSync fills data from IndexedDB.
+//
+// Two caches per route pattern:
+//   <name>-html  — the navigation HTML shell (hard refresh / direct URL)
+//   <name>-rsc   — the RSC payload (client-side navigation via Next.js router)
+//
+// On first visit (navigate OR RSC), the shell is stored under a canonical key
+// that ignores the specific UUID. Any subsequent detail page works offline.
+//
+// This listener runs BEFORE serwist.addEventListeners() so it calls
+// respondWith() first; unmatched requests fall through to Serwist.
+(self as unknown as { addEventListener(t: string, h: (e: FetchEvent) => void): void }).addEventListener(
+  "fetch",
+  (event) => {
+    const url = new URL(event.request.url);
+    let htmlCacheName: string;
+    let htmlKey: string;
+    let rscCacheName: string;
+    let rscKey: string;
+
+    if (/^\/activities\/[^/]+$/.test(url.pathname)) {
+      htmlCacheName = "activity-html-shell-v1";
+      htmlKey = `${url.origin}/activities/__html_shell__`;
+      rscCacheName = "activity-rsc-shell-v1";
+      rscKey = `${url.origin}/activities/__rsc_shell__`;
+    } else if (/^\/soldiers\/[^/]+$/.test(url.pathname)) {
+      htmlCacheName = "soldier-html-shell-v1";
+      htmlKey = `${url.origin}/soldiers/__html_shell__`;
+      rscCacheName = "soldier-rsc-shell-v1";
+      rscKey = `${url.origin}/soldiers/__rsc_shell__`;
+    } else {
+      return; // Let Serwist handle everything else
+    }
+
+    if (event.request.mode === "navigate") {
+      // Hard navigation (direct URL, refresh): serve the cached HTML shell.
+      event.respondWith(handleHtmlShell(event, htmlKey, htmlCacheName));
+    } else {
+      // Client-side navigation: Next.js fetches RSC payload for the route.
+      // Cache one canonical RSC shell per route pattern; serve it offline.
+      event.respondWith(handleRscShell(event, rscKey, rscCacheName));
+    }
+  }
+);
+
+// Fetch the actual page HTML, cache under the canonical shell key, serve it.
+// Uses the navigation-preload response when available (avoids a redundant fetch
+// since the browser already started the request alongside SW startup).
+async function handleHtmlShell(
+  event: FetchEvent,
+  shellKey: string,
+  cacheName: string
+): Promise<Response> {
+  const preload = await Promise.resolve(event.preloadResponse).catch(() => undefined);
+  const response = preload ?? (await fetch(event.request).catch(() => undefined));
+
+  if (response?.ok) {
+    const cloned = response.clone(); // clone synchronously before body is consumed
+    caches.open(cacheName).then((c) => c.put(new Request(shellKey), cloned));
+    return response;
+  }
+
+  const cached = await caches.open(cacheName).then((c) => c.match(new Request(shellKey)));
+  if (cached) return cached;
+
+  return new Response(
+    `<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>אין חיבור</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100dvh; margin: 0; background: #f9fafb; color: #111; }
+    .card { text-align: center; padding: 2rem 1.5rem; max-width: 320px; }
+    h1 { font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem; }
+    p { font-size: 0.875rem; color: #6b7280; margin: 0 0 1.5rem; line-height: 1.5; }
+    a { display: inline-block; padding: 0.625rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; }
+    .primary { background: #273617; color: #fff; margin-bottom: 0.5rem; }
+    .secondary { border: 1px solid #d1d5db; color: #374151; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>אין חיבור לרשת</h1>
+    <p>הדף הזה לא זמין במצב לא מקוון. חזור לרשת כדי לפתוח אותו, או נווט לדף שביקרת בו בעבר.</p>
+    <a href="/" class="primary">חזרה לדף הבית</a><br>
+    <a href="javascript:history.back()" class="secondary">חזרה אחורה</a>
+  </div>
+</body>
+</html>`,
+    { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }
+  );
+}
+
+// Fetch the RSC payload for the route, cache under the canonical shell key.
+// /activities/[id] is a "use client" page so all UUIDs produce the same RSC
+// tree; useParams() on the client resolves the correct ID from the URL.
+async function handleRscShell(
+  event: FetchEvent,
+  shellKey: string,
+  cacheName: string
+): Promise<Response> {
+  const response = await fetch(event.request).catch(() => undefined);
+
+  if (response?.ok) {
+    const cloned = response.clone(); // clone synchronously before body is consumed
+    caches.open(cacheName).then((c) => c.put(new Request(shellKey), cloned));
+    return response;
+  }
+
+  const cached = await caches.open(cacheName).then((c) => c.match(new Request(shellKey)));
+  if (cached) return cached;
+
+  return new Response("", { status: 503 });
+}
 
 const serwist = new Serwist({
   precacheEntries,
   skipWaiting: true,
   clientsClaim: true,
+  // navigationPreload lets the browser start the page fetch in parallel with
+  // SW startup; the SW uses that pre-fetched response instead of making its
+  // own navigation-mode fetch (which can fail inside a SW in some browsers).
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    // API routes and PowerSync: never cache, always network-only.
+    {
+      matcher: /\/(api|@powersync)\//,
+      handler: new NetworkOnly(),
+    },
+    // Everything else (pages, fonts, images, JS/CSS not in precache):
+    // use the default Next.js-aware caching strategies from Serwist.
+    ...defaultCache,
+  ],
 });
 
 serwist.addEventListeners();

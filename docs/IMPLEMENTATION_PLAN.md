@@ -1072,11 +1072,11 @@ tironet/
 **Deliverable:** App functions in airplane mode. All mutations are queued and synced on reconnect.
 
 **Validation checklist:**
-- [ ] Open app while online; then disable network in Chrome DevTools (Network → Offline)
-- [ ] Navigate between pages — app renders from local PowerSync DB without any network requests
-- [ ] Create or edit an activity report while offline → offline banner appears; pending upload badge increments
-- [ ] Re-enable network → pending changes upload automatically; verify data persisted in Postgres via Prisma Studio
-- [ ] Open app in airplane mode from scratch (no prior cache) → app shell loads; cached data visible
+- [x] Open app while online; then disable network in Chrome DevTools (Network → Offline)
+- [x] Navigate between pages — app renders from local PowerSync DB without any network requests
+- [x] Create or edit an activity report while offline → offline banner appears; pending upload badge increments
+- [x] Re-enable network → pending changes upload automatically; verify data persisted in Postgres via Prisma Studio
+- [x] Open app in airplane mode from scratch (no prior cache) → app shell loads; cached data visible
 - [ ] Lighthouse PWA audit (DevTools → Lighthouse → Progressive Web App) — passes installability checks
 - [ ] Install app as PWA on Android Chrome (or iOS Safari) → opens as standalone without browser chrome
 - [ ] Sync status indicator: shows "מסונכרן" when online and in sync; shows pending count when changes are queued

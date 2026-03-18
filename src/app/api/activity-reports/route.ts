@@ -5,6 +5,9 @@ import { z } from "zod";
 import type { SessionUser } from "@/types";
 
 const upsertSchema = z.object({
+  // Optional client-generated UUID — used when the record was created offline
+  // so the server preserves the same ID the local PowerSync DB already has.
+  id: z.string().uuid().optional(),
   activityId: z.string().uuid(),
   soldierId: z.string().uuid(),
   result: z.enum(["passed", "failed", "na"]),
@@ -19,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { activityId, soldierId, result, grade, note } = parsed.data;
+  const { id: clientId, activityId, soldierId, result, grade, note } = parsed.data;
 
   // Find the activity to get cycleId
   const activity = await prisma.activity.findUnique({
@@ -57,6 +60,7 @@ export async function POST(request: NextRequest) {
       activityId_soldierId: { activityId, soldierId },
     },
     create: {
+      ...(clientId ? { id: clientId } : {}),
       activityId,
       soldierId,
       result,

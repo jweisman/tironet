@@ -46,10 +46,21 @@ export class TironetConnector implements PowerSyncBackendConnector {
 
         if (table === "activity_reports") {
           if (opType === UpdateType.PUT) {
+            // opData uses snake_case column names from the local schema.
+            // Transform to camelCase for the API, and pass the client id so
+            // the server creates the record with the same UUID.
+            const d = opData as Record<string, unknown>;
             await fetch(`/api/activity-reports`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id, ...opData }),
+              body: JSON.stringify({
+                id,
+                activityId: d.activity_id,
+                soldierId: d.soldier_id,
+                result: d.result,
+                grade: d.grade,
+                note: d.note,
+              }),
             });
           } else if (opType === UpdateType.PATCH) {
             await fetch(`/api/activity-reports/${id}`, {
@@ -97,7 +108,11 @@ export class TironetConnector implements PowerSyncBackendConnector {
 
       await transaction.complete();
     } catch (err) {
-      console.error("[PowerSync] uploadData error:", err);
+      // Network errors are expected when offline — PowerSync retries automatically.
+      // Only log unexpected errors (not plain fetch failures).
+      if (!(err instanceof TypeError && (err as TypeError).message === "Failed to fetch")) {
+        console.error("[PowerSync] uploadData error:", err);
+      }
       // Do not call transaction.complete() — PowerSync will retry
     }
   }
