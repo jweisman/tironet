@@ -8,7 +8,6 @@ export function SerwistProvider({ children }: { children: ReactNode }) {
     <BaseSerwistProvider
       swUrl="/serwist/sw.js"
       disable={process.env.NODE_ENV === "development"}
-      reloadOnOnline
     >
       {children}
     </BaseSerwistProvider>

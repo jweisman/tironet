@@ -6,10 +6,12 @@ import { UserAvatar } from "./UserAvatar";
 import { CyclePicker } from "./CyclePicker";
 import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
+import { ReloadDiagnostics } from "./ReloadDiagnostics";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
+      <ReloadDiagnostics />
       <OfflineBanner />
       <InstallPrompt />
       {/* Desktop: sidebar on the end (right in RTL) */}
