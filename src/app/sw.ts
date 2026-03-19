@@ -34,21 +34,43 @@ swLog("loaded, version", SW_VERSION);
   "activate",
   (event) => {
     swLog("activate event, version", SW_VERSION);
-    // Pre-populate shell caches on first activation so that iOS resume
-    // always has a cache to fall back to (iOS can evict Cache Storage).
-    event.waitUntil(prepopulateShellCaches());
+    // Clear stale shell caches from previous deployments, then repopulate.
+    // Stale cached HTML loads old JS bundles whose RSC state-tree headers
+    // don't match the new server, causing 400 errors and reload loops.
+    event.waitUntil(clearAndRepopulateShellCaches());
   }
 );
 
-// Fetch each shell route once to prime the cache. Errors are swallowed —
-// the user will populate caches naturally by navigating.
-async function prepopulateShellCaches() {
+// Cache names to clear on activation to prevent stale content after deployment.
+const STALE_CACHE_NAMES = [
+  // Our shell caches
+  "home-html-shell-v1",
+  "activities-list-html-shell-v1",
+  "soldiers-list-html-shell-v1",
+  "activity-html-shell-v1",
+  "soldier-html-shell-v1",
+  // Serwist defaultCache RSC/page caches (version-specific, stale = 400 errors)
+  "pages-rsc-prefetch",
+  "pages-rsc",
+  "pages",
+  "others",
+];
+
+async function clearAndRepopulateShellCaches() {
+  // 1. Delete all existing shell caches.
+  for (const name of STALE_CACHE_NAMES) {
+    const deleted = await caches.delete(name);
+    if (deleted) swLog("deleted stale cache", name);
+  }
+
+  // 2. Repopulate list-page shells from the network.
+  const origin = (self as unknown as { location: { origin: string } }).location.origin;
   const routes = ["/home", "/activities", "/soldiers"];
   for (const path of routes) {
     try {
       const res = await fetch(path, { credentials: "same-origin" });
       if (res.ok && !res.redirected) {
-        const shell = resolveShellRoute(path, (self as unknown as { location: { origin: string } }).location.origin);
+        const shell = resolveShellRoute(path, origin);
         if (shell) {
           const cache = await caches.open(shell.htmlCacheName);
           await cache.put(new Request(shell.htmlKey), res);
@@ -81,9 +103,9 @@ const precacheEntries = (self.__SW_MANIFEST ?? []).filter((entry) => {
 // redirect to /login, creating a loop that iOS shows as "A problem repeatedly
 // occurred". Serving the cached shell lets React boot and PowerSync reconnect.
 //
-// Two caches per route pattern:
-//   <name>-html  — the navigation HTML shell (hard refresh / direct URL)
-//   <name>-rsc   — the RSC payload (client-side navigation via Next.js router)
+// Only navigation (HTML) requests are cached. RSC payloads are NOT cached
+// because they are version-specific — serving stale RSC after a deployment
+// causes 400 errors that trigger Next.js MPA fallback reloads.
 //
 // This listener runs BEFORE serwist.addEventListeners() so it calls
 // respondWith() first; unmatched requests fall through to Serwist.
@@ -142,17 +164,17 @@ function resolveShellRoute(pathname: string, origin: string): {
   }
 );
 
-// Cache-first with network update for HTML shells.
+// Network-first with cache fallback for HTML shells.
 //
-// Serve the cached shell immediately (instant load, no auth redirect risk),
-// then update the cache from the network in the background. If no cache exists
-// yet, fall back to network.
+// Always fetch from the network to get the latest HTML (which loads the
+// correct JS bundles for the current deployment). Fall back to the cached
+// shell only when the network fails or returns a redirect (auth redirect
+// to /login). The `!response.redirected` check prevents caching login
+// pages as shells.
 //
-// This is critical for iOS standalone PWA: when iOS kills and resumes the app,
-// it reloads the URL. A network-first approach risks hitting the server's auth
-// redirect (302 → /login), which iOS interprets as a rapid-reload loop and
-// shows "A problem repeatedly occurred". Serving the cached shell lets React
-// boot and PowerSync reconnect from IndexedDB.
+// The cache fallback is critical for iOS standalone PWA: when iOS kills and
+// resumes the app while offline, the cached shell lets React boot and
+// PowerSync reconnect from IndexedDB.
 async function handleHtmlShell(
   event: FetchEvent,
   shellKey: string,
@@ -161,18 +183,7 @@ async function handleHtmlShell(
   const cache = await caches.open(cacheName);
   const shellReq = new Request(shellKey);
 
-  // 1. Check cache first.
-  const cached = await cache.match(shellReq);
-  if (cached) {
-    swLog("html-shell CACHE HIT", shellKey);
-    // Update cache in the background (fire-and-forget, but don't await —
-    // iOS terminates SW async work aggressively after respondWith()).
-    fetchAndCache(event.request, shellReq, cache);
-    return cached;
-  }
-
-  // 2. No cache — must go to network.
-  swLog("html-shell CACHE MISS, fetching network", shellKey);
+  // 1. Try network first.
   const response = await fetch(event.request).catch(() => undefined);
 
   if (response?.ok && !response.redirected) {
@@ -184,28 +195,18 @@ async function handleHtmlShell(
 
   swLog("html-shell network failed/redirected", shellKey, response?.status, response?.redirected);
 
-  // Return the response if we got one (e.g. redirect to /login when session
-  // is genuinely expired), otherwise show a static offline page.
+  // 2. Network failed or returned redirect — serve cached shell.
+  const cached = await cache.match(shellReq);
+  if (cached) {
+    swLog("html-shell CACHE FALLBACK", shellKey);
+    return cached;
+  }
+
+  // 3. No network, no cache — return the response if we got one (e.g. redirect
+  // to /login when session is genuinely expired), otherwise show offline page.
   if (response) return response;
 
   return offlineFallbackResponse();
-}
-
-// Fire-and-forget network fetch to update a cached shell.
-// Errors are silently swallowed — the user already has a cached response.
-function fetchAndCache(request: Request, shellReq: Request, cache: Cache) {
-  fetch(request)
-    .then((res) => {
-      if (res.ok && !res.redirected) {
-        swLog("background refresh OK", shellReq.url);
-        cache.put(shellReq, res);
-      } else {
-        swLog("background refresh skipped", shellReq.url, res.status, res.redirected);
-      }
-    })
-    .catch(() => {
-      swLog("background refresh failed (offline?)", shellReq.url);
-    });
 }
 
 function offlineFallbackResponse(): Response {
@@ -240,18 +241,11 @@ function offlineFallbackResponse(): Response {
 const serwist = new Serwist({
   precacheEntries,
   skipWaiting: true,
-  // clientsClaim is intentionally OFF. With it on, the new SW immediately
-  // takes control of open pages, firing a `controllerchange` event. The
-  // SerwistProvider reloads the page on controllerchange, and if that reload
-  // coincides with a stale-RSC 400 fallback reload, iOS detects two rapid
-  // reloads and shows "A problem repeatedly occurred". Without clientsClaim,
-  // the new SW takes over on the user's next navigation — no forced reload.
-  clientsClaim: false,
+  clientsClaim: true,
   // navigationPreload is DISABLED. Safari (pre-18.5) has a critical bug where
   // cached navigation-preload responses with redirects cause the SW to receive
-  // a stale/corrupt preload response on subsequent navigations, leading to
-  // "A problem repeatedly occurred" on iOS standalone PWA. Since we use
-  // cache-first for shell routes anyway, the preload provides no benefit.
+  // a stale/corrupt preload response on subsequent navigations. Since our
+  // shell handler does its own fetch(), the preload provides no benefit.
   navigationPreload: false,
   runtimeCaching: [
     // API routes and PowerSync: never cache, always network-only.
@@ -259,7 +253,20 @@ const serwist = new Serwist({
       matcher: /\/(api|@powersync)\//,
       handler: new NetworkOnly(),
     },
-    // Everything else (pages, fonts, images, JS/CSS not in precache):
+    // Pages, RSC payloads, and RSC prefetches: always network-only.
+    // defaultCache caches these in "pages-rsc-prefetch", "pages-rsc", and
+    // "pages" caches. After a deployment, stale RSC from the old deployment
+    // confuses the App Router → 400 → MPA fallback reload → iOS crash.
+    {
+      matcher: ({ request, sameOrigin, url: { pathname } }) =>
+        sameOrigin &&
+        !pathname.startsWith("/api/") &&
+        (request.headers.get("RSC") === "1" ||
+          request.headers.get("Next-Router-Prefetch") === "1" ||
+          request.mode === "navigate"),
+      handler: new NetworkOnly(),
+    },
+    // Everything else (fonts, images, JS/CSS not in precache):
     // use the default Next.js-aware caching strategies from Serwist.
     ...defaultCache,
   ],
