@@ -12,7 +12,10 @@ export function SerwistProvider({ children }: { children: ReactNode }) {
     }
 
     navigator.serviceWorker
-      .register("/serwist/sw.js")
+      .register("/serwist/sw.js", { scope: "/" })
+      .then((reg) => {
+        console.log("[SW] registered, scope:", reg.scope);
+      })
       .catch((err) => console.error("[SW] registration failed:", err));
 
     // Intentionally NO controllerchange listener. The default SerwistProvider
