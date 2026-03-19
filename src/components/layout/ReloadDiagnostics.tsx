@@ -60,16 +60,6 @@ export function ReloadDiagnostics() {
     };
     window.addEventListener("unhandledrejection", onRejection);
 
-    // Monkey-patch location.reload to capture call stack
-    const origReload = location.reload.bind(location);
-    Object.defineProperty(location, "reload", {
-      value: () => {
-        log(`location.reload() called! Stack: ${new Error().stack}`);
-        origReload();
-      },
-      configurable: true,
-    });
-
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
       navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange);
