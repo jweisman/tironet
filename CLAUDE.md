@@ -70,6 +70,14 @@ The PowerSync service requires a valid `aud` claim in every JWT. The allowed val
 
 The `aud` value in tokens must match `NEXT_PUBLIC_POWERSYNC_URL` (e.g. `http://localhost:8080` in dev). Both the token endpoint and `powersync.config.yaml` must agree.
 
+### VFS: must use OPFSCoopSyncVFS (not IDBBatchAtomicVFS)
+
+The default wa-sqlite VFS (`IDBBatchAtomicVFS`) causes iOS Safari to crash with "A problem repeatedly occurred". Root cause: IDBBatchAtomicVFS triggers stack overflows and exhausts WebKit's WASM gigacage memory region (WebKit bug 269937). iOS's JetSam daemon kills the WebContent process, and two rapid kills trigger the crash screen.
+
+**Fix:** `database.ts` explicitly sets `vfs: WASQLiteVFS.OPFSCoopSyncVFS`, which uses the Origin Private File System API instead of IndexedDB. This is faster and avoids the crash path entirely.
+
+**Caveat:** OPFS is not available in Safari Private Browsing mode. If incognito support is needed, add a runtime check and fall back to IDBBatchAtomicVFS.
+
 ### UMD worker setup for Next.js + Turbopack
 
 Both PowerSync workers must be pointed at the pre-built UMD files. Without this, Turbopack tries to bundle them from source and hangs:
@@ -77,6 +85,7 @@ Both PowerSync workers must be pointed at the pre-built UMD files. Without this,
 ```typescript
 // database.ts
 new WASQLiteOpenFactory({
+  vfs: WASQLiteVFS.OPFSCoopSyncVFS,  // REQUIRED — IDBBatchAtomicVFS crashes iOS Safari
   worker: "/@powersync/worker/WASQLiteDB.umd.js",  // DB worker
   ...
 })
@@ -218,22 +227,23 @@ Only `/_next/static/` assets (hashed filenames) are precached. Page HTML routes 
 
 ### App shell model for detail routes (`/activities/[id]`, `/soldiers/[id]`)
 
-These are `"use client"` pages — the server returns the **same HTML shell for every UUID**. Data comes entirely from PowerSync (IndexedDB). This enables caching one generic shell per route pattern so any detail page is accessible offline once a single detail was visited.
+These are `"use client"` pages — the server returns the **same HTML shell for every UUID**. Data comes entirely from PowerSync (local SQLite via OPFS). This enables caching one generic shell per route pattern so any detail page is accessible offline once a single detail was visited.
 
-Two caches per route pattern (both stored under a canonical UUID-independent key):
-
-| Cache | Trigger | Used for |
-|---|---|---|
-| `activity-html-shell-v1` | `navigate`-mode request (hard refresh, direct URL) | Offline hard navigation |
-| `activity-rsc-shell-v1` | Non-navigate request (Next.js client-side routing fetches RSC payload) | Offline client-side navigation |
+Only **navigation-mode** (HTML) requests are cached as shells. RSC payloads are **never cached** because they are version-specific — serving stale RSC after a deployment causes 400 errors that trigger Next.js MPA fallback reloads. The SW's `runtimeCaching` includes a `NetworkOnly` matcher for all RSC/navigate requests before `...defaultCache` to prevent Serwist's default `pages-rsc-prefetch` / `pages-rsc` / `pages` caches from staling.
 
 The custom `fetch` listener in `sw.ts` is registered **before** `serwist.addEventListeners()` so it calls `respondWith()` first; unmatched requests fall through to Serwist's handlers.
 
+On SW activation, all stale shell caches and Serwist page caches are cleared and list-page shells (`/home`, `/activities`, `/soldiers`) are repopulated from the network to ensure fresh HTML after deployment.
+
 **Critical gotcha:** call `response.clone()` synchronously (before any `await`) when caching. If you call it inside an async `.then()` callback, the response body may already be consumed by the time the clone runs, causing a "Response body is already used" error and an empty cache entry.
 
-### `navigationPreload: true`
+### `navigationPreload: false`
 
-Required for Next.js. The browser pre-fetches the navigation target alongside SW startup; the SW uses `event.preloadResponse` instead of making its own navigation-mode fetch (which fails in some browser/config combinations). Without this, page navigation stalls while the SW boots.
+Navigation preload is **disabled**. Safari (pre-18.5) has a critical bug where cached navigation-preload responses with redirects cause the SW to receive a stale/corrupt preload response on subsequent navigations. Since the shell handler does its own `fetch()`, the preload provides no benefit.
+
+### Service worker registration (no auto-reload on update)
+
+`serwist-provider.tsx` uses manual `navigator.serviceWorker.register()` instead of `@serwist/turbopack/react`'s `SerwistProvider`. The library's provider automatically reloads the page on `controllerchange` (when a new SW takes control via `skipWaiting` + `clientsClaim`). On iOS, that reload combined with any RSC error recovery = two rapid reloads = "A problem repeatedly occurred" crash. The manual registration intentionally omits the `controllerchange` listener — the new SW silently takes over and the next user navigation uses its cached content.
 
 ### `AUTH_TRUST_HOST=true`
 

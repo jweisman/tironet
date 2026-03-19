@@ -42,7 +42,6 @@ export function TabBar() {
             <Link
               key={href}
               href={href}
-              prefetch={false}
               className={cn(
                 "flex flex-1 flex-col items-center justify-center gap-1 py-3 text-xs transition-colors min-h-[60px]",
                 active
