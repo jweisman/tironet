@@ -92,7 +92,6 @@ const precacheEntries = (self.__SW_MANIFEST ?? []).filter((entry) => {
 // shares the same cached shell.
 function resolveShellRoute(pathname: string, origin: string): {
   htmlCacheName: string; htmlKey: string;
-  rscCacheName: string; rscKey: string;
 } | null {
   // List pages (exact path)
   const listRoutes: Record<string, string> = {
@@ -105,8 +104,6 @@ function resolveShellRoute(pathname: string, origin: string): {
     return {
       htmlCacheName: `${listMatch}-html-shell-v1`,
       htmlKey: `${origin}${pathname}`,
-      rscCacheName: `${listMatch}-rsc-shell-v1`,
-      rscKey: `${origin}${pathname}/__rsc_shell__`,
     };
   }
 
@@ -115,16 +112,12 @@ function resolveShellRoute(pathname: string, origin: string): {
     return {
       htmlCacheName: "activity-html-shell-v1",
       htmlKey: `${origin}/activities/__html_shell__`,
-      rscCacheName: "activity-rsc-shell-v1",
-      rscKey: `${origin}/activities/__rsc_shell__`,
     };
   }
   if (/^\/soldiers\/[^/]+$/.test(pathname)) {
     return {
       htmlCacheName: "soldier-html-shell-v1",
       htmlKey: `${origin}/soldiers/__html_shell__`,
-      rscCacheName: "soldier-rsc-shell-v1",
-      rscKey: `${origin}/soldiers/__rsc_shell__`,
     };
   }
 
@@ -138,13 +131,14 @@ function resolveShellRoute(pathname: string, origin: string): {
     const shell = resolveShellRoute(url.pathname, url.origin);
     if (!shell) return; // Let Serwist handle everything else
 
-    swLog("fetch", url.pathname, event.request.mode);
+    // Only intercept navigation requests (HTML shells). RSC payloads (cors mode)
+    // are NOT cached because they are version-specific — serving a stale RSC
+    // payload after a deployment causes a 400 from the server, which Next.js
+    // recovers from via a full page reload (triggering iOS crash detection).
+    if (event.request.mode !== "navigate") return;
 
-    if (event.request.mode === "navigate") {
-      event.respondWith(handleHtmlShell(event, shell.htmlKey, shell.htmlCacheName));
-    } else {
-      event.respondWith(handleRscShell(event, shell.rscKey, shell.rscCacheName));
-    }
+    swLog("fetch", url.pathname, "navigate");
+    event.respondWith(handleHtmlShell(event, shell.htmlKey, shell.htmlCacheName));
   }
 );
 
@@ -242,43 +236,17 @@ function offlineFallbackResponse(): Response {
   );
 }
 
-// Cache-first with network update for RSC payloads.
-// Same strategy as HTML shells.
-async function handleRscShell(
-  _event: FetchEvent,
-  shellKey: string,
-  cacheName: string
-): Promise<Response> {
-  const cache = await caches.open(cacheName);
-  const shellReq = new Request(shellKey);
-
-  const cached = await cache.match(shellReq);
-  if (cached) {
-    swLog("rsc-shell CACHE HIT", shellKey);
-    fetchAndCache(_event.request, shellReq, cache);
-    return cached;
-  }
-
-  swLog("rsc-shell CACHE MISS, fetching network", shellKey);
-  const response = await fetch(_event.request).catch(() => undefined);
-
-  if (response?.ok && !response.redirected) {
-    swLog("rsc-shell network OK, caching", shellKey);
-    const cloned = response.clone();
-    cache.put(shellReq, cloned);
-    return response;
-  }
-
-  swLog("rsc-shell network failed/redirected", shellKey, response?.status);
-  if (response) return response;
-
-  return new Response("", { status: 503 });
-}
 
 const serwist = new Serwist({
   precacheEntries,
   skipWaiting: true,
-  clientsClaim: true,
+  // clientsClaim is intentionally OFF. With it on, the new SW immediately
+  // takes control of open pages, firing a `controllerchange` event. The
+  // SerwistProvider reloads the page on controllerchange, and if that reload
+  // coincides with a stale-RSC 400 fallback reload, iOS detects two rapid
+  // reloads and shows "A problem repeatedly occurred". Without clientsClaim,
+  // the new SW takes over on the user's next navigation — no forced reload.
+  clientsClaim: false,
   // navigationPreload is DISABLED. Safari (pre-18.5) has a critical bug where
   // cached navigation-preload responses with redirects cause the SW to receive
   // a stale/corrupt preload response on subsequent navigations, leading to
