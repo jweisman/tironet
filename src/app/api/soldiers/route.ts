@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
+import { validateProfileImage } from "@/lib/api/validate-image";
 
 const postSchema = z.object({
   cycleId: z.string().uuid(),
@@ -191,6 +192,11 @@ export async function POST(req: NextRequest) {
 
   const { cycleId, squadId, givenName, familyName, rank, status, profileImage } =
     parsed.data;
+
+  const imageError = validateProfileImage(profileImage);
+  if (imageError) {
+    return NextResponse.json({ error: imageError }, { status: 422 });
+  }
 
   const isAdmin = session.user.isAdmin;
 

@@ -11,8 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ImageCropDialog } from "@/components/ImageCropDialog";
+import dynamic from "next/dynamic";
 import { RANKS } from "@/lib/auth/permissions";
+
+const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
 import type { SoldierStatus } from "@/types";
 
 interface SoldierData {

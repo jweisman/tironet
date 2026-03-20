@@ -2,7 +2,9 @@
 
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ImageCropDialog } from "@/components/ImageCropDialog";
+import dynamic from "next/dynamic";
+
+const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 

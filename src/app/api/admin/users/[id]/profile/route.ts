@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/api/admin-guard";
 import { auth } from "@/lib/auth/auth";
 import { toE164 } from "@/lib/phone";
+import { validateProfileImage } from "@/lib/api/validate-image";
 
 const schema = z.object({
   givenName: z.string().min(1).optional(),
@@ -42,6 +43,11 @@ export async function PATCH(
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const imageError = validateProfileImage(parsed.data.profileImage);
+  if (imageError) {
+    return NextResponse.json({ error: imageError }, { status: 422 });
   }
 
   const { phone: rawPhone, email: rawEmail, ...rest } = parsed.data;

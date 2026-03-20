@@ -192,11 +192,11 @@ interface RawTopGap {
 
 export default function HomePage() {
   const { data: session } = useSession();
-  const { selectedCycleId, selectedAssignment, activeCycles } = useCycle();
+  const { selectedCycleId, selectedAssignment, activeCycles, isLoading: cycleLoading } = useCycle();
 
-  // Brief grace period before showing "no data" — gives PowerSync time to
-  // hydrate from IndexedDB on page load. Can't use useStatus() here because
-  // the PowerSync context isn't available during SSR.
+  // Grace period before showing "no data" — useQuery returns cached local
+  // SQLite data almost instantly for returning users, but on first load
+  // there is a brief window before PowerSync hydrates.
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 1500);
@@ -243,6 +243,12 @@ export default function HomePage() {
       })),
     [rawSquads, topGapsMap]
   );
+
+  // While session / cycle context is still resolving, show nothing
+  // (avoids flashing "no access" or "choose a cycle" before data arrives).
+  if (cycleLoading) {
+    return null;
+  }
 
   // No active cycles
   if (activeCycles.length === 0) {

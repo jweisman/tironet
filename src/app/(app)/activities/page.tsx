@@ -3,8 +3,9 @@
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
-import { useQuery } from "@powersync/react";
+import { useQuery, useStatus } from "@powersync/react";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
 import { CreateActivityForm } from "@/components/activities/CreateActivityForm";
 import {
@@ -24,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +138,7 @@ export default function ActivitiesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const syncStatus = useStatus();
   const role = selectedAssignment?.role ?? "";
   const canCreate = role !== "squad_commander" && !!role;
 
@@ -204,6 +207,7 @@ export default function ActivitiesPage() {
 
   function handleCreateSuccess(activityId: string) {
     setCreateOpen(false);
+    toast.success("הפעילות נוצרה בהצלחה");
     setPendingActivityId(activityId);
   }
 
@@ -281,7 +285,21 @@ export default function ActivitiesPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !syncStatus.hasSynced && filter === "all" && (
+          <div className="divide-y divide-border">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+                <Skeleton className="h-5 w-12 rounded-full" />
+              </div>
+            ))}
+          </div>
+        )}
+        {filtered.length === 0 && (syncStatus.hasSynced || filter !== "all") && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין פעילויות</p>
             {filter !== "all" && <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>}

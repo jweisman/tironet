@@ -4,7 +4,10 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
 import { toE164 } from "@/lib/phone";
+import { createRateLimiter } from "@/lib/api/rate-limit";
 import type { CycleAssignment, Role } from "@/types";
+
+const rateLimiter = createRateLimiter({ limit: 20, windowMs: 60_000 });
 
 const ROLE_RANK: Record<Role, number> = {
   company_commander: 3,
@@ -64,6 +67,10 @@ const schema = z
   });
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const limited = rateLimiter.check(ip);
+  if (limited) return limited;
+
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

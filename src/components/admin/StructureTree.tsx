@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   DndContext,
   DragEndEvent,
@@ -96,7 +97,7 @@ function InlineForm({ placeholder, onSave, onCancel }: InlineFormProps) {
       <Button size="icon" className="h-8 w-8" onClick={submit} disabled={loading || !name.trim()}>
         <Check className="w-3 h-3" />
       </Button>
-      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onCancel}>
+      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onCancel} aria-label="ביטול">
         <X className="w-3 h-3" />
       </Button>
     </div>
@@ -135,7 +136,7 @@ function EditInline({ initialName, onSave, onCancel }: EditInlineProps) {
       <Button size="icon" className="h-7 w-7" onClick={submit} disabled={loading || !name.trim()}>
         <Check className="w-3 h-3" />
       </Button>
-      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onCancel}>
+      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onCancel} aria-label="ביטול">
         <X className="w-3 h-3" />
       </Button>
     </div>
@@ -157,6 +158,7 @@ function SortableCompanyRow({
     <button
       {...attributes}
       {...listeners}
+      aria-label="גרור לסידור מחדש"
       className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
     >
       <GripVertical className="w-4 h-4" />
@@ -182,6 +184,7 @@ function SortablePlatoonRow({
     <button
       {...attributes}
       {...listeners}
+      aria-label="גרור לסידור מחדש"
       className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
     >
       <GripVertical className="w-3.5 h-3.5" />
@@ -207,6 +210,7 @@ function SortableSquadRow({
     <button
       {...attributes}
       {...listeners}
+      aria-label="גרור לסידור מחדש"
       className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
     >
       <GripVertical className="w-3 h-3" />
@@ -344,6 +348,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
   async function deleteCompany(companyId: string) {
     await mutate(`/api/admin/structure/${companyId}`, "DELETE", { type: "company" });
     updateStructure(selectedCycleId, (prev) => prev.filter((c) => c.id !== companyId));
+    toast.success("הפלוגה נמחקה");
   }
 
   // --- Platoon operations ---
@@ -385,6 +390,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
           : c
       )
     );
+    toast.success("המחלקה נמחקה");
   }
 
   // --- Squad operations ---
@@ -445,6 +451,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
           : c
       )
     );
+    toast.success("הכיתה נמחקה");
   }
 
   function toggleCompany(id: string) {
@@ -547,6 +554,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
                                 variant="ghost"
                                 className="h-7 w-7"
                                 onClick={() => setEditingCompanyId(company.id)}
+                                aria-label="ערוך פלוגה"
                               >
                                 <Pencil className="w-3 h-3" />
                               </Button>
@@ -557,6 +565,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
                                       size="icon"
                                       variant="ghost"
                                       className="h-7 w-7 text-destructive hover:text-destructive"
+                                      aria-label="מחק פלוגה"
                                     />
                                   }
                                 >
@@ -647,6 +656,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
                                                   variant="ghost"
                                                   className="h-6 w-6"
                                                   onClick={() => setEditingPlatoonId(platoon.id)}
+                                                  aria-label="ערוך מחלקה"
                                                 >
                                                   <Pencil className="w-3 h-3" />
                                                 </Button>
@@ -657,6 +667,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
                                                         size="icon"
                                                         variant="ghost"
                                                         className="h-6 w-6 text-destructive hover:text-destructive"
+                                                        aria-label="מחק מחלקה"
                                                       />
                                                     }
                                                   >
@@ -739,6 +750,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
                                                                 onClick={() =>
                                                                   setEditingSquadId(squad.id)
                                                                 }
+                                                                aria-label="ערוך כיתה"
                                                               >
                                                                 <Pencil className="w-3 h-3" />
                                                               </Button>
@@ -749,6 +761,7 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
                                                                       size="icon"
                                                                       variant="ghost"
                                                                       className="h-6 w-6 text-destructive hover:text-destructive"
+                                                                      aria-label="מחק כיתה"
                                                                     />
                                                                   }
                                                                 >

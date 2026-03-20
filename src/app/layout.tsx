@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Heebo } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
+import { Toaster } from "@/components/ui/sonner";
 import { SerwistProvider } from "./serwist-provider";
 import "./globals.css";
 
@@ -48,6 +49,7 @@ export default async function RootLayout({
         <SerwistProvider>
           <NextIntlClientProvider messages={messages}>
             {children}
+            <Toaster />
           </NextIntlClientProvider>
         </SerwistProvider>
       </body>

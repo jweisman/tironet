@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
+import { validateProfileImage } from "@/lib/api/validate-image";
 
 const patchSchema = z.object({
   givenName: z.string().min(1).optional(),
@@ -163,6 +164,11 @@ export async function PATCH(
     if (!inScope) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+  }
+
+  const imageError = validateProfileImage(parsed.data.profileImage);
+  if (imageError) {
+    return NextResponse.json({ error: imageError }, { status: 422 });
   }
 
   const updateData: Record<string, unknown> = {};

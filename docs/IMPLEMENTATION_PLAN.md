@@ -1077,10 +1077,10 @@ tironet/
 - [x] Create or edit an activity report while offline → offline banner appears; pending upload badge increments
 - [x] Re-enable network → pending changes upload automatically; verify data persisted in Postgres via Prisma Studio
 - [x] Open app in airplane mode from scratch (no prior cache) → app shell loads; cached data visible
-- [ ] Lighthouse PWA audit (DevTools → Lighthouse → Progressive Web App) — passes installability checks
-- [ ] Install app as PWA on Android Chrome (or iOS Safari) → opens as standalone without browser chrome
-- [ ] Sync status indicator: shows "מסונכרן" when online and in sync; shows pending count when changes are queued
-- [ ] PowerSync JWT endpoint (`/api/powersync/token`) returns 401 for unauthenticated requests
+- [x] Lighthouse PWA audit (DevTools → Lighthouse → Progressive Web App) — passes installability checks
+- [x] Install app as PWA on Android Chrome (or iOS Safari) → opens as standalone without browser chrome
+- [x] Sync status indicator: shows "מסונכרן" when online and in sync; shows pending count when changes are queued
+- [x] PowerSync JWT endpoint (`/api/powersync/token`) returns 401 for unauthenticated requests
 
 ---
 
@@ -1135,8 +1135,8 @@ tironet/
 **Deliverable:** Production-ready app passing Lighthouse audits, security review, and cross-device testing.
 
 **Validation checklist:**
-- [ ] Every form submission shows a loading spinner on the button during the request
-- [ ] Successful mutation → Hebrew success toast appears and auto-dismisses
+- [x] Every form submission shows a loading spinner on the button during the request
+- [x] Successful mutation → Hebrew success toast appears and auto-dismisses
 - [ ] Failed mutation → Hebrew error toast with the relevant message
 - [ ] Activity report row updates result icon immediately on change before the server response (optimistic UI)
 - [ ] Skeleton loaders appear on first list load before data arrives
@@ -1147,7 +1147,7 @@ tironet/
 - [ ] All icon-only buttons have a Hebrew `aria-label` (inspect in DevTools Accessibility panel)
 - [ ] Enable a colour-blind simulation in DevTools (Rendering → Emulate vision deficiency) — gap indicators still distinguishable by icon, not colour alone
 - [ ] Chrome Android: full feature test; install as PWA; use camera for profile picture upload
-- [ ] Safari iOS: install to home screen; open offline; edit a report; reconnect — report synced
+- [x] Safari iOS: install to home screen; open offline; edit a report; reconnect — report synced
 - [ ] Firefox (desktop): navigate all major flows; no JS errors in console
 - [ ] Unauthenticated `fetch` to any `/api/admin/*` route → `403`; to any `/api/*` route → `401`
 - [ ] Rapid requests to `/api/auth/*` (>threshold) → `429 Too Many Requests`

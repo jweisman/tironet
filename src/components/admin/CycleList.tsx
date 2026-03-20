@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   DndContext,
   DragEndEvent,
@@ -159,6 +160,7 @@ export default function CycleList({ initialCycles }: Props) {
     const res = await fetch(`/api/admin/cycles/${id}`, { method: "DELETE" });
     if (res.ok) {
       setCycles((prev) => prev.filter((c) => c.id !== id));
+      toast.success("המחזור נמחק");
     }
   }
 

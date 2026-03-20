@@ -9,6 +9,8 @@ interface CycleContextValue {
   selectedAssignment: CycleAssignment | null;
   setSelectedCycleId: (id: string) => void;
   activeCycles: CycleAssignment[];
+  /** true while the session is still loading (cycle state not yet resolved) */
+  isLoading: boolean;
 }
 
 const CycleContext = createContext<CycleContextValue>({
@@ -16,10 +18,11 @@ const CycleContext = createContext<CycleContextValue>({
   selectedAssignment: null,
   setSelectedCycleId: () => {},
   activeCycles: [],
+  isLoading: true,
 });
 
 export function CycleProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [selectedCycleId, setSelectedCycleIdState] = useState<string | null>(null);
 
   const activeCycles = (session?.user?.cycleAssignments ?? []).filter(
@@ -48,9 +51,15 @@ export function CycleProvider({ children }: { children: React.ReactNode }) {
     ? activeCycles.find((a) => a.cycleId === selectedCycleId) ?? null
     : null;
 
+  // Still loading if session hasn't resolved, or if we have cycles but
+  // the useEffect hasn't auto-selected yet (selectedCycleId still null).
+  const isLoading =
+    status === "loading" ||
+    (activeCycles.length > 0 && selectedCycleId === null);
+
   return (
     <CycleContext.Provider
-      value={{ selectedCycleId, selectedAssignment, setSelectedCycleId, activeCycles }}
+      value={{ selectedCycleId, selectedAssignment, setSelectedCycleId, activeCycles, isLoading }}
     >
       {children}
     </CycleContext.Provider>

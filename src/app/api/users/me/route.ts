@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
+import { validateProfileImage } from "@/lib/api/validate-image";
 
 const schema = z.object({
   givenName: z.string().min(1).optional(),
@@ -32,6 +33,11 @@ export async function PATCH(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const imageError = validateProfileImage(parsed.data.profileImage);
+  if (imageError) {
+    return NextResponse.json({ error: imageError }, { status: 422 });
   }
 
   await prisma.user.update({

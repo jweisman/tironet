@@ -3,13 +3,16 @@
 import { useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/layout/UserAvatar";
-import { ImageCropDialog } from "@/components/ImageCropDialog";
+import dynamic from "next/dynamic";
+
+const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
 import type { Role } from "@/types";
@@ -19,16 +22,12 @@ export default function ProfilePage() {
   const [givenName, setGivenName] = useState(session?.user?.givenName ?? "");
   const [familyName, setFamilyName] = useState(session?.user?.familyName ?? "");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
-    setSaved(false);
     try {
       const res = await fetch("/api/users/me", {
         method: "PATCH",
@@ -40,10 +39,9 @@ export default function ProfilePage() {
       });
       if (!res.ok) throw new Error("שגיאה בשמירה");
       await update();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      toast.success("הפרטים נשמרו בהצלחה");
     } catch {
-      setError("אירעה שגיאה. נסה שנית.");
+      toast.error("אירעה שגיאה. נסה שנית.");
     } finally {
       setSaving(false);
     }
@@ -60,9 +58,9 @@ export default function ProfilePage() {
         body: JSON.stringify({ profileImage: base64 }),
       });
       if (res.ok) await update();
-      else setError("שגיאה בהעלאת התמונה");
+      else toast.error("שגיאה בהעלאת התמונה");
     } catch {
-      setError("שגיאה בהעלאת התמונה");
+      toast.error("שגיאה בהעלאת התמונה");
     }
   }
 
@@ -135,9 +133,6 @@ export default function ProfilePage() {
             <Input value={toIsraeliDisplay(session.user.phone)} disabled dir="ltr" />
           </div>
         )}
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        {saved && <p className="text-sm text-green-600">הפרטים נשמרו בהצלחה</p>}
 
         <Button type="submit" disabled={saving}>
           {saving ? "שומר..." : "שמור שינויים"}
