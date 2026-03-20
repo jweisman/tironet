@@ -61,8 +61,34 @@ export function useOnlineStatus() {
     }
   }, []);
 
+  // Reconnection grace: when the app resumes from background, the WebSocket
+  // is dead but navigator.onLine is true. Give PowerSync a few seconds to
+  // reconnect before showing the offline banner. If the network is actually
+  // down, navigator.onLine flips to false almost immediately, bypassing
+  // this grace via the browserOnline check.
+  const [reconnectGrace, setReconnectGrace] = useState(false);
+  const prevConnectedRef = useRef(status.connected);
+  useEffect(() => {
+    const wasConnected = prevConnectedRef.current;
+    prevConnectedRef.current = status.connected;
+
+    if (wasConnected && !status.connected && browserOnline) {
+      // WebSocket dropped while browser still has network — likely app resume
+      setReconnectGrace(true);
+      const t = setTimeout(() => setReconnectGrace(false), 4000);
+      return () => clearTimeout(t);
+    }
+    if (status.connected) {
+      // Reconnected — clear any active grace
+      setReconnectGrace(false);
+    }
+  }, [status.connected, browserOnline]);
+
   const isConnected =
-    browserOnline && (status.connected || (!hasConnectedRef.current && grace));
+    browserOnline &&
+    (status.connected ||
+      (!hasConnectedRef.current && grace) ||
+      reconnectGrace);
 
   // Persist offline state for subsequent MPA fallback reloads.
   useEffect(() => {
