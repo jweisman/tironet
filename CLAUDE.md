@@ -289,6 +289,50 @@ Required when the dev server runs on a non-standard port (e.g. 3001). NextAuth v
 
 The project tsconfig does not include the WebWorker lib, so `FetchEvent`, `ServiceWorkerGlobalScope.addEventListener`, etc. are not available as global types. `sw.ts` declares a minimal local `FetchEvent` type and casts `self` to access `addEventListener`. This is fine because `sw.ts` is compiled by esbuild (type-strips only — no type checking), so TypeScript errors in this file are IDE warnings only and do not block the build.
 
+## CSP (Content-Security-Policy)
+
+CSP is configured in `next.config.ts` via the `headers()` function (not middleware).
+
+### `script-src` must include `'unsafe-inline'`
+
+Next.js injects inline `<script>` tags for hydration data. Without `'unsafe-inline'` in `script-src`, CSP blocks them and the **entire app renders as a blank page** — no console errors in the page itself, only CSP violation messages. A nonce-based approach would be more secure but requires Next.js middleware to inject nonces into every response.
+
+### `connect-src` must include local dev origins
+
+PowerSync runs on a different port (`localhost:8080`) than the Next.js dev server. `'self'` only covers the same origin (same port). Add `http://localhost:* ws://localhost:*` for local development, otherwise PowerSync WebSocket connections are silently blocked.
+
+## UI Patterns
+
+### Base UI Select: always provide children to `SelectValue`
+
+The Select component uses `@base-ui/react` (not Radix). Base UI's `SelectValue` may display the raw `value` prop (e.g. a UUID) instead of the selected item's display text. Always render the label explicitly:
+
+```tsx
+<SelectValue placeholder="בחר מחלקה">
+  {options.find((o) => o.id === selectedId)?.name ?? "בחר מחלקה"}
+</SelectValue>
+```
+
+### Toast notifications via Sonner
+
+All user-facing mutations should show a `toast.success()` on completion (from `sonner`). The `<Toaster />` component is in `layout.tsx`, configured for RTL. For form dialogs that call an `onSuccess` callback, the **parent** is responsible for the toast — the form itself just calls the callback.
+
+### CycleContext `isLoading` flag
+
+`CycleContext` exposes `isLoading: boolean` that is `true` while the session is still loading OR when cycles exist but the auto-select `useEffect` hasn't fired yet. Pages should return `null` (or a skeleton) while `isLoading` is true to avoid flashing "no access" or "choose a cycle" messages before the cycle state resolves.
+
+## PowerSync + React Rendering Gotchas (continued)
+
+### `useStatus()` crashes during SSR
+
+The `PowerSyncProvider` renders children **without** a context wrapper during SSR (`db` is `null` on the server). Calling `useStatus()` during SSR throws `Cannot read properties of null (reading 'currentStatus')`. Pages that are the first to load (e.g. `/home`) hit this because they're server-rendered. Pages reached via client navigation (e.g. `/activities`) don't because the context is already mounted.
+
+**Workaround:** don't use `useStatus()` on pages that may be SSR'd. Use a timeout-based grace period instead, or create a wrapper hook that checks `useContext(PowerSyncContext)` before accessing status.
+
+### `hasSynced` does not reflect previously cached data
+
+`useStatus().hasSynced` only becomes `true` after a sync completes **in the current session**. It does NOT reflect data already available in the local SQLite DB from a previous session. `useQuery` returns that cached data immediately, but `hasSynced` stays `false` until `connect()` + sync finishes. Do not use `hasSynced` to gate "has data loaded" — use a timeout or check `data.length > 0` instead.
+
 ## Environment Variable Naming
 
 - Variables used inside the PowerSync Docker container must be prefixed `PS_` to work with the `!env` tag in `powersync.config.yaml`

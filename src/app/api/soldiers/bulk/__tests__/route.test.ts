@@ -1,0 +1,259 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    squad: { findMany: vi.fn() },
+    platoon: { findMany: vi.fn() },
+    company: { findMany: vi.fn() },
+    soldier: { create: vi.fn() },
+    activity: { count: vi.fn() },
+    $transaction: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/auth/auth", () => ({
+  auth: vi.fn(),
+}));
+
+import { POST } from "../route";
+import { prisma } from "@/lib/db/prisma";
+import { auth } from "@/lib/auth/auth";
+import {
+  createMockRequest,
+  mockSessionUser,
+  mockAssignment,
+} from "@/__tests__/helpers/api";
+
+const mockAuth = vi.mocked(auth);
+const mockSquadFindMany = vi.mocked(prisma.squad.findMany);
+const mockTransaction = vi.mocked(prisma.$transaction);
+const mockActivityCount = vi.mocked(prisma.activity.count);
+
+// Valid v4 UUIDs for Zod validation
+const CYCLE = "00000000-0000-4000-8000-000000000001";
+const SQUAD = "00000000-0000-4000-8000-000000000002";
+const SQUAD_MINE = "00000000-0000-4000-8000-000000000003";
+const PLATOON = "00000000-0000-4000-8000-000000000004";
+const COMP = "00000000-0000-4000-8000-000000000005";
+const OTHER_CYCLE = "00000000-0000-4000-8000-000000000099";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("POST /api/soldiers/bulk", () => {
+  it("returns 401 when unauthenticated", async () => {
+    mockAuth.mockResolvedValue(null as never);
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [{ squadId: SQUAD, givenName: "A", familyName: "B" }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 for invalid input (missing soldiers)", async () => {
+    mockAuth.mockResolvedValue({ user: mockSessionUser({ isAdmin: true }) } as never);
+    const req = createMockRequest("POST", "/api/soldiers/bulk", { cycleId: CYCLE });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for empty soldiers array", async () => {
+    mockAuth.mockResolvedValue({ user: mockSessionUser({ isAdmin: true }) } as never);
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE, soldiers: [],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 403 when non-admin has no assignment for cycle", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [] }),
+    } as never);
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [{ squadId: SQUAD, givenName: "A", familyName: "B" }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when squad is out of scope for squad_commander", async () => {
+    const assignment = mockAssignment({
+      cycleId: CYCLE,
+      role: "squad_commander",
+      unitType: "squad",
+      unitId: SQUAD_MINE,
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
+    } as never);
+
+    // Squad exists and belongs to cycle, but not in scope
+    mockSquadFindMany.mockResolvedValue([
+      {
+        id: SQUAD, platoonId: PLATOON,
+        platoon: { company: { cycleId: CYCLE } },
+      },
+    ] as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [{ squadId: SQUAD, givenName: "A", familyName: "B" }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 when squad does not belong to the cycle", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+
+    // Admin: scopeSquadIds is null (not called), goes straight to validation
+    // Validation query: prisma.squad.findMany for the unique squad IDs
+    mockSquadFindMany.mockResolvedValueOnce([
+      {
+        id: SQUAD, platoonId: PLATOON,
+        platoon: { company: { cycleId: OTHER_CYCLE } },
+      },
+    ] as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [{ squadId: SQUAD, givenName: "A", familyName: "B" }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Squad not found in cycle");
+  });
+
+  it("returns 403 when platoon_commander's scope excludes the squad", async () => {
+    const PLATOON_MINE = "00000000-0000-4000-8000-000000000010";
+    const assignment = mockAssignment({
+      cycleId: CYCLE,
+      role: "platoon_commander",
+      unitType: "platoon",
+      unitId: PLATOON_MINE,
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
+    } as never);
+
+    // getScopeSquadIds for platoon_commander returns only SQUAD_MINE
+    mockSquadFindMany
+      .mockResolvedValueOnce([{ id: SQUAD_MINE }] as never) // scope query
+      .mockResolvedValueOnce([                               // validation query
+        {
+          id: SQUAD, platoonId: PLATOON,
+          platoon: { company: { cycleId: CYCLE } },
+        },
+      ] as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [{ squadId: SQUAD, givenName: "A", familyName: "B" }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+  });
+
+  it("creates soldiers for platoon_commander within scope", async () => {
+    const assignment = mockAssignment({
+      cycleId: CYCLE,
+      role: "platoon_commander",
+      unitType: "platoon",
+      unitId: PLATOON,
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
+    } as never);
+
+    // getScopeSquadIds for platoon_commander
+    mockSquadFindMany
+      .mockResolvedValueOnce([{ id: SQUAD }] as never) // scope query
+      .mockResolvedValueOnce([                          // validation query
+        {
+          id: SQUAD, platoonId: PLATOON,
+          platoon: { company: { cycleId: CYCLE } },
+        },
+      ] as never);
+
+    mockTransaction.mockResolvedValue([] as never);
+    mockActivityCount.mockResolvedValue(3 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [{ squadId: SQUAD, givenName: "A", familyName: "B" }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+  });
+
+  it("creates soldiers for company_commander within scope", async () => {
+    const mockPlatoonFindMany = vi.mocked(prisma.platoon.findMany);
+    const assignment = mockAssignment({
+      cycleId: CYCLE,
+      role: "company_commander",
+      unitType: "company",
+      unitId: COMP,
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
+    } as never);
+
+    // getScopeSquadIds for company_commander
+    mockPlatoonFindMany.mockResolvedValueOnce([{ id: PLATOON }] as never);
+    mockSquadFindMany
+      .mockResolvedValueOnce([{ id: SQUAD }] as never) // scope query
+      .mockResolvedValueOnce([                          // validation query
+        {
+          id: SQUAD, platoonId: PLATOON,
+          platoon: { company: { cycleId: CYCLE } },
+        },
+      ] as never);
+
+    mockTransaction.mockResolvedValue([] as never);
+    mockActivityCount.mockResolvedValue(1 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [{ squadId: SQUAD, givenName: "A", familyName: "B" }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+  });
+
+  it("creates soldiers in bulk and returns 201 for admin", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+
+    // Admin: scopeSquadIds is null (not called), goes straight to validation
+    mockSquadFindMany.mockResolvedValueOnce([
+      {
+        id: SQUAD, platoonId: PLATOON,
+        platoon: { company: { cycleId: CYCLE } },
+      },
+    ] as never);
+
+    mockTransaction.mockResolvedValue([] as never);
+    mockActivityCount.mockResolvedValue(5 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [
+        { squadId: SQUAD, givenName: "Alice", familyName: "A" },
+        { squadId: SQUAD, givenName: "Bob", familyName: "B" },
+      ],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.created).toBe(2);
+    expect(body.activeActivityCount).toBe(5);
+  });
+});
