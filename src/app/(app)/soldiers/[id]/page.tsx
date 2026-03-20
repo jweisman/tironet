@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Pencil, CheckCircle } from "lucide-react";
@@ -136,20 +136,50 @@ interface RawMissing {
 export default function SoldierDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const soldierId = params.id;
+
+  // The SW caches one HTML shell for all /soldiers/[id] pages (app shell pattern).
+  // Next.js bakes useParams() into the hydration data, so when the SW serves a
+  // shell cached from /soldiers/_ for /soldiers/<real-uuid>, useParams() returns
+  // "_" instead of the real UUID. Read the actual URL after hydration to fix this.
+  const [soldierId, setSoldierId] = useState(params.id);
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/soldiers\/([^/]+)$/);
+    if (match && match[1] !== soldierId) {
+      setSoldierId(match[1]);
+    }
+  }, []);
 
   const [editOpen, setEditOpen] = useState(false);
+
+  // Grace period: give PowerSync time to hydrate local SQLite after an
+  // offline shell load before showing "not found".
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   const soldierParams = useMemo(() => [soldierId], [soldierId]);
   const missingParams = useMemo(() => [soldierId, soldierId], [soldierId]);
 
-  const { data: soldierRows } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
+  const { data: soldierRows, isLoading: soldierLoading } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
   const { data: reportRows } = useQuery<RawReport>(REPORTS_QUERY, soldierParams);
   const { data: missingRows } = useQuery<RawMissing>(MISSING_QUERY, missingParams);
 
   const raw = soldierRows?.[0] ?? null;
 
-  if (!raw) {
+  // Debug: log query state to diagnose offline data availability
+  useEffect(() => {
+    console.log("[SoldierDetail] query state:", {
+      soldierId,
+      soldierRows: soldierRows?.length ?? 0,
+      soldierLoading,
+      raw: !!raw,
+      ready,
+    });
+  }, [soldierId, soldierRows, soldierLoading, raw, ready]);
+
+  if (!raw && ready) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
         <p className="font-medium">חייל לא נמצא</p>
@@ -158,6 +188,10 @@ export default function SoldierDetailPage() {
         </Button>
       </div>
     );
+  }
+
+  if (!raw) {
+    return null;
   }
 
   const soldier = {

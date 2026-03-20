@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -72,16 +72,38 @@ interface RawReport {
 // ---------------------------------------------------------------------------
 
 export default function ActivityPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+
+  // The SW caches one HTML shell for all /activities/[id] pages (app shell pattern).
+  // Next.js bakes useParams() into the hydration data, so when the SW serves a
+  // shell cached from /activities/_ for /activities/<real-uuid>, useParams() returns
+  // "_" instead of the real UUID. Read the actual URL after hydration to fix this.
+  const [id, setId] = useState(params.id);
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/activities\/([^/]+)$/);
+    if (match && match[1] !== id) {
+      setId(match[1]);
+    }
+  }, []);
   const initialGapsOnly = searchParams.get("gaps") === "1";
 
   const { data: session } = useSession();
   const { selectedAssignment } = useCycle();
 
   const activityParams = useMemo(() => [id], [id]);
-  const { data: activityRows } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
+  const { data: activityRows, isLoading: activityLoading } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
   const activity = activityRows?.[0] ?? null;
+
+  // Debug: log query state to diagnose offline data availability
+  useEffect(() => {
+    console.log("[ActivityDetail] query state:", {
+      id,
+      activityRows: activityRows?.length ?? 0,
+      activityLoading,
+      activity: !!activity,
+    });
+  }, [id, activityRows, activityLoading, activity]);
 
   // Use the assignment for the activity's own cycle, not the globally selected one.
   // A user may have assignments in multiple cycles (e.g. squad_commander in a past
@@ -180,7 +202,13 @@ export default function ActivityPage() {
     };
   }, [activity, squadsRows, soldiersRows, reportsRows, role, activityAssignment]);
 
-  const errorMessage = !activity ? "הפעילות לא נמצאה" : null;
+  // Grace period: give PowerSync time to hydrate local SQLite after an
+  // offline shell load before showing "not found".
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <div>
@@ -194,9 +222,9 @@ export default function ActivityPage() {
         </Link>
       </div>
 
-      {errorMessage && (
+      {!data && ready && (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
-          <p className="font-medium text-destructive">{errorMessage}</p>
+          <p className="font-medium text-destructive">הפעילות לא נמצאה</p>
           <Link
             href="/activities"
             className="text-sm text-muted-foreground hover:text-foreground"

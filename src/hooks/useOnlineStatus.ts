@@ -1,6 +1,28 @@
 import { useStatus } from "@powersync/react";
 import { useState, useEffect, useRef } from "react";
 
+const OFFLINE_KEY = "tironet:offline";
+
+function readPersistedOffline(): boolean {
+  try {
+    return localStorage.getItem(OFFLINE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function persistOffline(offline: boolean) {
+  try {
+    if (offline) {
+      localStorage.setItem(OFFLINE_KEY, "1");
+    } else {
+      localStorage.removeItem(OFFLINE_KEY);
+    }
+  } catch {
+    // localStorage unavailable (e.g. private browsing)
+  }
+}
+
 export function useOnlineStatus() {
   const status = useStatus();
 
@@ -22,17 +44,30 @@ export function useOnlineStatus() {
   }, []);
 
   // Track whether PowerSync has connected at least once in THIS page session.
-  // `status.hasSynced` is persisted across sessions and is always true after
-  // the first-ever sync, so it can't distinguish "still booting" from
-  // "lost connection". This ref stays false until we see connected: true.
   const hasConnectedRef = useRef(false);
   if (status.connected) hasConnectedRef.current = true;
 
-  // Show offline banner only when:
-  // - Browser is offline, OR
-  // - PowerSync was connected this session but lost connection
-  // Don't show it while PowerSync is still establishing its initial connection.
-  const isConnected = browserOnline && (!hasConnectedRef.current || status.connected);
+  // Use persisted offline state so that after an MPA fallback reload the
+  // banner appears immediately instead of waiting for the grace period.
+  const wasOffline = useRef(readPersistedOffline());
+
+  // Grace period: give PowerSync time to connect after page load.
+  // Skip the grace period if we already know we were offline (persisted).
+  const [grace, setGrace] = useState(!wasOffline.current);
+  useEffect(() => {
+    if (!wasOffline.current) {
+      const t = setTimeout(() => setGrace(false), 5000);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
+  const isConnected =
+    browserOnline && (status.connected || (!hasConnectedRef.current && grace));
+
+  // Persist offline state for subsequent MPA fallback reloads.
+  useEffect(() => {
+    persistOffline(!isConnected);
+  }, [isConnected]);
 
   return {
     isConnected,

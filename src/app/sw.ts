@@ -19,89 +19,154 @@ type FetchEvent = Event & {
 type ExtendableEvent = Event & { waitUntil(p: Promise<unknown>): void };
 
 // ---------------------------------------------------------------------------
-// Diagnostic logging — visible in Safari Web Inspector → Console for the SW
+// Build identity — derived from precache manifest content hashes.
+// Changes on every deployment so shell caches are automatically versioned.
 // ---------------------------------------------------------------------------
-const SW_VERSION = "2.0.0";
-const LOG_PREFIX = "[SW]";
-function swLog(...args: unknown[]) {
-  console.log(LOG_PREFIX, ...args);
-}
-
-swLog("loaded, version", SW_VERSION);
-
-// Log lifecycle events for debugging iOS resume behavior.
-(self as unknown as { addEventListener(t: string, h: (e: ExtendableEvent) => void): void }).addEventListener(
-  "activate",
-  (event) => {
-    swLog("activate event, version", SW_VERSION);
-    // Clear stale shell caches from previous deployments, then repopulate.
-    // Stale cached HTML loads old JS bundles whose RSC state-tree headers
-    // don't match the new server, causing 400 errors and reload loops.
-    event.waitUntil(clearAndRepopulateShellCaches());
-  }
-);
-
-// Cache names to clear on activation to prevent stale content after deployment.
-const STALE_CACHE_NAMES = [
-  // Our shell caches
-  "home-html-shell-v1",
-  "activities-list-html-shell-v1",
-  "soldiers-list-html-shell-v1",
-  "activity-html-shell-v1",
-  "soldier-html-shell-v1",
-  // Serwist defaultCache RSC/page caches (version-specific, stale = 400 errors)
-  "pages-rsc-prefetch",
-  "pages-rsc",
-  "pages",
-  "others",
-];
-
-async function clearAndRepopulateShellCaches() {
-  // 1. Delete all existing shell caches.
-  for (const name of STALE_CACHE_NAMES) {
-    const deleted = await caches.delete(name);
-    if (deleted) swLog("deleted stale cache", name);
-  }
-
-  // 2. Repopulate list-page shells from the network.
-  const origin = (self as unknown as { location: { origin: string } }).location.origin;
-  const routes = ["/home", "/activities", "/soldiers"];
-  for (const path of routes) {
-    try {
-      const res = await fetch(path, { credentials: "same-origin" });
-      if (res.ok && !res.redirected) {
-        const shell = resolveShellRoute(path, origin);
-        if (shell) {
-          const cache = await caches.open(shell.htmlCacheName);
-          await cache.put(new Request(shell.htmlKey), res);
-          swLog("prepopulated shell cache", path);
-        }
-      } else {
-        swLog("prepopulate skipped (not ok or redirected)", path, res.status);
-      }
-    } catch {
-      swLog("prepopulate failed (offline?)", path);
-    }
-  }
-}
-
-// Only precache Next.js static bundles (hashed, no auth needed).
-// Page HTML routes, API routes, and PowerSync workers are excluded.
 const precacheEntries = (self.__SW_MANIFEST ?? []).filter((entry) => {
   const url = typeof entry === "string" ? entry : entry.url;
   return url.startsWith("/_next/static/");
 });
 
-// App shell caching for "use client" pages.
+// Compute a short build hash from the first few precache revision strings.
+// This changes whenever JS/CSS bundles change (i.e. every deployment).
+function computeBuildHash(): string {
+  const revisions = precacheEntries
+    .slice(0, 8)
+    .map((e) => (typeof e === "string" ? e : e.revision ?? e.url))
+    .join("|");
+  // Simple string hash — only needs to be unique per build, not cryptographic.
+  let hash = 0;
+  for (let i = 0; i < revisions.length; i++) {
+    hash = ((hash << 5) - hash + revisions.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+const BUILD_ID = computeBuildHash();
+const SHELL_CACHE_PREFIX = "shell-";
+
+// ---------------------------------------------------------------------------
+// Logging
+// ---------------------------------------------------------------------------
+const LOG_PREFIX = "[SW]";
+function swLog(...args: unknown[]) {
+  console.log(LOG_PREFIX, ...args);
+}
+
+swLog("loaded, build", BUILD_ID);
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+(self as unknown as { addEventListener(t: string, h: (e: ExtendableEvent) => void): void }).addEventListener(
+  "activate",
+  (event) => {
+    swLog("activate, build", BUILD_ID);
+    event.waitUntil(cleanAndPrepopulateCaches());
+  }
+);
+
+// Client-triggered cache warming. Next.js Link navigations use RSC payloads
+// (mode: "cors"), not full navigations (mode: "navigate"), so the SW never
+// gets a chance to cache shells during normal browsing. The client sends a
+// WARM_SHELLS message after authentication to ensure shells are cached.
+type MessageEvent = Event & { data: unknown; waitUntil?(p: Promise<unknown>): void };
+(self as unknown as { addEventListener(t: string, h: (e: MessageEvent) => void): void }).addEventListener(
+  "message",
+  (event) => {
+    if (
+      event.data &&
+      typeof event.data === "object" &&
+      (event.data as Record<string, unknown>).type === "WARM_SHELLS"
+    ) {
+      swLog("warming shells from client message");
+      const p = warmShellCache();
+      if (event.waitUntil) event.waitUntil(p);
+    }
+  }
+);
+
+// Fixed cache name shared between SW and main thread. The SW clears and
+// repopulates on activation (i.e. on every deployment), so no build-hash
+// suffix is needed — the activation lifecycle handles versioning.
+const SHELL_CACHE_NAME = "app-shells";
+
+async function cleanAndPrepopulateCaches() {
+  // 1. Delete ALL caches from previous builds.
+  //    - Our shell caches: prefixed with "shell-"
+  //    - Serwist defaultCache page/RSC caches: version-specific, stale after deploy
+  const allCaches = await caches.keys();
+  const staleCachePrefixes = [
+    SHELL_CACHE_PREFIX,      // old build-hashed shell caches ("shell-xxx")
+    "pages-rsc-prefetch",    // Serwist RSC prefetch cache
+    "pages-rsc",             // Serwist RSC cache
+    "pages",                 // Serwist pages cache
+    "others",                // Serwist catch-all cache
+  ];
+  // Also delete per-route caches from the previous SW version
+  const staleCacheExact = [
+    "activity-rsc-shell-v1",
+    "soldier-rsc-shell-v1",
+    "activities-list-rsc-shell-v1",
+    "soldiers-list-rsc-shell-v1",
+    "home-rsc-shell-v1",
+  ];
+  for (const name of allCaches) {
+    // Keep current shell cache
+    if (name === SHELL_CACHE_NAME) continue;
+    // Delete caches matching stale prefixes or exact names
+    if (
+      staleCachePrefixes.some((prefix) => name.startsWith(prefix)) ||
+      staleCacheExact.includes(name)
+    ) {
+      await caches.delete(name);
+      swLog("deleted stale cache", name);
+    }
+  }
+
+  // 2. Prepopulate shell caches.
+  await warmShellCache();
+}
+
+// Shared logic: fetch shell routes and store in cache.
+// Called from activation (prepopulation) and from client message (WARM_SHELLS).
+const SHELL_ROUTES = [
+  "/home",
+  "/activities",
+  "/soldiers",
+  "/activities/_",   // detail page shell (dummy slug — same HTML for any ID)
+  "/soldiers/_",     // detail page shell
+];
+
+async function warmShellCache() {
+  const origin = (self as unknown as { location: { origin: string } }).location.origin;
+  const cache = await caches.open(SHELL_CACHE_NAME);
+
+  for (const path of SHELL_ROUTES) {
+    try {
+      const res = await fetch(path, { credentials: "same-origin" });
+      if (res.ok && !res.redirected) {
+        const shell = resolveShellRoute(path, origin);
+        if (shell) {
+          await cache.put(new Request(shell.htmlKey), res);
+          swLog("cached shell", path, "→", shell.htmlKey);
+        }
+      } else {
+        swLog("shell skipped (not ok or redirected)", path, res.status);
+      }
+    } catch {
+      swLog("shell fetch failed (offline?)", path);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// App shell routing
+// ---------------------------------------------------------------------------
 //
-// All app pages are client-rendered with data from PowerSync (IndexedDB).
-// The server returns the same HTML shell regardless of state, so we can cache
+// All app pages are client-rendered with data from PowerSync (local SQLite).
+// The server returns the same HTML shell regardless of state, so we cache
 // one copy per route pattern and serve it offline.
-//
-// This is critical for iOS standalone PWA: when iOS kills and resumes the app,
-// it reloads the URL. Without a cached shell, the server-side auth check may
-// redirect to /login, creating a loop that iOS shows as "A problem repeatedly
-// occurred". Serving the cached shell lets React boot and PowerSync reconnect.
 //
 // Only navigation (HTML) requests are cached. RSC payloads are NOT cached
 // because they are version-specific — serving stale RSC after a deployment
@@ -110,37 +175,20 @@ const precacheEntries = (self.__SW_MANIFEST ?? []).filter((entry) => {
 // This listener runs BEFORE serwist.addEventListeners() so it calls
 // respondWith() first; unmatched requests fall through to Serwist.
 
-// Routes to cache as app shells. Detail routes use a canonical key so any UUID
-// shares the same cached shell.
 function resolveShellRoute(pathname: string, origin: string): {
-  htmlCacheName: string; htmlKey: string;
+  htmlKey: string;
 } | null {
   // List pages (exact path)
-  const listRoutes: Record<string, string> = {
-    "/home": "home",
-    "/activities": "activities-list",
-    "/soldiers": "soldiers-list",
-  };
-  const listMatch = listRoutes[pathname];
-  if (listMatch) {
-    return {
-      htmlCacheName: `${listMatch}-html-shell-v1`,
-      htmlKey: `${origin}${pathname}`,
-    };
+  if (pathname === "/home" || pathname === "/activities" || pathname === "/soldiers") {
+    return { htmlKey: `${origin}${pathname}` };
   }
 
   // Detail pages (UUID-parameterized — cache under a canonical key)
   if (/^\/activities\/[^/]+$/.test(pathname)) {
-    return {
-      htmlCacheName: "activity-html-shell-v1",
-      htmlKey: `${origin}/activities/__html_shell__`,
-    };
+    return { htmlKey: `${origin}/activities/__shell__` };
   }
   if (/^\/soldiers\/[^/]+$/.test(pathname)) {
-    return {
-      htmlCacheName: "soldier-html-shell-v1",
-      htmlKey: `${origin}/soldiers/__html_shell__`,
-    };
+    return { htmlKey: `${origin}/soldiers/__shell__` };
   }
 
   return null;
@@ -154,33 +202,20 @@ function resolveShellRoute(pathname: string, origin: string): {
     if (!shell) return; // Let Serwist handle everything else
 
     // Only intercept navigation requests (HTML shells). RSC payloads (cors mode)
-    // are NOT cached because they are version-specific — serving a stale RSC
-    // payload after a deployment causes a 400 from the server, which Next.js
-    // recovers from via a full page reload (triggering iOS crash detection).
+    // are NOT cached because they are version-specific.
     if (event.request.mode !== "navigate") return;
 
     swLog("fetch", url.pathname, "navigate");
-    event.respondWith(handleHtmlShell(event, shell.htmlKey, shell.htmlCacheName));
+    event.respondWith(handleHtmlShell(event, shell.htmlKey));
   }
 );
 
 // Network-first with cache fallback for HTML shells.
-//
-// Always fetch from the network to get the latest HTML (which loads the
-// correct JS bundles for the current deployment). Fall back to the cached
-// shell only when the network fails or returns a redirect (auth redirect
-// to /login). The `!response.redirected` check prevents caching login
-// pages as shells.
-//
-// The cache fallback is critical for iOS standalone PWA: when iOS kills and
-// resumes the app while offline, the cached shell lets React boot and
-// PowerSync reconnect from IndexedDB.
 async function handleHtmlShell(
   event: FetchEvent,
-  shellKey: string,
-  cacheName: string
+  shellKey: string
 ): Promise<Response> {
-  const cache = await caches.open(cacheName);
+  const cache = await caches.open(SHELL_CACHE_NAME);
   const shellReq = new Request(shellKey);
 
   // 1. Try network first.
@@ -188,6 +223,7 @@ async function handleHtmlShell(
 
   if (response?.ok && !response.redirected) {
     swLog("html-shell network OK, caching", shellKey);
+    // Clone synchronously before the body is consumed.
     const cloned = response.clone();
     cache.put(shellReq, cloned);
     return response;

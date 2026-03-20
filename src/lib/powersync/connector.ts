@@ -12,6 +12,7 @@ interface TokenResponse {
 export class TironetConnector implements PowerSyncBackendConnector {
   private cachedToken: TokenResponse | null = null;
   private tokenExpiry = 0;
+  private lastFetchError = 0;
 
   async fetchCredentials() {
     // Return cached token if still valid (with 30s buffer)
@@ -22,18 +23,33 @@ export class TironetConnector implements PowerSyncBackendConnector {
       };
     }
 
-    const res = await fetch("/api/powersync/token");
-    if (!res.ok) throw new Error("Failed to fetch PowerSync token");
+    // Throttle retries when offline — don't hammer the network.
+    // PowerSync retries fetchCredentials() rapidly; without this guard
+    // we'd fire dozens of failing fetches per second.
+    const now = Date.now();
+    if (this.lastFetchError && now - this.lastFetchError < 10_000) {
+      throw new Error("Token fetch throttled (offline)");
+    }
 
-    const data: TokenResponse = await res.json();
-    this.cachedToken = data;
-    // Tokens are issued with 5m expiry
-    this.tokenExpiry = Date.now() + 5 * 60 * 1000;
+    try {
+      const res = await fetch("/api/powersync/token");
+      if (!res.ok) throw new Error("Failed to fetch PowerSync token");
 
-    return {
-      endpoint: data.powersync_url,
-      token: data.token,
-    };
+      const data: TokenResponse = await res.json();
+      this.cachedToken = data;
+      this.lastFetchError = 0;
+      // Tokens are issued with 5m expiry
+      this.tokenExpiry = Date.now() + 5 * 60 * 1000;
+
+      console.log("[PowerSync] token fetched OK");
+      return {
+        endpoint: data.powersync_url,
+        token: data.token,
+      };
+    } catch (err) {
+      this.lastFetchError = Date.now();
+      throw err;
+    }
   }
 
   async uploadData(database: AbstractPowerSyncDatabase): Promise<void> {
