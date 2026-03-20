@@ -36,25 +36,36 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 
 ## Offline Capabilities
 
-The app is designed to work reliably in low-connectivity field environments.
+The app is designed to work reliably in low-connectivity field environments. All offline data is stored in a local SQLite database (via PowerSync + OPFS) and syncs automatically when connectivity is restored.
 
 ### What works offline
 
-- **Activity detail pages** (`/activities/[id]`) — Fully accessible offline after visiting once while online. The page shell is cached by the service worker; data loads from the local PowerSync database (IndexedDB).
+- **Home dashboard** (`/home`) — Cached shell with live data from local SQLite. Shows activity completion rates, gap counts, and missing reports.
+- **Soldier list** (`/soldiers`) — Browse the full soldier roster with gap counts, powered by local queries.
+- **Soldier detail pages** (`/soldiers/[id]`) — View soldier profile, status, and gap activities. Any soldier can be viewed offline — the service worker caches a single HTML shell that works for all soldier IDs.
+- **Activity list** (`/activities`) — Browse all activities assigned to the user's platoons.
+- **Activity detail pages** (`/activities/[id]`) — View and manage per-soldier results. Same shell caching as soldier detail pages — any activity can be viewed offline.
 - **Recording activity reports** — Pass/fail/N/A results, grades, and notes can be saved while offline. Writes go to local SQLite instantly; the connector uploads them to the server when connectivity is restored.
 - **Bulk squad updates** — The bulk "mark all" action also works offline under the same mechanism.
-- **Soldier detail pages** (`/soldiers/[id]`) — Same app-shell caching as activity pages.
+- **Editing soldiers** — Soldier profile fields (name, rank, status) can be updated offline.
 
 ### What requires connectivity
 
 - Logging in (authentication is always server-side)
 - Creating new activities
-- Admin operations (structure changes, user management)
-- Dashboard (reads from the server-rendered page)
+- Admin operations (structure changes, user management, invitations)
+- User profile page
+- Pages not listed above show a friendly offline fallback with a link back to the home page
+
+### How it works
+
+The service worker proactively caches HTML shells for all main routes (`/home`, `/activities`, `/soldiers`, and detail page templates) immediately after registration. On subsequent visits, the SW serves the cached shell and PowerSync provides data from local SQLite — no network round-trip needed.
+
+On each deployment, the SW clears stale caches and re-fetches fresh shells. RSC payloads are never cached (they are version-specific), preventing stale-cache errors after updates.
 
 ### Offline indicator
 
-A banner appears at the top of every page when the connection is lost, including a "pending changes" pill when unsynced writes are queued. The banner uses `navigator.onLine` for immediate detection (appears within milliseconds of going offline), supplemented by PowerSync's WebSocket connection status.
+A banner appears at the top of every page when the connection is lost, including a "pending changes" pill when unsynced writes are queued. The banner uses `navigator.onLine` for immediate detection (appears within milliseconds of going offline), supplemented by PowerSync's WebSocket connection status. The offline state persists across page reloads so the banner appears instantly even after navigation-triggered reloads.
 
 ### Installing as a PWA
 

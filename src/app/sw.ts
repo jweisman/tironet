@@ -198,15 +198,24 @@ function resolveShellRoute(pathname: string, origin: string): {
   "fetch",
   (event) => {
     const url = new URL(event.request.url);
-    const shell = resolveShellRoute(url.pathname, url.origin);
-    if (!shell) return; // Let Serwist handle everything else
 
-    // Only intercept navigation requests (HTML shells). RSC payloads (cors mode)
+    // Only intercept navigation requests (HTML). RSC payloads (cors mode)
     // are NOT cached because they are version-specific.
     if (event.request.mode !== "navigate") return;
 
-    swLog("fetch", url.pathname, "navigate");
-    event.respondWith(handleHtmlShell(event, shell.htmlKey));
+    const shell = resolveShellRoute(url.pathname, url.origin);
+    if (shell) {
+      swLog("fetch", url.pathname, "navigate (shell)");
+      event.respondWith(handleHtmlShell(event, shell.htmlKey));
+      return;
+    }
+
+    // For app pages without a cached shell (e.g. /admin, /profile), try
+    // the network and fall back to an offline page instead of a raw error.
+    if (url.origin === (self as unknown as { location: { origin: string } }).location.origin) {
+      swLog("fetch", url.pathname, "navigate (fallback)");
+      event.respondWith(handleNavigateFallback(event));
+    }
   }
 );
 
@@ -245,6 +254,13 @@ async function handleHtmlShell(
   return offlineFallbackResponse();
 }
 
+// Network-only with offline fallback for pages without a cached shell.
+async function handleNavigateFallback(event: FetchEvent): Promise<Response> {
+  const response = await fetch(event.request).catch(() => undefined);
+  if (response) return response;
+  return offlineFallbackResponse();
+}
+
 function offlineFallbackResponse(): Response {
   return new Response(
     `<!doctype html>
@@ -266,6 +282,7 @@ function offlineFallbackResponse(): Response {
     <h1>אין חיבור לרשת</h1>
     <p>הדף הזה לא זמין במצב לא מקוון. חזור לרשת ונסה שוב.</p>
     <button onclick="location.reload()">נסה שוב</button>
+    <button onclick="location.href='/home'" style="background:#6b7280;">דף הבית</button>
   </div>
 </body>
 </html>`,

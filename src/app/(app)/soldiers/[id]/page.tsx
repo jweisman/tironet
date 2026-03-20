@@ -162,22 +162,11 @@ export default function SoldierDetailPage() {
   const soldierParams = useMemo(() => [soldierId], [soldierId]);
   const missingParams = useMemo(() => [soldierId, soldierId], [soldierId]);
 
-  const { data: soldierRows, isLoading: soldierLoading } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
+  const { data: soldierRows } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
   const { data: reportRows } = useQuery<RawReport>(REPORTS_QUERY, soldierParams);
   const { data: missingRows } = useQuery<RawMissing>(MISSING_QUERY, missingParams);
 
   const raw = soldierRows?.[0] ?? null;
-
-  // Debug: log query state to diagnose offline data availability
-  useEffect(() => {
-    console.log("[SoldierDetail] query state:", {
-      soldierId,
-      soldierRows: soldierRows?.length ?? 0,
-      soldierLoading,
-      raw: !!raw,
-      ready,
-    });
-  }, [soldierId, soldierRows, soldierLoading, raw, ready]);
 
   if (!raw && ready) {
     return (

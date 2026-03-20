@@ -92,18 +92,8 @@ export default function ActivityPage() {
   const { selectedAssignment } = useCycle();
 
   const activityParams = useMemo(() => [id], [id]);
-  const { data: activityRows, isLoading: activityLoading } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
+  const { data: activityRows } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
   const activity = activityRows?.[0] ?? null;
-
-  // Debug: log query state to diagnose offline data availability
-  useEffect(() => {
-    console.log("[ActivityDetail] query state:", {
-      id,
-      activityRows: activityRows?.length ?? 0,
-      activityLoading,
-      activity: !!activity,
-    });
-  }, [id, activityRows, activityLoading, activity]);
 
   // Use the assignment for the activity's own cycle, not the globally selected one.
   // A user may have assignments in multiple cycles (e.g. squad_commander in a past

@@ -180,6 +180,16 @@ create: {
 
 The upsert `where` clause uses the composite unique key (e.g. `activityId_soldierId`), so if the record already exists the `id` is ignored and the row is updated in place.
 
+### `init()` before `connect()` — offline DB access
+
+`PowerSyncProvider` calls `db.init()` first, then `db.connect(connector)`. `init()` opens the local SQLite DB and creates tables from the schema — it is fast and requires no network. `connect()` additionally starts the sync stream, which calls `fetchCredentials()` and may fail offline. By calling `init()` first, `useQuery()` returns previously synced data immediately, even when offline.
+
+**Do not** gate `init()` or `connect()` on authentication state (e.g. `useSession()`). When offline, NextAuth's session refresh fails and `status` may flip to `"unauthenticated"`, which would disconnect the DB and break offline queries.
+
+### Token fetch throttling
+
+PowerSync retries `fetchCredentials()` rapidly when the sync stream drops. Without throttling, this fires dozens of failing `/api/powersync/token` fetches per second while offline. `connector.ts` implements a 10-second cooldown after a failed fetch attempt (`lastFetchError` timestamp).
+
 ### Offline indicator
 
 `useOnlineStatus()` in `src/hooks/useOnlineStatus.ts` combines two signals:
@@ -187,6 +197,8 @@ The upsert `where` clause uses the composite unique key (e.g. `activityId_soldie
 - `status.connected` from PowerSync — can take 10–30s to flip (WebSocket timeout)
 
 Use `browserOnline && status.connected` so the banner appears instantly. `hasPendingUploads` is true when `status.dataFlowStatus.uploadError` is set (failed upload attempt while offline) — this drives the "שינויים ממתינים לסנכרון" pill in `OfflineBanner`.
+
+The offline state is persisted to `localStorage` (`tironet:offline` key) so the banner appears immediately after MPA fallback reloads that reset React state.
 
 ## Data Model Constraints
 
@@ -236,6 +248,30 @@ The custom `fetch` listener in `sw.ts` is registered **before** `serwist.addEven
 On SW activation, all stale shell caches and Serwist page caches are cleared and list-page shells (`/home`, `/activities`, `/soldiers`) are repopulated from the network to ensure fresh HTML after deployment.
 
 **Critical gotcha:** call `response.clone()` synchronously (before any `await`) when caching. If you call it inside an async `.then()` callback, the response body may already be consumed by the time the clone runs, causing a "Response body is already used" error and an empty cache entry.
+
+### `useParams()` hydration baking — the app shell gotcha
+
+Next.js bakes `useParams()` into the server-rendered HTML/RSC hydration data. When the SW serves a cached shell from `/soldiers/_` for `/soldiers/<real-uuid>`, `useParams()` returns `"_"` instead of the real UUID. This causes queries to return 0 rows and the page shows "not found".
+
+**Fix:** each detail page reads `window.location.pathname` after hydration to get the real ID:
+
+```tsx
+const [soldierId, setSoldierId] = useState(params.id);
+useEffect(() => {
+  const match = window.location.pathname.match(/^\/soldiers\/([^/]+)$/);
+  if (match && match[1] !== soldierId) setSoldierId(match[1]);
+}, []);
+```
+
+Apply this pattern to any new detail page that uses the app shell caching model.
+
+### Client-triggered shell warming via `postMessage`
+
+Next.js `<Link>` navigations use RSC payloads (`mode: "cors"`), not full navigations (`mode: "navigate"`). The SW's fetch handler only triggers on `navigate`, so it never caches shells during normal in-app browsing. To ensure shells are cached, `serwist-provider.tsx` sends a `WARM_SHELLS` message after SW registration, triggering the SW to proactively fetch and cache all shell routes (`/home`, `/activities`, `/soldiers`, `/activities/_`, `/soldiers/_`).
+
+### Offline fallback for unsupported pages
+
+Pages without a cached shell (e.g. `/admin`, `/profile`) fall through to `handleNavigateFallback()` which tries the network and returns an inline offline HTML page on failure. This page includes "try again" and "go to home page" buttons so users aren't stuck.
 
 ### `navigationPreload: false`
 
