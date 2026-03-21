@@ -1,0 +1,91 @@
+import { test, expect } from "@playwright/test";
+import { EMAILS } from "./helpers/constants";
+import { getLatestEmail, extractVerificationUrl, clearMailhog } from "./helpers/mailhog";
+
+test.describe("Authentication", () => {
+  test("login page renders all provider options", async ({ page }) => {
+    await page.goto("/login");
+
+    // Google button
+    await expect(page.getByRole("button", { name: /google/i })).toBeVisible();
+
+    // Email magic link form
+    await expect(page.locator("input#email")).toBeVisible();
+
+    // WhatsApp/SMS OTP button
+    await expect(page.getByRole("button", { name: /SMS/ })).toBeVisible();
+  });
+
+  test("unauthenticated user visiting /home is redirected to /login", async ({
+    page,
+  }) => {
+    await page.goto("/home");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("unauthenticated user visiting /admin is redirected to /login", async ({
+    page,
+  }) => {
+    await page.goto("/admin/cycles");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("magic link login flow works end-to-end", async ({ page }) => {
+    await clearMailhog();
+    await page.goto("/login");
+
+    // Enter email and submit
+    await page.fill("input#email", EMAILS.admin);
+    await page.click('form button[type="submit"]');
+
+    // Should show "check your email" confirmation — actual translated text
+    await expect(page.getByText("בדוק את תיבת הדואר שלך")).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Fetch verification email from Mailhog
+    const message = await getLatestEmail(EMAILS.admin);
+    const verifyUrl = extractVerificationUrl(message);
+
+    // Navigate to verification URL
+    await page.goto(verifyUrl);
+
+    // Should land on /home
+    await expect(page).toHaveURL(/\/home/, { timeout: 15000 });
+  });
+
+  test("authenticated user sees their name in sidebar", async ({ browser }) => {
+    const context = await browser.newContext({
+      storageState: "e2e/.auth/admin.json",
+    });
+    const page = await context.newPage();
+    await page.goto("/home");
+
+    // Admin user name should appear in the sidebar
+    await expect(page.getByText("Admin Test")).toBeVisible({ timeout: 10000 });
+    await context.close();
+  });
+
+  test("logout clears session and redirects to landing", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      storageState: "e2e/.auth/admin.json",
+    });
+    const page = await context.newPage();
+    await page.goto("/home");
+
+    // Wait for sidebar to render
+    await expect(page.getByRole("button", { name: /התנתק/ })).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Click the logout button in the sidebar
+    await page.getByRole("button", { name: /התנתק/ }).click();
+
+    // Should redirect to landing page (/)
+    // toHaveURL matches against full URL (e.g. http://localhost:3001/)
+    await expect(page).toHaveURL(/:\d+\/?$|\/login/, { timeout: 15000 });
+    await context.close();
+  });
+});

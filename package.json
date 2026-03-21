@@ -14,7 +14,9 @@
     "make-admin": "tsx scripts/make-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "e2e": "DATABASE_URL=postgresql://tironet:tironet@127.0.0.1:5434/tironet_test playwright test",
+    "e2e:ui": "DATABASE_URL=postgresql://tironet:tironet@127.0.0.1:5434/tironet_test playwright test --ui"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -59,6 +61,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.11",

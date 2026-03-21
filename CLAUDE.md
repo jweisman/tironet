@@ -333,6 +333,48 @@ The `PowerSyncProvider` renders children **without** a context wrapper during SS
 
 `useStatus().hasSynced` only becomes `true` after a sync completes **in the current session**. It does NOT reflect data already available in the local SQLite DB from a previous session. `useQuery` returns that cached data immediately, but `hasSynced` stays `false` until `connect()` + sync finishes. Do not use `hasSynced` to gate "has data loaded" — use a timeout or check `data.length > 0` instead.
 
+## Testing
+
+### Unit Tests (Vitest)
+
+Unit tests live in `__tests__/` directories alongside the code they test. Run with `npm test`. Coverage is ~98% line coverage across 321 tests.
+
+Configuration is in `vitest.config.ts`. Tests use `vi.mock()` for Prisma, NextAuth, and other server dependencies. PowerSync hooks are mocked at the module level.
+
+### E2E Tests (Playwright)
+
+72 end-to-end tests across 11 spec files in `e2e/`. They run against the full stack (Next.js + PostgreSQL + PowerSync + Mailhog) via Docker Compose.
+
+**Running:** `npm run e2e` (or `npm run e2e:ui` for the Playwright UI). The Docker Compose stack must be running with the e2e overlay:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+```
+
+This creates a separate `tironet_test` database so e2e tests don't touch the dev DB. PowerSync is reconfigured to sync from `tironet_test`.
+
+**Architecture:**
+- `playwright.config.ts` defines 4 auth projects: `setup` (logs in 3 users via Mailhog), then `admin-tests`, `commander-tests`, `squad-tests` each using saved `storageState`
+- `e2e/global-setup.ts` seeds the test DB (Prisma), authenticates users via the magic link flow (Mailhog API), and saves auth state to `e2e/.auth/*.json`
+- `e2e/global-teardown.ts` truncates all tables after the run
+
+**Key gotchas for writing e2e tests:**
+
+1. **Test isolation with `fullyParallel: true`** — Admin CRUD tests must NOT modify seeded data (cycles, activity types). Each test should create its own temporary data, operate on it, and leave seeded data untouched. Modifying seeded data (e.g. deactivating "Test Cycle 2026") breaks all PowerSync-dependent tests running in parallel.
+
+2. **PowerSync sync timing** — Fresh browser contexts need 30–60 seconds for a full sync. Use `test.setTimeout(90000)` on describe blocks for PowerSync pages, and `{ timeout: 60000 }` on the first assertion that depends on synced data.
+
+3. **Hebrew name display convention** — The UI displays soldiers as `familyName givenName` (e.g. "Cohen Avi", not "Avi Cohen"). All test assertions must use this order.
+
+4. **Playwright strict mode** — Selectors matching multiple elements throw errors. Common fixes:
+   - `.first()` when multiple matches are acceptable
+   - `{ exact: true }` to avoid substring matches (e.g. `getByRole("button", { name: "טיוטה", exact: true })`)
+   - Scope to `page.getByRole("main")` to avoid matching sidebar text (e.g. "Squad Commander" matching `getByText("Squad C")`)
+
+5. **Sync scopes by `cycle_id`, not `squad_id`** — Squad commanders see ALL soldiers in their cycle, not just their squad. This is intentional — the sync stream filters by `cycle_id`. Don't write tests asserting squad commanders can't see other squads' soldiers.
+
+6. **Mailhog quoted-printable encoding** — Email bodies use `=3D` for `=` and soft line breaks (`=\r\n`). The `extractVerificationUrl` helper in `e2e/helpers/mailhog.ts` handles decoding.
+
 ## Environment Variable Naming
 
 - Variables used inside the PowerSync Docker container must be prefixed `PS_` to work with the `!env` tag in `powersync.config.yaml`
