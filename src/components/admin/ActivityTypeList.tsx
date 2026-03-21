@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import * as LucideIcons from "lucide-react";
 import { PlusCircle, Pencil, Trash2, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
     const res = await fetch(`/api/admin/activity-types/${id}`, { method: "DELETE" });
     if (res.ok) {
       setTypes((prev) => prev.filter((t) => t.id !== id));
+      toast.success("סוג הפעילות נמחק");
     }
   }
 
@@ -136,10 +138,10 @@ export default function ActivityTypeList({ initialTypes }: Props) {
               <LucideIcon name={newIcon} className="w-5 h-5" />
             </div>
           </div>
-          <Button size="sm" onClick={handleAdd} disabled={loading || !newName.trim() || !newIcon.trim()}>
+          <Button size="sm" onClick={handleAdd} disabled={loading || !newName.trim() || !newIcon.trim()} aria-label="אישור">
             <Check className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setNewName(""); setNewIcon("Activity"); }}>
+          <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setNewName(""); setNewIcon("Activity"); }} aria-label="ביטול">
             <X className="w-4 h-4" />
           </Button>
         </div>
@@ -181,10 +183,10 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                     <LucideIcon name={editIcon} className="w-4 h-4" />
                   </div>
                 </div>
-                <Button size="sm" onClick={() => handleEdit(type.id)} disabled={loading}>
+                <Button size="sm" onClick={() => handleEdit(type.id)} disabled={loading} aria-label="שמור">
                   <Check className="w-4 h-4" />
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} aria-label="ביטול">
                   <X className="w-4 h-4" />
                 </Button>
               </>
@@ -201,6 +203,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                 <Button
                   size="icon"
                   variant="ghost"
+                  aria-label="ערוך סוג פעילות"
                   onClick={() => {
                     setEditingId(type.id);
                     setEditName(type.name);
@@ -211,7 +214,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger
-                    render={<Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" />}
+                    render={<Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" aria-label="מחק סוג פעילות" />}
                   >
                     <Trash2 className="w-4 h-4" />
                   </AlertDialogTrigger>

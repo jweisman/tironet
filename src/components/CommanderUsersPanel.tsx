@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { UserPlus, RefreshCw, Send, Trash2, Copy, Check, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -108,6 +109,7 @@ export function CommanderUsersPanel({
 
   async function cancelInvitation(id: string) {
     await fetch(`/api/admin/invitations/${id}`, { method: "DELETE" });
+    toast.success("ההזמנה בוטלה");
     await reload();
   }
 
@@ -197,6 +199,7 @@ export function CommanderUsersPanel({
                   allowedRoles={invitableRoles}
                   onSuccess={() => {
                     setInviteOpen(false);
+                    toast.success("ההזמנה נוצרה בהצלחה");
                     reload();
                   }}
                   onCancel={() => setInviteOpen(false)}
@@ -278,7 +281,7 @@ export function CommanderUsersPanel({
                       user={{ ...editingUser, phone: editingUser.phone ?? null, email: editingUser.email ?? null }}
                       showAdminToggle={false}
                       endpoint={`/api/users/${editingUserId}/profile`}
-                      onSuccess={() => { setEditingUserId(null); reload(); }}
+                      onSuccess={() => { setEditingUserId(null); toast.success("המשתמש עודכן"); reload(); }}
                       onCancel={() => setEditingUserId(null)}
                     />
                   )}

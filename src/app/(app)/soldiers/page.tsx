@@ -3,11 +3,14 @@
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, AlertCircle, FileUp } from "lucide-react";
+import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
-import { useQuery } from "@powersync/react";
+import { useQuery, useStatus } from "@powersync/react";
 import { SoldierCard, type SoldierSummary } from "@/components/soldiers/SoldierCard";
 import { AddSoldierForm } from "@/components/soldiers/AddSoldierForm";
-import { BulkImportDialog } from "@/components/soldiers/BulkImportDialog";
+import dynamic from "next/dynamic";
+
+const BulkImportDialog = dynamic(() => import("@/components/soldiers/BulkImportDialog").then(m => m.BulkImportDialog));
 import {
   Dialog,
   DialogContent,
@@ -26,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { SoldierStatus } from "@/types";
 
 interface SquadData {
@@ -134,6 +138,7 @@ export default function SoldiersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const syncStatus = useStatus();
   const role = selectedAssignment?.role ?? "";
 
   // -------- PowerSync queries --------
@@ -211,6 +216,7 @@ export default function SoldiersPage() {
 
   function handleImportSuccess(created: number, activeActivityCount: number) {
     setImportOpen(false);
+    toast.success(`${created} חיילים יובאו בהצלחה`);
     if (activeActivityCount > 0 && created > 0) {
       setLateJoinerInfo({ count: activeActivityCount, soldierId: "__bulk__" });
     }
@@ -218,6 +224,7 @@ export default function SoldiersPage() {
 
   function handleAddSuccess(activeActivityCount: number, soldierId: string) {
     setAddOpen(false);
+    toast.success("החייל נוסף בהצלחה");
     if (activeActivityCount > 0) {
       setLateJoinerInfo({ count: activeActivityCount, soldierId });
     }
@@ -329,7 +336,20 @@ export default function SoldiersPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {totalSoldiers === 0 && (
+        {totalSoldiers === 0 && !syncStatus.hasSynced && !search && statusFilter === "all" && !showGapsOnly && (
+          <div className="divide-y divide-border">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {totalSoldiers === 0 && (syncStatus.hasSynced || search || statusFilter !== "all" || showGapsOnly) && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
             {(search || statusFilter !== "all" || showGapsOnly) && (

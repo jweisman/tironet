@@ -155,6 +155,7 @@ export function ReportRow({ soldier, report, disabled = false, onChange }: Repor
             defaultValue={report.grade ?? ""}
             onChange={handleGradeChange}
             placeholder="ציון (0-100)"
+            aria-label="ציון"
             className="w-28 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
             dir="ltr"
           />
@@ -163,6 +164,7 @@ export function ReportRow({ soldier, report, disabled = false, onChange }: Repor
             defaultValue={report.note ?? ""}
             onChange={handleNoteChange}
             placeholder="הערה"
+            aria-label="הערה"
             className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>

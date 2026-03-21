@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { usePowerSync } from "@powersync/react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -254,6 +255,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         }
         return next;
       });
+      toast.success(`${targets.length} דיווחים עודכנו`);
     } catch {
       setSaveError("שגיאה בעדכון כללי");
     } finally {
@@ -296,6 +298,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         activityType: updated.activityType,
       }));
       setEditingMetadata(false);
+      toast.success("הפעילות עודכנה בהצלחה");
     } catch {
       setMetaError("שגיאה בעדכון");
     } finally {
@@ -313,6 +316,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         setDeleteError(err.error ?? "שגיאה במחיקה");
         return;
       }
+      toast.success("הפעילות נמחקה");
       router.push("/activities");
     } catch {
       setDeleteError("שגיאה במחיקה");

@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Pencil, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
 import { useQuery } from "@powersync/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -332,7 +333,7 @@ export default function SoldierDetailPage() {
           </DialogHeader>
           <EditSoldierForm
             soldier={soldier}
-            onSuccess={() => setEditOpen(false)}
+            onSuccess={() => { setEditOpen(false); toast.success("החייל עודכן בהצלחה"); }}
             onCancel={() => setEditOpen(false)}
           />
         </DialogContent>

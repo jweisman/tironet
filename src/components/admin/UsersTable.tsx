@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { UserPlus, Trash2, Plus, RefreshCw, Send, Pencil, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -111,6 +112,7 @@ export function UsersTable({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ assignmentId }),
     });
+    toast.success("השיבוץ הוסר");
     await reloadUsers();
   }
 
@@ -119,14 +121,16 @@ export function UsersTable({
     const res = await fetch(`/api/admin/users/${id}/profile`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setDeleteError(data.error ?? "אירעה שגיאה במחיקת המשתמש.");
+      toast.error(data.error ?? "אירעה שגיאה במחיקת המשתמש.");
       return;
     }
+    toast.success("המשתמש נמחק");
     await reloadUsers();
   }
 
   async function cancelInvitation(id: string) {
     await fetch(`/api/admin/invitations/${id}`, { method: "DELETE" });
+    toast.success("ההזמנה בוטלה");
     await reloadInvitations();
   }
 
@@ -186,6 +190,7 @@ export function UsersTable({
                 structureByCycle={structureByCycle}
                 onSuccess={() => {
                   setInviteOpen(false);
+                  toast.success("ההזמנה נוצרה בהצלחה");
                   reloadInvitations();
                 }}
                 onCancel={() => setInviteOpen(false)}
@@ -272,7 +277,7 @@ export function UsersTable({
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
-                        title="ערוך משתמש"
+                        aria-label="ערוך משתמש"
                         onClick={() => setEditingUserId(user.id)}
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -281,7 +286,7 @@ export function UsersTable({
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
-                        title="הוסף שיבוץ"
+                        aria-label="הוסף שיבוץ"
                         onClick={() => setAssigningUserId(user.id)}
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -294,7 +299,7 @@ export function UsersTable({
                                 size="icon"
                                 variant="ghost"
                                 className="h-7 w-7 text-destructive hover:text-destructive"
-                                title="מחק משתמש"
+                                aria-label="מחק משתמש"
                               />
                             }
                           >
@@ -379,7 +384,7 @@ export function UsersTable({
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7"
-                          title="העתק קישור הזמנה"
+                          aria-label="העתק קישור הזמנה"
                           onClick={() => copyInviteLink(inv)}
                         >
                           {copiedId === inv.id ? (
@@ -395,7 +400,7 @@ export function UsersTable({
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            title="שלח הזמנה במייל"
+                            aria-label="שלח הזמנה במייל"
                             disabled={sendingEmailId === inv.id}
                             onClick={() => resendEmail(inv)}
                           >
@@ -417,6 +422,7 @@ export function UsersTable({
                                 size="icon"
                                 variant="ghost"
                                 className="h-7 w-7 text-destructive hover:text-destructive"
+                                aria-label="בטל הזמנה"
                               />
                             }
                           >
@@ -467,6 +473,7 @@ export function UsersTable({
               user={{ ...editingUser, phone: editingUser.phone ?? null }}
               onSuccess={async () => {
                 setEditingUserId(null);
+                toast.success("המשתמש עודכן בהצלחה");
                 await reloadUsers();
               }}
               onCancel={() => setEditingUserId(null)}
@@ -493,6 +500,7 @@ export function UsersTable({
               structureByCycle={structureByCycle}
               onSuccess={async () => {
                 setAssigningUserId(null);
+                toast.success("השיבוץ נשמר בהצלחה");
                 await reloadUsers();
               }}
               onCancel={() => setAssigningUserId(null)}

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { verifyWhatsAppOtp } from "@/lib/twilio";
+import { createRateLimiter } from "@/lib/api/rate-limit";
+
+const rateLimiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
 
 const schema = z.object({
   phone: z.string().min(1),
@@ -9,6 +12,10 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const limited = rateLimiter.check(ip);
+  if (limited) return limited;
+
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

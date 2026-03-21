@@ -118,7 +118,9 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
           <Label>מחלקה</Label>
           <Select value={platoonId} onValueChange={(v) => { if (v !== null) setPlatoonId(v); }}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="בחר מחלקה" />
+              <SelectValue placeholder="בחר מחלקה">
+                {platoonOptions.find((p) => p.id === platoonId)?.name ?? "בחר מחלקה"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {platoonOptions.map((p) => (
@@ -190,9 +192,11 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
       {/* Status */}
       <div className="space-y-1.5">
         <Label>סטטוס</Label>
-        <div className="flex rounded-lg bg-muted p-1 gap-1">
+        <div className="flex rounded-lg bg-muted p-1 gap-1" role="radiogroup" aria-label="סטטוס">
           <button
             type="button"
+            role="radio"
+            aria-checked={status === "draft"}
             onClick={() => setStatus("draft")}
             className={`flex-1 rounded-md py-2 text-sm font-medium transition-all ${
               status === "draft"
@@ -204,6 +208,8 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
           </button>
           <button
             type="button"
+            role="radio"
+            aria-checked={status === "active"}
             onClick={() => setStatus("active")}
             className={`flex-1 rounded-md py-2 text-sm font-medium transition-all ${
               status === "active"
