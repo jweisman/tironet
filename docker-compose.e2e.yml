@@ -1,0 +1,11 @@
+# E2E test overrides — creates a dedicated test database and points PowerSync to it.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+
+services:
+  postgres:
+    volumes:
+      - ./e2e/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+
+  powersync:
+    environment:
+      PS_DATABASE_URL: "postgresql://tironet:tironet@postgres:5432/tironet_test"

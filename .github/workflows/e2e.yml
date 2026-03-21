@@ -1,0 +1,76 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DATABASE_URL: postgresql://tironet:tironet@127.0.0.1:5434/tironet_test
+      AUTH_SECRET: ci-test-secret-not-for-production-use
+      AUTH_TRUST_HOST: "true"
+      NEXTAUTH_URL: http://localhost:3001
+      EMAIL_SERVER: smtp://localhost:1026
+      FROM_EMAIL: "Tironet <noreply@test.com>"
+      POWERSYNC_JWT_SECRET: ci-test-jwt-secret-32-bytes-long!
+      PS_JWT_SECRET_B64URL: Y2ktdGVzdC1qd3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch
+      PS_JWT_AUDIENCE: http://localhost:8080
+      PS_DATABASE_URL: postgresql://tironet:tironet@postgres:5432/tironet_test
+      NEXT_PUBLIC_POWERSYNC_URL: http://localhost:8080
+      NEXT_PUBLIC_APP_URL: http://localhost:3001
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Start Docker services
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+        env:
+          PS_DATABASE_URL: postgresql://tironet:tironet@postgres:5432/tironet_test
+          PS_JWT_SECRET_B64URL: Y2ktdGVzdC1qd3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch
+          PS_JWT_AUDIENCE: http://localhost:8080
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h 127.0.0.1 -p 5434 -U tironet && break
+            sleep 1
+          done
+
+      - name: Initialise MongoDB replica set
+        run: |
+          for i in $(seq 1 30); do
+            docker compose exec -T mongo mongosh --eval "rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]})" && break
+            sleep 2
+          done
+
+      - name: Wait for PowerSync
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/probes/ready && break
+            sleep 2
+          done
+
+      - name: Run E2E tests
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

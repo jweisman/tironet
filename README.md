@@ -165,6 +165,52 @@ npm run make-admin -- --email you@example.com
 | `npm run db:seed` | Seed reference data |
 | `npm run db:studio` | Open Prisma Studio at localhost:5555 |
 | `npm run make-admin -- --email <email>` | Promote a user to admin |
+| `npm test` | Run unit tests (Vitest) |
+| `npm run e2e` | Run e2e tests (Playwright) — requires Docker e2e stack |
+| `npm run e2e:ui` | Run e2e tests with Playwright UI |
+
+## Testing
+
+### Unit Tests (Vitest)
+
+```bash
+npm test
+```
+
+Runs 321 unit tests with ~98% line coverage. Tests cover API routes, auth logic, PowerSync connector, React components, and utility functions. Configuration is in `vitest.config.ts`.
+
+### E2E Tests (Playwright)
+
+E2E tests run against the full stack in a browser. They use a separate `tironet_test` database so they don't affect dev data.
+
+#### Prerequisites
+
+The Docker Compose stack must be running with the e2e overlay, which creates the test database and points PowerSync at it:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+```
+
+If this is the first run (or after wiping volumes), also run the one-time infrastructure setup commands from [step 4](#4-one-time-infrastructure-setup) above, replacing `tironet` with `tironet_test` for the PostgreSQL publication:
+
+```bash
+docker compose exec postgres psql -U tironet -d tironet_test -c "CREATE PUBLICATION powersync FOR ALL TABLES;"
+```
+
+#### Running
+
+```bash
+npm run e2e        # headless run
+npm run e2e:ui     # Playwright UI (interactive)
+```
+
+The test suite (72 tests across 11 spec files) takes ~45 seconds. Tests cover authentication, navigation guards, admin CRUD (cycles, structure, activity types, users), invitation flow, dashboard, activities, and soldiers.
+
+The setup phase automatically:
+1. Runs Prisma migrations against the test database
+2. Seeds test data (users, cycles, companies, platoons, squads, soldiers, activities, reports)
+3. Authenticates 3 test users (admin, platoon commander, squad commander) via the magic link flow using Mailhog
+4. Saves auth state to `e2e/.auth/` for reuse across all tests
 
 ## Environment Variables
 
