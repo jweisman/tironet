@@ -11,6 +11,10 @@ vi.mock("@/lib/twilio", () => ({
   verifyWhatsAppOtp: vi.fn(),
 }));
 
+vi.mock("@/lib/api/rate-limit", () => ({
+  createRateLimiter: () => ({ check: () => null }),
+}));
+
 import { POST } from "../verify/route";
 import { prisma } from "@/lib/db/prisma";
 import { verifyWhatsAppOtp } from "@/lib/twilio";

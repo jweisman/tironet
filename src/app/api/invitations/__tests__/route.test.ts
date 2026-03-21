@@ -21,6 +21,10 @@ vi.mock("@/lib/auth/auth", () => ({
   auth: vi.fn(),
 }));
 
+vi.mock("@/lib/api/rate-limit", () => ({
+  createRateLimiter: () => ({ check: () => null }),
+}));
+
 vi.mock("crypto", async (importOriginal) => {
   const actual = await importOriginal<typeof import("crypto")>();
   return {
