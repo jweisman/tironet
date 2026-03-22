@@ -217,7 +217,13 @@ function resolveShellRoute(pathname: string, origin: string): {
 
     // For app pages without a cached shell (e.g. /admin, /profile), try
     // the network and fall back to an offline page instead of a raw error.
-    if (url.origin === (self as unknown as { location: { origin: string } }).location.origin) {
+    // Skip /api/ routes — they are handled by Serwist's NetworkOnly matcher
+    // and must not be fetched twice (double-fetch breaks one-time-use tokens
+    // like email verification).
+    if (
+      url.origin === (self as unknown as { location: { origin: string } }).location.origin &&
+      !url.pathname.startsWith("/api/")
+    ) {
       swLog("fetch", url.pathname, "navigate (fallback)");
       event.respondWith(handleNavigateFallback(event));
     }
