@@ -3,6 +3,7 @@ import { Heebo } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
+import { SplashDismiss } from "@/components/SplashDismiss";
 import { SerwistProvider } from "./serwist-provider";
 import "./globals.css";
 
@@ -83,20 +84,7 @@ export default async function RootLayout({
             <Toaster />
           </NextIntlClientProvider>
         </SerwistProvider>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              // Remove splash as soon as the page has meaningful content.
-              // requestAnimationFrame ensures at least one paint has occurred.
-              requestAnimationFrame(function(){
-                requestAnimationFrame(function(){
-                  var s=document.getElementById("app-splash");
-                  if(s)s.remove();
-                });
-              });
-            `,
-          }}
-        />
+        <SplashDismiss />
       </body>
     </html>
   );
