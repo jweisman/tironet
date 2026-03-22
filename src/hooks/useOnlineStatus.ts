@@ -56,7 +56,7 @@ export function useOnlineStatus() {
   const [grace, setGrace] = useState(!wasOffline.current);
   useEffect(() => {
     if (!wasOffline.current) {
-      const t = setTimeout(() => setGrace(false), 10_000);
+      const t = setTimeout(() => setGrace(false), 20_000);
       return () => clearTimeout(t);
     }
   }, []);

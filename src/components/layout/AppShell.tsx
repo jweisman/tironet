@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { TabBar } from "./TabBar";
 import { Sidebar } from "./Sidebar";
 import { UserAvatar } from "./UserAvatar";
@@ -7,6 +8,16 @@ import { CyclePicker } from "./CyclePicker";
 import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
 export function AppShell({ children }: { children: React.ReactNode }) {
+  // Dismiss the inline splash screen once the app shell has mounted and
+  // painted. This avoids the blank/black gap between splash hide and app
+  // render that occurred when SplashDismiss hid it immediately on hydration.
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById("app-splash");
+      if (el) el.style.display = "none";
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <OfflineBanner />
