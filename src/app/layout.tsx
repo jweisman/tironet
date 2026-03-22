@@ -46,12 +46,57 @@ export default async function RootLayout({
   return (
     <html lang="he" dir="rtl">
       <body className={`${heebo.variable} font-sans antialiased`}>
+        {/* Inline splash shown instantly before React/CSS load. Hidden once
+            the first child paints. Uses inline styles so it works even when
+            stylesheets haven't loaded yet. */}
+        <div
+          id="app-splash"
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#ffffff",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              border: "3px solid #e5e7eb",
+              borderTopColor: "#273617",
+              borderRadius: "50%",
+              animation: "app-splash-spin 0.7s linear infinite",
+            }}
+          />
+          <style
+            dangerouslySetInnerHTML={{
+              __html: "@keyframes app-splash-spin{to{transform:rotate(360deg)}}",
+            }}
+          />
+        </div>
         <SerwistProvider>
           <NextIntlClientProvider messages={messages}>
             {children}
             <Toaster />
           </NextIntlClientProvider>
         </SerwistProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Remove splash as soon as the page has meaningful content.
+              // requestAnimationFrame ensures at least one paint has occurred.
+              requestAnimationFrame(function(){
+                requestAnimationFrame(function(){
+                  var s=document.getElementById("app-splash");
+                  if(s)s.remove();
+                });
+              });
+            `,
+          }}
+        />
       </body>
     </html>
   );
