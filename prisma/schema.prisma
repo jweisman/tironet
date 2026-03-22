@@ -32,6 +32,7 @@ model User {
   invitationsSent       Invitation[]           @relation("InvitationSender")
   activitiesCreated     Activity[]
   activityReportsEdited ActivityReport[]
+  requestsCreated       Request[]
 
   @@map("users")
 }
@@ -93,6 +94,7 @@ model Cycle {
   invitations      Invitation[]
   soldiers         Soldier[]
   activities       Activity[]
+  requests         Request[]
 
   @@map("cycles")
 }
@@ -228,6 +230,7 @@ model Soldier {
   cycle           Cycle            @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   squad           Squad            @relation(fields: [squadId], references: [id])
   activityReports ActivityReport[]
+  requests        Request[]
 
   @@index([cycleId, squadId], name: "idx_soldiers_cycle_squad")
   @@index([squadId, status], name: "idx_soldiers_squad_status")
@@ -306,4 +309,68 @@ model ActivityReport {
   @@index([activityId], name: "idx_activity_reports_activity")
   @@index([soldierId], name: "idx_activity_reports_soldier")
   @@map("activity_reports")
+}
+
+// ---------------------------------------------------------------------------
+// Requests
+// ---------------------------------------------------------------------------
+
+enum RequestType {
+  leave
+  medical
+  hardship
+}
+
+enum RequestStatus {
+  open
+  approved
+  denied
+}
+
+enum Transportation {
+  public_transit
+  shuttle
+  military_transport
+  other
+}
+
+model Request {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId         String        @map("cycle_id") @db.Uuid
+  soldierId       String        @map("soldier_id") @db.Uuid
+  type            RequestType
+  status          RequestStatus @default(open)
+  assignedRole    Role          @map("assigned_role")
+  createdByUserId String        @map("created_by_user_id") @db.Uuid
+
+  // Common
+  description     String?
+
+  // Leave fields
+  place           String?
+  departureAt     DateTime?     @map("departure_at") @db.Timestamptz()
+  returnAt        DateTime?     @map("return_at") @db.Timestamptz()
+  transportation  Transportation?
+
+  // Medical fields
+  urgent          Boolean?
+  paramedicDate   DateTime?     @map("paramedic_date") @db.Date
+  appointmentDate DateTime?     @map("appointment_date") @db.Date
+  appointmentPlace String?      @map("appointment_place")
+  appointmentType  String?      @map("appointment_type")
+  sickLeaveDays   Int?          @map("sick_leave_days")
+
+  // Hardship fields
+  specialConditions Boolean?    @map("special_conditions")
+
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  cycle           Cycle         @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  soldier         Soldier       @relation(fields: [soldierId], references: [id], onDelete: Cascade)
+  createdBy       User          @relation(fields: [createdByUserId], references: [id])
+
+  @@index([cycleId, status], name: "idx_requests_cycle_status")
+  @@index([soldierId], name: "idx_requests_soldier")
+  @@map("requests")
 }

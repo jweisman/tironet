@@ -3,9 +3,10 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Pencil, CheckCircle } from "lucide-react";
+import { ArrowRight, Pencil, CheckCircle, Plus, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@powersync/react";
+import { useCycle } from "@/contexts/CycleContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EditSoldierForm } from "@/components/soldiers/EditSoldierForm";
-import type { SoldierStatus } from "@/types";
+import { CreateRequestForm } from "@/components/requests/CreateRequestForm";
+import {
+  REQUEST_TYPE_LABELS,
+  REQUEST_TYPE_ICONS,
+  REQUEST_STATUS_LABELS,
+  REQUEST_STATUS_VARIANT,
+  ASSIGNED_ROLE_LABELS,
+} from "@/lib/requests/constants";
+import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -114,6 +123,35 @@ const MISSING_QUERY = `
   ORDER BY a.date DESC
 `;
 
+// Requests for this soldier (outstanding or approved)
+const SOLDIER_REQUESTS_QUERY = `
+  SELECT r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.created_at
+  FROM requests r
+  WHERE r.soldier_id = ?
+    AND (r.assigned_role IS NOT NULL OR r.status = 'approved')
+  ORDER BY r.created_at DESC
+`;
+
+// Check if soldier has an active hardship request with special_conditions
+const SPECIAL_CONDITIONS_QUERY = `
+  SELECT COUNT(*) as count
+  FROM requests
+  WHERE soldier_id = ?
+    AND type = 'hardship'
+    AND special_conditions = 1
+    AND (status = 'open' OR status = 'approved')
+`;
+
+interface RawSoldierRequest {
+  id: string;
+  type: string;
+  status: string;
+  assigned_role: string | null;
+  description: string | null;
+  urgent: number | null;
+  created_at: string;
+}
+
 interface RawSoldier {
   id: string; given_name: string; family_name: string;
   rank: string | null; status: string; profile_image: string | null;
@@ -151,6 +189,10 @@ export default function SoldierDetailPage() {
   }, []);
 
   const [editOpen, setEditOpen] = useState(false);
+  const [requestTypeMenuOpen, setRequestTypeMenuOpen] = useState(false);
+  const [createRequestType, setCreateRequestType] = useState<RequestType | null>(null);
+  const { selectedCycleId, selectedAssignment } = useCycle();
+  const userRole = (selectedAssignment?.role ?? "") as Role | "";
 
   // Grace period: give PowerSync time to hydrate local SQLite after an
   // offline shell load before showing "not found".
@@ -166,6 +208,9 @@ export default function SoldierDetailPage() {
   const { data: soldierRows } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
   const { data: reportRows } = useQuery<RawReport>(REPORTS_QUERY, soldierParams);
   const { data: missingRows } = useQuery<RawMissing>(MISSING_QUERY, missingParams);
+  const { data: soldierRequests } = useQuery<RawSoldierRequest>(SOLDIER_REQUESTS_QUERY, soldierParams);
+  const { data: specialConditionsRows } = useQuery<{ count: number }>(SPECIAL_CONDITIONS_QUERY, soldierParams);
+  const hasSpecialConditions = Number(specialConditionsRows?.[0]?.count ?? 0) > 0;
 
   const raw = soldierRows?.[0] ?? null;
 
@@ -254,16 +299,23 @@ export default function SoldierDetailPage() {
               </Button>
             </div>
 
-            <Badge
-              variant={statusVariant}
-              className={
-                raw.status === "injured"
-                  ? "bg-amber-100 text-amber-800 border-amber-200 w-fit"
-                  : "w-fit"
-              }
-            >
-              {STATUS_LABEL[raw.status as SoldierStatus]}
-            </Badge>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge
+                variant={statusVariant}
+                className={
+                  raw.status === "injured"
+                    ? "bg-amber-100 text-amber-800 border-amber-200"
+                    : ""
+                }
+              >
+                {STATUS_LABEL[raw.status as SoldierStatus]}
+              </Badge>
+              {hasSpecialConditions && (
+                <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                  ת&quot;ש מיוחד
+                </Badge>
+              )}
+            </div>
 
             <p className="text-sm text-muted-foreground">
               {raw.platoon_name} / {raw.squad_name}
@@ -324,6 +376,114 @@ export default function SoldierDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Requests section */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground">בקשות</h2>
+          {(userRole === "squad_commander" || userRole === "platoon_commander") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRequestTypeMenuOpen(true)}
+            >
+              <Plus size={14} className="ml-1" />
+              בקשה חדשה
+            </Button>
+          )}
+        </div>
+
+        {(!soldierRequests || soldierRequests.length === 0) ? (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            <FileText size={16} />
+            <span>אין בקשות</span>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+            {soldierRequests.map((r) => (
+              <Link
+                key={r.id}
+                href={`/requests/${r.id}`}
+                className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-base">
+                  {REQUEST_TYPE_ICONS[r.type as RequestType]}
+                </span>
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <p className="text-sm font-medium">{REQUEST_TYPE_LABELS[r.type as RequestType]}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {r.description || "—"}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <Badge variant={REQUEST_STATUS_VARIANT[r.status as RequestStatus]} className="text-xs">
+                    {REQUEST_STATUS_LABELS[r.status as RequestStatus]}
+                  </Badge>
+                  {r.assigned_role && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {ASSIGNED_ROLE_LABELS[r.assigned_role as Role]}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Request type selection dialog */}
+      <Dialog open={requestTypeMenuOpen} onOpenChange={setRequestTypeMenuOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>בחר סוג בקשה</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {(["leave", "medical", "hardship"] as RequestType[]).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => {
+                  setRequestTypeMenuOpen(false);
+                  setCreateRequestType(type);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg border border-border px-4 py-3 text-start hover:bg-muted transition-colors"
+              >
+                <span className="text-xl">{REQUEST_TYPE_ICONS[type]}</span>
+                <span className="text-sm font-medium">{REQUEST_TYPE_LABELS[type]}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create request dialog */}
+      <Dialog open={!!createRequestType} onOpenChange={(open) => { if (!open) setCreateRequestType(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {createRequestType && (
+                <>
+                  <span className="ml-2">{REQUEST_TYPE_ICONS[createRequestType]}</span>
+                  {REQUEST_TYPE_LABELS[createRequestType]}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {createRequestType && selectedCycleId && userRole && (
+            <CreateRequestForm
+              cycleId={selectedCycleId}
+              requestType={createRequestType}
+              userRole={userRole as Role}
+              preselectedSoldierId={soldierId}
+              onSuccess={() => {
+                setCreateRequestType(null);
+                toast.success("הבקשה נוצרה בהצלחה");
+              }}
+              onCancel={() => setCreateRequestType(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

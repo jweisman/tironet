@@ -103,6 +103,59 @@ export class TironetConnector implements PowerSyncBackendConnector {
           } else if (opType === UpdateType.DELETE) {
             await fetch(`/api/activities/${id}`, { method: "DELETE" });
           }
+        } else if (table === "requests") {
+          if (opType === UpdateType.PUT) {
+            const d = opData as Record<string, unknown>;
+            await fetch(`/api/requests`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id,
+                cycleId: d.cycle_id,
+                soldierId: d.soldier_id,
+                type: d.type,
+                status: d.status,
+                assignedRole: d.assigned_role,
+                description: d.description,
+                place: d.place,
+                departureAt: d.departure_at,
+                returnAt: d.return_at,
+                transportation: d.transportation,
+                urgent: d.urgent != null ? Boolean(d.urgent) : undefined,
+                paramedicDate: d.paramedic_date,
+                appointmentDate: d.appointment_date,
+                appointmentPlace: d.appointment_place,
+                appointmentType: d.appointment_type,
+                sickLeaveDays: d.sick_leave_days,
+                specialConditions: d.special_conditions != null ? Boolean(d.special_conditions) : undefined,
+              }),
+            });
+          } else if (opType === UpdateType.PATCH) {
+            const d = opData as Record<string, unknown>;
+            // Transform snake_case to camelCase for the API
+            const body: Record<string, unknown> = {};
+            const mapping: Record<string, string> = {
+              cycle_id: "cycleId", soldier_id: "soldierId",
+              assigned_role: "assignedRole", created_by_user_id: "createdByUserId",
+              departure_at: "departureAt", return_at: "returnAt",
+              paramedic_date: "paramedicDate", appointment_date: "appointmentDate",
+              appointment_place: "appointmentPlace", appointment_type: "appointmentType",
+              sick_leave_days: "sickLeaveDays", special_conditions: "specialConditions",
+            };
+            for (const [key, value] of Object.entries(d)) {
+              body[mapping[key] ?? key] = value;
+            }
+            // Convert integer booleans back
+            if ("urgent" in body) body.urgent = body.urgent != null ? Boolean(body.urgent) : undefined;
+            if ("specialConditions" in body) body.specialConditions = body.specialConditions != null ? Boolean(body.specialConditions) : undefined;
+            await fetch(`/api/requests/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+          } else if (opType === UpdateType.DELETE) {
+            await fetch(`/api/requests/${id}`, { method: "DELETE" });
+          }
         } else if (table === "soldiers") {
           if (opType === UpdateType.PUT) {
             await fetch(`/api/soldiers`, {

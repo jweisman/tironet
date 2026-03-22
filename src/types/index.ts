@@ -15,6 +15,16 @@ export type ActivityStatus = "draft" | "active";
 
 export type ActivityResult = "passed" | "failed" | "na";
 
+export type RequestType = "leave" | "medical" | "hardship";
+
+export type RequestStatus = "open" | "approved" | "denied";
+
+export type Transportation =
+  | "public_transit"
+  | "shuttle"
+  | "military_transport"
+  | "other";
+
 // Serializable cycle assignment carried in the JWT and session
 export interface CycleAssignment {
   cycleId: string;

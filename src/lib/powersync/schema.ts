@@ -62,6 +62,32 @@ const activity_reports = new Table({
   note: column.text,
 });
 
+const requests = new Table({
+  cycle_id: column.text,
+  soldier_id: column.text,
+  type: column.text,
+  status: column.text,
+  assigned_role: column.text,
+  created_by_user_id: column.text,
+  description: column.text,
+  // Leave fields
+  place: column.text,
+  departure_at: column.text,
+  return_at: column.text,
+  transportation: column.text,
+  // Medical fields
+  urgent: column.integer,
+  paramedic_date: column.text,
+  appointment_date: column.text,
+  appointment_place: column.text,
+  appointment_type: column.text,
+  sick_leave_days: column.integer,
+  // Hardship fields
+  special_conditions: column.integer,
+  created_at: column.text,
+  updated_at: column.text,
+});
+
 export const AppSchema = new Schema({
   cycles,
   companies,
@@ -71,6 +97,7 @@ export const AppSchema = new Schema({
   soldiers,
   activities,
   activity_reports,
+  requests,
 });
 
 export type Database = (typeof AppSchema)["types"];
