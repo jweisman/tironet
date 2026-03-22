@@ -10,12 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   REQUEST_TYPE_LABELS,
-  REQUEST_TYPE_ICONS,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_VARIANT,
   ASSIGNED_ROLE_LABELS,
   TRANSPORTATION_LABELS,
 } from "@/lib/requests/constants";
+import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import { getAvailableActions, getNextState } from "@/lib/requests/workflow";
 import type { RequestType, RequestStatus, Role, Transportation } from "@/types";
 
@@ -208,8 +208,8 @@ export default function RequestDetailPage() {
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-xl">
-              {REQUEST_TYPE_ICONS[requestType]}
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+              <RequestTypeIcon type={requestType} size={20} />
             </span>
             <div>
               <h1 className="text-lg font-bold">{REQUEST_TYPE_LABELS[requestType]}</h1>

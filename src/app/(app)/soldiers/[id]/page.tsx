@@ -19,11 +19,11 @@ import { EditSoldierForm } from "@/components/soldiers/EditSoldierForm";
 import { CreateRequestForm } from "@/components/requests/CreateRequestForm";
 import {
   REQUEST_TYPE_LABELS,
-  REQUEST_TYPE_ICONS,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_VARIANT,
   ASSIGNED_ROLE_LABELS,
 } from "@/lib/requests/constants";
+import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -406,8 +406,8 @@ export default function SoldierDetailPage() {
                 href={`/requests/${r.id}`}
                 className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-base">
-                  {REQUEST_TYPE_ICONS[r.type as RequestType]}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <RequestTypeIcon type={r.type as RequestType} size={16} />
                 </span>
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <p className="text-sm font-medium">{REQUEST_TYPE_LABELS[r.type as RequestType]}</p>
@@ -448,7 +448,7 @@ export default function SoldierDetailPage() {
                 }}
                 className="flex w-full items-center gap-3 rounded-lg border border-border px-4 py-3 text-start hover:bg-muted transition-colors"
               >
-                <span className="text-xl">{REQUEST_TYPE_ICONS[type]}</span>
+                <RequestTypeIcon type={type} size={20} />
                 <span className="text-sm font-medium">{REQUEST_TYPE_LABELS[type]}</span>
               </button>
             ))}
@@ -463,17 +463,18 @@ export default function SoldierDetailPage() {
             <DialogTitle>
               {createRequestType && (
                 <>
-                  <span className="ml-2">{REQUEST_TYPE_ICONS[createRequestType]}</span>
+                  <RequestTypeIcon type={createRequestType} size={18} className="ml-2 inline" />
                   {REQUEST_TYPE_LABELS[createRequestType]}
                 </>
               )}
             </DialogTitle>
           </DialogHeader>
-          {createRequestType && selectedCycleId && userRole && (
+          {createRequestType && selectedCycleId && userRole && selectedAssignment && (
             <CreateRequestForm
               cycleId={selectedCycleId}
               requestType={createRequestType}
               userRole={userRole as Role}
+              unitId={selectedAssignment.unitId}
               preselectedSoldierId={soldierId}
               onSuccess={() => {
                 setCreateRequestType(null);

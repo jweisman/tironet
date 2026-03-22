@@ -16,22 +16,44 @@ import {
 import { TRANSPORTATION_LABELS } from "@/lib/requests/constants";
 import type { RequestType, Transportation, Role } from "@/types";
 
+/** Format a Date as a `datetime-local` input value (YYYY-MM-DDTHH:MM). */
+function toLocalDatetime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 interface Props {
   cycleId: string;
   requestType: RequestType;
   userRole: Role;
+  /** Unit ID from the user's cycle assignment (squad/platoon/company ID) */
+  unitId: string;
   /** Pre-selected soldier ID (when creating from soldier detail page) */
   preselectedSoldierId?: string;
   onSuccess: (requestId: string) => void;
   onCancel: () => void;
 }
 
-const SOLDIERS_QUERY = `
+// Squad commanders: only their squad's soldiers
+const SOLDIERS_BY_SQUAD_QUERY = `
   SELECT s.id, s.given_name, s.family_name,
          sq.name AS squad_name
   FROM soldiers s
   JOIN squads sq ON sq.id = s.squad_id
   WHERE s.cycle_id = ?
+    AND s.squad_id = ?
+    AND s.status = 'active'
+  ORDER BY s.family_name, s.given_name
+`;
+
+// Platoon commanders: all soldiers in their platoon's squads
+const SOLDIERS_BY_PLATOON_QUERY = `
+  SELECT s.id, s.given_name, s.family_name,
+         sq.name AS squad_name
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  WHERE s.cycle_id = ?
+    AND sq.platoon_id = ?
     AND s.status = 'active'
   ORDER BY s.family_name, s.given_name
 `;
@@ -40,27 +62,42 @@ export function CreateRequestForm({
   cycleId,
   requestType,
   userRole,
+  unitId,
   preselectedSoldierId,
   onSuccess,
   onCancel,
 }: Props) {
   const db = usePowerSync();
 
-  const soldierParams = useMemo(() => [cycleId], [cycleId]);
+  const soldierQuery = userRole === "squad_commander"
+    ? SOLDIERS_BY_SQUAD_QUERY
+    : SOLDIERS_BY_PLATOON_QUERY;
+  const soldierParams = useMemo(() => [cycleId, unitId], [cycleId, unitId]);
   const { data: soldiers } = useQuery<{
     id: string;
     given_name: string;
     family_name: string;
     squad_name: string;
-  }>(SOLDIERS_QUERY, soldierParams);
+  }>(soldierQuery, soldierParams);
 
   const [soldierId, setSoldierId] = useState(preselectedSoldierId ?? "");
   const [description, setDescription] = useState("");
 
   // Leave fields
   const [place, setPlace] = useState("");
-  const [departureAt, setDepartureAt] = useState("");
-  const [returnAt, setReturnAt] = useState("");
+  // Default departure: next whole hour; return: departure + 24h
+  const [departureAt, setDepartureAt] = useState(() => {
+    if (requestType !== "leave") return "";
+    const d = new Date();
+    d.setHours(d.getHours() + 1, 0, 0, 0);
+    return toLocalDatetime(d);
+  });
+  const [returnAt, setReturnAt] = useState(() => {
+    if (requestType !== "leave") return "";
+    const d = new Date();
+    d.setHours(d.getHours() + 25, 0, 0, 0);
+    return toLocalDatetime(d);
+  });
   const [transportation, setTransportation] = useState<Transportation | "">("");
 
   // Medical fields
@@ -85,6 +122,11 @@ export function CreateRequestForm({
     e.preventDefault();
     if (!soldierId) {
       setError("יש לבחור חייל");
+      return;
+    }
+
+    if (requestType === "leave" && departureAt && returnAt && departureAt >= returnAt) {
+      setError("שעת היציאה חייבת להיות לפני שעת החזרה");
       return;
     }
 
@@ -209,6 +251,7 @@ export function CreateRequestForm({
                 value={departureAt}
                 onChange={(e) => setDepartureAt(e.target.value)}
                 dir="ltr"
+                lang="he"
               />
             </div>
             <div className="space-y-1.5">
@@ -219,6 +262,7 @@ export function CreateRequestForm({
                 value={returnAt}
                 onChange={(e) => setReturnAt(e.target.value)}
                 dir="ltr"
+                lang="he"
               />
             </div>
           </div>
@@ -259,6 +303,8 @@ export function CreateRequestForm({
               value={paramedicDate}
               onChange={(e) => setParamedicDate(e.target.value)}
               dir="ltr"
+              lang="he"
+              style={paramedicDate ? undefined : { color: "transparent" }}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -270,6 +316,8 @@ export function CreateRequestForm({
                 value={appointmentDate}
                 onChange={(e) => setAppointmentDate(e.target.value)}
                 dir="ltr"
+                lang="he"
+                style={appointmentDate ? undefined : { color: "transparent" }}
               />
             </div>
             <div className="space-y-1.5">

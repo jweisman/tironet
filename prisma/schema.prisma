@@ -340,7 +340,7 @@ model Request {
   soldierId       String        @map("soldier_id") @db.Uuid
   type            RequestType
   status          RequestStatus @default(open)
-  assignedRole    Role          @map("assigned_role")
+  assignedRole    Role?         @map("assigned_role")
   createdByUserId String        @map("created_by_user_id") @db.Uuid
 
   // Common

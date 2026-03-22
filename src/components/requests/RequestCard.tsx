@@ -1,13 +1,14 @@
 "use client";
 
+import { ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   REQUEST_TYPE_LABELS,
-  REQUEST_TYPE_ICONS,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_VARIANT,
   ASSIGNED_ROLE_LABELS,
 } from "@/lib/requests/constants";
+import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import type { RequestType, RequestStatus, Role } from "@/types";
 
 export interface RequestSummary {
@@ -49,8 +50,8 @@ export function RequestCard({ request, userRole, onClick }: Props) {
       className="flex w-full items-start gap-3 px-4 py-3 text-start hover:bg-muted/50 transition-colors"
     >
       {/* Icon */}
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-lg">
-        {REQUEST_TYPE_ICONS[request.type]}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+        <RequestTypeIcon type={request.type} size={18} />
       </span>
 
       {/* Content */}
@@ -93,6 +94,9 @@ export function RequestCard({ request, userRole, onClick }: Props) {
           </span>
         )}
       </div>
+
+      {/* Chevron */}
+      <ChevronLeft size={16} className="shrink-0 text-muted-foreground self-center" />
     </button>
   );
 }

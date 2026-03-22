@@ -15,10 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  REQUEST_TYPE_LABELS,
-  REQUEST_TYPE_ICONS,
-} from "@/lib/requests/constants";
+import { REQUEST_TYPE_LABELS } from "@/lib/requests/constants";
+import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RequestType, RequestStatus, Role } from "@/types";
@@ -107,7 +105,7 @@ export default function RequestsPage() {
 
   // Filtered lists
   const openRequests = useMemo(
-    () => allRequests.filter((r) => r.status === "open" || (r.assignedRole !== null && r.status !== "approved")),
+    () => allRequests.filter((r) => r.assignedRole !== null),
     [allRequests],
   );
 
@@ -296,7 +294,7 @@ export default function RequestsPage() {
                 onClick={() => handleTypeSelect(type)}
                 className="flex w-full items-center gap-3 rounded-lg border border-border px-4 py-3 text-start hover:bg-muted transition-colors"
               >
-                <span className="text-xl">{REQUEST_TYPE_ICONS[type]}</span>
+                <RequestTypeIcon type={type} size={20} />
                 <span className="text-sm font-medium">{REQUEST_TYPE_LABELS[type]}</span>
               </button>
             ))}
@@ -311,17 +309,18 @@ export default function RequestsPage() {
             <DialogTitle>
               {createType && (
                 <>
-                  <span className="ml-2">{REQUEST_TYPE_ICONS[createType]}</span>
+                  <RequestTypeIcon type={createType} size={18} className="ml-2 inline" />
                   {REQUEST_TYPE_LABELS[createType]}
                 </>
               )}
             </DialogTitle>
           </DialogHeader>
-          {createType && selectedCycleId && role && (
+          {createType && selectedCycleId && role && selectedAssignment && (
             <CreateRequestForm
               cycleId={selectedCycleId}
               requestType={createType}
               userRole={role as Role}
+              unitId={selectedAssignment.unitId}
               onSuccess={handleCreateSuccess}
               onCancel={() => setCreateType(null)}
             />

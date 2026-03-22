@@ -23,7 +23,7 @@ const patchSchema = z.object({
   specialConditions: z.boolean().nullable().optional(),
   // Status/assignment override from connector (offline sync)
   status: z.enum(["open", "approved", "denied"]).optional(),
-  assignedRole: z.enum(["squad_commander", "platoon_commander", "company_commander"]).optional(),
+  assignedRole: z.enum(["squad_commander", "platoon_commander", "company_commander"]).nullable().optional(),
 });
 
 export async function GET(
@@ -114,7 +114,7 @@ export async function PATCH(
       where: { id },
       data: {
         status: transition.newStatus,
-        assignedRole: transition.newAssignedRole ?? undefined,
+        assignedRole: transition.newAssignedRole,
       },
     });
 
@@ -127,12 +127,12 @@ export async function PATCH(
   }
 
   // If this is from the connector (has status/assignedRole), apply directly
-  if (data.status || data.assignedRole) {
+  if (data.status !== undefined || data.assignedRole !== undefined) {
     const updated = await prisma.request.update({
       where: { id },
       data: {
-        ...(data.status ? { status: data.status } : {}),
-        ...(data.assignedRole ? { assignedRole: data.assignedRole } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.assignedRole !== undefined ? { assignedRole: data.assignedRole } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.place !== undefined ? { place: data.place } : {}),
         ...(data.departureAt !== undefined ? { departureAt: data.departureAt ? new Date(data.departureAt) : null } : {}),

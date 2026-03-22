@@ -1,3 +1,5 @@
+import { DoorOpen, Stethoscope, HandHeart } from "lucide-react";
+import type { LucideProps } from "lucide-react";
 import type { RequestType, RequestStatus, Transportation, Role } from "@/types";
 
 export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
@@ -6,10 +8,13 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
   hardship: 'בקשת ת"ש',
 };
 
-export const REQUEST_TYPE_ICONS: Record<RequestType, string> = {
-  leave: "🚪",
-  medical: "🏥",
-  hardship: "💪",
+export const REQUEST_TYPE_ICONS: Record<
+  RequestType,
+  React.ComponentType<LucideProps>
+> = {
+  leave: DoorOpen,
+  medical: Stethoscope,
+  hardship: HandHeart,
 };
 
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
