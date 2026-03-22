@@ -181,7 +181,7 @@ Runs 321 unit tests with ~98% line coverage. Tests cover API routes, auth logic,
 
 ### E2E Tests (Playwright)
 
-E2E tests run against the full stack in a browser. They use a separate `tironet_test` database so they don't affect dev data.
+E2E tests run against the full stack in a browser. They use a separate `tironet_test` PostgreSQL database and a separate `powersync_e2e` MongoDB database, so they don't affect dev data or PowerSync replication state.
 
 #### Prerequisites
 
@@ -211,6 +211,8 @@ The setup phase automatically:
 2. Seeds test data (users, cycles, companies, platoons, squads, soldiers, activities, reports)
 3. Authenticates 3 test users (admin, platoon commander, squad commander) via the magic link flow using Mailhog
 4. Saves auth state to `e2e/.auth/` for reuse across all tests
+
+After running e2e tests, switch back to dev with a normal `docker compose up -d` — no cleanup needed. The e2e overlay isolates both the PostgreSQL and MongoDB databases, so there are no replication slot conflicts.
 
 ## Environment Variables
 

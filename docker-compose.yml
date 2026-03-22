@@ -48,6 +48,7 @@ services:
       PS_DATABASE_URL: ${PS_DATABASE_URL}
       PS_JWT_SECRET_B64URL: ${PS_JWT_SECRET_B64URL}
       PS_JWT_AUDIENCE: ${PS_JWT_AUDIENCE}
+      PS_MONGODB_URI: ${PS_MONGODB_URI}
     volumes:
       - ./powersync.config.yaml:/config/powersync.config.yaml
       - ./src/lib/powersync/sync-config.yaml:/config/sync-config.yaml

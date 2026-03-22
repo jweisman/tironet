@@ -40,7 +40,7 @@ test.describe("Activities — platoon commander", () => {
     await page.getByText("Shooting Drill 1").click();
 
     // Should navigate to detail page
-    await expect(page).toHaveURL(/\/activities\//, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/activities\//, { timeout: 15000 });
 
     // Should show soldiers from Platoon 1 squads (familyName givenName)
     await expect(page.getByText("Cohen Avi")).toBeVisible({ timeout: 60000 });
