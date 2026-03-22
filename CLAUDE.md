@@ -273,6 +273,8 @@ Next.js `<Link>` navigations use RSC payloads (`mode: "cors"`), not full navigat
 
 Pages without a cached shell (e.g. `/admin`, `/profile`) fall through to `handleNavigateFallback()` which tries the network and returns an inline offline HTML page on failure. This page includes "try again" and "go to home page" buttons so users aren't stuck.
 
+**Critical:** `handleNavigateFallback` must **exclude `/api/` paths**. When the custom fetch listener and Serwist's `NetworkOnly` `/api/` matcher both handle the same navigate request, two `fetch()` calls hit the server. This breaks one-time-use tokens (e.g. NextAuth email verification: the first request consumes the token, the second gets P2025 → `?error=Verification`). The guard `!url.pathname.startsWith("/api/")` ensures API navigations (like clicking a magic link) are handled solely by Serwist.
+
 ### `navigationPreload: false`
 
 Navigation preload is **disabled**. Safari (pre-18.5) has a critical bug where cached navigation-preload responses with redirects cause the SW to receive a stale/corrupt preload response on subsequent navigations. Since the shell handler does its own `fetch()`, the preload provides no benefit.
@@ -302,6 +304,10 @@ Next.js injects inline `<script>` tags for hydration data. Without `'unsafe-inli
 PowerSync runs on a different port (`localhost:8080`) than the Next.js dev server. `'self'` only covers the same origin (same port). Add `http://localhost:* ws://localhost:*` for local development, otherwise PowerSync WebSocket connections are silently blocked.
 
 ## UI Patterns
+
+### Inline splash spinner — public routes must dismiss it
+
+The root layout (`src/app/layout.tsx`) renders an inline `#app-splash` spinner that covers the viewport until the app paints. For authenticated routes, `AppShell` dismisses it. For public routes (`(public)/` group — login, landing), there is no `AppShell`, so the public layout (`src/app/(public)/layout.tsx`) must be a `"use client"` component that dismisses the spinner in a `useEffect`. Without this, public pages render behind the opaque spinner overlay and appear blank.
 
 ### Base UI Select: always provide children to `SelectValue`
 
