@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
-import { useQuery, useStatus } from "@powersync/react";
+import { useQuery } from "@powersync/react";
+import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
 import { CreateActivityForm } from "@/components/activities/CreateActivityForm";
 import {

@@ -42,6 +42,7 @@ jobs:
           PS_DATABASE_URL: postgresql://tironet:tironet@postgres:5432/tironet_test
           PS_JWT_SECRET_B64URL: Y2ktdGVzdC1qd3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch
           PS_JWT_AUDIENCE: http://localhost:8080
+          PS_MONGODB_URI: mongodb://mongo:27017/powersync_e2e
 
       - name: Wait for PostgreSQL
         run: |

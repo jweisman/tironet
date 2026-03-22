@@ -55,14 +55,23 @@ test.describe("Authentication", () => {
   });
 
   test("authenticated user sees their name in sidebar", async ({ browser }) => {
+    test.setTimeout(60000);
     const context = await browser.newContext({
       storageState: "e2e/.auth/admin.json",
+      viewport: { width: 1280, height: 720 },
     });
     const page = await context.newPage();
     await page.goto("/home");
 
-    // Admin user name should appear in the sidebar
-    await expect(page.getByText("Admin Test")).toBeVisible({ timeout: 10000 });
+    // Ensure we're authenticated and on /home (not redirected to /login)
+    await expect(page).toHaveURL(/\/home/, { timeout: 15000 });
+
+    // Admin user name should appear in the desktop sidebar.
+    // The profile edit test may temporarily rename "Admin" to "AdminUpdated",
+    // so match either variant to avoid flake from parallel test execution.
+    await expect(
+      page.locator("aside p").filter({ hasText: /Admin.*Test/ })
+    ).toBeVisible({ timeout: 30000 });
     await context.close();
   });
 

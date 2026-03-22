@@ -12,7 +12,7 @@ replication:
 
 storage:
   type: mongodb
-  uri: mongodb://mongo:27017/powersync
+  uri: !env PS_MONGODB_URI
 
 client_auth:
   # HS256 shared secret — must start with PS_ for the !env tag to work.

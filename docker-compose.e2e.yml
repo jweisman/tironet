@@ -9,3 +9,4 @@ services:
   powersync:
     environment:
       PS_DATABASE_URL: "postgresql://tironet:tironet@postgres:5432/tironet_test"
+      PS_MONGODB_URI: "mongodb://mongo:27017/powersync_e2e"
