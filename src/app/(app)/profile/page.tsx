@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { UserAvatar } from "@/components/layout/UserAvatar";
+import { UserAvatar, PROFILE_IMAGE_UPDATED_EVENT } from "@/components/layout/UserAvatar";
 import dynamic from "next/dynamic";
 
 const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
@@ -57,8 +57,14 @@ export default function ProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profileImage: base64 }),
       });
-      if (res.ok) await update();
-      else toast.error("שגיאה בהעלאת התמונה");
+      if (res.ok) {
+        // Notify all UserAvatar instances immediately (belt-and-suspenders
+        // alongside the session-based profileImageVersion mechanism)
+        window.dispatchEvent(
+          new CustomEvent(PROFILE_IMAGE_UPDATED_EVENT, { detail: base64 })
+        );
+        await update();
+      } else toast.error("שגיאה בהעלאת התמונה");
     } catch {
       toast.error("שגיאה בהעלאת התמונה");
     }
