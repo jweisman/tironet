@@ -217,13 +217,13 @@ export function BulkImportDialog({
 
         <div className="flex-1 overflow-y-auto space-y-4 py-1">
           {/* Squad selector */}
-          {squads.length > 1 && (
+          {!defaultSquadId && squads.length >= 1 && (
             <div className="space-y-1.5">
-              <Label>מחלקה</Label>
+              <Label>כיתה</Label>
               <Select value={squadId} onValueChange={(v) => v && setSquadId(v)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="בחר מחלקה">
-                    {squads.find((s) => s.id === squadId)?.name ?? "בחר מחלקה"}
+                  <SelectValue placeholder="בחר כיתה">
+                    {squads.find((s) => s.id === squadId)?.name ?? "בחר כיתה"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
