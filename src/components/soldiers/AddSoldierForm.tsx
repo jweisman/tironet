@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,12 @@ export function AddSoldierForm({
   const [squadId, setSquadId] = useState(
     defaultSquadId ?? squads[0]?.id ?? ""
   );
+  // Sync squadId when squads arrive after initial mount (PowerSync async)
+  useEffect(() => {
+    if (!squadId && squads.length > 0) {
+      setSquadId(defaultSquadId ?? squads[0].id);
+    }
+  }, [squads, defaultSquadId, squadId]);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -47,7 +53,7 @@ export function AddSoldierForm({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const singleSquad = squads.length === 1;
+  const showSquadSelector = !defaultSquadId && squads.length >= 1;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -153,7 +159,7 @@ export function AddSoldierForm({
         </div>
       </div>
 
-      {!singleSquad && (
+      {showSquadSelector && (
         <div className="space-y-1.5">
           <Label>כיתה</Label>
           <Select
