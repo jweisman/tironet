@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -129,6 +129,12 @@ export function BulkImportDialog({
   onSuccess,
 }: Props) {
   const [squadId, setSquadId] = useState(defaultSquadId ?? squads[0]?.id ?? "");
+  // Sync squadId when squads arrive after initial mount (PowerSync async)
+  useEffect(() => {
+    if (!squadId && squads.length > 0) {
+      setSquadId(defaultSquadId ?? squads[0].id);
+    }
+  }, [squads, defaultSquadId, squadId]);
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
