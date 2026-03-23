@@ -179,6 +179,9 @@ export default function RequestsPage() {
                 {tab === "open" && openRequests.length > 0 && (
                   <span className="mr-1">({openRequests.length})</span>
                 )}
+                {tab === "approved" && approvedRequests.length > 0 && (
+                  <span className="mr-1">({approvedRequests.length})</span>
+                )}
               </button>
             ))}
           </div>

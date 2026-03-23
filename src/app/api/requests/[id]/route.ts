@@ -21,6 +21,7 @@ const patchSchema = z.object({
   appointmentType: z.string().nullable().optional(),
   sickLeaveDays: z.number().int().min(0).nullable().optional(),
   specialConditions: z.boolean().nullable().optional(),
+  denialReason: z.string().nullable().optional(),
   // Status/assignment override from connector (offline sync)
   status: z.enum(["open", "approved", "denied"]).optional(),
   assignedRole: z.enum(["squad_commander", "platoon_commander", "company_commander"]).nullable().optional(),
@@ -115,6 +116,9 @@ export async function PATCH(
       data: {
         status: transition.newStatus,
         assignedRole: transition.newAssignedRole,
+        ...(data.action === "deny" && data.denialReason !== undefined
+          ? { denialReason: data.denialReason }
+          : {}),
       },
     });
 
@@ -145,6 +149,7 @@ export async function PATCH(
         ...(data.appointmentType !== undefined ? { appointmentType: data.appointmentType } : {}),
         ...(data.sickLeaveDays !== undefined ? { sickLeaveDays: data.sickLeaveDays } : {}),
         ...(data.specialConditions !== undefined ? { specialConditions: data.specialConditions } : {}),
+        ...(data.denialReason !== undefined ? { denialReason: data.denialReason } : {}),
       },
     });
     return NextResponse.json({ request: updated });

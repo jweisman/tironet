@@ -9,6 +9,12 @@ import { useCycle } from "@/contexts/CycleContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   REQUEST_TYPE_LABELS,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_VARIANT,
@@ -60,6 +66,7 @@ interface RawRequest {
   appointment_type: string | null;
   sick_leave_days: number | null;
   special_conditions: number | null;
+  denial_reason: string | null;
   created_at: string;
   updated_at: string;
   soldier_given_name: string;
@@ -137,6 +144,8 @@ export default function RequestDetailPage() {
   const userRole = (selectedAssignment?.role ?? "") as Role | "";
 
   const [acting, setActing] = useState(false);
+  const [denyDialogOpen, setDenyDialogOpen] = useState(false);
+  const [denialReason, setDenialReason] = useState("");
 
   if (!raw && ready) {
     return (
@@ -185,6 +194,32 @@ export default function RequestDetailPage() {
         acknowledge: "הבקשה הועברה",
       };
       toast.success(messages[action]);
+    } catch {
+      toast.error("שגיאה בביצוע הפעולה");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function confirmDeny() {
+    if (!assignedRole) return;
+    const transition = getNextState(requestStatus, assignedRole, "deny", requestType);
+    if (!transition) return;
+
+    setActing(true);
+    try {
+      await db.execute(
+        `UPDATE requests SET status = ?, assigned_role = ?, denial_reason = ?, updated_at = ? WHERE id = ?`,
+        [
+          transition.newStatus,
+          transition.newAssignedRole,
+          denialReason.trim() || null,
+          new Date().toISOString(),
+          raw.id,
+        ],
+      );
+      toast.success("הבקשה נדחתה");
+      setDenyDialogOpen(false);
     } catch {
       toast.error("שגיאה בביצוע הפעולה");
     } finally {
@@ -316,6 +351,14 @@ export default function RequestDetailPage() {
         )}
       </div>
 
+      {/* Denial reason */}
+      {requestStatus === "denied" && raw.denial_reason && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-1">
+          <h2 className="text-sm font-semibold text-destructive">סיבת הדחייה</h2>
+          <p className="text-sm whitespace-pre-wrap">{raw.denial_reason}</p>
+        </div>
+      )}
+
       {/* Action buttons */}
       {actions.length > 0 && (
         <div className="flex gap-2">
@@ -332,7 +375,7 @@ export default function RequestDetailPage() {
           {actions.includes("deny") && (
             <Button
               variant="destructive"
-              onClick={() => handleAction("deny")}
+              onClick={() => { setDenialReason(""); setDenyDialogOpen(true); }}
               disabled={acting}
               className="flex-1"
             >
@@ -352,6 +395,33 @@ export default function RequestDetailPage() {
           )}
         </div>
       )}
+
+      {/* Deny dialog */}
+      <Dialog open={denyDialogOpen} onOpenChange={setDenyDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>דחיית בקשה</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm text-muted-foreground">סיבת הדחייה (אופציונלי)</label>
+            <textarea
+              value={denialReason}
+              onChange={(e) => setDenialReason(e.target.value)}
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              placeholder="הוסף סיבה..."
+              rows={3}
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDenyDialogOpen(false)} className="flex-1">
+              ביטול
+            </Button>
+            <Button variant="destructive" onClick={confirmDeny} disabled={acting} className="flex-1">
+              דחה
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

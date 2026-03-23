@@ -84,6 +84,8 @@ const requests = new Table({
   sick_leave_days: column.integer,
   // Hardship fields
   special_conditions: column.integer,
+  // Denial
+  denial_reason: column.text,
   created_at: column.text,
   updated_at: column.text,
 });

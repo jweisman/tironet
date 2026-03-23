@@ -363,6 +363,9 @@ model Request {
   // Hardship fields
   specialConditions Boolean?    @map("special_conditions")
 
+  // Denial
+  denialReason    String?       @map("denial_reason")
+
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
 
