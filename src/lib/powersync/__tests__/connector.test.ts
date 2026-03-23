@@ -219,6 +219,7 @@ describe("TironetConnector", () => {
 
       expect(mockFetch).toHaveBeenCalledWith("/api/activity-reports/report-1", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
       });
     });
 
@@ -279,6 +280,7 @@ describe("TironetConnector", () => {
 
       expect(mockFetch).toHaveBeenCalledWith("/api/activities/act-1", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
       });
     });
 
@@ -318,6 +320,7 @@ describe("TironetConnector", () => {
 
       expect(mockFetch).toHaveBeenCalledWith("/api/soldiers/sol-1", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
       });
     });
 
