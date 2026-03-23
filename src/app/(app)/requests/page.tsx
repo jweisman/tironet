@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
@@ -86,6 +86,7 @@ function formatDayHeader(dateStr: string) {
 export default function RequestsPage() {
   const { selectedCycleId, selectedAssignment } = useCycle();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const syncStatus = useStatus();
   const role = (selectedAssignment?.role ?? "") as Role | "";
   const canCreate = role === "squad_commander" || role === "platoon_commander";
@@ -98,8 +99,13 @@ export default function RequestsPage() {
     [rawRequests],
   );
 
-  // UI state
-  const [viewTab, setViewTab] = useState<ViewTab>("open");
+  // UI state — initialise from URL params
+  const [viewTab, setViewTab] = useState<ViewTab>(
+    searchParams.get("tab") === "approved" ? "approved" : "open"
+  );
+  const [showMineOnly, setShowMineOnly] = useState(
+    searchParams.get("filter") === "mine"
+  );
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [createType, setCreateType] = useState<RequestType | null>(null);
 
@@ -125,15 +131,19 @@ export default function RequestsPage() {
     return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a));
   }, [approvedRequests]);
 
-  // Sort open: assigned to me first
+  // Sort open: assigned to me first; optionally filter to mine only
   const sortedOpen = useMemo(() => {
-    if (!role) return openRequests;
-    return [...openRequests].sort((a, b) => {
+    let list = openRequests;
+    if (showMineOnly && role) {
+      list = list.filter((r) => r.assignedRole === role);
+    }
+    if (!role) return list;
+    return [...list].sort((a, b) => {
       const aMe = a.assignedRole === role ? 0 : 1;
       const bMe = b.assignedRole === role ? 0 : 1;
       return aMe - bMe;
     });
-  }, [openRequests, role]);
+  }, [openRequests, role, showMineOnly]);
 
   function handleTypeSelect(type: RequestType) {
     setTypeMenuOpen(false);
@@ -196,6 +206,23 @@ export default function RequestsPage() {
             </button>
           )}
         </div>
+        {viewTab === "open" && role && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowMineOnly((v) => !v)}
+              className={cn(
+                "shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                showMineOnly
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Bell size={12} />
+              <span>דורשות טיפולי</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}

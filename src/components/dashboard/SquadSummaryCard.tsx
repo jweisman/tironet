@@ -54,10 +54,10 @@ export function SquadSummaryCard({ squad }: Props) {
         )}
       </div>
 
-      {/* Stats — 2 columns */}
-      <div className="grid grid-cols-2 divide-x divide-border border-b border-border rtl:divide-x-reverse">
+      {/* Stats — 3 columns */}
+      <div className="flex border-b border-border">
         {/* Soldiers */}
-        <div className="px-4 py-3 space-y-1">
+        <div className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border">
           <p className="text-xs font-semibold text-muted-foreground mb-1.5">חיילים</p>
           <StatButton onClick={() => router.push("/soldiers")}>
             <span className="text-xl font-bold">{squad.soldierCount}</span>
@@ -76,7 +76,7 @@ export function SquadSummaryCard({ squad }: Props) {
         </div>
 
         {/* Activities */}
-        <div className="px-4 py-3 space-y-1">
+        <div className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border">
           <p className="text-xs font-semibold text-muted-foreground mb-1.5">פעילויות</p>
           <StatButton onClick={() => router.push("/activities")}>
             <span className="text-xl font-bold text-green-600">
@@ -93,6 +93,31 @@ export function SquadSummaryCard({ squad }: Props) {
             </StatButton>
           ) : (
             <p className="text-xs text-green-600 font-medium py-0.5">הכל דווח</p>
+          )}
+        </div>
+
+        {/* Requests */}
+        <div className="flex-1 min-w-0 px-3 py-3 space-y-1">
+          <p className="text-xs font-semibold text-muted-foreground mb-1.5">בקשות</p>
+          {squad.approvedRequests > 0 ? (
+            <StatButton onClick={() => router.push("/requests?tab=approved")}>
+              <span className="text-xl font-bold text-green-600">
+                {squad.approvedRequests}
+              </span>
+              <span className="text-xs text-muted-foreground">אושרו</span>
+            </StatButton>
+          ) : (
+            <p className="text-xs text-muted-foreground py-0.5">—</p>
+          )}
+          {squad.inProgressRequests > 0 ? (
+            <StatButton onClick={() => router.push("/requests")}>
+              <span className="text-base font-bold text-amber-600">
+                {squad.inProgressRequests}
+              </span>
+              <span className="text-xs text-muted-foreground">בטיפול</span>
+            </StatButton>
+          ) : (
+            <p className="text-xs text-muted-foreground py-0.5">—</p>
           )}
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, AlertCircle, FileUp } from "lucide-react";
+import { Plus, Search, AlertCircle, FileUp, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
@@ -84,7 +84,14 @@ const SOLDIERS_QUERY = `
             WHERE ar.activity_id = a.id AND ar.soldier_id = s.id AND ar.result = 'failed'
           )
         )
-    ) AS gap_count
+    ) AS gap_count,
+    (
+      SELECT COUNT(*)
+      FROM requests r
+      WHERE r.soldier_id = s.id
+        AND r.cycle_id = s.cycle_id
+        AND r.assigned_role IS NOT NULL
+    ) AS open_request_count
   FROM soldiers s
   WHERE s.cycle_id = ?
   ORDER BY s.family_name ASC, s.given_name ASC
@@ -109,6 +116,7 @@ interface RawSoldier {
   profile_image: string | null;
   squad_id: string;
   gap_count: number;
+  open_request_count: number;
 }
 
 interface RawSquad {
@@ -127,6 +135,7 @@ function mapSoldier(raw: RawSoldier): SoldierSummary {
     status: raw.status as SoldierStatus,
     profileImage: raw.profile_image ?? null,
     gapCount: Number(raw.gap_count ?? 0),
+    openRequestCount: Number(raw.open_request_count ?? 0),
   };
 }
 
@@ -171,6 +180,7 @@ export default function SoldiersPage() {
   const [showGapsOnly, setShowGapsOnly] = useState(
     searchParams.get("filter") === "gaps"
   );
+  const [showRequestsOnly, setShowRequestsOnly] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -187,6 +197,7 @@ export default function SoldiersPage() {
         soldiers: squad.soldiers.filter((s) => {
           if (statusFilter !== "all" && s.status !== statusFilter) return false;
           if (showGapsOnly && s.gapCount === 0) return false;
+          if (showRequestsOnly && s.openRequestCount === 0) return false;
           if (search.trim()) {
             const q = search.trim().toLowerCase();
             const fullName = `${s.familyName} ${s.givenName}`.toLowerCase();
@@ -196,7 +207,7 @@ export default function SoldiersPage() {
         }),
       }))
       .filter((sq) => sq.soldiers.length > 0);
-  }, [allSquads, statusFilter, showGapsOnly, search]);
+  }, [allSquads, statusFilter, showGapsOnly, showRequestsOnly, search]);
 
   const totalSoldiers = filteredSquads.reduce(
     (sum, sq) => sum + sq.soldiers.length,
@@ -321,6 +332,19 @@ export default function SoldiersPage() {
           </div>
           <button
             type="button"
+            onClick={() => setShowRequestsOnly((v) => !v)}
+            className={cn(
+              "shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              showRequestsOnly
+                ? "bg-amber-100 text-amber-800"
+                : "bg-muted text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <FileText size={12} />
+            <span>בקשות</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setShowGapsOnly((v) => !v)}
             className={cn(
               "shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
@@ -337,7 +361,7 @@ export default function SoldiersPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {totalSoldiers === 0 && !syncStatus.hasSynced && !search && statusFilter === "all" && !showGapsOnly && (
+        {totalSoldiers === 0 && !syncStatus.hasSynced && !search && statusFilter === "all" && !showGapsOnly && !showRequestsOnly && (
           <div className="divide-y divide-border">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -350,10 +374,10 @@ export default function SoldiersPage() {
             ))}
           </div>
         )}
-        {totalSoldiers === 0 && (syncStatus.hasSynced || search || statusFilter !== "all" || showGapsOnly) && (
+        {totalSoldiers === 0 && (syncStatus.hasSynced || search || statusFilter !== "all" || showGapsOnly || showRequestsOnly) && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
-            {(search || statusFilter !== "all" || showGapsOnly) && (
+            {(search || statusFilter !== "all" || showGapsOnly || showRequestsOnly) && (
               <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>
             )}
           </div>

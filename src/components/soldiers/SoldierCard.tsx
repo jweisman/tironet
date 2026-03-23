@@ -12,6 +12,7 @@ export interface SoldierSummary {
   status: SoldierStatus;
   profileImage: string | null;
   gapCount: number;
+  openRequestCount: number;
 }
 
 interface Props {
@@ -95,18 +96,25 @@ export function SoldierCard({ soldier, onClick }: Props) {
             </span>
           )}
         </div>
-        <div>
-          <Badge variant={statusVariant} className={soldier.status === "injured" ? "bg-amber-100 text-amber-800 border-amber-200" : undefined}>
-            {STATUS_LABEL[soldier.status]}
-          </Badge>
-        </div>
+        {soldier.status !== "active" && (
+          <div>
+            <Badge variant={statusVariant} className={soldier.status === "injured" ? "bg-amber-100 text-amber-800 border-amber-200" : undefined}>
+              {STATUS_LABEL[soldier.status]}
+            </Badge>
+          </div>
+        )}
       </div>
 
-      {/* Gap count + chevron */}
-      <div className="flex shrink-0 items-center gap-2">
+      {/* Indicators + chevron */}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {soldier.openRequestCount > 0 && (
+          <span className="inline-flex h-5 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 text-xs font-medium text-amber-800">
+            {soldier.openRequestCount} בקשות
+          </span>
+        )}
         {soldier.gapCount > 0 && (
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive/10 px-1 text-xs font-medium text-destructive">
-            {soldier.gapCount}
+          <span className="inline-flex h-5 items-center gap-0.5 rounded-full bg-destructive/10 px-1.5 text-xs font-medium text-destructive">
+            {soldier.gapCount} פערים
           </span>
         )}
         <ChevronLeft size={16} className="text-muted-foreground" />
