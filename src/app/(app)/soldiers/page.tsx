@@ -259,10 +259,10 @@ export default function SoldiersPage() {
     );
   }
 
-  const squadsForForm = allSquads.map((s) => ({ id: s.id, name: s.name }));
+  const squadsForForm = (rawSquads ?? []).map((s) => ({ id: s.id, name: s.name }));
   const defaultSquadId =
-    role === "squad_commander" && allSquads.length === 1
-      ? allSquads[0].id
+    role === "squad_commander" && squadsForForm.length === 1
+      ? squadsForForm[0].id
       : undefined;
 
   return (
