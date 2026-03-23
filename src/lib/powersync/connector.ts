@@ -9,6 +9,18 @@ interface TokenResponse {
   powersync_url: string;
 }
 
+/** Wrapper around fetch that throws on non-OK responses so the CRUD
+ *  transaction is not marked complete and PowerSync retries later. */
+async function apiRequest(url: string, method: string, body?: unknown) {
+  const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`API ${method} ${url} → ${res.status}: ${text}`);
+  }
+}
+
 export class TironetConnector implements PowerSyncBackendConnector {
   private cachedToken: TokenResponse | null = null;
   private tokenExpiry = 0;
@@ -66,58 +78,80 @@ export class TironetConnector implements PowerSyncBackendConnector {
             // Transform to camelCase for the API, and pass the client id so
             // the server creates the record with the same UUID.
             const d = opData as Record<string, unknown>;
-            await fetch(`/api/activity-reports`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                id,
-                activityId: d.activity_id,
-                soldierId: d.soldier_id,
-                result: d.result,
-                grade: d.grade,
-                note: d.note,
-              }),
+            await apiRequest("/api/activity-reports", "POST", {
+              id,
+              activityId: d.activity_id,
+              soldierId: d.soldier_id,
+              result: d.result,
+              grade: d.grade,
+              note: d.note,
             });
           } else if (opType === UpdateType.PATCH) {
-            await fetch(`/api/activity-reports/${id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(opData),
-            });
+            await apiRequest(`/api/activity-reports/${id}`, "PATCH", opData);
           } else if (opType === UpdateType.DELETE) {
-            await fetch(`/api/activity-reports/${id}`, { method: "DELETE" });
+            await apiRequest(`/api/activity-reports/${id}`, "DELETE");
           }
         } else if (table === "activities") {
           if (opType === UpdateType.PUT) {
-            await fetch(`/api/activities`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id, ...opData }),
+            await apiRequest("/api/activities", "POST", { id, ...opData });
+          } else if (opType === UpdateType.PATCH) {
+            await apiRequest(`/api/activities/${id}`, "PATCH", opData);
+          } else if (opType === UpdateType.DELETE) {
+            await apiRequest(`/api/activities/${id}`, "DELETE");
+          }
+        } else if (table === "requests") {
+          if (opType === UpdateType.PUT) {
+            const d = opData as Record<string, unknown>;
+            // Don't send status/assignedRole — the server determines these
+            // based on the creator's role.
+            await apiRequest("/api/requests", "POST", {
+              id,
+              cycleId: d.cycle_id,
+              soldierId: d.soldier_id,
+              type: d.type,
+              description: d.description,
+              place: d.place,
+              departureAt: d.departure_at,
+              returnAt: d.return_at,
+              transportation: d.transportation,
+              urgent: d.urgent != null ? Boolean(d.urgent) : undefined,
+              paramedicDate: d.paramedic_date,
+              appointmentDate: d.appointment_date,
+              appointmentPlace: d.appointment_place,
+              appointmentType: d.appointment_type,
+              sickLeaveDays: d.sick_leave_days,
+              specialConditions: d.special_conditions != null ? Boolean(d.special_conditions) : undefined,
             });
           } else if (opType === UpdateType.PATCH) {
-            await fetch(`/api/activities/${id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(opData),
-            });
+            const d = opData as Record<string, unknown>;
+            // Transform snake_case to camelCase for the API
+            const body: Record<string, unknown> = {};
+            const mapping: Record<string, string> = {
+              cycle_id: "cycleId", soldier_id: "soldierId",
+              assigned_role: "assignedRole", created_by_user_id: "createdByUserId",
+              departure_at: "departureAt", return_at: "returnAt",
+              paramedic_date: "paramedicDate", appointment_date: "appointmentDate",
+              appointment_place: "appointmentPlace", appointment_type: "appointmentType",
+              sick_leave_days: "sickLeaveDays", special_conditions: "specialConditions",
+              denial_reason: "denialReason",
+            };
+            for (const [key, value] of Object.entries(d)) {
+              body[mapping[key] ?? key] = value;
+            }
+            // Convert integer booleans back
+            if ("urgent" in body) body.urgent = body.urgent != null ? Boolean(body.urgent) : undefined;
+            if ("specialConditions" in body) body.specialConditions = body.specialConditions != null ? Boolean(body.specialConditions) : undefined;
+            await apiRequest(`/api/requests/${id}`, "PATCH", body);
           } else if (opType === UpdateType.DELETE) {
-            await fetch(`/api/activities/${id}`, { method: "DELETE" });
+            await apiRequest(`/api/requests/${id}`, "DELETE");
           }
         } else if (table === "soldiers") {
           if (opType === UpdateType.PUT) {
-            await fetch(`/api/soldiers`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id, ...opData }),
-            });
+            await apiRequest("/api/soldiers", "POST", { id, ...opData });
           } else if (opType === UpdateType.PATCH) {
-            await fetch(`/api/soldiers/${id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(opData),
-            });
+            await apiRequest(`/api/soldiers/${id}`, "PATCH", opData);
           } else if (opType === UpdateType.DELETE) {
-            await fetch(`/api/soldiers/${id}`, { method: "DELETE" });
+            await apiRequest(`/api/soldiers/${id}`, "DELETE");
           }
         }
       }

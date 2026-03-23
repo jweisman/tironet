@@ -134,8 +134,10 @@ const SHELL_ROUTES = [
   "/home",
   "/activities",
   "/soldiers",
+  "/requests",
   "/activities/_",   // detail page shell (dummy slug — same HTML for any ID)
   "/soldiers/_",     // detail page shell
+  "/requests/_",     // request detail page shell
 ];
 
 async function warmShellCache() {
@@ -179,7 +181,7 @@ function resolveShellRoute(pathname: string, origin: string): {
   htmlKey: string;
 } | null {
   // List pages (exact path)
-  if (pathname === "/home" || pathname === "/activities" || pathname === "/soldiers") {
+  if (pathname === "/home" || pathname === "/activities" || pathname === "/soldiers" || pathname === "/requests") {
     return { htmlKey: `${origin}${pathname}` };
   }
 
@@ -189,6 +191,9 @@ function resolveShellRoute(pathname: string, origin: string): {
   }
   if (/^\/soldiers\/[^/]+$/.test(pathname)) {
     return { htmlKey: `${origin}/soldiers/__shell__` };
+  }
+  if (/^\/requests\/[^/]+$/.test(pathname)) {
+    return { htmlKey: `${origin}/requests/__shell__` };
   }
 
   return null;

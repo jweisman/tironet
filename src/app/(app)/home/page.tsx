@@ -2,8 +2,11 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Bell } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
+import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { CyclePicker } from "@/components/CyclePicker";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import type { SquadSummary } from "@/app/api/dashboard/route";
@@ -29,8 +32,10 @@ function AggregateRow({ squads }: { squads: SquadSummary[] }) {
       withGaps: acc.withGaps + s.soldiersWithGaps,
       reported: acc.reported + s.reportedActivities,
       missing: acc.missing + s.missingReportActivities,
+      approved: acc.approved + s.approvedRequests,
+      inProgress: acc.inProgress + s.inProgressRequests,
     }),
-    { soldiers: 0, withGaps: 0, reported: 0, missing: 0 }
+    { soldiers: 0, withGaps: 0, reported: 0, missing: 0, approved: 0, inProgress: 0 }
   );
 
   return (
@@ -38,6 +43,9 @@ function AggregateRow({ squads }: { squads: SquadSummary[] }) {
       <span className="text-muted-foreground">{total.soldiers} חיילים</span>
       {total.withGaps > 0 && (
         <span className="text-amber-600 font-semibold">{total.withGaps} עם פערים</span>
+      )}
+      {total.inProgress > 0 && (
+        <span className="text-amber-600 font-semibold">{total.inProgress} בקשות בטיפול</span>
       )}
       <span className="text-muted-foreground ms-auto">
         <span className="text-green-600 font-semibold">✓ {total.reported}</span>
@@ -176,11 +184,41 @@ const TOP_GAPS_QUERY = `
   ORDER BY g.squad_id, g.gap_count DESC
 `;
 
+// Per-squad request counts — separate query to keep the main SQUADS_QUERY simpler
+// Params: [cycleId, squadId]
+const REQUESTS_QUERY = `
+  WITH
+    cycle AS (SELECT ? AS id),
+    sf    AS (SELECT ? AS squad_id),
+    scope AS (
+      SELECT sq2.id AS squad_id
+      FROM squads sq2
+      JOIN platoons p2 ON p2.id = sq2.platoon_id
+      JOIN companies c  ON c.id  = p2.company_id
+      WHERE c.cycle_id = (SELECT id FROM cycle)
+        AND ((SELECT squad_id FROM sf) = '' OR sq2.id = (SELECT squad_id FROM sf))
+    )
+  SELECT
+    s.squad_id,
+    SUM(CASE WHEN r.status = 'approved' AND r.assigned_role IS NULL THEN 1 ELSE 0 END) AS approved_requests,
+    SUM(CASE WHEN r.assigned_role IS NOT NULL THEN 1 ELSE 0 END) AS in_progress_requests
+  FROM requests r
+  JOIN soldiers s ON s.id = r.soldier_id
+  WHERE r.cycle_id = (SELECT id FROM cycle)
+    AND s.squad_id IN (SELECT squad_id FROM scope)
+  GROUP BY s.squad_id
+`;
+
 interface RawSquad {
   squad_id: string; squad_name: string;
   platoon_id: string; platoon_name: string;
   soldier_count: number; soldiers_with_gaps: number;
   reported_activities: number; missing_report_activities: number;
+}
+interface RawSquadRequests {
+  squad_id: string;
+  approved_requests: number;
+  in_progress_requests: number;
 }
 interface RawTopGap {
   squad_id: string; activity_id: string; activity_name: string; gap_count: number;
@@ -192,7 +230,9 @@ interface RawTopGap {
 
 export default function HomePage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const { selectedCycleId, selectedAssignment, activeCycles, isLoading: cycleLoading } = useCycle();
+  const requestBadge = useRequestBadge();
 
   // Grace period before showing "no data" — useQuery returns cached local
   // SQLite data almost instantly for returning users, but on first load
@@ -213,6 +253,7 @@ export default function HomePage() {
 
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
   const { data: rawTopGaps } = useQuery<RawTopGap>(TOP_GAPS_QUERY, queryParams);
+  const { data: rawSquadRequests } = useQuery<RawSquadRequests>(REQUESTS_QUERY, queryParams);
 
   // Build top-3-gaps map per squad from flat rows (avoids json_group_array)
   const topGapsMap = useMemo(() => {
@@ -227,6 +268,18 @@ export default function HomePage() {
     return map;
   }, [rawTopGaps]);
 
+  // Build request counts map per squad
+  const requestsMap = useMemo(() => {
+    const map = new Map<string, { approved: number; inProgress: number }>();
+    for (const row of rawSquadRequests ?? []) {
+      map.set(row.squad_id, {
+        approved: Number(row.approved_requests ?? 0),
+        inProgress: Number(row.in_progress_requests ?? 0),
+      });
+    }
+    return map;
+  }, [rawSquadRequests]);
+
   const squads: SquadSummary[] = useMemo(
     () =>
       (rawSquads ?? []).map((raw) => ({
@@ -239,9 +292,11 @@ export default function HomePage() {
         soldiersWithGaps: Number(raw.soldiers_with_gaps),
         reportedActivities: Number(raw.reported_activities),
         missingReportActivities: Number(raw.missing_report_activities),
+        approvedRequests: requestsMap.get(raw.squad_id)?.approved ?? 0,
+        inProgressRequests: requestsMap.get(raw.squad_id)?.inProgress ?? 0,
         topGapActivities: topGapsMap.get(raw.squad_id) ?? [],
       })),
-    [rawSquads, topGapsMap]
+    [rawSquads, topGapsMap, requestsMap]
   );
 
   // While session / cycle context is still resolving, show nothing
@@ -303,6 +358,23 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {/* Requests requiring attention callout */}
+      {requestBadge > 0 && (
+        <button
+          type="button"
+          onClick={() => router.push("/requests?filter=mine")}
+          className="w-full flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-start transition-colors hover:bg-amber-50 active:bg-amber-100"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700 shrink-0">
+            <Bell size={18} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">{requestBadge} בקשות ממתינות לטיפולך</p>
+            <p className="text-xs text-muted-foreground">לחץ כדי לצפות</p>
+          </div>
+        </button>
+      )}
 
       {/* No cycle selected */}
       {!selectedCycleId && (

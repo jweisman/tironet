@@ -214,11 +214,59 @@ This matters because PowerSync scopes `activity_reports` to users via a JOIN on 
 
 Similarly, `Soldier.squadId` is write-once. The "transferred" status (`SoldierStatus.transferred`) marks a soldier as inactive rather than moving them.
 
+## Requests (בקשות) Workflow
+
+### Request types
+
+Three types: `leave` (יציאה), `medical` (רפואה), `hardship` (ת"ש). Each has type-specific fields defined in the Prisma schema and PowerSync local schema.
+
+### Workflow state machine
+
+Requests use a `status` + `assignedRole` pair to track progress. `assignedRole` is nullable — `null` means the workflow is complete (terminal state).
+
+**Creation routing:**
+- Squad commander creates → assigned to `platoon_commander`
+- Platoon commander creates → assigned to `company_commander` (skips platoon approval)
+- Admin creates → assigned to `platoon_commander`
+
+**Approval chain (leave & medical):**
+```
+squad_commander creates → platoon_commander (approve/deny)
+  → if approved: company_commander (approve/deny)
+    → if approved: platoon_commander (acknowledge) → squad_commander (acknowledge) → done (assignedRole = null)
+    → if denied: platoon_commander (acknowledge) → squad_commander (acknowledge) → done
+  → if denied: squad_commander (acknowledge) → done
+```
+
+**Hardship requests** skip company commander — platoon commander approval goes directly to squad commander acknowledge.
+
+**Key implementation detail:** the `acknowledge` action passes the decision down the chain without changing the status. Only approve/deny change the status.
+
+### Denial reason
+
+When denying a request, commanders can provide a free-text denial reason. The deny button opens a dialog with an optional text field. The reason is stored in `Request.denialReason` and displayed on the detail page for denied requests.
+
+### Offline writes
+
+Request creation and workflow actions (approve/deny/acknowledge) write to the local PowerSync SQLite DB via `db.execute()`. The connector uploads them via PATCH/POST to the API. The `uploadData` handler in `connector.ts` maps snake_case columns to camelCase for the API.
+
+### Request scoping (`getRequestScope`)
+
+`src/lib/api/request-scope.ts` provides `getRequestScope(cycleId)` which resolves the user's role, permissions (`canCreate`), and `soldierIds` they can access for a given cycle. This is used by both the list and detail API routes. Admin users have `canCreate: true` and see all soldiers.
+
+### List page filtering
+
+The requests list page (`/requests`) has two tabs:
+- **Open** (`פתוחות`): requests where `assignedRole !== null` (still in the workflow)
+- **Approved** (`אושרו`): requests where `status === "approved" && assignedRole === null` (workflow complete)
+
+Open requests are sorted with "assigned to me" first.
+
 ## API Conventions
 
 - All protected routes call `auth()` from `@/lib/auth/auth` and check `session.user`
 - Admin routes use `requireAdmin()` from `@/lib/api/admin-guard`
-- Non-admin data access is scoped via `getActivityScope()` which resolves the user's role and unit IDs for a given cycle
+- Non-admin data access is scoped via `getActivityScope()` (activities) or `getRequestScope()` (requests) which resolve the user's role and unit IDs for a given cycle
 - Polymorphic FK: `UserCycleAssignment.unitId` points to `companies`, `platoons`, or `squads` depending on `unitType`. Referential integrity is enforced at the application layer, not by the DB.
 
 ## PWA / Service Worker Architecture

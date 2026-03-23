@@ -2,21 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, UserCog, Settings } from "lucide-react";
+import { Home, Users, Activity, UserCog, Settings, FileText } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { useRequestBadge } from "@/hooks/useRequestBadge";
 
 const staticTabs = [
   { href: "/home", icon: Home, labelKey: "home" as const },
   { href: "/soldiers", icon: Users, labelKey: "soldiers" as const },
   { href: "/activities", icon: Activity, labelKey: "activities" as const },
+  { href: "/requests", icon: FileText, labelKey: "requests" as const },
 ];
 
 export function TabBar() {
   const pathname = usePathname();
   const t = useTranslations("nav");
   const { data: session } = useSession();
+  const requestBadge = useRequestBadge();
   const isAdmin = session?.user?.isAdmin;
   const isCommander = session?.user?.cycleAssignments?.some(
     (a) => a.role === "company_commander" || a.role === "platoon_commander"
@@ -49,7 +52,14 @@ export function TabBar() {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+              <span className="relative">
+                <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+                {href === "/requests" && requestBadge > 0 && (
+                  <span className="absolute -top-1.5 -end-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                    {requestBadge}
+                  </span>
+                )}
+              </span>
               <span>{label}</span>
             </Link>
           );

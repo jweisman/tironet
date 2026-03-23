@@ -8,6 +8,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Role-based access** — Admins, cycle commanders, company commanders, platoon commanders, and squad commanders each see only their slice of the hierarchy
 - **Activity management** — Create training activities, assign them to platoons, and record per-soldier results (pass / fail / N/A) with optional grades and notes
 - **Bulk reporting** — Update an entire squad's activity results in one action
+- **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), denial reasons, and full offline support
 - **Dashboard** — Live summary of activity completion rates, gap counts, and missing reports per platoon/squad
 - **Soldier profiles** — Photo upload with in-browser cropping and compression; bulk import from Excel
 - **Invitation system** — Admins invite users by email; each invitation scopes the user to a specific unit and role
@@ -48,6 +49,7 @@ The app is designed to work reliably in low-connectivity field environments. All
 - **Recording activity reports** — Pass/fail/N/A results, grades, and notes can be saved while offline. Writes go to local SQLite instantly; the connector uploads them to the server when connectivity is restored.
 - **Bulk squad updates** — The bulk "mark all" action also works offline under the same mechanism.
 - **Editing soldiers** — Soldier profile fields (name, rank, status) can be updated offline.
+- **Requests** — Creating requests and performing workflow actions (approve, deny, acknowledge) all work offline. Changes sync when connectivity is restored.
 
 ### What requires connectivity
 
@@ -335,6 +337,7 @@ src/
 │   │   ├── home/            # Dashboard
 │   │   ├── activities/      # Activity management & reporting
 │   │   ├── soldiers/        # Soldier roster
+│   │   ├── requests/        # Leave, medical & hardship requests workflow
 │   │   ├── users/           # User management (admin)
 │   │   ├── admin/           # Admin panel (cycles, structure, activity types)
 │   │   └── profile/         # User profile

@@ -61,3 +61,15 @@ streams:
       WHERE activity_id IN (
         SELECT id FROM activities WHERE platoon_id IN auth.parameter('platoon_ids')
       )
+
+  requests:
+    auto_subscribe: true
+    query: >
+      SELECT id, cycle_id, soldier_id, type, status, assigned_role,
+             created_by_user_id, description,
+             place, departure_at, return_at, transportation,
+             urgent, paramedic_date, appointment_date, appointment_place,
+             appointment_type, sick_leave_days,
+             special_conditions, denial_reason, created_at, updated_at
+      FROM requests
+      WHERE cycle_id IN auth.parameter('cycle_ids')

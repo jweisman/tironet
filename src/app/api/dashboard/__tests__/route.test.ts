@@ -7,6 +7,7 @@ vi.mock("@/lib/db/prisma", () => ({
     activity: { findMany: vi.fn() },
     activityReport: { findMany: vi.fn() },
     userCycleAssignment: { findMany: vi.fn() },
+    request: { groupBy: vi.fn() },
   },
 }));
 
@@ -24,6 +25,7 @@ const mockPlatoonFindMany = vi.mocked(prisma.platoon.findMany);
 const mockActivityFindMany = vi.mocked(prisma.activity.findMany);
 const mockReportFindMany = vi.mocked(prisma.activityReport.findMany);
 const mockAssignmentFindMany = vi.mocked(prisma.userCycleAssignment.findMany);
+const mockRequestGroupBy = vi.mocked(prisma.request.groupBy);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -115,6 +117,8 @@ describe("GET /api/dashboard", () => {
       },
     ] as never);
 
+    mockRequestGroupBy.mockResolvedValue([] as never);
+
     const req = createMockRequest("GET", "/api/dashboard", undefined, {
       cycleId: "cycle-1",
     });
@@ -135,6 +139,8 @@ describe("GET /api/dashboard", () => {
     expect(squad.missingReportActivities).toBe(1);
     expect(squad.soldiersWithGaps).toBe(2); // sol-1 (failed), sol-2 (missing)
     expect(squad.commanders).toEqual(["Sgt Dan Cohen"]);
+    expect(squad.approvedRequests).toBe(0);
+    expect(squad.inProgressRequests).toBe(0);
   });
 
   it("returns empty squads when no platoons in scope", async () => {
@@ -162,6 +168,55 @@ describe("GET /api/dashboard", () => {
 
     const body = await res.json();
     expect(body.squads).toEqual([]);
+  });
+
+  it("computes request counts per squad", async () => {
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "platoon_commander",
+        platoonIds: ["platoon-1"],
+        platoons: [{ id: "platoon-1", name: "Platoon 1" }],
+        canCreate: true,
+        canEditMetadataForPlatoon: () => true,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    mockPlatoonFindMany.mockResolvedValue([
+      {
+        id: "platoon-1",
+        name: "Platoon 1",
+        squads: [
+          {
+            id: "squad-1",
+            name: "Squad A",
+            soldiers: [{ id: "sol-1" }, { id: "sol-2" }],
+          },
+        ],
+      },
+    ] as never);
+
+    mockActivityFindMany.mockResolvedValue([] as never);
+    mockReportFindMany.mockResolvedValue([] as never);
+    mockAssignmentFindMany.mockResolvedValue([] as never);
+
+    // 2 approved (status=approved, assignedRole=null), 1 in-progress (assignedRole != null)
+    mockRequestGroupBy.mockResolvedValue([
+      { soldierId: "sol-1", status: "approved", assignedRole: null, _count: 2 },
+      { soldierId: "sol-2", status: "open", assignedRole: "company_commander", _count: 1 },
+    ] as never);
+
+    const req = createMockRequest("GET", "/api/dashboard", undefined, {
+      cycleId: "cycle-1",
+    });
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    const squad = body.squads[0];
+    expect(squad.approvedRequests).toBe(2);
+    expect(squad.inProgressRequests).toBe(1);
   });
 
   it("filters squads for squad_commander", async () => {
@@ -199,6 +254,7 @@ describe("GET /api/dashboard", () => {
 
     mockActivityFindMany.mockResolvedValue([] as never);
     mockAssignmentFindMany.mockResolvedValue([] as never);
+    mockRequestGroupBy.mockResolvedValue([] as never);
 
     const req = createMockRequest("GET", "/api/dashboard", undefined, {
       cycleId: "cycle-1",

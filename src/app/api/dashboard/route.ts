@@ -14,6 +14,9 @@ export interface SquadSummary {
   // Activities section (activity-level, not pair-level)
   reportedActivities: number;  // required activities where ALL soldiers have a report
   missingReportActivities: number; // required activities where ≥1 soldier has no report
+  // Requests section
+  approvedRequests: number;     // requests with status=approved and assignedRole=null
+  inProgressRequests: number;   // requests with assignedRole not null (still in workflow)
   // Top gaps
   topGapActivities: { id: string; name: string; gapCount: number }[];
 }
@@ -119,6 +122,42 @@ export async function GET(request: NextRequest) {
     commandersBySquad.get(a.unitId)!.push(parts);
   }
 
+  // Fetch request counts per squad (grouped by soldier's squad)
+  const requestCounts = allSoldierIds.length > 0
+    ? await prisma.request.groupBy({
+        by: ["soldierId", "status", "assignedRole"],
+        where: {
+          cycleId,
+          soldierId: { in: allSoldierIds },
+        },
+        _count: true,
+      })
+    : [];
+
+  // Build soldier→squad lookup
+  const soldierSquadMap = new Map<string, string>();
+  for (const p of filteredPlatoons) {
+    for (const sq of p.squads) {
+      for (const s of sq.soldiers) {
+        soldierSquadMap.set(s.id, sq.id);
+      }
+    }
+  }
+
+  // Aggregate request counts per squad
+  const requestsBySquad = new Map<string, { approved: number; inProgress: number }>();
+  for (const row of requestCounts) {
+    const sqId = soldierSquadMap.get(row.soldierId);
+    if (!sqId) continue;
+    if (!requestsBySquad.has(sqId)) requestsBySquad.set(sqId, { approved: 0, inProgress: 0 });
+    const entry = requestsBySquad.get(sqId)!;
+    if (row.status === "approved" && row.assignedRole === null) {
+      entry.approved += row._count;
+    } else if (row.assignedRole !== null) {
+      entry.inProgress += row._count;
+    }
+  }
+
   // Compute per-squad stats
   const squads: SquadSummary[] = filteredPlatoons.flatMap((platoon) => {
     const platoonActivities = activities.filter((a) => a.platoonId === platoon.id);
@@ -174,6 +213,8 @@ export async function GET(request: NextRequest) {
         soldiersWithGaps: soldiersWithGapSet.size,
         reportedActivities,
         missingReportActivities,
+        approvedRequests: requestsBySquad.get(squad.id)?.approved ?? 0,
+        inProgressRequests: requestsBySquad.get(squad.id)?.inProgress ?? 0,
         topGapActivities: activityGaps.slice(0, 3),
       };
     });

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, Settings, LogOut, UserCog } from "lucide-react";
+import { Home, Users, Activity, Settings, LogOut, UserCog, FileText } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
@@ -10,11 +10,13 @@ import { cn } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
 import { useCycle } from "@/contexts/CycleContext";
 import { CyclePicker } from "./CyclePicker";
+import { useRequestBadge } from "@/hooks/useRequestBadge";
 
 const navItems = [
   { href: "/home", icon: Home, labelKey: "home" },
   { href: "/soldiers", icon: Users, labelKey: "soldiers" },
   { href: "/activities", icon: Activity, labelKey: "activities" },
+  { href: "/requests", icon: FileText, labelKey: "requests" },
 ] as const;
 
 export function Sidebar() {
@@ -22,6 +24,7 @@ export function Sidebar() {
   const t = useTranslations("nav");
   const { data: session } = useSession();
   const { activeCycles } = useCycle();
+  const requestBadge = useRequestBadge();
   const isAdmin = session?.user?.isAdmin;
   const isCommander = session?.user?.cycleAssignments?.some(
     (a) => a.role === "company_commander" || a.role === "platoon_commander"
@@ -63,7 +66,12 @@ export function Sidebar() {
               )}
             >
               <Icon size={18} />
-              <span>{t(labelKey)}</span>
+              <span className="flex-1">{t(labelKey)}</span>
+              {href === "/requests" && requestBadge > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-bold text-destructive-foreground">
+                  {requestBadge}
+                </span>
+              )}
             </Link>
           );
         })}
