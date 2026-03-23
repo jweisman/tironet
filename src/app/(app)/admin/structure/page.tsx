@@ -3,8 +3,8 @@ import StructureTree from "@/components/admin/StructureTree";
 
 export default async function StructurePage() {
   const cycles = await prisma.cycle.findMany({
-    orderBy: { createdAt: "desc" },
-    select: { id: true, name: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    select: { id: true, name: true, isActive: true },
   });
 
   const companies = await prisma.company.findMany({

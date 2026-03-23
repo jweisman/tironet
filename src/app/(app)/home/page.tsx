@@ -138,7 +138,7 @@ const SQUADS_QUERY = `
   FROM squads sq
   JOIN platoons p ON p.id = sq.platoon_id
   WHERE sq.id IN (SELECT squad_id FROM scope)
-  ORDER BY p.sort_order ASC, sq.sort_order ASC
+  ORDER BY p.sort_order ASC, p.name ASC, sq.sort_order ASC, sq.name ASC
 `;
 
 // Returns one row per (squad, activity) gap — avoids json_group_array.

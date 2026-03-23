@@ -35,7 +35,7 @@ const SQUADS_QUERY = `
   SELECT id, name, sort_order
   FROM squads
   WHERE platoon_id = ?
-  ORDER BY sort_order ASC
+  ORDER BY sort_order ASC, name ASC
 `;
 
 const SOLDIERS_QUERY = `

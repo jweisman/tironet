@@ -22,21 +22,33 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
 
   if (data.type === "company") {
+    const maxOrder = await prisma.company.aggregate({
+      where: { cycleId: data.cycleId },
+      _max: { sortOrder: true },
+    });
     const company = await prisma.company.create({
-      data: { cycleId: data.cycleId, name: data.name },
+      data: { cycleId: data.cycleId, name: data.name, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
     });
     return NextResponse.json(company, { status: 201 });
   }
 
   if (data.type === "platoon") {
+    const maxOrder = await prisma.platoon.aggregate({
+      where: { companyId: data.companyId },
+      _max: { sortOrder: true },
+    });
     const platoon = await prisma.platoon.create({
-      data: { companyId: data.companyId, name: data.name },
+      data: { companyId: data.companyId, name: data.name, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
     });
     return NextResponse.json(platoon, { status: 201 });
   }
 
+  const maxOrder = await prisma.squad.aggregate({
+    where: { platoonId: data.platoonId },
+    _max: { sortOrder: true },
+  });
   const squad = await prisma.squad.create({
-    data: { platoonId: data.platoonId, name: data.name },
+    data: { platoonId: data.platoonId, name: data.name, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
   });
   return NextResponse.json(squad, { status: 201 });
 }

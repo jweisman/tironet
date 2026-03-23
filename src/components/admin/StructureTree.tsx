@@ -22,6 +22,8 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   GripVertical,
   PlusCircle,
   Pencil,
@@ -57,7 +59,7 @@ import { cn } from "@/lib/utils";
 type Squad = { id: string; name: string };
 type Platoon = { id: string; name: string; squads: Squad[] };
 type Company = { id: string; name: string; platoons: Platoon[] };
-type Cycle = { id: string; name: string };
+type Cycle = { id: string; name: string; isActive: boolean };
 
 type Props = {
   cycles: Cycle[];
@@ -224,7 +226,9 @@ function SortableSquadRow({
 }
 
 export default function StructureTree({ cycles, initialStructure }: Props) {
-  const [selectedCycleId, setSelectedCycleId] = useState(cycles[0]?.id ?? "");
+  const [selectedCycleId, setSelectedCycleId] = useState(
+    () => (cycles.find((c) => c.isActive) ?? cycles[0])?.id ?? ""
+  );
   const [structure, setStructure] = useState<Record<string, Company[]>>(initialStructure);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [expandedPlatoons, setExpandedPlatoons] = useState<Set<string>>(new Set());
@@ -462,6 +466,32 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
     });
   }
 
+  function toggleExpandAll(company: Company) {
+    const platoonIds = company.platoons.map((p) => p.id);
+    const companyExpanded = expandedCompanies.has(company.id);
+    const allExpanded = companyExpanded && platoonIds.every((id) => expandedPlatoons.has(id));
+
+    if (allExpanded) {
+      setExpandedCompanies((prev) => {
+        const next = new Set(prev);
+        next.delete(company.id);
+        return next;
+      });
+      setExpandedPlatoons((prev) => {
+        const next = new Set(prev);
+        platoonIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setExpandedCompanies((prev) => new Set([...prev, company.id]));
+      setExpandedPlatoons((prev) => {
+        const next = new Set(prev);
+        platoonIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  }
+
   function togglePlatoon(id: string) {
     setExpandedPlatoons((prev) => {
       const next = new Set(prev);
@@ -537,6 +567,21 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
                           ) : (
                             <>
                               <span className="flex-1 font-medium text-sm">{company.name}</span>
+                              {company.platoons.length > 0 && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  onClick={() => toggleExpandAll(company)}
+                                  aria-label={companyExpanded && company.platoons.every((p) => expandedPlatoons.has(p.id)) ? "כווץ הכל" : "הרחב הכל"}
+                                >
+                                  {companyExpanded && company.platoons.every((p) => expandedPlatoons.has(p.id)) ? (
+                                    <ChevronsDownUp className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <ChevronsUpDown className="w-3.5 h-3.5" />
+                                  )}
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="ghost"

@@ -7,16 +7,19 @@ vi.mock("@/lib/db/prisma", () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      aggregate: vi.fn(),
     },
     platoon: {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      aggregate: vi.fn(),
     },
     squad: {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      aggregate: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -69,9 +72,10 @@ const UUID = "550e8400-e29b-41d4-a716-446655440001";
 // POST /api/admin/structure — create
 // ---------------------------------------------------------------------------
 describe("POST /api/admin/structure", () => {
-  it("creates a company", async () => {
+  it("creates a company with next sortOrder", async () => {
     adminSuccess();
     const created = { id: "comp-1", cycleId: UUID, name: "Alpha" };
+    vi.mocked(prisma.company.aggregate).mockResolvedValue({ _max: { sortOrder: 2 } } as never);
     mockCompanyCreate.mockResolvedValue(created as never);
 
     const req = createMockRequest("POST", "/api/admin/structure", {
@@ -86,13 +90,14 @@ describe("POST /api/admin/structure", () => {
     expect(res.status).toBe(201);
     expect(body).toEqual(created);
     expect(mockCompanyCreate).toHaveBeenCalledWith({
-      data: { cycleId: UUID, name: "Alpha" },
+      data: { cycleId: UUID, name: "Alpha", sortOrder: 3 },
     });
   });
 
-  it("creates a platoon", async () => {
+  it("creates a platoon with next sortOrder", async () => {
     adminSuccess();
     const created = { id: "plt-1", companyId: UUID, name: "Platoon 1" };
+    vi.mocked(prisma.platoon.aggregate).mockResolvedValue({ _max: { sortOrder: 1 } } as never);
     mockPlatoonCreate.mockResolvedValue(created as never);
 
     const req = createMockRequest("POST", "/api/admin/structure", {
@@ -107,13 +112,14 @@ describe("POST /api/admin/structure", () => {
     expect(res.status).toBe(201);
     expect(body).toEqual(created);
     expect(mockPlatoonCreate).toHaveBeenCalledWith({
-      data: { companyId: UUID, name: "Platoon 1" },
+      data: { companyId: UUID, name: "Platoon 1", sortOrder: 2 },
     });
   });
 
-  it("creates a squad", async () => {
+  it("creates a squad with next sortOrder", async () => {
     adminSuccess();
     const created = { id: "sq-1", platoonId: UUID, name: "Squad 1" };
+    vi.mocked(prisma.squad.aggregate).mockResolvedValue({ _max: { sortOrder: null } } as never);
     mockSquadCreate.mockResolvedValue(created as never);
 
     const req = createMockRequest("POST", "/api/admin/structure", {
@@ -128,7 +134,7 @@ describe("POST /api/admin/structure", () => {
     expect(res.status).toBe(201);
     expect(body).toEqual(created);
     expect(mockSquadCreate).toHaveBeenCalledWith({
-      data: { platoonId: UUID, name: "Squad 1" },
+      data: { platoonId: UUID, name: "Squad 1", sortOrder: 0 },
     });
   });
 

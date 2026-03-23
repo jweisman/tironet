@@ -95,7 +95,7 @@ const ACTIVITIES_QUERY = `
 `;
 
 const COMPANY_PLATOONS_QUERY = `
-  SELECT id, name FROM platoons WHERE company_id = ? ORDER BY sort_order ASC
+  SELECT id, name FROM platoons WHERE company_id = ? ORDER BY sort_order ASC, name ASC
 `;
 
 // ---------------------------------------------------------------------------

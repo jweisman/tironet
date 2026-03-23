@@ -104,7 +104,7 @@ const SQUADS_QUERY = `
   JOIN platoons p ON p.id = sq.platoon_id
   JOIN companies c ON c.id = p.company_id
   WHERE c.cycle_id = ?
-  ORDER BY p.sort_order ASC, sq.sort_order ASC
+  ORDER BY p.sort_order ASC, p.name ASC, sq.sort_order ASC, sq.name ASC
 `;
 
 interface RawSoldier {
