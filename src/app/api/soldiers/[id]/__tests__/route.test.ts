@@ -353,6 +353,56 @@ describe("PATCH /api/soldiers/[id]", () => {
       data: { givenName: "Updated", familyName: "Name", rank: "corporal" },
     });
   });
+  it("updates idNumber for admin", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      squadId: "squad-1",
+    } as never);
+
+    mockSoldierUpdate.mockResolvedValue({
+      id: "s1", givenName: "John", familyName: "Doe", idNumber: "7654321",
+      rank: null, status: "active",
+    } as never);
+
+    const req = createMockRequest("PATCH", "/api/soldiers/s1", {
+      idNumber: "7654321",
+    });
+    const res = await PATCH(req, makeParams("s1"));
+    expect(res.status).toBe(200);
+
+    expect(mockSoldierUpdate).toHaveBeenCalledWith({
+      where: { id: "s1" },
+      data: { idNumber: "7654321" },
+    });
+  });
+
+  it("clears idNumber when set to null", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      squadId: "squad-1",
+    } as never);
+
+    mockSoldierUpdate.mockResolvedValue({
+      id: "s1", givenName: "John", familyName: "Doe", idNumber: null,
+    } as never);
+
+    const req = createMockRequest("PATCH", "/api/soldiers/s1", {
+      idNumber: null,
+    });
+    const res = await PATCH(req, makeParams("s1"));
+    expect(res.status).toBe(200);
+
+    expect(mockSoldierUpdate).toHaveBeenCalledWith({
+      where: { id: "s1" },
+      data: { idNumber: null },
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

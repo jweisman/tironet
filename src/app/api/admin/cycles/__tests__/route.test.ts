@@ -243,7 +243,7 @@ describe("PATCH /api/admin/cycles/reorder", () => {
     expect(res.status).toBe(204);
     expect(mockTransaction).toHaveBeenCalledTimes(1);
     // The transaction receives an array of Prisma update promises
-    const txArg = mockTransaction.mock.calls[0][0] as unknown[];
+    const txArg = mockTransaction.mock.calls[0][0] as unknown as unknown[];
     expect(txArg).toHaveLength(3);
   });
 

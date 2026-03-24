@@ -7,6 +7,7 @@ const soldierSchema = z.object({
   squadId: z.string().uuid(),
   givenName: z.string().min(1),
   familyName: z.string().min(1),
+  idNumber: z.string().nullable().optional(),
   rank: z.string().nullable().optional(),
   status: z.enum(["active", "transferred", "dropped", "injured"]).optional(),
 });
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Create all soldiers in a transaction
-  await prisma.$transaction(
+  const created = await prisma.$transaction(
     soldiers.map((s) =>
       prisma.soldier.create({
         data: {
@@ -117,9 +118,11 @@ export async function POST(req: NextRequest) {
           squadId: s.squadId,
           givenName: s.givenName.trim(),
           familyName: s.familyName.trim(),
+          idNumber: s.idNumber ?? null,
           rank: s.rank ?? null,
           status: s.status ?? "active",
         },
+        select: { id: true },
       })
     )
   );
@@ -134,5 +137,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ created: soldiers.length, activeActivityCount }, { status: 201 });
+  return NextResponse.json({
+    created: soldiers.length,
+    activeActivityCount,
+    soldierIds: created.map((s) => s.id),
+  }, { status: 201 });
 }

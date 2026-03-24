@@ -21,7 +21,7 @@ export function createMockRequest(
     init.body = JSON.stringify(body);
     init.headers = { "Content-Type": "application/json" };
   }
-  return new NextRequest(fullUrl, init);
+  return new NextRequest(fullUrl, init as import("next/dist/server/web/spec-extension/request").RequestInit);
 }
 
 /**

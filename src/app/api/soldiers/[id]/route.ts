@@ -7,6 +7,7 @@ import { validateProfileImage } from "@/lib/api/validate-image";
 const patchSchema = z.object({
   givenName: z.string().min(1).optional(),
   familyName: z.string().min(1).optional(),
+  idNumber: z.string().nullable().optional(),
   rank: z.string().nullable().optional(),
   status: z.enum(["active", "transferred", "dropped", "injured"]).optional(),
   profileImage: z.string().nullable().optional(),
@@ -176,6 +177,7 @@ export async function PATCH(
     updateData.givenName = parsed.data.givenName.trim();
   if (parsed.data.familyName !== undefined)
     updateData.familyName = parsed.data.familyName.trim();
+  if (parsed.data.idNumber !== undefined) updateData.idNumber = parsed.data.idNumber;
   if (parsed.data.rank !== undefined) updateData.rank = parsed.data.rank;
   if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
   if (parsed.data.profileImage !== undefined)
