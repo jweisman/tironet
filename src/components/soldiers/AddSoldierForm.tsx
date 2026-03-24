@@ -35,6 +35,7 @@ export function AddSoldierForm({
 }: Props) {
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
+  const [idNumber, setIdNumber] = useState("");
   const [rank, setRank] = useState("");
   const [status, setStatus] = useState("active");
   const [squadId, setSquadId] = useState(
@@ -69,6 +70,7 @@ export function AddSoldierForm({
           squadId,
           givenName: givenName.trim(),
           familyName: familyName.trim(),
+          idNumber: idNumber.trim() || null,
           rank: rank || null,
           status,
           profileImage: imageBase64 ?? null,
@@ -111,6 +113,16 @@ export function AddSoldierForm({
             required
           />
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="soldier-id-number">מספר אישי</Label>
+        <Input
+          id="soldier-id-number"
+          value={idNumber}
+          onChange={(e) => setIdNumber(e.target.value)}
+          placeholder="מספר אישי"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

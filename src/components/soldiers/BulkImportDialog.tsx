@@ -34,15 +34,18 @@ interface Props {
   cycleId: string;
   squads: SquadOption[];
   defaultSquadId?: string;
-  onSuccess: (created: number, activeActivityCount: number) => void;
+  onSuccess: (created: number, activeActivityCount: number, soldierIds?: string[]) => void;
 }
 
 interface ParsedRow {
   rowIndex: number;
   familyName: string;
   givenName: string;
+  idNumber: string;
   rank: string;
   status: string;
+  squadName: string;
+  resolvedSquadId: string | null;
   errors: string[];
 }
 
@@ -57,28 +60,32 @@ const VALID_STATUSES: Record<string, SoldierStatus> = {
   injured: "injured",
 };
 
-const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "דרגה", "סטטוס"];
+const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "כיתה", "דרגה", "סטטוס"];
+
+const FROM_FILE = "__from_file__";
 
 function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    ["כהן", "דוד", "טוראי", "פעיל"],
-    ["לוי", "רחל", "", ""],
+    ["כהן", "דוד", "1234567", "כיתה א", "טוראי", "פעיל"],
+    ["לוי", "רחל", "", "", "", ""],
   ]);
-  // Set column widths
-  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }];
+  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, ws, "חיילים");
   XLSX.writeFile(wb, "תבנית-חיילים.xlsx");
 }
 
-function parseSheet(workbook: XLSX.WorkBook): ParsedRow[] {
+function parseSheet(
+  workbook: XLSX.WorkBook,
+  squads: SquadOption[],
+  squadMode: "select" | "file"
+): ParsedRow[] {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as string[][];
 
   if (rows.length < 2) return [];
 
-  // Find header row: look for a row containing both שם משפחה and שם פרטי
   let headerIdx = 0;
   for (let i = 0; i < Math.min(rows.length, 5); i++) {
     const cells = rows[i].map((c) => String(c ?? "").trim());
@@ -91,8 +98,16 @@ function parseSheet(workbook: XLSX.WorkBook): ParsedRow[] {
   const headers = rows[headerIdx].map((c) => String(c ?? "").trim());
   const familyIdx = headers.findIndex((h) => h === "שם משפחה");
   const givenIdx = headers.findIndex((h) => h === "שם פרטי");
+  const idNumberIdx = headers.findIndex((h) => h === "מספר אישי");
+  const squadIdx = headers.findIndex((h) => h === "כיתה");
   const rankIdx = headers.findIndex((h) => h === "דרגה");
   const statusIdx = headers.findIndex((h) => h === "סטטוס");
+
+  // Build squad name → id lookup (case-insensitive, trimmed)
+  const squadLookup = new Map<string, string>();
+  for (const s of squads) {
+    squadLookup.set(s.name.trim().toLowerCase(), s.id);
+  }
 
   const dataRows = rows.slice(headerIdx + 1);
   const parsed: ParsedRow[] = [];
@@ -101,11 +116,12 @@ function parseSheet(workbook: XLSX.WorkBook): ParsedRow[] {
     const get = (idx: number) => (idx >= 0 ? String(row[idx] ?? "").trim() : "");
     const familyName = get(familyIdx);
     const givenName = get(givenIdx);
+    const idNumber = get(idNumberIdx);
+    const squadName = get(squadIdx);
     const rank = get(rankIdx);
     const status = get(statusIdx);
 
-    // Skip completely empty rows
-    if (!familyName && !givenName && !rank && !status) return;
+    if (!familyName && !givenName && !rank && !status && !idNumber && !squadName) return;
 
     const errors: string[] = [];
     if (!familyName) errors.push("שם משפחה חסר");
@@ -114,7 +130,29 @@ function parseSheet(workbook: XLSX.WorkBook): ParsedRow[] {
       errors.push(`סטטוס לא חוקי: "${status}"`);
     }
 
-    parsed.push({ rowIndex: i + headerIdx + 2, familyName, givenName, rank, status, errors });
+    let resolvedSquadId: string | null = null;
+    if (squadMode === "file") {
+      if (!squadName) {
+        errors.push("כיתה חסרה");
+      } else {
+        resolvedSquadId = squadLookup.get(squadName.toLowerCase()) ?? null;
+        if (!resolvedSquadId) {
+          errors.push(`כיתה לא נמצאה: "${squadName}"`);
+        }
+      }
+    }
+
+    parsed.push({
+      rowIndex: i + headerIdx + 2,
+      familyName,
+      givenName,
+      idNumber,
+      rank,
+      status,
+      squadName,
+      resolvedSquadId,
+      errors,
+    });
   });
 
   return parsed;
@@ -129,7 +167,6 @@ export function BulkImportDialog({
   onSuccess,
 }: Props) {
   const [squadId, setSquadId] = useState(defaultSquadId ?? squads[0]?.id ?? "");
-  // Sync squadId when squads arrive after initial mount (PowerSync async)
   useEffect(() => {
     if (!squadId && squads.length > 0) {
       setSquadId(defaultSquadId ?? squads[0].id);
@@ -139,12 +176,24 @@ export function BulkImportDialog({
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const squadMode = squadId === FROM_FILE ? "file" : "select";
+
+  // Re-parse when squad mode changes (switching between "from file" and a specific squad)
+  useEffect(() => {
+    if (workbook) {
+      const parsed = parseSheet(workbook, squads, squadMode);
+      setRows(parsed);
+    }
+  }, [squadMode, workbook, squads]);
 
   function reset() {
     setRows(null);
     setFileName("");
     setImportError(null);
+    setWorkbook(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -163,18 +212,21 @@ export function BulkImportDialog({
       try {
         const data = ev.target?.result;
         const wb = XLSX.read(data, { type: "array" });
-        const parsed = parseSheet(wb);
+        setWorkbook(wb);
+        const parsed = parseSheet(wb, squads, squadMode);
         setRows(parsed);
       } catch {
         setImportError("לא ניתן לקרוא את הקובץ");
         setRows(null);
+        setWorkbook(null);
       }
     };
     reader.readAsArrayBuffer(file);
   }
 
   async function handleImport() {
-    if (!rows || !squadId) return;
+    if (!rows) return;
+    if (squadMode === "select" && !squadId) return;
     const validRows = rows.filter((r) => r.errors.length === 0);
     if (validRows.length === 0) return;
 
@@ -187,9 +239,10 @@ export function BulkImportDialog({
         body: JSON.stringify({
           cycleId,
           soldiers: validRows.map((r) => ({
-            squadId,
+            squadId: squadMode === "file" ? r.resolvedSquadId : squadId,
             familyName: r.familyName,
             givenName: r.givenName,
+            idNumber: r.idNumber || null,
             rank: r.rank || null,
             status: (VALID_STATUSES[r.status] ?? "active") as SoldierStatus,
           })),
@@ -200,9 +253,9 @@ export function BulkImportDialog({
         setImportError(data.error ?? "שגיאה בייבוא");
         return;
       }
-      const { created, activeActivityCount } = await res.json();
+      const { created, activeActivityCount, soldierIds } = await res.json();
       reset();
-      onSuccess(created, activeActivityCount);
+      onSuccess(created, activeActivityCount, soldierIds);
     } catch {
       setImportError("שגיאה בייבוא");
     } finally {
@@ -213,6 +266,7 @@ export function BulkImportDialog({
   const validRows = rows?.filter((r) => r.errors.length === 0) ?? [];
   const errorRows = rows?.filter((r) => r.errors.length > 0) ?? [];
   const hasErrors = errorRows.length > 0;
+  const canImport = rows && validRows.length > 0 && (squadMode === "file" || squadId);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -229,10 +283,13 @@ export function BulkImportDialog({
               <Select value={squadId} onValueChange={(v) => v && setSquadId(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="בחר כיתה">
-                    {squads.find((s) => s.id === squadId)?.name ?? "בחר כיתה"}
+                    {squadId === FROM_FILE
+                      ? "מהקובץ"
+                      : squads.find((s) => s.id === squadId)?.name ?? "בחר כיתה"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={FROM_FILE}>מהקובץ</SelectItem>
                   {squads.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
@@ -240,6 +297,11 @@ export function BulkImportDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {squadId === FROM_FILE && (
+                <p className="text-xs text-muted-foreground">
+                  הכיתה תיקרא מעמודת &quot;כיתה&quot; בקובץ. השם חייב להתאים בדיוק לשם הכיתה במערכת.
+                </p>
+              )}
             </div>
           )}
 
@@ -310,6 +372,10 @@ export function BulkImportDialog({
                         <th className="text-end px-2 py-1.5 font-medium">#</th>
                         <th className="text-end px-2 py-1.5 font-medium">שם משפחה</th>
                         <th className="text-end px-2 py-1.5 font-medium">שם פרטי</th>
+                        <th className="text-end px-2 py-1.5 font-medium">מ.א.</th>
+                        {squadMode === "file" && (
+                          <th className="text-end px-2 py-1.5 font-medium">כיתה</th>
+                        )}
                         <th className="text-end px-2 py-1.5 font-medium">דרגה</th>
                         <th className="text-end px-2 py-1.5 font-medium">סטטוס</th>
                       </tr>
@@ -340,6 +406,20 @@ export function BulkImportDialog({
                           >
                             {row.givenName || "—"}
                           </td>
+                          <td className="px-2 py-1.5 text-muted-foreground">
+                            {row.idNumber || "—"}
+                          </td>
+                          {squadMode === "file" && (
+                            <td
+                              className={cn(
+                                "px-2 py-1.5",
+                                row.squadName && !row.resolvedSquadId && "text-destructive font-medium",
+                                !row.squadName && "text-destructive font-medium"
+                              )}
+                            >
+                              {row.squadName || "—"}
+                            </td>
+                          )}
                           <td className="px-2 py-1.5 text-muted-foreground">
                             {row.rank || "—"}
                           </td>
@@ -386,7 +466,7 @@ export function BulkImportDialog({
           <Button
             type="button"
             onClick={handleImport}
-            disabled={importing || !rows || validRows.length === 0 || !squadId}
+            disabled={importing || !canImport}
           >
             {importing ? "מייבא..." : `ייבא ${validRows.length > 0 ? validRows.length : ""} חיילים`}
           </Button>

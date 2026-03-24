@@ -146,10 +146,22 @@ export class TironetConnector implements PowerSyncBackendConnector {
             await apiRequest(`/api/requests/${id}`, "DELETE");
           }
         } else if (table === "soldiers") {
+          const soldierMapping: Record<string, string> = {
+            cycle_id: "cycleId", squad_id: "squadId",
+            given_name: "givenName", family_name: "familyName",
+            id_number: "idNumber", profile_image: "profileImage",
+          };
+          function mapSoldierData(d: Record<string, unknown>) {
+            const body: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(d)) {
+              body[soldierMapping[key] ?? key] = value;
+            }
+            return body;
+          }
           if (opType === UpdateType.PUT) {
-            await apiRequest("/api/soldiers", "POST", { id, ...opData });
+            await apiRequest("/api/soldiers", "POST", { id, ...mapSoldierData(opData as Record<string, unknown>) });
           } else if (opType === UpdateType.PATCH) {
-            await apiRequest(`/api/soldiers/${id}`, "PATCH", opData);
+            await apiRequest(`/api/soldiers/${id}`, "PATCH", mapSoldierData(opData as Record<string, unknown>));
           } else if (opType === UpdateType.DELETE) {
             await apiRequest(`/api/soldiers/${id}`, "DELETE");
           }

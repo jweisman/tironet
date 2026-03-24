@@ -39,6 +39,7 @@ const soldiers = new Table({
   squad_id: column.text,
   given_name: column.text,
   family_name: column.text,
+  id_number: column.text,
   rank: column.text,
   status: column.text,
   profile_image: column.text,

@@ -231,6 +231,38 @@ describe("POST /api/soldiers", () => {
     expect(body.activeActivityCount).toBe(3);
   });
 
+  it("creates a soldier with idNumber for admin", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+
+    vi.mocked(prisma.company.findMany).mockResolvedValue([{ id: COMP }] as never);
+    vi.mocked(prisma.platoon.findMany).mockResolvedValue([{ id: PLATOON }] as never);
+    mockSquadFindMany.mockResolvedValue([{ id: SQUAD }] as never);
+    mockSquadFindUnique.mockResolvedValue({
+      id: SQUAD, platoonId: PLATOON,
+      platoon: { companyId: COMP, company: { cycleId: CYCLE } },
+    } as never);
+
+    const createdSoldier = {
+      id: "soldier-new", cycleId: CYCLE, squadId: SQUAD,
+      givenName: "Jane", familyName: "Doe", idNumber: "1234567",
+      rank: null, status: "active", profileImage: null,
+    };
+    mockSoldierCreate.mockResolvedValue(createdSoldier as never);
+    mockActivityCount.mockResolvedValue(0 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers", {
+      cycleId: CYCLE, squadId: SQUAD, givenName: "Jane", familyName: "Doe", idNumber: "1234567",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+
+    expect(mockSoldierCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ idNumber: "1234567" }),
+    });
+  });
+
   it("creates a soldier for squad_commander within their squad", async () => {
     const assignment = mockAssignment({
       cycleId: CYCLE,

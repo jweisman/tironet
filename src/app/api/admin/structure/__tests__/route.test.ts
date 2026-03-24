@@ -422,7 +422,7 @@ describe("PATCH /api/admin/structure/reorder", () => {
     const res = await PATCH_REORDER(req);
     expect(res.status).toBe(204);
     expect(mockTransaction).toHaveBeenCalledTimes(1);
-    const txArg = mockTransaction.mock.calls[0][0] as unknown[];
+    const txArg = mockTransaction.mock.calls[0][0] as unknown as unknown[];
     expect(txArg).toHaveLength(2);
   });
 

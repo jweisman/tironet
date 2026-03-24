@@ -187,6 +187,7 @@ export default function SoldiersPage() {
   const [lateJoinerInfo, setLateJoinerInfo] = useState<{
     count: number;
     soldierId: string;
+    soldierIds?: string[];
   } | null>(null);
   const [markingNa, setMarkingNa] = useState(false);
 
@@ -226,11 +227,11 @@ export default function SoldiersPage() {
     return Array.from(map.values());
   }, [filteredSquads, role]);
 
-  function handleImportSuccess(created: number, activeActivityCount: number) {
+  function handleImportSuccess(created: number, activeActivityCount: number, soldierIds?: string[]) {
     setImportOpen(false);
     toast.success(`${created} חיילים יובאו בהצלחה`);
-    if (activeActivityCount > 0 && created > 0) {
-      setLateJoinerInfo({ count: activeActivityCount, soldierId: "__bulk__" });
+    if (activeActivityCount > 0 && created > 0 && soldierIds?.length) {
+      setLateJoinerInfo({ count: activeActivityCount, soldierId: "__bulk__", soldierIds });
     }
   }
 
@@ -246,11 +247,12 @@ export default function SoldiersPage() {
     if (!lateJoinerInfo) return;
     setMarkingNa(true);
     try {
-      if (lateJoinerInfo.soldierId !== "__bulk__") {
-        await fetch(`/api/soldiers/${lateJoinerInfo.soldierId}/mark-na`, {
-          method: "POST",
-        });
-      }
+      const ids = lateJoinerInfo.soldierIds ?? [lateJoinerInfo.soldierId];
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/soldiers/${id}/mark-na`, { method: "POST" })
+        )
+      );
     } catch {
       // ignore
     } finally {

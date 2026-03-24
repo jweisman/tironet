@@ -301,7 +301,7 @@ describe("TironetConnector", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/soldiers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: "sol-uuid", given_name: "New", family_name: "Soldier", cycle_id: "c1" }),
+        body: JSON.stringify({ id: "sol-uuid", givenName: "New", familyName: "Soldier", cycleId: "c1" }),
       });
     });
 
@@ -324,7 +324,7 @@ describe("TironetConnector", () => {
       });
     });
 
-    it("uploads soldiers PATCH", async () => {
+    it("uploads soldiers PATCH with snake_case to camelCase mapping", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       const db = mockDatabase([
@@ -332,7 +332,7 @@ describe("TironetConnector", () => {
           table: "soldiers",
           op: UpdateType.PATCH,
           id: "sol-1",
-          opData: { firstName: "Updated" },
+          opData: { given_name: "Updated", id_number: "1234567" },
         },
       ]);
 
@@ -341,7 +341,7 @@ describe("TironetConnector", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/soldiers/sol-1", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName: "Updated" }),
+        body: JSON.stringify({ givenName: "Updated", idNumber: "1234567" }),
       });
     });
 

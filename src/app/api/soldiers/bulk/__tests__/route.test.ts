@@ -227,6 +227,35 @@ describe("POST /api/soldiers/bulk", () => {
     expect(res.status).toBe(201);
   });
 
+  it("creates soldiers with idNumber in bulk for admin", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+
+    mockSquadFindMany.mockResolvedValueOnce([
+      {
+        id: SQUAD, platoonId: PLATOON,
+        platoon: { company: { cycleId: CYCLE } },
+      },
+    ] as never);
+
+    mockTransaction.mockResolvedValue([] as never);
+    mockActivityCount.mockResolvedValue(0 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [
+        { squadId: SQUAD, givenName: "Alice", familyName: "A", idNumber: "111" },
+        { squadId: SQUAD, givenName: "Bob", familyName: "B", idNumber: null },
+      ],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+
+    // Verify $transaction was called with the soldier creates
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+  });
+
   it("creates soldiers in bulk and returns 201 for admin", async () => {
     mockAuth.mockResolvedValue({
       user: mockSessionUser({ isAdmin: true }),
