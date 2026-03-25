@@ -13,14 +13,16 @@ vi.mock("@/lib/api/request-scope", () => ({
 
 vi.mock("@/lib/requests/workflow", () => ({
   getNextState: vi.fn(),
+  canActOnRequest: vi.fn(() => true),
 }));
 
 import { GET, PATCH, DELETE } from "../route";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";
-import { getNextState } from "@/lib/requests/workflow";
+import { getNextState, canActOnRequest } from "@/lib/requests/workflow";
 import { createMockRequest, mockSessionUser } from "@/__tests__/helpers/api";
 
+const mockCanActOnRequest = vi.mocked(canActOnRequest);
 const mockGetScope = vi.mocked(getRequestScope);
 const mockRequestFindUnique = vi.mocked(prisma.request.findUnique);
 const mockRequestUpdate = vi.mocked(prisma.request.update);
@@ -170,6 +172,7 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
   });
 
   it("returns 403 when not assigned to user's role", async () => {
+    mockCanActOnRequest.mockReturnValueOnce(false);
     mockRequestFindUnique.mockResolvedValue({
       ...baseRequest,
       assignedRole: "company_commander",
@@ -252,6 +255,7 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
 // ---------------------------------------------------------------------------
 describe("PATCH /api/requests/[id] — field edits", () => {
   it("returns 403 when non-admin non-assigned role edits", async () => {
+    mockCanActOnRequest.mockReturnValueOnce(false);
     mockRequestFindUnique.mockResolvedValue({
       ...baseRequest,
       assignedRole: "company_commander",

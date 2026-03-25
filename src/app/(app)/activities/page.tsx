@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
+import { effectiveRole } from "@/lib/auth/permissions";
+import type { Role } from "@/types";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
 import { CreateActivityForm } from "@/components/activities/CreateActivityForm";
 import {
@@ -140,7 +142,8 @@ export default function ActivitiesPage() {
   const searchParams = useSearchParams();
 
   const syncStatus = useStatus();
-  const role = selectedAssignment?.role ?? "";
+  const rawRole = selectedAssignment?.role ?? "";
+  const role = rawRole ? effectiveRole(rawRole as Role) : "";
   const canCreate = role !== "squad_commander" && !!role;
 
   // -------- PowerSync queries --------

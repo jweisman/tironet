@@ -7,6 +7,7 @@ import type { Adapter, AdapterUser, AdapterAccount } from "next-auth/adapters";
 import { prisma } from "@/lib/db/prisma";
 import { verifyWhatsAppOtp } from "@/lib/twilio";
 import type { CycleAssignment } from "@/types";
+import { effectiveRole } from "@/lib/auth/permissions";
 
 // ---------------------------------------------------------------------------
 // Adapter — extend PrismaAdapter to map name → givenName/familyName
@@ -164,15 +165,16 @@ async function resolvePowerSyncClaims(assignments: RawAssignment[]): Promise<{
   let squad_id: string | null = null;
 
   for (const a of assignments) {
-    if (a.role === "company_commander") {
+    const role = effectiveRole(a.role as import("@/types").Role);
+    if (role === "company_commander") {
       const platoons = await prisma.platoon.findMany({
         where: { companyId: a.unitId },
         select: { id: true },
       });
       platoons.forEach((p) => platoon_ids.add(p.id));
-    } else if (a.role === "platoon_commander") {
+    } else if (role === "platoon_commander") {
       platoon_ids.add(a.unitId);
-    } else if (a.role === "squad_commander") {
+    } else if (role === "squad_commander") {
       squad_id = a.unitId;
       const squad = await prisma.squad.findUnique({
         where: { id: a.unitId },

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
 import { validateProfileImage } from "@/lib/api/validate-image";
+import { effectiveRole } from "@/lib/auth/permissions";
+import type { Role } from "@/types";
 
 const patchSchema = z.object({
   givenName: z.string().min(1).optional(),
@@ -14,10 +16,11 @@ const patchSchema = z.object({
 });
 
 async function isSquadInScope(
-  role: string,
+  rawRole: string,
   unitId: string,
   squadId: string
 ): Promise<boolean> {
+  const role = effectiveRole(rawRole as Role);
   if (role === "squad_commander") {
     return unitId === squadId;
   }

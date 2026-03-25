@@ -4,7 +4,9 @@
 
 export type Role =
   | "company_commander"
+  | "deputy_company_commander"
   | "platoon_commander"
+  | "platoon_sergeant"
   | "squad_commander";
 
 export type UnitType = "company" | "platoon" | "squad";

@@ -69,7 +69,8 @@ export function CreateRequestForm({
 }: Props) {
   const db = usePowerSync();
 
-  const soldierQuery = userRole === "squad_commander"
+  const isSquadRole = userRole === "squad_commander";
+  const soldierQuery = isSquadRole
     ? SOLDIERS_BY_SQUAD_QUERY
     : SOLDIERS_BY_PLATOON_QUERY;
   const soldierParams = useMemo(() => [cycleId, unitId], [cycleId, unitId]);
@@ -115,6 +116,7 @@ export function CreateRequestForm({
   const [error, setError] = useState<string | null>(null);
 
   // Determine initial assignment based on creator's role
+  // Platoon commander skips to company; platoon sergeant and squad commander go to platoon commander
   const assignedRole: Role =
     userRole === "platoon_commander" ? "company_commander" : "platoon_commander";
 

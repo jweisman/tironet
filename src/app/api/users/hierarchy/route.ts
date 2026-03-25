@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
-import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { ROLE_LABELS, effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 
 export async function GET() {
@@ -13,7 +13,7 @@ export async function GET() {
   const { cycleAssignments } = session.user;
 
   // Only company/platoon commanders can manage subordinates
-  const managerAssignments = cycleAssignments.filter((a) => a.role !== "squad_commander");
+  const managerAssignments = cycleAssignments.filter((a) => effectiveRole(a.role as Role) !== "squad_commander");
   if (managerAssignments.length === 0) {
     return NextResponse.json({
       users: [],
@@ -34,7 +34,8 @@ export async function GET() {
   for (const a of managerAssignments) {
     cycleMap[a.cycleId] = a.cycleName;
 
-    if (a.role === "platoon_commander") {
+    const eRole = effectiveRole(a.role as Role);
+    if (eRole === "platoon_commander") {
       const platoon = await prisma.platoon.findUnique({
         where: { id: a.unitId },
         select: {
@@ -56,7 +57,7 @@ export async function GET() {
         structureByCycle[a.cycleId].push(company);
       }
       company.platoons.push({ id: platoon.id, name: platoon.name, squads: platoon.squads });
-    } else if (a.role === "company_commander") {
+    } else if (eRole === "company_commander") {
       const company = await prisma.company.findUnique({
         where: { id: a.unitId },
         select: {

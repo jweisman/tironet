@@ -95,6 +95,14 @@ describe("canActOnRequest", () => {
   it("returns false when roles do not match", () => {
     expect(canActOnRequest("squad_commander", "platoon_commander")).toBe(false);
   });
+
+  it("deputy_company_commander can act on company_commander assignments", () => {
+    expect(canActOnRequest("deputy_company_commander", "company_commander")).toBe(true);
+  });
+
+  it("platoon_sergeant cannot act on platoon_commander assignments", () => {
+    expect(canActOnRequest("platoon_sergeant", "platoon_commander")).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -136,6 +144,17 @@ describe("getAvailableActions", () => {
 
   it("returns empty array for squad_commander on open request (cannot approve)", () => {
     const actions = getAvailableActions("open", "squad_commander", "squad_commander", "leave");
+    expect(actions).toEqual([]);
+  });
+
+  it("deputy_company_commander gets approve+deny for company_commander assignment", () => {
+    const actions = getAvailableActions("open", "company_commander", "deputy_company_commander", "leave");
+    expect(actions).toContain("approve");
+    expect(actions).toContain("deny");
+  });
+
+  it("platoon_sergeant gets no actions for platoon_commander assignment", () => {
+    const actions = getAvailableActions("open", "platoon_commander", "platoon_sergeant", "leave");
     expect(actions).toEqual([]);
   });
 });

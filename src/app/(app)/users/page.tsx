@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
-import { ROLE_LABELS, rolesInvitableBy } from "@/lib/auth/permissions";
+import { ROLE_LABELS, rolesInvitableBy, effectiveRole } from "@/lib/auth/permissions";
 import { CommanderUsersPanel } from "@/components/CommanderUsersPanel";
 import type { Role } from "@/types";
 
@@ -9,7 +9,7 @@ export default async function UsersPage() {
   if (!session?.user) return null;
 
   const { cycleAssignments } = session.user;
-  const managerAssignments = cycleAssignments.filter((a) => a.role !== "squad_commander");
+  const managerAssignments = cycleAssignments.filter((a) => effectiveRole(a.role as Role) !== "squad_commander");
 
   if (managerAssignments.length === 0) {
     return (
@@ -38,7 +38,8 @@ export default async function UsersPage() {
   const cycleMap: Record<string, string> = {};
 
   for (const a of managerAssignments) {
-    if (a.role === "platoon_commander") {
+    const eRole = effectiveRole(a.role as Role);
+    if (eRole === "platoon_commander") {
       const platoon = await prisma.platoon.findUnique({
         where: { id: a.unitId },
         select: {
@@ -64,7 +65,7 @@ export default async function UsersPage() {
         structureByCycle[a.cycleId].push(company);
       }
       company.platoons.push({ id: platoon.id, name: platoon.name, squads: platoon.squads });
-    } else if (a.role === "company_commander") {
+    } else if (eRole === "company_commander") {
       const company = await prisma.company.findUnique({
         where: { id: a.unitId },
         select: {

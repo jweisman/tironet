@@ -33,7 +33,9 @@ export const TRANSPORTATION_LABELS: Record<Transportation, string> = {
 export const ASSIGNED_ROLE_LABELS: Record<Role, string> = {
   squad_commander: 'מ"כ',
   platoon_commander: 'מ"מ',
+  platoon_sergeant: 'סמ"ח',
   company_commander: 'מ"פ',
+  deputy_company_commander: 'סמ"פ',
 };
 
 export const REQUEST_STATUS_VARIANT: Record<

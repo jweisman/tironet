@@ -25,6 +25,7 @@ import {
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
+import { effectiveRole } from "@/lib/auth/permissions";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -192,7 +193,8 @@ export default function SoldierDetailPage() {
   const [requestTypeMenuOpen, setRequestTypeMenuOpen] = useState(false);
   const [createRequestType, setCreateRequestType] = useState<RequestType | null>(null);
   const { selectedCycleId, selectedAssignment } = useCycle();
-  const userRole = (selectedAssignment?.role ?? "") as Role | "";
+  const rawUserRole = (selectedAssignment?.role ?? "") as Role | "";
+  const userRole = rawUserRole ? effectiveRole(rawUserRole) : "";
 
   // Grace period: give PowerSync time to hydrate local SQLite after an
   // offline shell load before showing "not found".
@@ -473,11 +475,11 @@ export default function SoldierDetailPage() {
               )}
             </DialogTitle>
           </DialogHeader>
-          {createRequestType && selectedCycleId && userRole && selectedAssignment && (
+          {createRequestType && selectedCycleId && rawUserRole && selectedAssignment && (
             <CreateRequestForm
               cycleId={selectedCycleId}
               requestType={createRequestType}
-              userRole={userRole as Role}
+              userRole={rawUserRole as Role}
               unitId={selectedAssignment.unitId}
               preselectedSoldierId={soldierId}
               onSuccess={() => {

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { NextResponse } from "next/server";
 import type { SessionUser, CycleAssignment, Role } from "@/types";
+import { effectiveRole } from "@/lib/auth/permissions";
 
 export interface RequestScope {
   role: Role | "admin";
@@ -68,7 +69,9 @@ export async function getRequestScope(cycleId: string): Promise<ScopeResult> {
     };
   }
 
-  if (assignment.role === "squad_commander") {
+  const role = effectiveRole(assignment.role);
+
+  if (role === "squad_commander") {
     const squad = await prisma.squad.findUnique({
       where: { id: assignment.unitId },
       select: { id: true, platoonId: true },
@@ -97,7 +100,7 @@ export async function getRequestScope(cycleId: string): Promise<ScopeResult> {
     };
   }
 
-  if (assignment.role === "platoon_commander") {
+  if (role === "platoon_commander") {
     const squads = await prisma.squad.findMany({
       where: { platoonId: assignment.unitId },
       select: { id: true },
@@ -109,7 +112,7 @@ export async function getRequestScope(cycleId: string): Promise<ScopeResult> {
     });
     return {
       scope: {
-        role: "platoon_commander",
+        role: assignment.role,
         soldierIds: soldiers.map((s) => s.id),
         squadIds,
         platoonIds: [assignment.unitId],
@@ -120,7 +123,7 @@ export async function getRequestScope(cycleId: string): Promise<ScopeResult> {
     };
   }
 
-  if (assignment.role === "company_commander") {
+  if (role === "company_commander") {
     const platoons = await prisma.platoon.findMany({
       where: { companyId: assignment.unitId },
       select: { id: true },

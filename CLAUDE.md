@@ -429,6 +429,8 @@ This creates a separate `tironet_test` database so e2e tests don't touch the dev
 
 6. **Mailhog quoted-printable encoding** — Email bodies use `=3D` for `=` and soft line breaks (`=\r\n`). The `extractVerificationUrl` helper in `e2e/helpers/mailhog.ts` handles decoding.
 
+7. **Turbopack recompilation after source changes** — Locally, the Playwright `webServer` runs `npm run dev` and `reuseExistingServer` is `true`. After modifying source files, the first `npm run e2e` triggers Turbopack recompilation mid-test, which causes Fast Refresh and resets React component state — leading to flaky failures (especially admin CRUD tests that interact with forms). **Workaround:** run `npm run e2e` twice — the first run warms the server, the second reuses it and passes cleanly. In CI this is not an issue because there are no concurrent file edits.
+
 ## Environment Variable Naming
 
 - Variables used inside the PowerSync Docker container must be prefixed `PS_` to work with the `!env` tag in `powersync.config.yaml`

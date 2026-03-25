@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
+import { effectiveRole } from "@/lib/auth/permissions";
+import type { Role } from "@/types";
 
 const soldierSchema = z.object({
   squadId: z.string().uuid(),
@@ -22,15 +24,16 @@ async function getScopeSquadIds(
   unitId: string,
   cycleId: string
 ): Promise<string[]> {
-  if (role === "squad_commander") return [unitId];
-  if (role === "platoon_commander") {
+  const eRole = effectiveRole(role as Role);
+  if (eRole === "squad_commander") return [unitId];
+  if (eRole === "platoon_commander") {
     const squads = await prisma.squad.findMany({
       where: { platoonId: unitId },
       select: { id: true },
     });
     return squads.map((s) => s.id);
   }
-  if (role === "company_commander") {
+  if (eRole === "company_commander") {
     const platoons = await prisma.platoon.findMany({
       where: { companyId: unitId },
       select: { id: true },

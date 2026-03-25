@@ -20,6 +20,8 @@ import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RequestType, RequestStatus, Role } from "@/types";
+import { effectiveRole } from "@/lib/auth/permissions";
+import { canActOnRequest } from "@/lib/requests/workflow";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,7 +90,8 @@ export default function RequestsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const syncStatus = useStatus();
-  const role = (selectedAssignment?.role ?? "") as Role | "";
+  const rawRole = (selectedAssignment?.role ?? "") as Role | "";
+  const role = rawRole ? effectiveRole(rawRole) : "";
   const canCreate = role === "squad_commander" || role === "platoon_commander";
 
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
@@ -134,16 +137,16 @@ export default function RequestsPage() {
   // Sort open: assigned to me first; optionally filter to mine only
   const sortedOpen = useMemo(() => {
     let list = openRequests;
-    if (showMineOnly && role) {
-      list = list.filter((r) => r.assignedRole === role);
+    if (showMineOnly && rawRole) {
+      list = list.filter((r) => r.assignedRole !== null && canActOnRequest(rawRole as Role, r.assignedRole));
     }
-    if (!role) return list;
+    if (!rawRole) return list;
     return [...list].sort((a, b) => {
-      const aMe = a.assignedRole === role ? 0 : 1;
-      const bMe = b.assignedRole === role ? 0 : 1;
+      const aMe = a.assignedRole !== null && canActOnRequest(rawRole as Role, a.assignedRole) ? 0 : 1;
+      const bMe = b.assignedRole !== null && canActOnRequest(rawRole as Role, b.assignedRole) ? 0 : 1;
       return aMe - bMe;
     });
-  }, [openRequests, role, showMineOnly]);
+  }, [openRequests, rawRole, showMineOnly]);
 
   function handleTypeSelect(type: RequestType) {
     setTypeMenuOpen(false);
@@ -258,7 +261,7 @@ export default function RequestsPage() {
                   <RequestCard
                     key={r.id}
                     request={r}
-                    userRole={role as Role}
+                    userRole={rawRole as Role}
                     onClick={() => router.push(`/requests/${r.id}`)}
                   />
                 ))}
@@ -287,7 +290,7 @@ export default function RequestsPage() {
                     <RequestCard
                       key={r.id}
                       request={r}
-                      userRole={role as Role}
+                      userRole={rawRole as Role}
                       onClick={() => router.push(`/requests/${r.id}`)}
                     />
                   ))}
@@ -345,11 +348,11 @@ export default function RequestsPage() {
               )}
             </DialogTitle>
           </DialogHeader>
-          {createType && selectedCycleId && role && selectedAssignment && (
+          {createType && selectedCycleId && rawRole && selectedAssignment && (
             <CreateRequestForm
               cycleId={selectedCycleId}
               requestType={createType}
-              userRole={role as Role}
+              userRole={rawRole as Role}
               unitId={selectedAssignment.unitId}
               onSuccess={handleCreateSuccess}
               onCancel={() => setCreateType(null)}

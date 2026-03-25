@@ -11,6 +11,8 @@ import { UserAvatar } from "./UserAvatar";
 import { useCycle } from "@/contexts/CycleContext";
 import { CyclePicker } from "./CyclePicker";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
+import { effectiveRole } from "@/lib/auth/permissions";
+import type { Role } from "@/types";
 
 const navItems = [
   { href: "/home", icon: Home, labelKey: "home" },
@@ -27,7 +29,7 @@ export function Sidebar() {
   const requestBadge = useRequestBadge();
   const isAdmin = session?.user?.isAdmin;
   const isCommander = session?.user?.cycleAssignments?.some(
-    (a) => a.role === "company_commander" || a.role === "platoon_commander"
+    (a) => { const r = effectiveRole(a.role as Role); return r === "company_commander" || r === "platoon_commander"; }
   );
 
   // Deduplicate cycles by id
