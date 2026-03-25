@@ -32,7 +32,7 @@ export default defineConfig({
     },
     {
       name: "commander-tests",
-      testMatch: /(navigation|home|activities|soldiers|profile|invite)\.spec\.ts/,
+      testMatch: /(navigation|home|activities|soldiers|profile|invite|requests)\.spec\.ts/,
       dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
