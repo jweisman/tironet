@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/api/admin-guard";
 
 const patchSchema = z.object({
   assignmentId: z.string().uuid(),
-  role: z.enum(["company_commander", "platoon_commander", "squad_commander"]).optional(),
+  role: z.enum(["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander"]).optional(),
   unitType: z.enum(["company", "platoon", "squad"]).optional(),
   unitId: z.string().uuid().optional(),
 });

@@ -9,6 +9,7 @@ import {
   ASSIGNED_ROLE_LABELS,
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
+import { canActOnRequest } from "@/lib/requests/workflow";
 import type { RequestType, RequestStatus, Role } from "@/types";
 
 export interface RequestSummary {
@@ -41,7 +42,7 @@ function formatDate(dateStr: string) {
 
 export function RequestCard({ request, userRole, onClick }: Props) {
   const isAssignedToMe =
-    request.assignedRole !== null && userRole === request.assignedRole;
+    request.assignedRole !== null && userRole !== "admin" && canActOnRequest(userRole, request.assignedRole);
 
   return (
     <button

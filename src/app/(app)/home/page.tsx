@@ -10,6 +10,8 @@ import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { CyclePicker } from "@/components/CyclePicker";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import type { SquadSummary } from "@/app/api/dashboard/route";
+import { effectiveRole } from "@/lib/auth/permissions";
+import type { Role } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -18,7 +20,9 @@ import type { SquadSummary } from "@/app/api/dashboard/route";
 const ROLE_SHORT: Record<string, string> = {
   squad_commander: 'מ"כ',
   platoon_commander: 'מ"מ',
+  platoon_sergeant: 'סמ"ח',
   company_commander: 'מ"פ',
+  deputy_company_commander: 'סמ"פ',
 };
 
 // ---------------------------------------------------------------------------
@@ -243,7 +247,8 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, []);
 
-  const role = selectedAssignment?.role ?? "";
+  const rawRole = selectedAssignment?.role ?? "";
+  const role = rawRole ? effectiveRole(rawRole as Role) : "";
   const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
 
   const queryParams = useMemo(
@@ -345,9 +350,9 @@ export default function HomePage() {
           {user?.givenName ?? ""}
         </h1>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {role && (
+          {rawRole && (
             <span className="text-sm font-medium text-primary">
-              {ROLE_SHORT[role] ?? role}
+              {ROLE_SHORT[rawRole] ?? rawRole}
             </span>
           )}
           {role && cycleName && (

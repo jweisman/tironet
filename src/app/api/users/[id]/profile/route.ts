@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
+import { effectiveRole } from "@/lib/auth/permissions";
+import type { Role } from "@/types";
 import { toE164 } from "@/lib/phone";
 
 const schema = z.object({
@@ -23,9 +25,9 @@ async function authorize(userId: string): Promise<{ error: NextResponse } | { er
     return { error: null };
   }
 
-  // Must be a platoon_commander or company_commander
+  // Must be a platoon_commander or company_commander (or their deputies)
   const commanderAssignments = session.user.cycleAssignments.filter(
-    (a) => a.role === "platoon_commander" || a.role === "company_commander"
+    (a) => { const r = effectiveRole(a.role as Role); return r === "platoon_commander" || r === "company_commander"; }
   );
   if (commanderAssignments.length === 0) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
@@ -34,7 +36,8 @@ async function authorize(userId: string): Promise<{ error: NextResponse } | { er
   // Collect sub-unit IDs the requester commands
   const subUnitIds: string[] = [];
   for (const a of commanderAssignments) {
-    if (a.role === "platoon_commander") {
+    const eRole = effectiveRole(a.role as Role);
+    if (eRole === "platoon_commander") {
       const platoon = await prisma.platoon.findUnique({
         where: { id: a.unitId },
         select: { squads: { select: { id: true } } },
@@ -42,7 +45,7 @@ async function authorize(userId: string): Promise<{ error: NextResponse } | { er
       if (platoon) {
         platoon.squads.forEach((s) => subUnitIds.push(s.id));
       }
-    } else if (a.role === "company_commander") {
+    } else if (eRole === "company_commander") {
       const company = await prisma.company.findUnique({
         where: { id: a.unitId },
         select: {

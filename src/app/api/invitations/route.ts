@@ -6,12 +6,15 @@ import { auth } from "@/lib/auth/auth";
 import { toE164 } from "@/lib/phone";
 import { createRateLimiter } from "@/lib/api/rate-limit";
 import type { CycleAssignment, Role } from "@/types";
+import { effectiveRole } from "@/lib/auth/permissions";
 
 const rateLimiter = createRateLimiter({ limit: 20, windowMs: 60_000 });
 
 const ROLE_RANK: Record<Role, number> = {
   company_commander: 3,
+  deputy_company_commander: 3,
   platoon_commander: 2,
+  platoon_sergeant: 2,
   squad_commander: 1,
 };
 
@@ -28,7 +31,8 @@ async function isAuthorizedToInvite(
   if (eligible.length === 0) return false;
 
   for (const a of eligible) {
-    if (a.role === "company_commander") {
+    const eRole = effectiveRole(a.role as Role);
+    if (eRole === "company_commander") {
       if (unitType === "platoon") {
         const p = await prisma.platoon.findUnique({ where: { id: unitId }, select: { companyId: true } });
         if (p?.companyId === a.unitId) return true;
@@ -39,7 +43,7 @@ async function isAuthorizedToInvite(
         });
         if (s?.platoon.companyId === a.unitId) return true;
       }
-    } else if (a.role === "platoon_commander") {
+    } else if (eRole === "platoon_commander") {
       if (unitType === "squad") {
         const s = await prisma.squad.findUnique({ where: { id: unitId }, select: { platoonId: true } });
         if (s?.platoonId === a.unitId) return true;
@@ -54,7 +58,7 @@ const schema = z
     email: z.string().email().optional(),
     phone: z.string().optional(),
     cycleId: z.string().uuid(),
-    role: z.enum(["company_commander", "platoon_commander", "squad_commander"]),
+    role: z.enum(["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander"]),
     unitType: z.enum(["company", "platoon", "squad"]),
     unitId: z.string().uuid(),
     givenName: z.string().min(1).optional(),

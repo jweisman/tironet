@@ -50,6 +50,9 @@ export async function POST(request: NextRequest) {
   let assignedRole: Role;
   if (scope.role === "squad_commander") {
     assignedRole = "platoon_commander";
+  } else if (scope.role === "platoon_sergeant") {
+    // Platoon sergeant creates → goes to platoon commander (not company)
+    assignedRole = "platoon_commander";
   } else if (scope.role === "platoon_commander") {
     // Platoon commander creates → goes directly to company commander
     assignedRole = "company_commander";

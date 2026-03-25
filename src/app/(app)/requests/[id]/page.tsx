@@ -22,7 +22,7 @@ import {
   TRANSPORTATION_LABELS,
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
-import { getAvailableActions, getNextState } from "@/lib/requests/workflow";
+import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/requests/workflow";
 import type { RequestType, RequestStatus, Role, Transportation } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ export default function RequestDetailPage() {
   const raw = requestRows?.[0] ?? null;
 
   const { selectedAssignment } = useCycle();
-  const userRole = (selectedAssignment?.role ?? "") as Role | "";
+  const rawUserRole = (selectedAssignment?.role ?? "") as Role | "";
 
   const [acting, setActing] = useState(false);
   const [denyDialogOpen, setDenyDialogOpen] = useState(false);
@@ -164,11 +164,11 @@ export default function RequestDetailPage() {
   const requestStatus = raw.status as RequestStatus;
   const assignedRole = raw.assigned_role as Role | null;
 
-  const actions = userRole && assignedRole
-    ? getAvailableActions(requestStatus, assignedRole, userRole as Role, requestType)
+  const actions = rawUserRole && assignedRole
+    ? getAvailableActions(requestStatus, assignedRole, rawUserRole as Role, requestType)
     : [];
 
-  const isAssignedToMe = assignedRole !== null && userRole === assignedRole;
+  const isAssignedToMe = assignedRole !== null && rawUserRole !== "" && canActOnRequest(rawUserRole as Role, assignedRole);
 
   async function handleAction(action: "approve" | "deny" | "acknowledge") {
     if (!assignedRole) return;

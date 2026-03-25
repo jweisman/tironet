@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { NextResponse } from "next/server";
 import type { SessionUser, CycleAssignment } from "@/types";
+import { effectiveRole } from "@/lib/auth/permissions";
 
 export interface ActivityScope {
   role: "squad_commander" | "platoon_commander" | "company_commander" | "admin";
@@ -61,7 +62,9 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
     };
   }
 
-  if (assignment.role === "squad_commander") {
+  const role = effectiveRole(assignment.role);
+
+  if (role === "squad_commander") {
     // unitId is a squadId; find its platoon
     const squad = await prisma.squad.findUnique({
       where: { id: assignment.unitId },
@@ -85,7 +88,7 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
     return { scope, error: null, user };
   }
 
-  if (assignment.role === "platoon_commander") {
+  if (role === "platoon_commander") {
     // unitId is a platoonId
     const platoonId = assignment.unitId;
     const platoon = await prisma.platoon.findUnique({
@@ -102,7 +105,7 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
     return { scope, error: null, user };
   }
 
-  if (assignment.role === "company_commander") {
+  if (role === "company_commander") {
     // unitId is a companyId; get all platoons in that company
     const platoons = await prisma.platoon.findMany({
       where: { companyId: assignment.unitId },

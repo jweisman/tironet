@@ -148,7 +148,9 @@ model Squad {
 
 enum Role {
   company_commander
+  deputy_company_commander
   platoon_commander
+  platoon_sergeant
   squad_commander
 }
 

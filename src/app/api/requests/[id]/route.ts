@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";
 import { getNextState } from "@/lib/requests/workflow";
+import { canActOnRequest } from "@/lib/requests/workflow";
 import { z } from "zod";
 import type { RequestStatus, RequestType, Role } from "@/types";
 
@@ -107,7 +108,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid transition" }, { status: 400 });
     }
 
-    if (scope.role !== req.assignedRole) {
+    if (!canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
       return NextResponse.json({ error: "Not assigned to you" }, { status: 403 });
     }
 
@@ -126,7 +127,7 @@ export async function PATCH(
   }
 
   // Handle field edits — only the assigned role can edit
-  if (scope.role !== "admin" && scope.role !== req.assignedRole) {
+  if (scope.role !== "admin" && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
     return NextResponse.json({ error: "Only the assigned role can edit" }, { status: 403 });
   }
 

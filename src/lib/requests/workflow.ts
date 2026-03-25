@@ -2,6 +2,17 @@ import type { RequestStatus, RequestType, Role } from "@/types";
 
 export type WorkflowAction = "approve" | "deny" | "acknowledge";
 
+/**
+ * Whether a user's role can act on a request assigned to the given role.
+ * Deputy company commander can act on company_commander assignments.
+ * Platoon sergeant CANNOT act on platoon_commander assignments.
+ */
+function matchesAssignment(userRole: Role, assignedRole: Role): boolean {
+  if (userRole === assignedRole) return true;
+  if (userRole === "deputy_company_commander" && assignedRole === "company_commander") return true;
+  return false;
+}
+
 interface Transition {
   newStatus: RequestStatus;
   newAssignedRole: Role | null; // null = no assignment (workflow complete)
@@ -69,7 +80,7 @@ export function canActOnRequest(
   userRole: Role,
   assignedRole: Role,
 ): boolean {
-  return userRole === assignedRole;
+  return matchesAssignment(userRole, assignedRole);
 }
 
 /**
@@ -81,7 +92,7 @@ export function getAvailableActions(
   userRole: Role,
   requestType: RequestType,
 ): WorkflowAction[] {
-  if (!currentAssignedRole || userRole !== currentAssignedRole) return [];
+  if (!currentAssignedRole || !matchesAssignment(userRole, currentAssignedRole)) return [];
 
   const actions: WorkflowAction[] = [];
 

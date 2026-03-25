@@ -11,20 +11,38 @@ describe("rolesInvitableBy", () => {
   it("admin can invite all roles", () => {
     const roles = rolesInvitableBy(null, true);
     expect(roles).toContain("company_commander");
+    expect(roles).toContain("deputy_company_commander");
     expect(roles).toContain("platoon_commander");
+    expect(roles).toContain("platoon_sergeant");
     expect(roles).toContain("squad_commander");
-    expect(roles).toHaveLength(3);
+    expect(roles).toHaveLength(5);
   });
 
-  it("company_commander can invite platoon_commander and squad_commander", () => {
+  it("company_commander can invite lower-ranked roles", () => {
     const roles = rolesInvitableBy("company_commander", false);
     expect(roles).toContain("platoon_commander");
+    expect(roles).toContain("platoon_sergeant");
     expect(roles).toContain("squad_commander");
     expect(roles).not.toContain("company_commander");
+    expect(roles).not.toContain("deputy_company_commander");
+  });
+
+  it("deputy_company_commander can invite same roles as company_commander", () => {
+    const roles = rolesInvitableBy("deputy_company_commander", false);
+    expect(roles).toContain("platoon_commander");
+    expect(roles).toContain("platoon_sergeant");
+    expect(roles).toContain("squad_commander");
+    expect(roles).not.toContain("company_commander");
+    expect(roles).not.toContain("deputy_company_commander");
   });
 
   it("platoon_commander can invite squad_commander only", () => {
     const roles = rolesInvitableBy("platoon_commander", false);
+    expect(roles).toEqual(["squad_commander"]);
+  });
+
+  it("platoon_sergeant can invite squad_commander only", () => {
+    const roles = rolesInvitableBy("platoon_sergeant", false);
     expect(roles).toEqual(["squad_commander"]);
   });
 
@@ -76,13 +94,17 @@ describe("constants", () => {
 
   it("ROLE_LABELS maps all roles", () => {
     expect(ROLE_LABELS.company_commander).toBe('מ"פ');
+    expect(ROLE_LABELS.deputy_company_commander).toBe('סמ"פ');
     expect(ROLE_LABELS.platoon_commander).toBe('מ"מ');
+    expect(ROLE_LABELS.platoon_sergeant).toBe('סמ"ח');
     expect(ROLE_LABELS.squad_commander).toBe('מ"כ');
   });
 
   it("UNIT_TYPE_FOR_ROLE maps roles to unit types", () => {
     expect(UNIT_TYPE_FOR_ROLE.company_commander).toBe("company");
+    expect(UNIT_TYPE_FOR_ROLE.deputy_company_commander).toBe("company");
     expect(UNIT_TYPE_FOR_ROLE.platoon_commander).toBe("platoon");
+    expect(UNIT_TYPE_FOR_ROLE.platoon_sergeant).toBe("platoon");
     expect(UNIT_TYPE_FOR_ROLE.squad_commander).toBe("squad");
   });
 });

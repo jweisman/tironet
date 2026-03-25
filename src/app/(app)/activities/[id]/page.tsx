@@ -11,7 +11,8 @@ import {
   ActivityDetail,
   type ActivityDetailData,
 } from "@/components/activities/ActivityDetail";
-import type { ActivityResult } from "@/types";
+import type { ActivityResult, Role } from "@/types";
+import { effectiveRole } from "@/lib/auth/permissions";
 
 // ---------------------------------------------------------------------------
 // SQL queries (PowerSync local SQLite)
@@ -104,7 +105,8 @@ export default function ActivityPage() {
     ? (cycleAssignments.find((a) => a.cycleId === activity.cycle_id) ?? null)
     : selectedAssignment;
 
-  const role = activityAssignment?.role ?? "";
+  const rawRole = activityAssignment?.role ?? "";
+  const role = rawRole ? effectiveRole(rawRole as Role) : "";
 
   const platoonParams = useMemo(
     () => [activity?.platoon_id ?? ""],

@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
+import { effectiveRole } from "@/lib/auth/permissions";
+import type { Role } from "@/types";
 import { SoldierCard, type SoldierSummary } from "@/components/soldiers/SoldierCard";
 import { AddSoldierForm } from "@/components/soldiers/AddSoldierForm";
 import dynamic from "next/dynamic";
@@ -149,7 +151,8 @@ export default function SoldiersPage() {
   const searchParams = useSearchParams();
 
   const syncStatus = useStatus();
-  const role = selectedAssignment?.role ?? "";
+  const rawRole = selectedAssignment?.role ?? "";
+  const role = rawRole ? effectiveRole(rawRole as Role) : "";
 
   // -------- PowerSync queries --------
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
