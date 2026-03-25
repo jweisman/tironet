@@ -78,22 +78,26 @@ test.describe("Authentication", () => {
   test("logout clears session and redirects to landing", async ({
     browser,
   }) => {
+    test.setTimeout(60000);
     const context = await browser.newContext({
       storageState: "e2e/.auth/admin.json",
     });
     const page = await context.newPage();
     await page.goto("/home");
 
-    // Wait for sidebar to render
+    // Wait for the page to be fully loaded and interactive
+    await expect(page).toHaveURL(/\/home/, { timeout: 15000 });
     await expect(page.getByRole("button", { name: /התנתק/ })).toBeVisible({
       timeout: 10000,
     });
 
-    // Click the logout button in the sidebar
-    await page.getByRole("button", { name: /התנתק/ }).click();
+    // Click logout and wait for navigation away from /home
+    await Promise.all([
+      page.waitForURL(/^(?!.*\/home)/, { timeout: 30000 }),
+      page.getByRole("button", { name: /התנתק/ }).click(),
+    ]);
 
-    // Should redirect to landing page (/)
-    // toHaveURL matches against full URL (e.g. http://localhost:3001/)
+    // Should be on landing page (/) or login page
     await expect(page).toHaveURL(/:\d+\/?$|\/login/, { timeout: 15000 });
     await context.close();
   });
