@@ -1,11 +1,13 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Admin — Users", () => {
+  test.setTimeout(60000);
+
   test("shows seeded users", async ({ page }) => {
     await page.goto("/admin/users");
 
     const main = page.getByRole("main");
-    await expect(main.getByText("Admin Test")).toBeVisible({ timeout: 10000 });
+    await expect(main.getByText("admin-e2e@test.com")).toBeVisible({ timeout: 15000 });
     await expect(main.getByText("Platoon Commander")).toBeVisible();
     await expect(main.getByText("Squad Commander")).toBeVisible();
   });
@@ -15,14 +17,14 @@ test.describe("Admin — Users", () => {
 
     // Pending invitations section
     await expect(page.getByText("הזמנות ממתינות")).toBeVisible({
-      timeout: 10000,
+      timeout: 15000,
     });
     await expect(page.getByText("new-e2e@test.com")).toBeVisible();
   });
 
   test("create new invitation", async ({ page }) => {
     await page.goto("/admin/users");
-    await expect(page.getByRole("main").getByText("Admin Test")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("main").getByText("admin-e2e@test.com")).toBeVisible({ timeout: 15000 });
 
     // Click invite button
     await page.getByRole("button", { name: /הזמן משתמש/ }).click();
@@ -48,7 +50,7 @@ test.describe("Admin — Users", () => {
 
     // Should show success with invite URL
     await expect(page.getByText("העתק קישור הזמנה")).toBeVisible({
-      timeout: 5000,
+      timeout: 10000,
     });
 
     // Close dialog
@@ -57,7 +59,7 @@ test.describe("Admin — Users", () => {
 
   test("cancel invitation", async ({ page }) => {
     await page.goto("/admin/users");
-    await expect(page.getByRole("main").getByText("Admin Test")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("main").getByText("admin-e2e@test.com")).toBeVisible({ timeout: 15000 });
 
     // Create a temporary invitation to cancel (don't rely on seeded one)
     await page.getByRole("button", { name: /הזמן משתמש/ }).click();
@@ -75,11 +77,11 @@ test.describe("Admin — Users", () => {
     await page.getByRole("option", { name: "Squad A" }).click();
 
     await dialog.getByRole("button", { name: "צור הזמנה" }).click();
-    await expect(page.getByText("העתק קישור הזמנה")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("העתק קישור הזמנה")).toBeVisible({ timeout: 10000 });
     await page.getByRole("button", { name: "סיום" }).click();
 
     // Now cancel it
-    await expect(page.getByText("cancel-me-e2e@test.com")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("cancel-me-e2e@test.com")).toBeVisible({ timeout: 10000 });
     const invRow = page.getByText("cancel-me-e2e@test.com", { exact: true }).locator("../..");
     await invRow.locator("button:has(svg.lucide-trash-2)").click();
     await page.getByRole("button", { name: "בטל הזמנה" }).click();
@@ -87,6 +89,6 @@ test.describe("Admin — Users", () => {
     // Should be removed
     await expect(
       page.getByText("cancel-me-e2e@test.com", { exact: true })
-    ).toHaveCount(0, { timeout: 5000 });
+    ).toHaveCount(0, { timeout: 10000 });
   });
 });

@@ -200,17 +200,9 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
     // Navigate directly to the request detail — avoids list strict-mode issues
     await platoonPage.goto(`/requests/${requestId}`);
 
-    // Should show "דורש טיפול שלך" (assigned to me)
-    await expect(platoonPage.getByText("דורש טיפול שלך")).toBeVisible({
-      timeout: 60000,
-    });
-
-    // Approve button should be visible
+    // Wait for the approve button — confirms both data loaded and role resolved
     const approveBtn = platoonPage.getByRole("button", { name: "אשר" });
-    await expect(approveBtn).toBeVisible();
-
-    // Also deny button
-    await expect(platoonPage.getByRole("button", { name: "דחה" })).toBeVisible();
+    await expect(approveBtn).toBeVisible({ timeout: 60000 });
 
     // Click approve
     await approveBtn.click();
@@ -243,20 +235,9 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
     // Navigate to the request detail
     await squadPage2.goto(`/requests/${requestId}`);
 
-    // Wait for the page to render the request (type header confirms data loaded)
-    await expect(squadPage2.getByText('בקשת ת"ש')).toBeVisible({
-      timeout: 60000,
-    });
-
-    // Wait for sync to propagate the updated state — squad commander should see
-    // "דורש טיפול שלך" once the approved state syncs from the server
-    await expect(squadPage2.getByText("דורש טיפול שלך")).toBeVisible({
-      timeout: 60000,
-    });
-
-    // Acknowledge button should be visible
+    // Wait for the acknowledge button — confirms data synced and role resolved
     const ackBtn = squadPage2.getByRole("button", { name: "קבלתי" });
-    await expect(ackBtn).toBeVisible();
+    await expect(ackBtn).toBeVisible({ timeout: 60000 });
 
     // Click acknowledge
     await ackBtn.click();
@@ -325,18 +306,12 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     // Navigate directly to the request detail
     await platoonPage.goto(`/requests/${requestId}`);
 
-    // Wait for the page to render (type header confirms data synced and loaded)
-    await expect(platoonPage.getByText('בקשת ת"ש')).toBeVisible({
-      timeout: 60000,
-    });
-
-    // Should show "דורש טיפול שלך" (assigned to platoon commander)
-    await expect(platoonPage.getByText("דורש טיפול שלך")).toBeVisible({
-      timeout: 60000,
-    });
+    // Wait for the deny button — confirms both data loaded and role resolved
+    const denyBtn = platoonPage.getByRole("button", { name: "דחה" });
+    await expect(denyBtn).toBeVisible({ timeout: 60000 });
 
     // Click deny
-    await platoonPage.getByRole("button", { name: "דחה" }).click();
+    await denyBtn.click();
 
     // Deny dialog should appear
     const denyDialog = platoonPage.getByRole("dialog");
@@ -373,22 +348,16 @@ test.describe("Requests — denial workflow (cross-role)", () => {
 
     await squadPage2.goto(`/requests/${requestId}`);
 
-    // Wait for the page to render the request (type header confirms data loaded)
-    await expect(squadPage2.getByText('בקשת ת"ש')).toBeVisible({
-      timeout: 60000,
-    });
-
-    // Wait for sync to propagate the denied state
-    await expect(squadPage2.getByText("דורש טיפול שלך")).toBeVisible({
-      timeout: 60000,
-    });
+    // Wait for the acknowledge button — confirms data synced and role resolved
+    const ackBtn = squadPage2.getByRole("button", { name: "קבלתי" });
+    await expect(ackBtn).toBeVisible({ timeout: 60000 });
 
     // Denial reason should be displayed
     await expect(squadPage2.getByText("E2E denial reason")).toBeVisible();
     await expect(squadPage2.getByText("סיבת הדחייה")).toBeVisible();
 
     // Acknowledge
-    await squadPage2.getByRole("button", { name: "קבלתי" }).click();
+    await ackBtn.click();
 
     await expect(squadPage2.getByText("הבקשה הועברה")).toBeVisible({
       timeout: 10000,

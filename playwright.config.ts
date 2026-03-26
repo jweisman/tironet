@@ -21,10 +21,21 @@ export default defineConfig({
     // Auth setup — runs first, logs in all 3 users and saves storageState
     { name: "setup", testMatch: /global-setup\.ts/ },
 
+    // Admin warmup — pre-compiles all admin routes so tests don't block each other
+    {
+      name: "admin-warmup",
+      testMatch: /admin-warmup\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/admin.json",
+      },
+    },
     {
       name: "admin-tests",
       testMatch: /admin\/.*\.spec\.ts/,
-      dependencies: ["setup"],
+      dependencies: ["admin-warmup"],
+      fullyParallel: false, // Serial within each file to avoid compilation storms
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/admin.json",
