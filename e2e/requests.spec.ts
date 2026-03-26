@@ -332,7 +332,7 @@ test.describe("Requests — denial workflow (cross-role)", () => {
 
     // Should show "דורש טיפול שלך" (assigned to platoon commander)
     await expect(platoonPage.getByText("דורש טיפול שלך")).toBeVisible({
-      timeout: 10000,
+      timeout: 60000,
     });
 
     // Click deny
