@@ -43,6 +43,7 @@ async function authorize(userId: string): Promise<{ error: NextResponse } | { er
         select: { squads: { select: { id: true } } },
       });
       if (platoon) {
+        subUnitIds.push(a.unitId); // Include platoon itself (for platoon-level assignments like platoon_sergeant)
         platoon.squads.forEach((s) => subUnitIds.push(s.id));
       }
     } else if (eRole === "company_commander") {

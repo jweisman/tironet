@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
-import { ROLE_LABELS, effectiveRole } from "@/lib/auth/permissions";
+import { ROLE_LABELS, effectiveRole, canInviteRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 
 export async function GET() {
@@ -47,6 +47,7 @@ export async function GET() {
       });
       if (!platoon) continue;
 
+      subUnitIds.push(platoon.id); // Include platoon itself (for platoon-level assignments like platoon_sergeant)
       platoon.squads.forEach((s) => subUnitIds.push(s.id));
 
       if (!structureByCycle[a.cycleId]) structureByCycle[a.cycleId] = [];
@@ -116,6 +117,14 @@ export async function GET() {
     }
   }
 
+  // Platoon IDs the viewer commands as platoon_commander (not company_commander).
+  // Used to exclude peer platoon_commander assignments from the list.
+  const viewerPlatoonIds = new Set(
+    managerAssignments
+      .filter((a) => effectiveRole(a.role as Role) === "platoon_commander")
+      .map((a) => a.unitId)
+  );
+
   // Group assignments by user
   const userMap = new Map<
     string,
@@ -139,6 +148,11 @@ export async function GET() {
     }
   >();
   for (const a of assignments) {
+    // For platoon-level assignments on the viewer's own platoon(s), only show roles the viewer can invite
+    if (viewerPlatoonIds.has(a.unitId) && (a.role === "platoon_commander" || a.role === "platoon_sergeant")) {
+      const viewerAssignment = managerAssignments.find((m) => m.unitId === a.unitId);
+      if (!viewerAssignment || !canInviteRole(viewerAssignment.role as Role, a.role as Role)) continue;
+    }
     if (!userMap.has(a.user.id)) {
       userMap.set(a.user.id, { ...a.user, cycleAssignments: [] });
     }

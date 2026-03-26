@@ -36,9 +36,11 @@ describe("rolesInvitableBy", () => {
     expect(roles).not.toContain("deputy_company_commander");
   });
 
-  it("platoon_commander can invite squad_commander only", () => {
+  it("platoon_commander can invite squad_commander and platoon_sergeant", () => {
     const roles = rolesInvitableBy("platoon_commander", false);
-    expect(roles).toEqual(["squad_commander"]);
+    expect(roles).toContain("squad_commander");
+    expect(roles).toContain("platoon_sergeant");
+    expect(roles).toHaveLength(2);
   });
 
   it("platoon_sergeant can invite squad_commander only", () => {
@@ -72,6 +74,10 @@ describe("canInviteRole", () => {
 
   it("platoon_commander can invite squad_commander", () => {
     expect(canInviteRole("platoon_commander", "squad_commander")).toBe(true);
+  });
+
+  it("platoon_commander can invite platoon_sergeant", () => {
+    expect(canInviteRole("platoon_commander", "platoon_sergeant")).toBe(true);
   });
 
   it("platoon_commander cannot invite platoon_commander", () => {

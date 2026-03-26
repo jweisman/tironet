@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 
@@ -76,6 +76,13 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
       )
     );
   })();
+
+  // Auto-select unit when there's only one option (e.g. platoon commander inviting platoon_sergeant)
+  useEffect(() => {
+    if (unitOptions.length === 1 && unitId !== unitOptions[0].id) {
+      setUnitId(unitOptions[0].id);
+    }
+  }, [unitOptions.length, unitOptions[0]?.id, role]);
 
   const hasContact = email.trim() || phone.trim();
 

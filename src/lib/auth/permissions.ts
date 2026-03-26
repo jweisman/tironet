@@ -41,12 +41,18 @@ export const UNIT_TYPE_FOR_ROLE: Record<Role, "company" | "platoon" | "squad"> =
 export function rolesInvitableBy(inviterRole: Role | null, isAdmin: boolean): Role[] {
   if (isAdmin) return Object.keys(ROLE_RANK) as Role[];
   if (!inviterRole) return [];
-  return (Object.keys(ROLE_RANK) as Role[]).filter(
+  const roles = (Object.keys(ROLE_RANK) as Role[]).filter(
     (r) => ROLE_RANK[inviterRole] > ROLE_RANK[r]
   );
+  // Exception: platoon commanders can also invite platoon sergeants
+  if (inviterRole === "platoon_commander" && !roles.includes("platoon_sergeant")) {
+    roles.push("platoon_sergeant");
+  }
+  return roles;
 }
 
 /** Returns true if the inviter can assign the target role. */
 export function canInviteRole(inviterRole: Role, targetRole: Role): boolean {
+  if (inviterRole === "platoon_commander" && targetRole === "platoon_sergeant") return true;
   return ROLE_RANK[inviterRole] > ROLE_RANK[targetRole];
 }

@@ -6,17 +6,9 @@ import { auth } from "@/lib/auth/auth";
 import { toE164 } from "@/lib/phone";
 import { createRateLimiter } from "@/lib/api/rate-limit";
 import type { CycleAssignment, Role } from "@/types";
-import { effectiveRole } from "@/lib/auth/permissions";
+import { effectiveRole, canInviteRole } from "@/lib/auth/permissions";
 
 const rateLimiter = createRateLimiter({ limit: 20, windowMs: 60_000 });
-
-const ROLE_RANK: Record<Role, number> = {
-  company_commander: 3,
-  deputy_company_commander: 3,
-  platoon_commander: 2,
-  platoon_sergeant: 2,
-  squad_commander: 1,
-};
 
 async function isAuthorizedToInvite(
   assignments: CycleAssignment[],
@@ -26,7 +18,7 @@ async function isAuthorizedToInvite(
   unitId: string
 ): Promise<boolean> {
   const eligible = assignments.filter(
-    (a) => a.cycleId === cycleId && ROLE_RANK[a.role] > ROLE_RANK[targetRole]
+    (a) => a.cycleId === cycleId && canInviteRole(a.role as Role, targetRole)
   );
   if (eligible.length === 0) return false;
 
@@ -47,6 +39,9 @@ async function isAuthorizedToInvite(
       if (unitType === "squad") {
         const s = await prisma.squad.findUnique({ where: { id: unitId }, select: { platoonId: true } });
         if (s?.platoonId === a.unitId) return true;
+      } else if (unitType === "platoon") {
+        // Platoon commander inviting platoon_sergeant for their own platoon
+        if (unitId === a.unitId) return true;
       }
     }
   }
