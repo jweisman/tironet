@@ -5,6 +5,24 @@ import { test, expect, type Page } from "@playwright/test";
 // ---------------------------------------------------------------------------
 
 /**
+ * Wait until a request exists on the server (PowerSync connector has uploaded it).
+ * Polls the API every 1s for up to 30s. Call this BEFORE closing a browser context
+ * to ensure the local PowerSync write has been synced to PostgreSQL.
+ *
+ * Optionally verifies the request has a specific status (for workflow transitions).
+ */
+async function waitForRequestOnServer(page: Page, requestId: string, expectedStatus?: string) {
+  await expect(async () => {
+    const res = await page.request.get(`/api/requests/${requestId}`);
+    expect(res.ok()).toBeTruthy();
+    if (expectedStatus) {
+      const data = await res.json();
+      expect(data.request.status).toBe(expectedStatus);
+    }
+  }).toPass({ timeout: 30000, intervals: [1000] });
+}
+
+/**
  * Wait for PowerSync to sync and the requests page to be ready.
  * Navigates to /requests and waits for either request cards or the empty state.
  */
@@ -185,7 +203,7 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
     });
 
     // Wait for the connector to upload the new request to the server
-    await squadPage.waitForTimeout(5000);
+    await waitForRequestOnServer(squadPage, requestId!);
 
     await squadPage.close();
     await squadContext.close();
@@ -219,8 +237,8 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
       timeout: 10000,
     });
 
-    // Wait for the connector to upload the change to the server
-    await platoonPage.waitForTimeout(5000);
+    // Wait for the connector to upload the approval to the server
+    await waitForRequestOnServer(platoonPage, requestId!, "approved");
 
     await platoonPage.close();
     await platoonContext.close();
@@ -291,7 +309,7 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     expect(requestId).toBeTruthy();
 
     // Wait for the connector to upload the new request to the server
-    await squadPage.waitForTimeout(5000);
+    await waitForRequestOnServer(squadPage, requestId!);
 
     await squadPage.close();
     await squadContext.close();
@@ -333,8 +351,8 @@ test.describe("Requests — denial workflow (cross-role)", () => {
       timeout: 10000,
     });
 
-    // Wait for the connector to upload the change to the server
-    await platoonPage.waitForTimeout(5000);
+    // Wait for the connector to upload the denial to the server
+    await waitForRequestOnServer(platoonPage, requestId!, "denied");
 
     await platoonPage.close();
     await platoonContext.close();
