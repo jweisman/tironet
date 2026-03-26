@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { PowerSyncContext } from "@powersync/react";
 import { db } from "@/lib/powersync/database";
 import { TironetConnector } from "@/lib/powersync/connector";
@@ -12,6 +12,8 @@ export function TironetPowerSyncProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const [initFailed, setInitFailed] = useState(false);
+
   // Open the local SQLite DB immediately on mount. This makes useQuery()
   // return previously synced data even when offline (before sync starts).
   // connect() additionally starts the sync stream — if fetchCredentials()
@@ -32,6 +34,7 @@ export function TironetPowerSyncProvider({
       .init()
       .then(() => {
         console.log("[PowerSync] init() resolved — DB open, local queries ready");
+        setInitFailed(false);
         // Start sync — may fail offline, PowerSync retries automatically.
         console.log("[PowerSync] calling connect()...");
         return localDb.connect(connector);
@@ -40,8 +43,14 @@ export function TironetPowerSyncProvider({
         console.log("[PowerSync] connect() resolved — sync started");
       })
       .catch((err: unknown) => {
-        // Expected when offline — DB is still open from init()
-        console.warn("[PowerSync] error (DB still open from init):", err);
+        // Distinguish init() failure (OPFS corruption, quota, private browsing)
+        // from connect() failure (offline — expected, DB still usable).
+        if (!localDb.currentStatus?.hasSynced && !localDb.connected) {
+          console.error("[PowerSync] init() failed — offline mode unavailable:", err);
+          setInitFailed(true);
+        } else {
+          console.warn("[PowerSync] connect() failed (DB still open from init):", err);
+        }
       });
 
     return () => {
@@ -56,6 +65,14 @@ export function TironetPowerSyncProvider({
 
   return (
     <PowerSyncContext.Provider value={db}>
+      {initFailed && (
+        <div
+          role="alert"
+          className="fixed top-0 inset-x-0 z-50 bg-destructive text-destructive-foreground text-center text-xs py-1.5 px-4"
+        >
+          מצב לא מקוון אינו זמין — נדרש חיבור לרשת
+        </div>
+      )}
       {children}
     </PowerSyncContext.Provider>
   );

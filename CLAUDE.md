@@ -109,20 +109,26 @@ The UMD files are served from `public/@powersync/` (copied by `postinstall`). Th
 
 `useQuery` from `@powersync/react` runs against local SQLite synchronously. When a query's params change (e.g. because a prior query's result resolved and updated the params), the `loading` flag may never transition through `true` — the new result is available immediately. Do not rely on `loading: true` to gate downstream rendering.
 
-### `ActivityDetail` uses `useState(initialData)` — key on data content, not just IDs
+### `ActivityDetail` uses `useState(initialData)` — key on squad IDs + soldier presence
 
 `ActivityDetail` initializes its internal state with `useState(initialData)` and never syncs with prop changes. When the page builds `localData` from chained `useQuery` calls (activity → platoon params → squads → soldiers), React may mount `ActivityDetail` with partially-loaded data (correct squads, empty soldiers) before soldiers resolve in the next render cycle.
 
-**Fix:** key the component on both squad IDs AND total soldier count so it remounts when soldiers arrive:
+**Fix:** key the component on squad IDs AND a binary "has soldiers" flag so it remounts exactly once when soldiers first arrive, but does NOT remount as additional soldiers trickle in during incremental sync (which would discard unsaved edits):
 
 ```tsx
 <ActivityDetail
-  key={`${data.squads.map(s => s.id).join(",")}-${data.squads.reduce((n, s) => n + s.soldiers.length, 0)}`}
+  key={`${data.squads.map(s => s.id).join(",")}-${data.squads.some(s => s.soldiers.length > 0) ? 1 : 0}`}
   initialData={data}
 />
 ```
 
+**Do NOT** use the exact soldier count in the key — incremental sync updates would remount the component repeatedly, discarding any in-progress grade/note edits.
+
 If you ever add another `useState(initialData)` component fed by chained `useQuery` params, apply the same pattern.
+
+### `ActivityDetail` debounce cleanup
+
+`ActivityDetail` stores `setTimeout` handles in a `debounceRefs` Map for grade/note auto-save. A `useEffect` cleanup clears all pending timeouts on unmount to prevent stale callbacks firing against unmounted state. If you add more debounced refs, follow the same cleanup pattern.
 
 ### Activity detail page uses activity-cycle assignment, not global context
 
@@ -158,10 +164,11 @@ Writes are **instant and optimistic** — no network round-trip, no loading stat
 
 `src/lib/powersync/connector.ts` uploads queued writes via `uploadData()`. Key rules:
 
-1. **Do NOT call `transaction.complete()` on error** — PowerSync retries automatically. Only call it after all operations in the transaction succeed.
-2. **PowerSync CRUD `opData` uses snake_case** (matching the local schema column names). Transform to camelCase before calling the API. Example: `opData.activity_id` → `activityId`.
-3. **PUT operations must pass the client-generated `id`** to the server so the server creates the record with the same UUID the local DB already has. Without this, the server generates a new UUID and PowerSync syncs back a duplicate record with a mismatched ID.
-4. **Network errors during upload are expected when offline** — suppress `TypeError: Failed to fetch` in the catch block to avoid console noise. All other errors should still be logged.
+1. **Network errors (`TypeError: Failed to fetch`)** — do not call `transaction.complete()`. PowerSync retries automatically when connectivity is restored.
+2. **4xx client errors (bad data, permission denied)** — call `transaction.complete()` to drain the failed operation. Retrying will never succeed and would block all subsequent uploads. The error is logged with a warning.
+3. **5xx server errors** — do not call `transaction.complete()`. PowerSync retries automatically.
+4. **PowerSync CRUD `opData` uses snake_case** (matching the local schema column names). Transform to camelCase before calling the API. Example: `opData.activity_id` → `activityId`.
+5. **PUT operations must pass the client-generated `id`** to the server so the server creates the record with the same UUID the local DB already has. Without this, the server generates a new UUID and PowerSync syncs back a duplicate record with a mismatched ID.
 
 ### API: accept client-generated `id` on POST (upsert)
 
@@ -186,9 +193,13 @@ The upsert `where` clause uses the composite unique key (e.g. `activityId_soldie
 
 **Do not** gate `init()` or `connect()` on authentication state (e.g. `useSession()`). When offline, NextAuth's session refresh fails and `status` may flip to `"unauthenticated"`, which would disconnect the DB and break offline queries.
 
-### Token fetch throttling
+If `init()` itself fails (OPFS corruption, quota exceeded, Safari Private Browsing), `PowerSyncProvider` shows a persistent banner ("מצב לא מקוון אינו זמין") so users know offline mode is unavailable. This is distinguished from `connect()` failure (offline, expected) by checking `!localDb.connected` after the catch.
 
-PowerSync retries `fetchCredentials()` rapidly when the sync stream drops. Without throttling, this fires dozens of failing `/api/powersync/token` fetches per second while offline. `connector.ts` implements a 10-second cooldown after a failed fetch attempt (`lastFetchError` timestamp).
+### Token fetch throttling and auth error handling
+
+PowerSync retries `fetchCredentials()` rapidly when the sync stream drops. Without throttling, this fires dozens of failing `/api/powersync/token` fetches per second while offline. `connector.ts` implements **exponential backoff** (2s → 4s → 8s → ... capped at 30s) that resets on success.
+
+**Auth errors (401/403)** are distinguished from network errors. When the token endpoint returns 401 or 403 (session expired or revoked), the connector clears its cached token and throws a distinguishable `"Authentication expired (${status})"` error. This allows callers to prompt re-login instead of silently retrying with dead credentials.
 
 ### Offline indicator
 
@@ -198,7 +209,13 @@ PowerSync retries `fetchCredentials()` rapidly when the sync stream drops. Witho
 
 Use `browserOnline && status.connected` so the banner appears instantly. `hasPendingUploads` is true when `status.dataFlowStatus.uploadError` is set (failed upload attempt while offline) — this drives the "שינויים ממתינים לסנכרון" pill in `OfflineBanner`.
 
+**Debounce:** online → offline transitions are debounced by 2 seconds so brief network blips don't flash the banner. Offline → online is instant (no delay).
+
 The offline state is persisted to `localStorage` (`tironet:offline` key) so the banner appears immediately after MPA fallback reloads that reset React state.
+
+### NextAuth JWT maxAge
+
+The JWT `maxAge` is set to **1 day** (86400 seconds) so that `cycleAssignments` and PowerSync sync claims are refreshed from the database daily. The NextAuth default is 30 days, which means role changes (e.g. promotion to platoon commander) wouldn't take effect in the sync scope for up to a month.
 
 ## Data Model Constraints
 
@@ -293,7 +310,9 @@ Only **navigation-mode** (HTML) requests are cached as shells. RSC payloads are 
 
 The custom `fetch` listener in `sw.ts` is registered **before** `serwist.addEventListeners()` so it calls `respondWith()` first; unmatched requests fall through to Serwist's handlers.
 
-On SW activation, all stale shell caches and Serwist page caches are cleared and list-page shells (`/home`, `/activities`, `/soldiers`) are repopulated from the network to ensure fresh HTML after deployment.
+The shell cache name includes a build hash derived from precache manifest content hashes (`app-shells-${BUILD_ID}`), so each deployment automatically gets its own cache. On SW activation, all caches from prior builds (matching `app-shells-*`, `shell-*`, and Serwist page caches) are deleted and list-page shells (`/home`, `/activities`, `/soldiers`) are repopulated from the network.
+
+Shell warming fetches use a 5-second `AbortController` timeout per request, so slow 3G connections don't hang SW activation. Timed-out shells are skipped and cached on first real navigation instead.
 
 **Critical gotcha:** call `response.clone()` synchronously (before any `await`) when caching. If you call it inside an async `.then()` callback, the response body may already be consumed by the time the clone runs, causing a "Response body is already used" error and an empty cache entry.
 
@@ -315,7 +334,7 @@ Apply this pattern to any new detail page that uses the app shell caching model.
 
 ### Client-triggered shell warming via `postMessage`
 
-Next.js `<Link>` navigations use RSC payloads (`mode: "cors"`), not full navigations (`mode: "navigate"`). The SW's fetch handler only triggers on `navigate`, so it never caches shells during normal in-app browsing. To ensure shells are cached, `serwist-provider.tsx` sends a `WARM_SHELLS` message after SW registration, triggering the SW to proactively fetch and cache all shell routes (`/home`, `/activities`, `/soldiers`, `/activities/_`, `/soldiers/_`).
+Next.js `<Link>` navigations use RSC payloads (`mode: "cors"`), not full navigations (`mode: "navigate"`). The SW's fetch handler only triggers on `navigate`, so it never caches shells during normal in-app browsing. To ensure shells are cached, `serwist-provider.tsx` sends a `WARM_SHELLS` message inside the `.then()` callback after successful SW registration, triggering the SW to proactively fetch and cache all shell routes (`/home`, `/activities`, `/soldiers`, `/activities/_`, `/soldiers/_`). The message is only sent after registration succeeds — if registration fails, no message is sent (there is no controller to receive it).
 
 ### Offline fallback for unsupported pages
 
@@ -371,9 +390,11 @@ The Select component uses `@base-ui/react` (not Radix). Base UI's `SelectValue` 
 
 All user-facing mutations should show a `toast.success()` on completion (from `sonner`). The `<Toaster />` component is in `layout.tsx`, configured for RTL. For form dialogs that call an `onSuccess` callback, the **parent** is responsible for the toast — the form itself just calls the callback.
 
-### CycleContext `isLoading` flag
+### CycleContext auto-select and `isLoading` flag
 
 `CycleContext` exposes `isLoading: boolean` that is `true` while the session is still loading OR when cycles exist but the auto-select `useEffect` hasn't fired yet. Pages should return `null` (or a skeleton) while `isLoading` is true to avoid flashing "no access" or "choose a cycle" messages before the cycle state resolves.
+
+The auto-select `useEffect` depends on a stable key of all active cycle IDs (`activeCycles.map(a => a.cycleId).join(",")`) — not just `activeCycles.length`. This ensures the effect re-fires when cycles are swapped out even if the count stays the same (e.g. two old cycles deactivated and two new ones created).
 
 ## PowerSync + React Rendering Gotchas (continued)
 
@@ -386,6 +407,10 @@ The `PowerSyncProvider` renders children **without** a context wrapper during SS
 ### `hasSynced` does not reflect previously cached data
 
 `useStatus().hasSynced` only becomes `true` after a sync completes **in the current session**. It does NOT reflect data already available in the local SQLite DB from a previous session. `useQuery` returns that cached data immediately, but `hasSynced` stays `false` until `connect()` + sync finishes. Do not use `hasSynced` to gate "has data loaded" — use a timeout or check `data.length > 0` instead.
+
+### Detail page grace period pattern
+
+Detail pages (`/activities/[id]`, `/soldiers/[id]`, `/requests/[id]`) and the home page use a 3-second `timedOut` flag as a hard upper bound before showing "not found" / "no data". Data renders immediately when available — the timeout only gates the error state. A spinner is shown while waiting. The variable is named `timedOut` (not `ready`) to clarify that it represents the timeout expiring, not data being ready.
 
 ## Testing
 

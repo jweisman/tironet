@@ -129,10 +129,10 @@ export default function RequestDetailPage() {
     }
   }, []);
 
-  // Grace period
-  const [ready, setReady] = useState(false);
+  // Grace period: hard upper bound — if data arrives before it, we render immediately.
+  const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setReady(true), 1500);
+    const t = setTimeout(() => setTimedOut(true), 3000);
     return () => clearTimeout(t);
   }, []);
 
@@ -147,7 +147,7 @@ export default function RequestDetailPage() {
   const [denyDialogOpen, setDenyDialogOpen] = useState(false);
   const [denialReason, setDenialReason] = useState("");
 
-  if (!raw && ready) {
+  if (!raw && timedOut) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
         <p className="font-medium">בקשה לא נמצאה</p>
@@ -158,7 +158,13 @@ export default function RequestDetailPage() {
     );
   }
 
-  if (!raw) return null;
+  if (!raw) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   const requestType = raw.type as RequestType;
   const requestStatus = raw.status as RequestStatus;

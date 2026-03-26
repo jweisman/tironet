@@ -86,10 +86,10 @@ type MessageEvent = Event & { data: unknown; waitUntil?(p: Promise<unknown>): vo
   }
 );
 
-// Fixed cache name shared between SW and main thread. The SW clears and
-// repopulates on activation (i.e. on every deployment), so no build-hash
-// suffix is needed — the activation lifecycle handles versioning.
-const SHELL_CACHE_NAME = "app-shells";
+// Build-hashed cache name — each deployment gets its own cache so stale
+// shells from a previous build are never served. The activation handler
+// deletes caches from prior builds.
+const SHELL_CACHE_NAME = `app-shells-${BUILD_ID}`;
 
 async function cleanAndPrepopulateCaches() {
   // 1. Delete ALL caches from previous builds.
@@ -98,6 +98,7 @@ async function cleanAndPrepopulateCaches() {
   const allCaches = await caches.keys();
   const staleCachePrefixes = [
     SHELL_CACHE_PREFIX,      // old build-hashed shell caches ("shell-xxx")
+    "app-shells",            // old and current-format shell caches ("app-shells-xxx")
     "pages-rsc-prefetch",    // Serwist RSC prefetch cache
     "pages-rsc",             // Serwist RSC cache
     "pages",                 // Serwist pages cache
@@ -112,7 +113,7 @@ async function cleanAndPrepopulateCaches() {
     "home-rsc-shell-v1",
   ];
   for (const name of allCaches) {
-    // Keep current shell cache
+    // Keep current build's shell cache
     if (name === SHELL_CACHE_NAME) continue;
     // Delete caches matching stale prefixes or exact names
     if (
@@ -146,7 +147,16 @@ async function warmShellCache() {
 
   for (const path of SHELL_ROUTES) {
     try {
-      const res = await fetch(path, { credentials: "same-origin" });
+      // Abort after 5 seconds — on slow networks it's better to skip and
+      // cache on first real navigation than to hang SW activation.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(path, {
+        credentials: "same-origin",
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
       if (res.ok && !res.redirected) {
         const shell = resolveShellRoute(path, origin);
         if (shell) {
@@ -157,7 +167,7 @@ async function warmShellCache() {
         swLog("shell skipped (not ok or redirected)", path, res.status);
       }
     } catch {
-      swLog("shell fetch failed (offline?)", path);
+      swLog("shell fetch failed (offline/timeout?)", path);
     }
   }
 }

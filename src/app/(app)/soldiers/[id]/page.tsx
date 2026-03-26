@@ -197,10 +197,11 @@ export default function SoldierDetailPage() {
   const userRole = rawUserRole ? effectiveRole(rawUserRole) : "";
 
   // Grace period: give PowerSync time to hydrate local SQLite after an
-  // offline shell load before showing "not found".
-  const [ready, setReady] = useState(false);
+  // offline shell load before showing "not found". The timeout is a hard
+  // upper bound — if data arrives before it, we skip straight to rendering.
+  const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setReady(true), 1500);
+    const t = setTimeout(() => setTimedOut(true), 3000);
     return () => clearTimeout(t);
   }, []);
 
@@ -216,7 +217,7 @@ export default function SoldierDetailPage() {
 
   const raw = soldierRows?.[0] ?? null;
 
-  if (!raw && ready) {
+  if (!raw && timedOut) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
         <p className="font-medium">חייל לא נמצא</p>
@@ -228,7 +229,11 @@ export default function SoldierDetailPage() {
   }
 
   if (!raw) {
-    return null;
+    return (
+      <div className="flex justify-center py-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
   const soldier = {

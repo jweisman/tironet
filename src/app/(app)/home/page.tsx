@@ -240,10 +240,11 @@ export default function HomePage() {
 
   // Grace period before showing "no data" — useQuery returns cached local
   // SQLite data almost instantly for returning users, but on first load
-  // there is a brief window before PowerSync hydrates.
-  const [ready, setReady] = useState(false);
+  // there is a brief window before PowerSync hydrates. Extended to 3s as
+  // a hard upper bound; if data arrives earlier, we render immediately.
+  const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setReady(true), 1500);
+    const t = setTimeout(() => setTimedOut(true), 3000);
     return () => clearTimeout(t);
   }, []);
 
@@ -427,13 +428,14 @@ export default function HomePage() {
             </div>
           )}
 
-          {squads.length === 0 && !ready && (
+          {squads.length === 0 && !timedOut && (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">טוען נתונים...</p>
             </div>
           )}
 
-          {squads.length === 0 && ready && (
+          {squads.length === 0 && timedOut && (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
               <p className="font-medium">אין נתונים להצגה</p>
               <p className="text-sm text-muted-foreground">אין כיתות מוגדרות למחזור זה.</p>

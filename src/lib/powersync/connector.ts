@@ -25,6 +25,8 @@ export class TironetConnector implements PowerSyncBackendConnector {
   private cachedToken: TokenResponse | null = null;
   private tokenExpiry = 0;
   private lastFetchError = 0;
+  /** Consecutive network-error count — drives exponential backoff. */
+  private consecutiveErrors = 0;
 
   async fetchCredentials() {
     // Return cached token if still valid (with 30s buffer)
@@ -35,21 +37,36 @@ export class TironetConnector implements PowerSyncBackendConnector {
       };
     }
 
-    // Throttle retries when offline — don't hammer the network.
+    // Exponential backoff when offline — don't hammer the network.
     // PowerSync retries fetchCredentials() rapidly; without this guard
     // we'd fire dozens of failing fetches per second.
     const now = Date.now();
-    if (this.lastFetchError && now - this.lastFetchError < 10_000) {
-      throw new Error("Token fetch throttled (offline)");
+    if (this.lastFetchError) {
+      const backoff = Math.min(1000 * 2 ** this.consecutiveErrors, 30_000);
+      if (now - this.lastFetchError < backoff) {
+        throw new Error("Token fetch throttled (offline)");
+      }
     }
 
     try {
       const res = await fetch("/api/powersync/token");
+
+      // Auth failure — session expired or revoked. Clear cached token and
+      // throw a distinguishable error so callers can prompt re-login.
+      if (res.status === 401 || res.status === 403) {
+        this.cachedToken = null;
+        this.tokenExpiry = 0;
+        throw new Error(
+          `Authentication expired (${res.status}) — please sign in again`
+        );
+      }
+
       if (!res.ok) throw new Error("Failed to fetch PowerSync token");
 
       const data: TokenResponse = await res.json();
       this.cachedToken = data;
       this.lastFetchError = 0;
+      this.consecutiveErrors = 0;
       // Tokens are issued with 5m expiry
       this.tokenExpiry = Date.now() + 5 * 60 * 1000;
 
@@ -60,6 +77,7 @@ export class TironetConnector implements PowerSyncBackendConnector {
       };
     } catch (err) {
       this.lastFetchError = Date.now();
+      this.consecutiveErrors++;
       throw err;
     }
   }
@@ -171,11 +189,23 @@ export class TironetConnector implements PowerSyncBackendConnector {
       await transaction.complete();
     } catch (err) {
       // Network errors are expected when offline — PowerSync retries automatically.
-      // Only log unexpected errors (not plain fetch failures).
-      if (!(err instanceof TypeError && (err as TypeError).message === "Failed to fetch")) {
-        console.error("[PowerSync] uploadData error:", err);
+      if (err instanceof TypeError && err.message === "Failed to fetch") {
+        // Offline — do not complete the transaction so PowerSync retries later.
+        return;
       }
-      // Do not call transaction.complete() — PowerSync will retry
+
+      console.error("[PowerSync] uploadData error:", err);
+
+      // If the server returned a 4xx client error (bad data, permission denied),
+      // retrying will never succeed. Complete the transaction to drain the bad
+      // operation from the queue so it doesn't block subsequent uploads.
+      const is4xx = err instanceof Error && /→ 4\d{2}:/.test(err.message);
+      if (is4xx) {
+        console.warn("[PowerSync] Draining failed transaction (4xx — will not retry)");
+        await transaction.complete();
+      }
+      // For 5xx or other unexpected errors, leave the transaction incomplete
+      // so PowerSync retries automatically.
     }
   }
 }
