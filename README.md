@@ -206,7 +206,7 @@ npm run e2e        # headless run
 npm run e2e:ui     # Playwright UI (interactive)
 ```
 
-The test suite (72 tests across 11 spec files) takes ~45 seconds. Tests cover authentication, navigation guards, admin CRUD (cycles, structure, activity types, users), invitation flow, dashboard, activities, and soldiers.
+The test suite (81 tests across 12 spec files) takes ~1 minute locally (~5–6 minutes in CI). Tests cover authentication, navigation guards, admin CRUD (cycles, structure, activity types, users), invitation flow, dashboard, activities, soldiers, and the requests workflow (creation, approval chain, denial with reason, cross-role handoffs).
 
 The setup phase automatically:
 1. Runs Prisma migrations against the test database
