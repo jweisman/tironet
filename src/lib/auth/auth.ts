@@ -193,7 +193,7 @@ async function resolvePowerSyncClaims(assignments: RawAssignment[]): Promise<{
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: tironetAdapter,
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 24 * 60 * 60 /* 1 day — forces daily refresh of cycleAssignments */ },
 
   providers: [
     Google({ allowDangerousEmailAccountLinking: true }),

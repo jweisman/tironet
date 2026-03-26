@@ -82,35 +82,82 @@ describe("TironetConnector", () => {
       expect(creds.token).toBe("jwt-token-2");
     });
 
-    it("throws on non-ok response and sets lastFetchError", async () => {
+    it("throws auth error on 401 response", async () => {
       mockFetch.mockResolvedValue({ ok: false, status: 401 });
 
+      await expect(connector.fetchCredentials()).rejects.toThrow(
+        "Authentication expired (401)"
+      );
+    });
+
+    it("throws auth error on 403 response", async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 403 });
+
+      await expect(connector.fetchCredentials()).rejects.toThrow(
+        "Authentication expired (403)"
+      );
+    });
+
+    it("throws generic error on 500 response", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve("Internal Server Error"),
+      });
+
+      // 500 goes through apiRequest-style path — but fetchCredentials
+      // only checks ok, so it throws the generic message.
       await expect(connector.fetchCredentials()).rejects.toThrow(
         "Failed to fetch PowerSync token"
       );
     });
 
-    it("throttles retries within 10s of a failed fetch", async () => {
-      mockFetch.mockResolvedValue({ ok: false, status: 500 });
+    it("throttles retries with exponential backoff", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve(""),
+      });
 
+      // First failure → consecutiveErrors becomes 1 → next backoff = 2^1 * 1000 = 2s
       await expect(connector.fetchCredentials()).rejects.toThrow();
 
-      // Second call within 10s should be throttled
-      vi.advanceTimersByTime(5000);
+      // Within 2s backoff window → throttled
+      vi.advanceTimersByTime(1000);
       await expect(connector.fetchCredentials()).rejects.toThrow(
         "Token fetch throttled (offline)"
       );
 
       // Only one actual fetch was made
       expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // After the 2s backoff expires, allow retry
+      vi.advanceTimersByTime(1001);
+      await expect(connector.fetchCredentials()).rejects.toThrow(
+        "Failed to fetch PowerSync token"
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      // Second failure → consecutiveErrors becomes 2 → backoff = 2^2 * 1000 = 4s
+      vi.advanceTimersByTime(3000);
+      await expect(connector.fetchCredentials()).rejects.toThrow(
+        "Token fetch throttled (offline)"
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it("allows retry after 10s cooldown", async () => {
-      mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+    it("allows retry after backoff and resets on success", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve(""),
+      });
 
+      // First failure → consecutiveErrors becomes 1 → backoff = 2s
       await expect(connector.fetchCredentials()).rejects.toThrow();
 
-      vi.advanceTimersByTime(10_001);
+      // Wait past the 2s backoff window
+      vi.advanceTimersByTime(2001);
 
       mockFetch.mockResolvedValue({
         ok: true,
@@ -364,7 +411,7 @@ describe("TironetConnector", () => {
       expect(tx.complete).not.toHaveBeenCalled();
     });
 
-    it("does not call transaction.complete() on non-fetch errors", async () => {
+    it("does not call transaction.complete() on 5xx errors (will retry)", async () => {
       mockFetch.mockRejectedValue(new Error("Server error"));
 
       const db = mockDatabase([
@@ -379,6 +426,28 @@ describe("TironetConnector", () => {
 
       const tx = await (db as { getNextCrudTransaction: () => Promise<{ complete: () => void }> }).getNextCrudTransaction();
       expect(tx.complete).not.toHaveBeenCalled();
+    });
+
+    it("drains transaction on 4xx client errors (will not retry)", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve("Bad request"),
+      });
+
+      const db = mockDatabase([
+        {
+          table: "activity_reports",
+          op: UpdateType.PUT,
+          id: "r1",
+          opData: { activity_id: "a1", soldier_id: "s1", result: "passed" },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      const tx = await (db as { getNextCrudTransaction: () => Promise<{ complete: () => void }> }).getNextCrudTransaction();
+      expect(tx.complete).toHaveBeenCalled();
     });
   });
 });

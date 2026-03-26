@@ -29,6 +29,10 @@ export function CycleProvider({ children }: { children: React.ReactNode }) {
     (a) => a.cycleIsActive
   );
 
+  // Stable key that changes when the set of active cycle IDs changes
+  // (not just the count — handles swap-in/swap-out of cycles).
+  const cycleKey = activeCycles.map((a) => a.cycleId).join(",");
+
   // On mount or when active cycles change: restore from localStorage or auto-select
   useEffect(() => {
     if (activeCycles.length === 0) return;
@@ -40,7 +44,7 @@ export function CycleProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("selectedCycleId", activeCycles[0].cycleId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCycles.length]);
+  }, [cycleKey]);
 
   function setSelectedCycleId(id: string) {
     setSelectedCycleIdState(id);

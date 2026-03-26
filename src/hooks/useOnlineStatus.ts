@@ -84,11 +84,37 @@ export function useOnlineStatus() {
     }
   }, [status.connected, browserOnline]);
 
-  const isConnected =
+  const isConnectedRaw =
     browserOnline &&
     (status.connected ||
       (!hasConnectedRef.current && grace) ||
       reconnectGrace);
+
+  // Debounce online → offline transitions by 2 seconds so brief network
+  // blips don't flash the offline banner. Offline → online is instant.
+  const [isConnected, setIsConnected] = useState(isConnectedRaw);
+  const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (isConnectedRaw) {
+      // Going online — clear any pending offline transition and update immediately.
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current);
+        offlineTimerRef.current = null;
+      }
+      setIsConnected(true);
+    } else {
+      // Going offline — wait 2s before committing, in case it's a brief blip.
+      if (!offlineTimerRef.current) {
+        offlineTimerRef.current = setTimeout(() => {
+          offlineTimerRef.current = null;
+          setIsConnected(false);
+        }, 2000);
+      }
+    }
+    return () => {
+      if (offlineTimerRef.current) clearTimeout(offlineTimerRef.current);
+    };
+  }, [isConnectedRaw]);
 
   // Persist offline state for subsequent MPA fallback reloads.
   useEffect(() => {

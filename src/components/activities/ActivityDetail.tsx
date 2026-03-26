@@ -125,8 +125,13 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [metaError, setMetaError] = useState<string | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
 
-  // Debounce refs per soldier
+  // Debounce refs per soldier — clear all pending timeouts on unmount
+  // to prevent stale callbacks firing against unmounted state.
   const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  useEffect(() => {
+    const refs = debounceRefs.current;
+    return () => { refs.forEach(clearTimeout); };
+  }, []);
 
   useEffect(() => {
     if (editingMetadata) {
