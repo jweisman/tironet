@@ -12,6 +12,7 @@ import { useCycle } from "@/contexts/CycleContext";
 import { CyclePicker } from "./CyclePicker";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { SoldierLogo } from "@/components/SoldierLogo";
 import type { Role } from "@/types";
 
 const navItems = [
@@ -41,7 +42,7 @@ export function Sidebar() {
     <aside className="hidden md:flex flex-col fixed inset-y-0 end-0 w-64 border-s border-border bg-background z-40">
       {/* App name */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
-        <img src="/soldier.svg" alt="" className="h-9 w-auto" />
+        <SoldierLogo className="h-9 w-auto text-[#273617] dark:text-[#7C9A6D]" />
         <span className="text-xl font-bold">טירונט</span>
       </div>
 

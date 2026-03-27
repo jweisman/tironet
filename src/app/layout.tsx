@@ -3,6 +3,7 @@ import { Heebo } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { SerwistProvider } from "./serwist-provider";
 import "./globals.css";
 
@@ -29,7 +30,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#273617",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#273617" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -44,11 +48,21 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang="he" dir="rtl">
+    <html lang="he" dir="rtl" suppressHydrationWarning>
+      <head>
+        {/* Inline theme init — runs before paint to set .dark class and avoid flash.
+            Reads the user's stored preference from localStorage. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=localStorage.getItem("tironet:theme")||"system";var d=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme:dark)").matches);if(d)document.documentElement.classList.add("dark")}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className={`${heebo.variable} font-sans antialiased`}>
         {/* Inline splash shown instantly before React/CSS load. Hidden once
             the first child paints. Uses inline styles so it works even when
-            stylesheets haven't loaded yet. */}
+            stylesheets haven't loaded yet. Colors adapt to dark mode via the
+            .dark class set by the inline script above. */}
         <div
           id="app-splash"
           style={{
@@ -57,30 +71,20 @@ export default async function RootLayout({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#ffffff",
             zIndex: 9999,
           }}
-        >
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              border: "3px solid #e5e7eb",
-              borderTopColor: "#273617",
-              borderRadius: "50%",
-              animation: "app-splash-spin 0.7s linear infinite",
-            }}
-          />
-          <style
-            dangerouslySetInnerHTML={{
-              __html: "@keyframes app-splash-spin{to{transform:rotate(360deg)}}",
-            }}
-          />
-        </div>
+        />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `#app-splash{background:#fff}.dark #app-splash{background:#1a1a1a}#app-splash::after{content:"";width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:#273617;border-radius:50%;animation:app-splash-spin .7s linear infinite}.dark #app-splash::after{border-color:#333;border-top-color:#7C9A6D}@keyframes app-splash-spin{to{transform:rotate(360deg)}}`,
+          }}
+        />
         <SerwistProvider>
           <NextIntlClientProvider messages={messages}>
-            {children}
-            <Toaster />
+            <ThemeProvider>
+              {children}
+              <Toaster />
+            </ThemeProvider>
           </NextIntlClientProvider>
         </SerwistProvider>
       </body>
