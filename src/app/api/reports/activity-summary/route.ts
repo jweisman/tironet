@@ -1,0 +1,23 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getReportScope } from "@/lib/api/report-scope";
+import { fetchActivitySummary } from "@/lib/reports/render-activity-summary";
+
+// Re-export types for the preview page
+export type { ActivitySummaryRow, ActivitySummaryItem, ActivitySummaryData } from "@/lib/reports/render-activity-summary";
+
+export async function GET(request: NextRequest) {
+  const cycleId = request.nextUrl.searchParams.get("cycleId");
+  if (!cycleId) {
+    return NextResponse.json({ error: "cycleId is required" }, { status: 400 });
+  }
+
+  const { scope, error } = await getReportScope(cycleId);
+  if (error) return error;
+
+  const data = await fetchActivitySummary(cycleId, scope!.platoonIds);
+  if (!data) {
+    return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(data);
+}

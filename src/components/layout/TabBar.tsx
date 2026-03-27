@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, UserCog, Settings, FileText } from "lucide-react";
+import { Home, Users, Activity, UserCog, Settings, FileText, BarChart3 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
 import type { Role } from "@/types";
 
 const staticTabs = [
@@ -26,23 +27,30 @@ export function TabBar() {
   const isCommander = session?.user?.cycleAssignments?.some(
     (a) => { const r = effectiveRole(a.role as Role); return r === "company_commander" || r === "platoon_commander"; }
   );
+  // Build overflow menu items
+  const overflowItems: OverflowItem[] = [];
 
-  const tabs = [
-    ...staticTabs,
-    ...(!isAdmin && isCommander
-      ? [{ href: "/users", icon: UserCog, label: "מפקדים" }]
-      : []),
-    ...(isAdmin
-      ? [{ href: "/admin", icon: Settings, label: "ניהול" }]
-      : []),
-  ];
+  // Reports — visible to everyone except squad commanders
+  if (isAdmin || isCommander) {
+    overflowItems.push({ href: "/reports", icon: BarChart3, label: "דוחות" });
+  }
+
+  // Commanders page — for non-admin commanders
+  if (!isAdmin && isCommander) {
+    overflowItems.push({ href: "/users", icon: UserCog, label: "מפקדים" });
+  }
+
+  // Admin page
+  if (isAdmin) {
+    overflowItems.push({ href: "/admin", icon: Settings, label: t("admin") });
+  }
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background md:hidden">
       <div className="flex">
-        {tabs.map(({ href, icon: Icon, ...rest }) => {
+        {staticTabs.map(({ href, icon: Icon, labelKey }) => {
           const active = pathname.startsWith(href);
-          const label = "label" in rest ? rest.label : t(rest.labelKey);
+          const label = t(labelKey);
           return (
             <Link
               key={href}
@@ -66,6 +74,10 @@ export function TabBar() {
             </Link>
           );
         })}
+
+        {overflowItems.length > 0 && (
+          <OverflowMenu items={overflowItems} />
+        )}
       </div>
     </nav>
   );

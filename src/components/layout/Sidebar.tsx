@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, Settings, LogOut, UserCog, FileText } from "lucide-react";
+import { Home, Users, Activity, Settings, LogOut, UserCog, FileText, BarChart3 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
@@ -77,6 +77,21 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {(isAdmin || isCommander) && (
+          <Link
+            href="/reports"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+              pathname.startsWith("/reports")
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <BarChart3 size={18} />
+            <span>דוחות</span>
+          </Link>
+        )}
 
         {!isAdmin && isCommander && (
           <Link

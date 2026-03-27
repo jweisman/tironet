@@ -25,7 +25,8 @@
     "requests": "בקשות",
     "profile": "פרופיל",
     "admin": "ניהול",
-    "logout": "התנתקות"
+    "logout": "התנתקות",
+    "reports": "דוחות"
   },
   "auth": {
     "signIn": "כניסה",
@@ -185,6 +186,27 @@
     "assignedTo_company_commander": "מ\"פ",
     "createdBy": "נוצר על ידי",
     "createdAt": "נוצר בתאריך"
+  },
+  "reports": {
+    "title": "דוחות",
+    "activitySummary": "סיכום פעילויות",
+    "activitySummaryDesc": "סיכום ציונים וביצועים לכל פעילות — גרף עוגה וטבלה לפי כיתות",
+    "allActivity": "כל הפעילויות",
+    "allActivityDesc": "טבלת חיילים × פעילויות עם ציונים — גיליון Google Sheets לכל כיתה",
+    "exportPdf": "ייצוא ל-PDF",
+    "exportSheets": "פתח ב-Google Sheets",
+    "generating": "מייצר...",
+    "requiresInternet": "הפקת דוחות דורשת חיבור לאינטרנט",
+    "noAccess": "אין גישה לדוחות",
+    "company": "פלוגה",
+    "platoon": "מחלקה",
+    "squad": "כיתה",
+    "average": "ממוצע",
+    "passed": "עבר",
+    "failed": "נכשל",
+    "na": "לא רלוונטי",
+    "noData": "אין נתונים",
+    "backToReports": "חזרה לדוחות"
   },
   "errors": {
     "generic": "אירעה שגיאה. נסה שנית.",
