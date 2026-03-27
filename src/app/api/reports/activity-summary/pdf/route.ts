@@ -11,15 +11,15 @@ export const maxDuration = 60;
 
 // Chromium binary URL for @sparticuz/chromium-min (downloads at runtime on Vercel)
 const CHROMIUM_PACK_URL =
-  "https://github.com/nichochar/chromium-binaries/releases/download/v131.0.1/chromium-v131.0.1-pack.tar";
+  "https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar";
 
 async function launchBrowser() {
-  // In production (Vercel/Lambda), use @sparticuz/chromium-min which downloads
-  // the Chromium binary at runtime (avoids Turbopack bundling issues).
+  // In production (Vercel/Lambda), use puppeteer-core + @sparticuz/chromium-min
+  // which downloads the Chromium binary at runtime (avoids Turbopack bundling issues).
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     const chromium = await import("@sparticuz/chromium-min").then((m) => m.default);
-    const { chromium: pw } = await import("playwright-core");
-    return pw.launch({
+    const puppeteer = await import("puppeteer-core").then((m) => m.default);
+    return puppeteer.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
       headless: true,
@@ -53,7 +53,11 @@ export async function GET(request: NextRequest) {
     const page = await browser.newPage();
 
     // Load HTML directly — avoids cross-process token issues and extra network hop
-    await page.setContent(html, { waitUntil: "networkidle" });
+    // Puppeteer uses "networkidle0", Playwright uses "networkidle"
+    const isVercel = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+    await page.setContent(html, {
+      waitUntil: isVercel ? "networkidle0" : "networkidle",
+    });
 
     // Wait for Google Fonts to load
     await page.waitForFunction(() => document.fonts.ready);

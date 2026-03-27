@@ -21,7 +21,7 @@ const cspDirectives = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["playwright-core", "@sparticuz/chromium-min"],
+  serverExternalPackages: ["playwright-core", "puppeteer-core", "@sparticuz/chromium-min"],
   // Allow external profile pictures from Google OAuth
   images: {
     remotePatterns: [
