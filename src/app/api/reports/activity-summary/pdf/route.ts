@@ -9,15 +9,19 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+// Chromium binary URL for @sparticuz/chromium-min (downloads at runtime on Vercel)
+const CHROMIUM_PACK_URL =
+  "https://github.com/nichochar/chromium-binaries/releases/download/v131.0.1/chromium-v131.0.1-pack.tar";
+
 async function launchBrowser() {
-  // In production (Vercel/Lambda), use @sparticuz/chromium which ships a
-  // Linux-compatible binary. Locally, use Playwright's own bundled browser.
+  // In production (Vercel/Lambda), use @sparticuz/chromium-min which downloads
+  // the Chromium binary at runtime (avoids Turbopack bundling issues).
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    const chromium = await import("@sparticuz/chromium").then((m) => m.default);
+    const chromium = await import("@sparticuz/chromium-min").then((m) => m.default);
     const { chromium: pw } = await import("playwright-core");
     return pw.launch({
       args: chromium.args,
-      executablePath: await chromium.executablePath(),
+      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
       headless: true,
     });
   }
