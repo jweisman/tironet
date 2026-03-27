@@ -7,6 +7,7 @@ import { UserAvatar } from "./UserAvatar";
 import { CyclePicker } from "./CyclePicker";
 import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
+import { SoldierLogo } from "@/components/SoldierLogo";
 export function AppShell({ children }: { children: React.ReactNode }) {
   // Dismiss the inline splash screen once the app shell has mounted and
   // painted. This avoids the blank/black gap between splash hide and app
@@ -30,7 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Mobile top bar */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
-            <img src="/soldier.svg" alt="" className="h-7 w-auto" />
+            <SoldierLogo className="h-7 w-auto text-[#273617] dark:text-[#7C9A6D]" />
             <span className="text-lg font-bold">טירונט</span>
           </div>
           <div className="flex items-center gap-2">

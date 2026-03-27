@@ -291,12 +291,18 @@ function offlineFallbackResponse(): Response {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>אין חיבור</title>
+  <script>try{var p=localStorage.getItem("tironet:theme")||"system";var d=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme:dark)").matches);if(d)document.documentElement.classList.add("dark")}catch(e){}</script>
   <style>
     body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100dvh; margin: 0; background: #f9fafb; color: #111; }
+    .dark body { background: #1a1a1a; color: #eee; }
     .card { text-align: center; padding: 2rem 1.5rem; max-width: 320px; }
     h1 { font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem; }
     p { font-size: 0.875rem; color: #6b7280; margin: 0 0 1.5rem; line-height: 1.5; }
+    .dark p { color: #9ca3af; }
     button { display: inline-block; padding: 0.625rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; border: none; cursor: pointer; background: #273617; color: #fff; }
+    .dark button { background: #7C9A6D; color: #111; }
+    .secondary { background: #6b7280; }
+    .dark .secondary { background: #4b5563; color: #eee; }
   </style>
 </head>
 <body>
@@ -304,7 +310,7 @@ function offlineFallbackResponse(): Response {
     <h1>אין חיבור לרשת</h1>
     <p>הדף הזה לא זמין במצב לא מקוון. חזור לרשת ונסה שוב.</p>
     <button onclick="location.reload()">נסה שוב</button>
-    <button onclick="location.href='/home'" style="background:#6b7280;">דף הבית</button>
+    <button class="secondary" onclick="location.href='/home'">דף הבית</button>
   </div>
 </body>
 </html>`,

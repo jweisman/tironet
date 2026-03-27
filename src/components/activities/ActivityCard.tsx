@@ -45,10 +45,10 @@ export function ActivityCard({ activity, showPlatoon = false, onClick }: Props) 
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full flex-col gap-1.5 py-3 px-4 text-start transition-colors hover:bg-muted/50 active:bg-muted border-s-2",
+        "flex w-full flex-col gap-1.5 py-3 px-4 text-start transition-colors hover:bg-muted/50 active:bg-muted border-b border-b-border border-s-2",
         hasIssues
-          ? "border-amber-400 bg-amber-50/50"
-          : "border-transparent"
+          ? "border-s-amber-400 bg-amber-50/50 dark:bg-transparent dark:border-s-amber-600"
+          : "border-s-transparent"
       )}
     >
       {/* Main row */}
@@ -88,7 +88,7 @@ export function ActivityCard({ activity, showPlatoon = false, onClick }: Props) 
         <span
           className={cn(
             "text-xs font-medium",
-            activity.passedCount > 0 ? "text-green-600" : "text-muted-foreground"
+            activity.passedCount > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
           )}
         >
           ✓{activity.passedCount}
@@ -96,7 +96,7 @@ export function ActivityCard({ activity, showPlatoon = false, onClick }: Props) 
         <span
           className={cn(
             "text-xs font-medium",
-            activity.failedCount > 0 ? "text-red-600" : "text-muted-foreground"
+            activity.failedCount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
           )}
         >
           ✗{activity.failedCount}
@@ -104,7 +104,7 @@ export function ActivityCard({ activity, showPlatoon = false, onClick }: Props) 
         <span
           className={cn(
             "text-xs font-medium",
-            activity.missingCount > 0 ? "text-amber-600" : "text-muted-foreground"
+            activity.missingCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
           )}
         >
           ⚠{activity.missingCount}

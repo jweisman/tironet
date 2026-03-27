@@ -15,10 +15,19 @@ import dynamic from "next/dynamic";
 const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
+import { useTheme, type ThemePreference } from "@/contexts/ThemeContext";
+import { Monitor, Sun, Moon } from "lucide-react";
 import type { Role } from "@/types";
+
+const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+  { value: "system", label: "מערכת", icon: Monitor },
+  { value: "light", label: "בהיר", icon: Sun },
+  { value: "dark", label: "כהה", icon: Moon },
+];
 
 export default function ProfilePage() {
   const { data: session, update } = useSession();
+  const { preference, setPreference } = useTheme();
   const [givenName, setGivenName] = useState(session?.user?.givenName ?? "");
   const [familyName, setFamilyName] = useState(session?.user?.familyName ?? "");
   const [saving, setSaving] = useState(false);
@@ -144,6 +153,29 @@ export default function ProfilePage() {
           {saving ? "שומר..." : "שמור שינויים"}
         </Button>
       </form>
+
+      {/* Display mode */}
+      <Separator />
+      <div className="space-y-3">
+        <Label>מצב תצוגה</Label>
+        <div className="flex gap-2">
+          {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setPreference(value)}
+              className={`flex flex-1 flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-sm transition-colors ${
+                preference === value
+                  ? "border-primary bg-primary/5 text-foreground"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Cycle assignments (read-only) */}
       {assignments.length > 0 && (

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { SoldierLogo } from "@/components/SoldierLogo";
 import { toE164 } from "@/lib/phone";
 
 type WhatsAppStep = "idle" | "phone" | "code" | "sent";
@@ -97,7 +98,7 @@ function LoginForm() {
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <img src="/soldier.svg" alt="" className="h-28 w-auto mx-auto mb-4" />
+          <SoldierLogo className="h-28 w-auto mx-auto mb-4 text-[#273617] dark:text-[#7C9A6D]" />
           <h1 className="text-3xl font-bold">טירונט</h1>
           <p className="mt-2 text-muted-foreground">{t("signIn")}</p>
         </div>

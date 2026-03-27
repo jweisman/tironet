@@ -311,7 +311,7 @@ export default function ActivitiesPage() {
           </div>
         )}
         {filtered.length > 0 && (
-          <div className="divide-y divide-border">
+          <div>
             {filtered.map((activity) => (
               <ActivityCard
                 key={activity.id}
