@@ -33,6 +33,7 @@ model User {
   activitiesCreated     Activity[]
   activityReportsEdited ActivityReport[]
   requestsCreated       Request[]
+  googleExportToken     GoogleExportToken?
 
   @@map("users")
 }
@@ -379,4 +380,23 @@ model Request {
   @@index([cycleId, status], name: "idx_requests_cycle_status")
   @@index([soldierId], name: "idx_requests_soldier")
   @@map("requests")
+}
+
+// ---------------------------------------------------------------------------
+// Google Sheets export tokens (incremental OAuth)
+// ---------------------------------------------------------------------------
+
+model GoogleExportToken {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @unique @map("user_id") @db.Uuid
+  accessToken  String   @map("access_token") @db.Text
+  refreshToken String   @map("refresh_token") @db.Text
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz()
+  scope        String
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("google_export_tokens")
 }
