@@ -13,22 +13,37 @@ export const maxDuration = 60;
 const CHROMIUM_PACK_URL =
   "https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar";
 
-async function launchBrowser() {
-  // In production (Vercel/Lambda), use puppeteer-core + @sparticuz/chromium-min
-  // which downloads the Chromium binary at runtime (avoids Turbopack bundling issues).
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    const chromium = await import("@sparticuz/chromium-min").then((m) => m.default);
-    const puppeteer = await import("puppeteer-core").then((m) => m.default);
-    return puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
-      headless: true,
-    });
-  }
+const PDF_OPTIONS = {
+  format: "A4" as const,
+  printBackground: true,
+  margin: { top: "15mm", right: "15mm", bottom: "15mm", left: "15mm" },
+};
 
-  // Local development — use full playwright (already installed for e2e tests)
+async function generatePdfVercel(html: string): Promise<Uint8Array> {
+  const chromium = await import("@sparticuz/chromium-min").then((m) => m.default);
+  const puppeteer = await import("puppeteer-core").then((m) => m.default);
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
+    headless: true,
+  });
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
+  await page.waitForFunction(() => document.fonts.ready);
+  const pdfBuffer = await page.pdf(PDF_OPTIONS);
+  await browser.close();
+  return new Uint8Array(pdfBuffer);
+}
+
+async function generatePdfLocal(html: string): Promise<Uint8Array> {
   const { chromium: pw } = await import("playwright-core");
-  return pw.launch({ headless: true });
+  const browser = await pw.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle" });
+  await page.waitForFunction(() => document.fonts.ready);
+  const pdfBuffer = await page.pdf(PDF_OPTIONS);
+  await browser.close();
+  return new Uint8Array(pdfBuffer);
 }
 
 export async function GET(request: NextRequest) {
@@ -49,28 +64,12 @@ export async function GET(request: NextRequest) {
   const html = renderActivitySummaryHtml(data);
 
   try {
-    const browser = await launchBrowser();
-    const page = await browser.newPage();
-
-    // Load HTML directly — avoids cross-process token issues and extra network hop
-    // Puppeteer uses "networkidle0", Playwright uses "networkidle"
     const isVercel = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-    await page.setContent(html, {
-      waitUntil: isVercel ? "networkidle0" : "networkidle",
-    });
+    const pdfBytes = isVercel
+      ? await generatePdfVercel(html)
+      : await generatePdfLocal(html);
 
-    // Wait for Google Fonts to load
-    await page.waitForFunction(() => document.fonts.ready);
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "15mm", right: "15mm", bottom: "15mm", left: "15mm" },
-    });
-
-    await browser.close();
-
-    return new NextResponse(new Uint8Array(pdfBuffer), {
+    return new NextResponse(pdfBytes as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
