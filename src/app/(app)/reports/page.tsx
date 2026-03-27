@@ -50,6 +50,7 @@ export default function ReportsPage() {
   const { selectedCycleId, isLoading: cycleLoading } = useCycle();
   const { data: session } = useSession();
   const [sheetsLoading, setSheetsLoading] = useState(false);
+  const [sheetsUrl, setSheetsUrl] = useState<string | null>(null);
 
   // Check role — squad commanders should not reach here (nav hides it),
   // but guard against direct URL access
@@ -84,6 +85,7 @@ export default function ReportsPage() {
       toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
       return;
     }
+
     setSheetsLoading(true);
     try {
       const res = await fetch(`/api/reports/all-activity/sheets?cycleId=${selectedCycleId}`, {
@@ -92,7 +94,6 @@ export default function ReportsPage() {
       const data = await res.json();
 
       if (data.needsAuth) {
-        // Redirect to Google OAuth consent
         window.location.href = data.authUrl;
         return;
       }
@@ -101,9 +102,7 @@ export default function ReportsPage() {
         throw new Error(data.error || "Export failed");
       }
 
-      // Open the spreadsheet in a new tab
-      window.open(data.url, "_blank");
-      toast.success("הדוח נוצר בהצלחה");
+      setSheetsUrl(data.url);
     } catch (err) {
       toast.error("שגיאה בהפקת הדוח");
     } finally {
@@ -135,36 +134,56 @@ export default function ReportsPage() {
         {reports.map((report) => {
           const isLoading = report.type === "sheets" && sheetsLoading;
           return (
-            <button
-              key={report.id}
-              type="button"
-              onClick={() => handleReportClick(report)}
-              disabled={isLoading}
-              className="flex w-full items-start gap-4 rounded-xl border border-border bg-background p-4 text-start hover:bg-muted/50 transition-colors disabled:opacity-60"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                {isLoading ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : (
-                  <report.icon size={20} />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold">
-                    {report.titleKey === "activitySummary" ? "סיכום פעילויות" : "כל הפעילויות"}
-                  </p>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                    {report.type === "pdf" ? "PDF" : "Sheets"}
-                  </span>
+            <div key={report.id} className="space-y-2">
+              <button
+                type="button"
+                onClick={() => handleReportClick(report)}
+                disabled={isLoading}
+                className="flex w-full items-start gap-4 rounded-xl border border-border bg-background p-4 text-start hover:bg-muted/50 transition-colors disabled:opacity-60"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  {isLoading ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <report.icon size={20} />
+                  )}
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {report.descKey === "activitySummaryDesc"
-                    ? "סיכום ציונים וביצועים לכל פעילות — גרף עוגה וטבלה לפי כיתות"
-                    : "טבלת חיילים × פעילויות עם ציונים — גיליון Google Sheets לכל כיתה"}
-                </p>
-              </div>
-            </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold">
+                      {report.titleKey === "activitySummary" ? "סיכום פעילויות" : "כל הפעילויות"}
+                    </p>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {report.type === "pdf" ? "PDF" : "Sheets"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {report.descKey === "activitySummaryDesc"
+                      ? "סיכום ציונים וביצועים לכל פעילות — גרף עוגה וטבלה לפי כיתות"
+                      : "טבלת חיילים × פעילויות עם ציונים — גיליון Google Sheets לכל כיתה"}
+                  </p>
+                </div>
+              </button>
+              {report.type === "sheets" && sheetsUrl && (
+                <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-4 py-2.5">
+                  <a
+                    href={sheetsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-semibold text-green-800 underline underline-offset-2"
+                  >
+                    פתח את הדוח ב-Google Sheets
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setSheetsUrl(null)}
+                    className="text-green-600 hover:text-green-800 text-xs"
+                  >
+                    סגור
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
