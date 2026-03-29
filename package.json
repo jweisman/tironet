@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "npx prisma migrate deploy && npx prisma generate && next build",
-    "postinstall": "prisma generate && powersync-web copy-assets -o public && cp public/@powersync/worker/*.umd.js public/@powersync/",
+    "postinstall": "prisma generate && powersync-web copy-assets -o public && cp public/@powersync/worker/*.umd.js public/@powersync/ && node scripts/generate-splash.mjs",
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
