@@ -32,6 +32,13 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  async rewrites() {
+    return [
+      { source: "/privacy", destination: "/privacy.html" },
+      { source: "/terms", destination: "/terms.html" },
+    ];
+  },
+
   async headers() {
     return [
       // PowerSync WASM assets — immutable, long-lived cache

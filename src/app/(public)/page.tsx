@@ -24,6 +24,12 @@ function LandingContent() {
           {t("signIn")}
         </Link>
       </div>
+
+      <footer className="absolute bottom-6 text-sm text-muted-foreground flex gap-3">
+        <a href="/terms" className="hover:underline">Terms of Use</a>
+        <span>·</span>
+        <a href="/privacy" className="hover:underline">Privacy Policy</a>
+      </footer>
     </main>
   );
 }

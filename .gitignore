@@ -51,3 +51,14 @@ next-env.d.ts
 # PowerSync — WASM + worker assets copied from node_modules by postinstall.
 # Regenerated on every `npm install`; no need to commit.
 /public/@powersync
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/crash.log
+infra/.terraform.lock.hcl
+infra/lambda.zip
+
+# Local vars
+infra/terraform.tfvars
