@@ -17,10 +17,16 @@ export const metadata: Metadata = {
   description: "מערכת ניהול אימוני טירונות",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon.svg",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+    ],
     // apple-touch-icon — used by iOS for the home screen icon.
     // appleWebApp alone does not emit this link tag.
     apple: "/icons/icon-192.png",
+    other: [
+      { rel: "mask-icon", url: "/mask-icon.svg", color: "#273617" },
+    ],
   },
   appleWebApp: {
     capable: true,
