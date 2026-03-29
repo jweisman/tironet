@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Generates apple-touch-startup-image PNGs for iOS PWA splash screens.
- * Uses the app icon (public/icon.svg) centered on the brand background.
+ * Uses the app icon (public/icon.svg) centered on the brand green background.
  *
  * Usage: node scripts/generate-splash.mjs
  * Output: public/splash/*.png
@@ -43,13 +43,12 @@ const devices = [
   [1024, 1366, 2, "ipad-pro-12"],      // iPad Pro 12.9"
 ];
 
-// Brand colors
-const lightBg = "#ffffff";
-const darkBg = "#1a1a1a";
+// Brand green — works as a neutral splash in both light and dark mode
+const bg = "#273617";
 
 const iconSvg = readFileSync(join(root, "public", "icon.svg"));
 
-async function generateSplash(width, height, ratio, name, bg, suffix) {
+async function generateSplash(width, height, ratio, name) {
   const pw = width * ratio;
   const ph = height * ratio;
 
@@ -74,16 +73,12 @@ async function generateSplash(width, height, ratio, name, bg, suffix) {
   })
     .composite([{ input: iconPng, left, top }])
     .png()
-    .toFile(join(outDir, `${name}${suffix}.png`));
+    .toFile(join(outDir, `${name}.png`));
 }
 
 console.log("Generating splash screens...");
 
-const tasks = [];
-for (const [w, h, r, name] of devices) {
-  tasks.push(generateSplash(w, h, r, name, lightBg, ""));
-  tasks.push(generateSplash(w, h, r, name, darkBg, "-dark"));
-}
+const tasks = devices.map(([w, h, r, name]) => generateSplash(w, h, r, name));
 
 await Promise.all(tasks);
 console.log(`Done — generated ${tasks.length} splash images in public/splash/`);
