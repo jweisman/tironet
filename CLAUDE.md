@@ -286,6 +286,36 @@ Open requests are sorted with "assigned to me" first.
 - Non-admin data access is scoped via `getActivityScope()` (activities) or `getRequestScope()` (requests) which resolve the user's role and unit IDs for a given cycle
 - Polymorphic FK: `UserCycleAssignment.unitId` points to `companies`, `platoons`, or `squads` depending on `unitType`. Referential integrity is enforced at the application layer, not by the DB.
 
+## Bulk Import Pattern (Spreadsheet Upload)
+
+Both soldiers and activities support bulk import from Excel/CSV spreadsheets. The pattern is the same:
+
+1. **Client-side dialog** parses the file with `xlsx`, validates rows against known values (squad names, activity type names), shows a preview table with per-row errors, and POSTs valid rows to a `/bulk` API route.
+2. **API route** validates with Zod, checks scope permissions, and creates records in a Prisma `$transaction`.
+
+### Activity bulk import specifics
+
+- **UI:** `BulkImportActivitiesDialog` in `src/components/activities/`. User selects one platoon for the entire batch. Template uses real activity type names from `/api/activity-types`.
+- **API:** `POST /api/activities/bulk` — only `platoon_commander` (own platoon) and `admin` can create. Activity types are matched by UUID (resolved client-side by name). Duplicates (same name + date + type + platoon) are skipped, not errored.
+- **Defaults:** `isRequired` = true, `status` = draft (consistent with single-create form).
+- **Excel date handling:** Dates in spreadsheets may arrive as Excel serial numbers (e.g. `46113`) when using `raw: true` in `sheet_to_json`. The parser uses `XLSX.SSF.parse_date_code()` to convert these. String dates in `YYYY-MM-DD` format also work.
+
+### Activity report bulk import (column mapping)
+
+Unlike soldier/activity import, report import uses **user-defined column mapping** because spreadsheet formats vary. Key differences from the other bulk imports:
+
+- **UI:** `BulkImportReportsDialog` in `src/components/activities/`. Accessed from the activity detail page ("ייבוא דיווחים" button). Only visible to users with `canEditReports`.
+- **No API route** — reports are written to the local PowerSync SQLite DB via `db.execute()`, matching the existing `saveReport` pattern. The connector handles upload automatically.
+- **Column mapping step:** After file upload, the user maps spreadsheet columns to report fields (personal number, result, note, and dynamic score columns based on activity type). Mappings are auto-detected from known Hebrew header names and persisted to `localStorage` keyed by `activityTypeId` (`tironet:report-mapping:${activityTypeId}`).
+- **Soldier lookup:** Soldiers are matched by `idNumber` (מספר אישי). The `SOLDIERS_QUERY` in the activity detail page fetches `id_number` for this purpose.
+- **Result values:** Accepts Hebrew (עבר/נכשל/לא רלוונטי), English (passed/failed/na), and numeric (1/0).
+- **Upsert behavior:** Existing reports are overwritten (same as manual edits). New reports are INSERTed with `crypto.randomUUID()`.
+
+### Soldier bulk import
+
+- **UI:** `BulkImportDialog` in `src/components/soldiers/`. Squad can be selected per-batch or read from a column in the file.
+- **API:** `POST /api/soldiers/bulk` — scoped by role (squad/platoon/company commander or admin). Returns `activeActivityCount` to trigger "mark as N/A" prompt for late joiners.
+
 ## PWA / Service Worker Architecture
 
 ### Why `@serwist/turbopack` (not `@ducanh2912/next-pwa`)
@@ -416,7 +446,7 @@ Detail pages (`/activities/[id]`, `/soldiers/[id]`, `/requests/[id]`) and the ho
 
 ### Unit Tests (Vitest)
 
-Unit tests live in `__tests__/` directories alongside the code they test. Run with `npm test`. Coverage is ~98% line coverage across 321 tests.
+Unit tests live in `__tests__/` directories alongside the code they test. Run with `npm test`. Coverage is ~98% line coverage across 408 tests.
 
 Configuration is in `vitest.config.ts`. Tests use `vi.mock()` for Prisma, NextAuth, and other server dependencies. PowerSync hooks are mocked at the module level.
 

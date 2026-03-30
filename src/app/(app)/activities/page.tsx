@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, ChevronDown } from "lucide-react";
+import { Plus, ChevronDown, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
@@ -11,6 +11,7 @@ import { effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
 import { CreateActivityForm } from "@/components/activities/CreateActivityForm";
+import { BulkImportActivitiesDialog } from "@/components/activities/BulkImportActivitiesDialog";
 import {
   Dialog,
   DialogContent,
@@ -172,6 +173,7 @@ export default function ActivitiesPage() {
   const [sortMode, setSortMode] = useState<SortMode>("date-desc");
   const [sortOpen, setSortOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
   const [notifying, setNotifying] = useState(false);
 
@@ -202,6 +204,28 @@ export default function ActivitiesPage() {
 
   const showPlatoon = role === "company_commander";
 
+  // Group activities by platoon for company commanders
+  const activitiesByPlatoon = useMemo(() => {
+    if (role !== "company_commander") return null;
+    const platoonOrder = (companyPlatoons ?? []).map((p) => p.id);
+    const map = new Map<string, { platoonName: string; activities: ActivitySummary[] }>();
+    for (const activity of filtered) {
+      const pid = activity.platoon.id;
+      if (!map.has(pid)) {
+        map.set(pid, { platoonName: activity.platoon.name, activities: [] });
+      }
+      map.get(pid)!.activities.push(activity);
+    }
+    // Sort platoon groups by the sort_order from the COMPANY_PLATOONS_QUERY
+    return Array.from(map.entries())
+      .sort(([a], [b]) => {
+        const ai = platoonOrder.indexOf(a);
+        const bi = platoonOrder.indexOf(b);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      })
+      .map(([, group]) => group);
+  }, [filtered, role, companyPlatoons]);
+
   const platoonOptions = useMemo(() => {
     if (!selectedAssignment) return [];
     if (role === "platoon_commander") return [{ id: selectedAssignment.unitId, name: "המחלקה שלי" }];
@@ -213,6 +237,13 @@ export default function ActivitiesPage() {
     setCreateOpen(false);
     toast.success("הפעילות נוצרה בהצלחה");
     setPendingActivityId(activityId);
+  }
+
+  function handleBulkSuccess(created: number, skipped: number) {
+    setBulkOpen(false);
+    const parts = [`${created} פעילויות יובאו בהצלחה`];
+    if (skipped > 0) parts.push(`(${skipped} דולגו — כבר קיימות)`);
+    toast.success(parts.join(" "));
   }
 
   async function handleNotify() {
@@ -277,12 +308,20 @@ export default function ActivitiesPage() {
             )}
           </div>
           {canCreate && (
-            <button
-              type="button" onClick={() => setCreateOpen(true)}
-              className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
-            >
-              <Plus size={15} /> הוסף פעילות
-            </button>
+            <>
+              <button
+                type="button" onClick={() => setBulkOpen(true)}
+                className="hidden md:flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors shrink-0"
+              >
+                <Upload size={15} /> ייבוא
+              </button>
+              <button
+                type="button" onClick={() => setCreateOpen(true)}
+                className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
+              >
+                <Plus size={15} /> הוסף פעילות
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -310,7 +349,31 @@ export default function ActivitiesPage() {
             {filter === "all" && canCreate && <p className="text-sm text-muted-foreground">לחץ על + כדי ליצור פעילות חדשה</p>}
           </div>
         )}
-        {filtered.length > 0 && (
+        {filtered.length > 0 && activitiesByPlatoon && (
+          <div>
+            {activitiesByPlatoon.map((platoonGroup) => (
+              <div key={platoonGroup.platoonName}>
+                <div className="sticky top-[52px] z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between border-b border-border">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {platoonGroup.platoonName}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {platoonGroup.activities.length}
+                  </span>
+                </div>
+                {platoonGroup.activities.map((activity) => (
+                  <ActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    showPlatoon={false}
+                    onClick={() => router.push(`/activities/${activity.id}`)}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+        {filtered.length > 0 && !activitiesByPlatoon && (
           <div>
             {filtered.map((activity) => (
               <ActivityCard
@@ -333,6 +396,16 @@ export default function ActivitiesPage() {
         >
           <Plus size={24} />
         </button>
+      )}
+
+      {canCreate && selectedCycleId && platoonOptions.length > 0 && (
+        <BulkImportActivitiesDialog
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          cycleId={selectedCycleId}
+          platoonOptions={platoonOptions}
+          onSuccess={handleBulkSuccess}
+        />
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
