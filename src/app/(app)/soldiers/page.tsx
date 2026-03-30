@@ -67,7 +67,7 @@ const STATUS_FILTERS: StatusFilter[] = [
 
 const SOLDIERS_QUERY = `
   SELECT
-    s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
+    s.id, s.given_name, s.family_name, s.id_number, s.rank, s.status, s.profile_image,
     s.squad_id,
     (
       SELECT COUNT(*)
@@ -113,6 +113,7 @@ interface RawSoldier {
   id: string;
   given_name: string;
   family_name: string;
+  id_number: string | null;
   rank: string | null;
   status: string;
   profile_image: string | null;
@@ -133,6 +134,7 @@ function mapSoldier(raw: RawSoldier): SoldierSummary {
     id: raw.id,
     givenName: raw.given_name,
     familyName: raw.family_name,
+    idNumber: raw.id_number ?? null,
     rank: raw.rank ?? null,
     status: raw.status as SoldierStatus,
     profileImage: raw.profile_image ?? null,
@@ -231,7 +233,9 @@ export default function SoldiersPage() {
           if (search.trim()) {
             const q = search.trim().toLowerCase();
             const fullName = `${s.familyName} ${s.givenName}`.toLowerCase();
-            if (!fullName.includes(q)) return false;
+            const matchesName = fullName.includes(q);
+            const matchesId = s.idNumber?.includes(q) ?? false;
+            if (!matchesName && !matchesId) return false;
           }
           return true;
         }),

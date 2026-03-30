@@ -8,6 +8,7 @@ export interface SoldierSummary {
   id: string;
   givenName: string;
   familyName: string;
+  idNumber: string | null;
   rank: string | null;
   status: SoldierStatus;
   profileImage: string | null;
