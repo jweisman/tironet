@@ -66,7 +66,7 @@ export function SoldierCard({ soldier, onClick }: Props) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 py-3 px-4 text-start transition-colors hover:bg-muted/50 active:bg-muted"
+      className="relative z-0 flex w-full items-center gap-3 py-3 px-4 text-start transition-colors hover:bg-muted/50 active:bg-muted"
     >
       {/* Avatar */}
       <div

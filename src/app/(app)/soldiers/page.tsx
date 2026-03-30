@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, AlertCircle, FileUp, FileText } from "lucide-react";
 import { toast } from "sonner";
@@ -177,6 +177,32 @@ export default function SoldiersPage() {
     return Array.from(squadMap.values()).filter((sq) => sq.soldiers.length > 0);
   }, [rawSoldiers, rawSquads]);
 
+  // -------- Sticky header offset --------
+  const stickyBarRef = useRef<HTMLDivElement>(null);
+  const platoonHeaderRef = useRef<HTMLDivElement>(null);
+  const [searchBarTop, setSearchBarTop] = useState(0);
+  const [stickyTop, setStickyTop] = useState(104); // fallback
+  const [squadStickyTop, setSquadStickyTop] = useState(140); // fallback
+  const measure = useCallback(() => {
+    // Mobile header (md:hidden) — query the AppShell header element
+    const mobileHeader = document.querySelector("header.sticky") as HTMLElement | null;
+    const headerH = mobileHeader?.offsetHeight ?? 0;
+    setSearchBarTop(headerH);
+    if (stickyBarRef.current) {
+      const barH = stickyBarRef.current.offsetHeight + headerH;
+      setStickyTop(barH);
+      const platoonH = platoonHeaderRef.current?.offsetHeight ?? 36;
+      setSquadStickyTop(barH + platoonH);
+    }
+  }, []);
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+  // Re-measure when role/data changes (platoonHeaderRef may not exist on first render)
+  useEffect(() => { measure(); }, [role, allSquads, measure]);
+
   // -------- UI state --------
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -275,7 +301,12 @@ export default function SoldiersPage() {
     );
   }
 
-  const squadsForForm = (rawSquads ?? []).map((s) => ({ id: s.id, name: s.name }));
+  const squadsForForm = (rawSquads ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    platoonId: s.platoon_id,
+    platoonName: s.platoon_name,
+  }));
   const defaultSquadId =
     role === "squad_commander" && squadsForForm.length === 1
       ? squadsForForm[0].id
@@ -284,7 +315,7 @@ export default function SoldiersPage() {
   return (
     <div className="-mx-4 -my-6">
       {/* Sticky top search + gaps filter */}
-      <div className="sticky top-0 z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2">
+      <div ref={stickyBarRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: searchBarTop }}>
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search
@@ -406,7 +437,7 @@ export default function SoldiersPage() {
           <div>
             {filteredSquads.map((squad) => (
               <div key={squad.id}>
-                <div className="sticky top-[104px] z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between border-b border-border">
+                <div className="sticky z-10 bg-muted px-4 py-2 flex items-center justify-between border-b border-border" style={{ top: stickyTop }}>
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     {squad.name}
                   </span>
@@ -432,14 +463,14 @@ export default function SoldiersPage() {
           <div>
             {squadsByPlatoon.map((platoonGroup) => (
               <div key={platoonGroup.platoonName}>
-                <div className="sticky top-[104px] z-10 bg-background border-b border-border px-4 py-2">
+                <div ref={platoonHeaderRef} className="sticky z-[11] bg-background border-b border-border px-4 py-2" style={{ top: stickyTop }}>
                   <span className="text-sm font-semibold">
                     {platoonGroup.platoonName}
                   </span>
                 </div>
                 {platoonGroup.squads.map((squad) => (
                   <div key={squad.id}>
-                    <div className="bg-muted/50 px-4 py-1.5 flex items-center justify-between border-b border-border">
+                    <div className="sticky z-10 bg-muted px-4 py-1.5 flex items-center justify-between border-b border-border" style={{ top: squadStickyTop }}>
                       <span className="text-xs font-medium text-muted-foreground">
                         {squad.name}
                       </span>

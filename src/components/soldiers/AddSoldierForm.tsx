@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import { RANKS } from "@/lib/auth/permissions";
 
 const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
 
-type Squad = { id: string; name: string };
+type Squad = { id: string; name: string; platoonId: string; platoonName: string };
 
 interface Props {
   cycleId: string;
@@ -38,6 +38,20 @@ export function AddSoldierForm({
   const [idNumber, setIdNumber] = useState("");
   const [rank, setRank] = useState("");
   const [status, setStatus] = useState("active");
+  // Platoon filter — only shown when there are multiple platoons (company commander / admin)
+  const platoons = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of squads) map.set(s.platoonId, s.platoonName);
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [squads]);
+  const showPlatoonSelector = !defaultSquadId && platoons.length > 1;
+
+  const [platoonId, setPlatoonId] = useState("");
+  const filteredSquads = useMemo(
+    () => platoonId ? squads.filter((s) => s.platoonId === platoonId) : squads,
+    [squads, platoonId]
+  );
+
   const [squadId, setSquadId] = useState(
     defaultSquadId ?? squads[0]?.id ?? ""
   );
@@ -47,6 +61,14 @@ export function AddSoldierForm({
       setSquadId(defaultSquadId ?? squads[0].id);
     }
   }, [squads, defaultSquadId, squadId]);
+
+  // Reset squad when platoon filter changes
+  useEffect(() => {
+    if (platoonId && filteredSquads.length > 0 && !filteredSquads.some((s) => s.id === squadId)) {
+      setSquadId(filteredSquads[0].id);
+    }
+  }, [platoonId, filteredSquads, squadId]);
+
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -171,6 +193,30 @@ export function AddSoldierForm({
         </div>
       </div>
 
+      {showPlatoonSelector && (
+        <div className="space-y-1.5">
+          <Label>מחלקה</Label>
+          <Select
+            value={platoonId}
+            onValueChange={(v) => setPlatoonId(!v || v === "__all__" ? "" : v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="כל המחלקות">
+                {platoons.find((p) => p.id === platoonId)?.name ?? "כל המחלקות"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">כל המחלקות</SelectItem>
+              {platoons.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {showSquadSelector && (
         <div className="space-y-1.5">
           <Label>כיתה</Label>
@@ -180,11 +226,11 @@ export function AddSoldierForm({
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="בחר כיתה">
-                {squads.find((s) => s.id === squadId)?.name ?? "בחר כיתה"}
+                {filteredSquads.find((s) => s.id === squadId)?.name ?? "בחר כיתה"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {squads.map((s) => (
+              {filteredSquads.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name}
                 </SelectItem>

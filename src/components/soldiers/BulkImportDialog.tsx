@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,8 @@ type SoldierStatus = "active" | "transferred" | "dropped" | "injured";
 interface SquadOption {
   id: string;
   name: string;
+  platoonId: string;
+  platoonName: string;
 }
 
 interface Props {
@@ -166,12 +168,34 @@ export function BulkImportDialog({
   defaultSquadId,
   onSuccess,
 }: Props) {
+  // Platoon filter — only shown when there are multiple platoons
+  const platoons = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of squads) map.set(s.platoonId, s.platoonName);
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [squads]);
+  const showPlatoonSelector = !defaultSquadId && platoons.length > 1;
+
+  const [platoonId, setPlatoonId] = useState("");
+  const filteredSquads = useMemo(
+    () => platoonId ? squads.filter((s) => s.platoonId === platoonId) : squads,
+    [squads, platoonId]
+  );
+
   const [squadId, setSquadId] = useState(defaultSquadId ?? squads[0]?.id ?? "");
   useEffect(() => {
     if (!squadId && squads.length > 0) {
       setSquadId(defaultSquadId ?? squads[0].id);
     }
   }, [squads, defaultSquadId, squadId]);
+
+  // Reset squad when platoon filter changes
+  useEffect(() => {
+    if (platoonId && squadId !== FROM_FILE && filteredSquads.length > 0 && !filteredSquads.some((s) => s.id === squadId)) {
+      setSquadId(filteredSquads[0].id);
+    }
+  }, [platoonId, filteredSquads, squadId]);
+
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
@@ -181,13 +205,13 @@ export function BulkImportDialog({
 
   const squadMode = squadId === FROM_FILE ? "file" : "select";
 
-  // Re-parse when squad mode changes (switching between "from file" and a specific squad)
+  // Re-parse when squad mode or platoon filter changes
   useEffect(() => {
     if (workbook) {
-      const parsed = parseSheet(workbook, squads, squadMode);
+      const parsed = parseSheet(workbook, filteredSquads, squadMode);
       setRows(parsed);
     }
-  }, [squadMode, workbook, squads]);
+  }, [squadMode, workbook, filteredSquads]);
 
   function reset() {
     setRows(null);
@@ -213,7 +237,7 @@ export function BulkImportDialog({
         const data = ev.target?.result;
         const wb = XLSX.read(data, { type: "array" });
         setWorkbook(wb);
-        const parsed = parseSheet(wb, squads, squadMode);
+        const parsed = parseSheet(wb, filteredSquads, squadMode);
         setRows(parsed);
       } catch {
         setImportError("לא ניתן לקרוא את הקובץ");
@@ -276,6 +300,31 @@ export function BulkImportDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 py-1">
+          {/* Platoon selector — only for company commanders / admins with multiple platoons */}
+          {showPlatoonSelector && (
+            <div className="space-y-1.5">
+              <Label>מחלקה</Label>
+              <Select
+                value={platoonId}
+                onValueChange={(v) => setPlatoonId(!v || v === "__all__" ? "" : v)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="כל המחלקות">
+                    {platoons.find((p) => p.id === platoonId)?.name ?? "כל המחלקות"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">כל המחלקות</SelectItem>
+                  {platoons.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Squad selector */}
           {!defaultSquadId && squads.length >= 1 && (
             <div className="space-y-1.5">
@@ -285,12 +334,12 @@ export function BulkImportDialog({
                   <SelectValue placeholder="בחר כיתה">
                     {squadId === FROM_FILE
                       ? "מהקובץ"
-                      : squads.find((s) => s.id === squadId)?.name ?? "בחר כיתה"}
+                      : filteredSquads.find((s) => s.id === squadId)?.name ?? "בחר כיתה"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={FROM_FILE}>מהקובץ</SelectItem>
-                  {squads.map((s) => (
+                  {filteredSquads.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>
