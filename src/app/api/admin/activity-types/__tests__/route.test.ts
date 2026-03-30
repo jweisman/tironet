@@ -155,6 +155,37 @@ describe("POST /api/admin/activity-types", () => {
     expect(res.status).toBe(400);
   });
 
+  it("creates activity type with score labels", async () => {
+    adminSuccess();
+    mockAggregate.mockResolvedValue({ _max: { sortOrder: 1 } } as never);
+    const created = {
+      id: "t4", name: "כש״ג", icon: "shield", sortOrder: 2, isActive: true,
+      score1Label: "מתח", score2Label: "בנץ׳", score3Label: "מקבילים",
+      score4Label: "ריצה", score5Label: "ספרינט", score6Label: "ציון סופי",
+    };
+    mockCreate.mockResolvedValue(created as never);
+
+    const req = createMockRequest("POST", "/api/admin/activity-types", {
+      name: "כש״ג",
+      icon: "shield",
+      score1Label: "מתח", score2Label: "בנץ׳", score3Label: "מקבילים",
+      score4Label: "ריצה", score5Label: "ספרינט", score6Label: "ציון סופי",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+
+    const body = await res.json();
+    expect(body.score1Label).toBe("מתח");
+    expect(body.score6Label).toBe("ציון סופי");
+    expect(mockCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        score1Label: "מתח",
+        score6Label: "ציון סופי",
+      }),
+    });
+  });
+
   it("returns 403 for non-admin", async () => {
     adminFailure();
 

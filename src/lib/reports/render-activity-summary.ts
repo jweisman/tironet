@@ -8,7 +8,7 @@ export interface ActivitySummaryRow {
   company: string;
   platoon: string;
   squad: string;
-  average: number | null;
+  averages: (number | null)[];
   level: "squad" | "platoon" | "company";
 }
 
@@ -17,6 +17,7 @@ export interface ActivitySummaryItem {
   name: string;
   activityTypeName: string;
   date: string;
+  scoreLabels: string[];
   passedCount: number;
   failedCount: number;
   naCount: number;
@@ -27,6 +28,14 @@ export interface ActivitySummaryItem {
 export interface ActivitySummaryData {
   cycleName: string;
   activities: ActivitySummaryItem[];
+}
+
+const GRADE_FIELDS = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"] as const;
+const SCORE_LABEL_FIELDS = ["score1Label", "score2Label", "score3Label", "score4Label", "score5Label", "score6Label"] as const;
+
+function roundAvg(nums: number[]): number | null {
+  if (nums.length === 0) return null;
+  return Math.round((nums.reduce((s, g) => s + g, 0) / nums.length) * 10) / 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -43,7 +52,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
   const activities = await prisma.activity.findMany({
     where: { cycleId, platoonId: { in: platoonIds }, status: "active" },
     include: {
-      activityType: { select: { name: true } },
+      activityType: { select: { name: true, score1Label: true, score2Label: true, score3Label: true, score4Label: true, score5Label: true, score6Label: true } },
       reports: {
         include: {
           soldier: {
@@ -66,36 +75,60 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
   });
 
   const result: ActivitySummaryItem[] = activities.map((activity) => {
+    const at = activity.activityType;
+    const scoreLabels = SCORE_LABEL_FIELDS
+      .map((f) => at[f])
+      .filter((l): l is string => l != null);
+    const scoreCount = scoreLabels.length;
+
     const activeReports = activity.reports.filter((r) => r.soldier.status === "active");
     const passedCount = activeReports.filter((r) => r.result === "passed").length;
     const failedCount = activeReports.filter((r) => r.result === "failed").length;
     const naCount = activeReports.filter((r) => r.result === "na").length;
 
-    const squadMap = new Map<string, { company: string; platoon: string; squad: string; grades: number[] }>();
+    // grades[scoreIndex][] per squad key
+    const squadMap = new Map<string, { company: string; platoon: string; squad: string; grades: number[][] }>();
     for (const report of activeReports) {
       const sq = report.soldier.squad;
       const key = `${sq.platoon.company.name}|${sq.platoon.name}|${sq.name}`;
       if (!squadMap.has(key)) {
-        squadMap.set(key, { company: sq.platoon.company.name, platoon: sq.platoon.name, squad: sq.name, grades: [] });
+        squadMap.set(key, {
+          company: sq.platoon.company.name,
+          platoon: sq.platoon.name,
+          squad: sq.name,
+          grades: Array.from({ length: scoreCount }, () => []),
+        });
       }
-      if (report.grade != null) squadMap.get(key)!.grades.push(Number(report.grade));
+      const entry = squadMap.get(key)!;
+      for (let i = 0; i < scoreCount; i++) {
+        const val = report[GRADE_FIELDS[i]];
+        if (val != null) entry.grades[i].push(Number(val));
+      }
     }
 
     const rows: ActivitySummaryRow[] = [];
-    const platoonMap = new Map<string, { company: string; grades: number[] }>();
-    const companyMap = new Map<string, number[]>();
+    const platoonMap = new Map<string, { company: string; grades: number[][] }>();
+    const companyMap = new Map<string, number[][]>();
     const sortedSquads = [...squadMap.values()].sort((a, b) =>
       `${a.company}|${a.platoon}|${a.squad}`.localeCompare(`${b.company}|${b.platoon}|${b.squad}`)
     );
 
     for (const entry of sortedSquads) {
-      const avg = entry.grades.length > 0 ? entry.grades.reduce((s, g) => s + g, 0) / entry.grades.length : null;
-      rows.push({ company: entry.company, platoon: entry.platoon, squad: entry.squad, average: avg != null ? Math.round(avg * 10) / 10 : null, level: "squad" });
+      const averages = entry.grades.map((g) => roundAvg(g));
+      rows.push({ company: entry.company, platoon: entry.platoon, squad: entry.squad, averages, level: "squad" });
+
       const pk = `${entry.company}|${entry.platoon}`;
-      if (!platoonMap.has(pk)) platoonMap.set(pk, { company: entry.company, grades: [] });
-      platoonMap.get(pk)!.grades.push(...entry.grades);
-      if (!companyMap.has(entry.company)) companyMap.set(entry.company, []);
-      companyMap.get(entry.company)!.push(...entry.grades);
+      if (!platoonMap.has(pk)) {
+        platoonMap.set(pk, { company: entry.company, grades: Array.from({ length: scoreCount }, () => []) });
+      }
+      const pm = platoonMap.get(pk)!;
+      for (let i = 0; i < scoreCount; i++) pm.grades[i].push(...entry.grades[i]);
+
+      if (!companyMap.has(entry.company)) {
+        companyMap.set(entry.company, Array.from({ length: scoreCount }, () => []));
+      }
+      const cm = companyMap.get(entry.company)!;
+      for (let i = 0; i < scoreCount; i++) cm[i].push(...entry.grades[i]);
     }
 
     const mergedRows: ActivitySummaryRow[] = [];
@@ -107,14 +140,12 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
         mergedRows.push(...cs.filter((r) => r.platoon === platoon));
         const pd = platoonMap.get(`${company}|${platoon}`);
         if (pd) {
-          const avg = pd.grades.length > 0 ? pd.grades.reduce((s, g) => s + g, 0) / pd.grades.length : null;
-          mergedRows.push({ company, platoon, squad: "", average: avg != null ? Math.round(avg * 10) / 10 : null, level: "platoon" });
+          mergedRows.push({ company, platoon, squad: "", averages: pd.grades.map((g) => roundAvg(g)), level: "platoon" });
         }
       }
       const cg = companyMap.get(company);
       if (cg) {
-        const avg = cg.length > 0 ? cg.reduce((s, g) => s + g, 0) / cg.length : null;
-        mergedRows.push({ company, platoon: "", squad: "", average: avg != null ? Math.round(avg * 10) / 10 : null, level: "company" });
+        mergedRows.push({ company, platoon: "", squad: "", averages: cg.map((g) => roundAvg(g)), level: "company" });
       }
     }
 
@@ -123,6 +154,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       name: activity.name,
       activityTypeName: activity.activityType.name,
       date: activity.date.toISOString().split("T")[0],
+      scoreLabels,
       passedCount, failedCount, naCount,
       totalSoldiers: activeReports.length,
       rows: mergedRows,
@@ -189,10 +221,14 @@ export function renderActivitySummaryHtml(
 
   const activitiesHtml = data.activities.map((activity) => {
     const pieSvg = renderPieSvg(activity.passedCount, activity.failedCount, activity.naCount);
+    const labels = activity.scoreLabels;
+
+    const scoreHeaders = labels.map((l) => `<th>${l}</th>`).join("");
 
     const tableRows = activity.rows.map((row) => {
       const cls = row.level === "company" ? ' class="row-company"' : row.level === "platoon" ? ' class="row-platoon"' : "";
-      return `<tr${cls}><td>${row.company}</td><td>${row.platoon}</td><td>${row.squad}</td><td>${row.average != null ? row.average : "—"}</td></tr>`;
+      const avgCells = row.averages.map((a) => `<td>${a != null ? a : "—"}</td>`).join("");
+      return `<tr${cls}><td>${row.company}</td><td>${row.platoon}</td><td>${row.squad}</td>${avgCells}</tr>`;
     }).join("\n");
 
     const dateStr = new Date(activity.date).toLocaleDateString("he-IL");
@@ -216,7 +252,7 @@ export function renderActivitySummaryHtml(
         </div>
         ${activity.rows.length > 0 ? `
         <table>
-          <thead><tr><th>פלוגה</th><th>מחלקה</th><th>כיתה</th><th>ממוצע</th></tr></thead>
+          <thead><tr><th>פלוגה</th><th>מחלקה</th><th>כיתה</th>${scoreHeaders}</tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
         ` : '<p class="no-data">אין נתונים</p>'}

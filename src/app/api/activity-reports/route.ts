@@ -4,6 +4,8 @@ import { getActivityScope } from "@/lib/api/activity-scope";
 import { z } from "zod";
 import type { SessionUser } from "@/types";
 
+const gradeSchema = z.number().min(0).max(100).nullable().optional();
+
 const upsertSchema = z.object({
   // Optional client-generated UUID — used when the record was created offline
   // so the server preserves the same ID the local PowerSync DB already has.
@@ -11,7 +13,12 @@ const upsertSchema = z.object({
   activityId: z.string().uuid(),
   soldierId: z.string().uuid(),
   result: z.enum(["passed", "failed", "na"]),
-  grade: z.number().min(0).max(100).nullable().optional(),
+  grade1: gradeSchema,
+  grade2: gradeSchema,
+  grade3: gradeSchema,
+  grade4: gradeSchema,
+  grade5: gradeSchema,
+  grade6: gradeSchema,
   note: z.string().nullable().optional(),
 });
 
@@ -22,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { id: clientId, activityId, soldierId, result, grade, note } = parsed.data;
+  const { id: clientId, activityId, soldierId, result, grade1, grade2, grade3, grade4, grade5, grade6, note } = parsed.data;
 
   // Find the activity to get cycleId
   const activity = await prisma.activity.findUnique({
@@ -55,6 +62,15 @@ export async function POST(request: NextRequest) {
 
   const sessionUser = user as SessionUser;
 
+  const grades = {
+    grade1: grade1 ?? null,
+    grade2: grade2 ?? null,
+    grade3: grade3 ?? null,
+    grade4: grade4 ?? null,
+    grade5: grade5 ?? null,
+    grade6: grade6 ?? null,
+  };
+
   const report = await prisma.activityReport.upsert({
     where: {
       activityId_soldierId: { activityId, soldierId },
@@ -64,13 +80,13 @@ export async function POST(request: NextRequest) {
       activityId,
       soldierId,
       result,
-      grade: grade ?? null,
+      ...grades,
       note: note ?? null,
       updatedByUserId: sessionUser.id,
     },
     update: {
       result,
-      grade: grade ?? null,
+      ...grades,
       note: note ?? null,
       updatedByUserId: sessionUser.id,
     },
@@ -79,7 +95,12 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     report: {
       ...report,
-      grade: report.grade ? Number(report.grade) : null,
+      grade1: report.grade1 ? Number(report.grade1) : null,
+      grade2: report.grade2 ? Number(report.grade2) : null,
+      grade3: report.grade3 ? Number(report.grade3) : null,
+      grade4: report.grade4 ? Number(report.grade4) : null,
+      grade5: report.grade5 ? Number(report.grade5) : null,
+      grade6: report.grade6 ? Number(report.grade6) : null,
     },
   });
 }

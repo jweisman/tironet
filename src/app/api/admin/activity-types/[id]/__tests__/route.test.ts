@@ -117,6 +117,34 @@ describe("PATCH /api/admin/activity-types/[id]", () => {
     });
   });
 
+  it("updates score labels", async () => {
+    adminSuccess();
+    const updated = {
+      id: "type-1", name: "כש״ג", icon: "shield", isActive: true,
+      score1Label: "מתח", score2Label: "בנץ׳", score3Label: null,
+      score4Label: null, score5Label: null, score6Label: null,
+    };
+    mockUpdate.mockResolvedValue(updated as never);
+
+    const req = createMockRequest("PATCH", "/api/admin/activity-types/type-1", {
+      score1Label: "מתח",
+      score2Label: "בנץ׳",
+      score3Label: null,
+    });
+
+    const res = await PATCH(req, idParams);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.score1Label).toBe("מתח");
+    expect(body.score2Label).toBe("בנץ׳");
+    expect(body.score3Label).toBeNull();
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: "type-1" },
+      data: { score1Label: "מתח", score2Label: "בנץ׳", score3Label: null },
+    });
+  });
+
   it("returns 400 for invalid input (empty name)", async () => {
     adminSuccess();
 

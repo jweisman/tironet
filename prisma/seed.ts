@@ -9,7 +9,11 @@ const prisma = new PrismaClient({ adapter });
 
 const ACTIVITY_TYPES = [
   { name: "אימונים", icon: "dumbbell", sortOrder: 1 },
-  { name: "כש״ג", icon: "shield", sortOrder: 2 },
+  {
+    name: "כש״ג", icon: "shield", sortOrder: 2,
+    score2Label: "מתח", score3Label: "בנץ׳", score4Label: "מקבילים",
+    score5Label: "ריצה", score6Label: "ספרינט", score1Label: "ציון סופי",
+  },
   { name: "ירי", icon: "crosshair", sortOrder: 3 },
   { name: "שיעורים", icon: "book-open", sortOrder: 4 },
   { name: "בוחנים", icon: "clipboard-check", sortOrder: 5 },
@@ -27,7 +31,19 @@ async function main() {
       await prisma.activityType.create({ data: at });
       console.log(`Created activity type: ${at.name}`);
     } else {
-      console.log(`Skipped existing activity type: ${at.name}`);
+      // Update score labels if they differ (e.g. כש״ג migration)
+      if ("score1Label" in at) {
+        await prisma.activityType.update({
+          where: { id: existing.id },
+          data: {
+            score1Label: at.score1Label, score2Label: at.score2Label, score3Label: at.score3Label,
+            score4Label: at.score4Label, score5Label: at.score5Label, score6Label: at.score6Label,
+          },
+        });
+        console.log(`Updated score labels for: ${at.name}`);
+      } else {
+        console.log(`Skipped existing activity type: ${at.name}`);
+      }
     }
   }
 

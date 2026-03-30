@@ -23,6 +23,8 @@ const ACTIVITY_QUERY = `
     a.id, a.name, a.date, a.status, a.is_required,
     a.platoon_id, a.cycle_id,
     at.id AS activity_type_id, at.name AS activity_type_name, at.icon AS activity_type_icon,
+    at.score1_label, at.score2_label, at.score3_label,
+    at.score4_label, at.score5_label, at.score6_label,
     p.name AS platoon_name,
     c.name AS company_name
   FROM activities a
@@ -47,7 +49,7 @@ const SOLDIERS_QUERY = `
 `;
 
 const REPORTS_QUERY = `
-  SELECT id, soldier_id, result, grade, note
+  SELECT id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note
   FROM activity_reports
   WHERE activity_id = ?
 `;
@@ -56,6 +58,8 @@ interface RawActivity {
   id: string; name: string; date: string; status: string; is_required: number;
   platoon_id: string; cycle_id: string;
   activity_type_id: string; activity_type_name: string; activity_type_icon: string;
+  score1_label: string | null; score2_label: string | null; score3_label: string | null;
+  score4_label: string | null; score5_label: string | null; score6_label: string | null;
   platoon_name: string; company_name: string;
 }
 interface RawSquad { id: string; name: string; sort_order: number; }
@@ -65,7 +69,9 @@ interface RawSoldier {
 }
 interface RawReport {
   id: string; soldier_id: string; result: string;
-  grade: number | null; note: string | null;
+  grade1: number | null; grade2: number | null; grade3: number | null;
+  grade4: number | null; grade5: number | null; grade6: number | null;
+  note: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,10 +162,15 @@ export default function ActivityPage() {
                 ? {
                     id: report.id,
                     result: report.result as ActivityResult,
-                    grade: report.grade != null ? Number(report.grade) : null,
+                    grade1: report.grade1 != null ? Number(report.grade1) : null,
+                    grade2: report.grade2 != null ? Number(report.grade2) : null,
+                    grade3: report.grade3 != null ? Number(report.grade3) : null,
+                    grade4: report.grade4 != null ? Number(report.grade4) : null,
+                    grade5: report.grade5 != null ? Number(report.grade5) : null,
+                    grade6: report.grade6 != null ? Number(report.grade6) : null,
                     note: report.note,
                   }
-                : { id: null, result: null, grade: null, note: null },
+                : { id: null, result: null, grade1: null, grade2: null, grade3: null, grade4: null, grade5: null, grade6: null, note: null },
             };
           });
 
@@ -181,6 +192,10 @@ export default function ActivityPage() {
         id: activity.activity_type_id,
         name: activity.activity_type_name,
         icon: activity.activity_type_icon,
+        scoreLabels: [
+          activity.score1_label, activity.score2_label, activity.score3_label,
+          activity.score4_label, activity.score5_label, activity.score6_label,
+        ].filter((l): l is string => l != null),
       },
       platoon: {
         id: activity.platoon_id,

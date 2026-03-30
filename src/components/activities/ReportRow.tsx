@@ -3,6 +3,9 @@
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { ActivityResult } from "@/types";
+import type { GradeKey } from "./ActivityDetail";
+
+const GRADE_KEYS: GradeKey[] = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"];
 
 interface ReportRowProps {
   soldier: {
@@ -15,13 +18,19 @@ interface ReportRowProps {
   report: {
     id: string | null;
     result: ActivityResult | null;
-    grade: number | null;
+    grade1: number | null;
+    grade2: number | null;
+    grade3: number | null;
+    grade4: number | null;
+    grade5: number | null;
+    grade6: number | null;
     note: string | null;
   };
+  scoreLabels: string[];
   disabled?: boolean;
   onChange: (
     soldierId: string,
-    field: "result" | "grade" | "note",
+    field: "result" | GradeKey | "note",
     value: unknown
   ) => void;
 }
@@ -45,34 +54,34 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash];
 }
 
-export function ReportRow({ soldier, report, disabled = false, onChange }: ReportRowProps) {
-  const gradeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const noteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function ReportRow({ soldier, report, scoreLabels, disabled = false, onChange }: ReportRowProps) {
+  const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const initials = (soldier.givenName[0] ?? "") + (soldier.familyName[0] ?? "");
   const colorClass = getAvatarColor(soldier.givenName + soldier.familyName);
 
   function handleResultClick(val: ActivityResult) {
-    // Clicking active result deselects it
     const newResult = report.result === val ? null : val;
     onChange(soldier.id, "result", newResult);
   }
 
-  function handleGradeChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleGradeChange(gradeKey: GradeKey, e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
-    if (gradeDebounceRef.current) clearTimeout(gradeDebounceRef.current);
-    gradeDebounceRef.current = setTimeout(() => {
+    const existing = debounceRefs.current.get(gradeKey);
+    if (existing) clearTimeout(existing);
+    debounceRefs.current.set(gradeKey, setTimeout(() => {
       const num = raw === "" ? null : Number(raw);
-      onChange(soldier.id, "grade", num);
-    }, 500);
+      onChange(soldier.id, gradeKey, num);
+    }, 500));
   }
 
   function handleNoteChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
-    if (noteDebounceRef.current) clearTimeout(noteDebounceRef.current);
-    noteDebounceRef.current = setTimeout(() => {
+    const existing = debounceRefs.current.get("note");
+    if (existing) clearTimeout(existing);
+    debounceRefs.current.set("note", setTimeout(() => {
       onChange(soldier.id, "note", val || null);
-    }, 500);
+    }, 500));
   }
 
   return (
@@ -145,27 +154,30 @@ export function ReportRow({ soldier, report, disabled = false, onChange }: Repor
         </div>
       </div>
 
-      {/* Grade + note (only shown when result is set) */}
+      {/* Grades + note (only shown when result is set) */}
       {report.result !== null && (
-        <div className="flex gap-2 mt-2 ps-[52px]">
-          <input
-            type="number"
-            min={0}
-            max={100}
-            defaultValue={report.grade ?? ""}
-            onChange={handleGradeChange}
-            placeholder="ציון (0-100)"
-            aria-label="ציון"
-            className="w-28 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            dir="ltr"
-          />
+        <div className="flex flex-wrap gap-2 mt-2 ps-[52px]">
+          {scoreLabels.map((label, i) => (
+            <input
+              key={GRADE_KEYS[i]}
+              type="number"
+              min={0}
+              max={100}
+              defaultValue={report[GRADE_KEYS[i]] ?? ""}
+              onChange={(e) => handleGradeChange(GRADE_KEYS[i], e)}
+              placeholder={label}
+              aria-label={label}
+              className="w-28 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              dir="ltr"
+            />
+          ))}
           <input
             type="text"
             defaultValue={report.note ?? ""}
             onChange={handleNoteChange}
             placeholder="הערה"
             aria-label="הערה"
-            className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            className="flex-1 min-w-[100px] rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
       )}

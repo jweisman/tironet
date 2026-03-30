@@ -187,7 +187,8 @@ describe("POST /api/activity-reports", () => {
       activityId: validBody.activityId,
       soldierId: validBody.soldierId,
       result: "passed",
-      grade: null,
+      grade1: null, grade2: null, grade3: null,
+      grade4: null, grade5: null, grade6: null,
       note: null,
     };
     mockPrisma.activityReport.upsert.mockResolvedValue(upsertedReport as never);
@@ -224,7 +225,8 @@ describe("POST /api/activity-reports", () => {
       activityId: validBody.activityId,
       soldierId: validBody.soldierId,
       result: "passed",
-      grade: null,
+      grade1: null, grade2: null, grade3: null,
+      grade4: null, grade5: null, grade6: null,
       note: null,
     } as never);
 
@@ -266,21 +268,22 @@ describe("POST /api/activity-reports", () => {
       activityId: validBody.activityId,
       soldierId: validBody.soldierId,
       result: "failed",
-      grade: 65,
+      grade1: 65, grade2: null, grade3: null,
+      grade4: null, grade5: null, grade6: null,
       note: "Needs improvement",
     } as never);
 
     const req = createMockRequest("POST", "/api/activity-reports", {
       ...validBody,
       result: "failed",
-      grade: 65,
+      grade1: 65,
       note: "Needs improvement",
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
 
     const json = await res.json();
-    expect(json.report.grade).toBe(65);
+    expect(json.report.grade1).toBe(65);
     expect(json.report.note).toBe("Needs improvement");
   });
 });
@@ -359,13 +362,14 @@ describe("PATCH /api/activity-reports/[id]", () => {
     mockPrisma.activityReport.update.mockResolvedValue({
       id: "r-1",
       result: "failed",
-      grade: 70,
+      grade1: 70, grade2: null, grade3: null,
+      grade4: null, grade5: null, grade6: null,
       note: "Updated note",
     } as never);
 
     const req = createMockRequest("PATCH", "/api/activity-reports/r-1", {
       result: "failed",
-      grade: 70,
+      grade1: 70,
       note: "Updated note",
     });
     const res = await PATCH(req, makeParams("r-1"));
@@ -373,7 +377,7 @@ describe("PATCH /api/activity-reports/[id]", () => {
 
     const json = await res.json();
     expect(json.report.result).toBe("failed");
-    expect(json.report.grade).toBe(70);
+    expect(json.report.grade1).toBe(70);
     expect(json.report.note).toBe("Updated note");
   });
 });

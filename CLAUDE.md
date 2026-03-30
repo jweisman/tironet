@@ -46,7 +46,7 @@ Correct pattern for `activity_reports`, which has no `platoon_id` of its own:
 
 ```yaml
 query: >
-  SELECT id, activity_id, soldier_id, result, grade, note
+  SELECT id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note
   FROM activity_reports
   WHERE activity_id IN (
     SELECT id FROM activities WHERE platoon_id IN auth.parameter('platoon_ids')
@@ -122,13 +122,13 @@ The UMD files are served from `public/@powersync/` (copied by `postinstall`). Th
 />
 ```
 
-**Do NOT** use the exact soldier count in the key — incremental sync updates would remount the component repeatedly, discarding any in-progress grade/note edits.
+**Do NOT** use the exact soldier count in the key — incremental sync updates would remount the component repeatedly, discarding any in-progress score/note edits.
 
 If you ever add another `useState(initialData)` component fed by chained `useQuery` params, apply the same pattern.
 
 ### `ActivityDetail` debounce cleanup
 
-`ActivityDetail` stores `setTimeout` handles in a `debounceRefs` Map for grade/note auto-save. A `useEffect` cleanup clears all pending timeouts on unmount to prevent stale callbacks firing against unmounted state. If you add more debounced refs, follow the same cleanup pattern.
+`ActivityDetail` stores `setTimeout` handles in a `debounceRefs` Map for score/note auto-save. A `useEffect` cleanup clears all pending timeouts on unmount to prevent stale callbacks firing against unmounted state. If you add more debounced refs, follow the same cleanup pattern.
 
 ### Activity detail page uses activity-cycle assignment, not global context
 
@@ -146,15 +146,15 @@ const db = usePowerSync(); // from @powersync/react
 
 // UPDATE existing row
 await db.execute(
-  "UPDATE activity_reports SET result = ?, grade = ?, note = ? WHERE id = ?",
-  [result, grade, note, id]
+  "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
+  [result, grade1, grade2, grade3, grade4, grade5, grade6, note, id]
 );
 
 // INSERT new row — always generate the UUID client-side
 const newId = crypto.randomUUID();
 await db.execute(
-  "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade, note) VALUES (?, ?, ?, ?, ?, ?)",
-  [newId, activityId, soldierId, result, grade, note]
+  "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  [newId, activityId, soldierId, result, grade1, grade2, grade3, grade4, grade5, grade6, note]
 );
 ```
 

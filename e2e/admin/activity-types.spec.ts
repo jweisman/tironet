@@ -49,8 +49,8 @@ test.describe("Admin — Activity Types", () => {
     // Create a temporary type to edit (don't modify seeded ones)
     await addActivityType(page, "Rename Me", "Edit");
 
-    // Click edit on Rename Me
-    const row = page.getByText("Rename Me").locator("..");
+    // Click edit on Rename Me — navigate up to the border rounded-lg card
+    const row = page.locator(".border.rounded-lg", { hasText: "Rename Me" });
     await row.getByRole("button", { name: "ערוך סוג פעילות" }).click();
 
     // Clear and type new name — use textbox role (not hidden checkbox)
@@ -73,8 +73,8 @@ test.describe("Admin — Activity Types", () => {
     // Create a temporary type to delete (seeded types have activities and can't be deleted)
     await addActivityType(page, "Temp Delete Me", "Trash");
 
-    // Now delete it
-    const row = page.getByText("Temp Delete Me").locator("..");
+    // Now delete it — navigate up to the border rounded-lg card
+    const row = page.locator(".border.rounded-lg", { hasText: "Temp Delete Me" });
     await row.getByRole("button", { name: "מחק סוג פעילות" }).click();
     await page.getByRole("button", { name: "מחק" }).click();
 

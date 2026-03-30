@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import * as LucideIcons from "lucide-react";
-import { PlusCircle, Pencil, Trash2, Check, X } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,12 +20,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+const SCORE_KEYS = ["score1Label", "score2Label", "score3Label", "score4Label", "score5Label", "score6Label"] as const;
+type ScoreKey = (typeof SCORE_KEYS)[number];
+
 type ActivityType = {
   id: string;
   name: string;
   icon: string;
   isActive: boolean;
   sortOrder: number;
+  score1Label: string | null;
+  score2Label: string | null;
+  score3Label: string | null;
+  score4Label: string | null;
+  score5Label: string | null;
+  score6Label: string | null;
 };
 
 type Props = {
@@ -34,7 +43,6 @@ type Props = {
 
 function LucideIcon({ name, className }: { name: string; className?: string }) {
   const icons = LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
-  // Convert kebab-case or PascalCase icon names to PascalCase
   const pascalName = name
     .split(/[-_]/)
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
@@ -42,6 +50,10 @@ function LucideIcon({ name, className }: { name: string; className?: string }) {
   const Icon = icons[pascalName];
   if (!Icon) return <span className={className}>?</span>;
   return <Icon className={className} />;
+}
+
+function activeScoreCount(type: ActivityType): number {
+  return SCORE_KEYS.filter((k) => type[k] != null).length;
 }
 
 export default function ActivityTypeList({ initialTypes }: Props) {
@@ -52,7 +64,35 @@ export default function ActivityTypeList({ initialTypes }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editIcon, setEditIcon] = useState("");
+  const [editScores, setEditScores] = useState<Record<ScoreKey, string>>({
+    score1Label: "ציון", score2Label: "", score3Label: "",
+    score4Label: "", score5Label: "", score6Label: "",
+  });
+  const [scoresExpandedId, setScoresExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function startEdit(type: ActivityType) {
+    setEditingId(type.id);
+    setEditName(type.name);
+    setEditIcon(type.icon);
+    setEditScores({
+      score1Label: type.score1Label ?? "",
+      score2Label: type.score2Label ?? "",
+      score3Label: type.score3Label ?? "",
+      score4Label: type.score4Label ?? "",
+      score5Label: type.score5Label ?? "",
+      score6Label: type.score6Label ?? "",
+    });
+    setScoresExpandedId(type.id);
+  }
+
+  function scorePayload(scores: Record<ScoreKey, string>): Record<ScoreKey, string | null> {
+    const out = {} as Record<ScoreKey, string | null>;
+    for (const k of SCORE_KEYS) {
+      out[k] = scores[k].trim() || null;
+    }
+    return out;
+  }
 
   async function handleAdd() {
     if (!newName.trim() || !newIcon.trim()) return;
@@ -90,12 +130,17 @@ export default function ActivityTypeList({ initialTypes }: Props) {
     const res = await fetch(`/api/admin/activity-types/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName.trim(), icon: editIcon.trim() }),
+      body: JSON.stringify({
+        name: editName.trim(),
+        icon: editIcon.trim(),
+        ...scorePayload(editScores),
+      }),
     });
     if (res.ok) {
       const updated = await res.json();
       setTypes((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       setEditingId(null);
+      setScoresExpandedId(null);
     }
     setLoading(false);
   }
@@ -158,85 +203,130 @@ export default function ActivityTypeList({ initialTypes }: Props) {
         {types.map((type) => (
           <div
             key={type.id}
-            className="flex items-center gap-3 p-3 border rounded-lg"
+            className="border rounded-lg"
           >
-            <div className="w-9 h-9 flex items-center justify-center rounded-md bg-muted">
-              <LucideIcon name={type.icon} className="w-5 h-5" />
+            <div className="flex items-center gap-3 p-3">
+              <div className="w-9 h-9 flex items-center justify-center rounded-md bg-muted">
+                <LucideIcon name={type.icon} className="w-5 h-5" />
+              </div>
+
+              {editingId === type.id ? (
+                <>
+                  <Input
+                    autoFocus
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="max-w-40"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={editIcon}
+                      onChange={(e) => setEditIcon(e.target.value)}
+                      className="max-w-32"
+                      placeholder="אייקון"
+                    />
+                    <div className="w-7 h-7 flex items-center justify-center border rounded">
+                      <LucideIcon name={editIcon} className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={() => handleEdit(type.id)} disabled={loading} aria-label="שמור">
+                    <Check className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setScoresExpandedId(null); }} aria-label="ביטול">
+                    <X className="w-4 h-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium">{type.name}</span>
+                    {activeScoreCount(type) > 1 && (
+                      <span className="text-xs text-muted-foreground ms-2">
+                        {activeScoreCount(type)} ציונים
+                      </span>
+                    )}
+                  </div>
+                  <Badge variant={type.isActive ? "default" : "secondary"}>
+                    {type.isActive ? "פעיל" : "לא פעיל"}
+                  </Badge>
+                  <Switch
+                    checked={type.isActive}
+                    onCheckedChange={() => handleToggleActive(type)}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="הגדרות ציונים"
+                    onClick={() => setScoresExpandedId(scoresExpandedId === type.id ? null : type.id)}
+                  >
+                    {scoresExpandedId === type.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="ערוך סוג פעילות"
+                    onClick={() => startEdit(type)}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger
+                      render={<Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" aria-label="מחק סוג פעילות" />}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>מחיקת סוג פעילות</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          האם אתה בטוח שברצונך למחוק את &quot;{type.name}&quot;?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>ביטול</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDelete(type.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          מחק
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
             </div>
 
-            {editingId === type.id ? (
-              <>
-                <Input
-                  autoFocus
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="max-w-40"
-                />
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={editIcon}
-                    onChange={(e) => setEditIcon(e.target.value)}
-                    className="max-w-32"
-                    placeholder="אייקון"
-                  />
-                  <div className="w-7 h-7 flex items-center justify-center border rounded">
-                    <LucideIcon name={editIcon} className="w-4 h-4" />
-                  </div>
+            {/* Score labels section (view or edit) */}
+            {scoresExpandedId === type.id && (
+              <div className="border-t px-3 py-3 bg-muted/20 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">תוויות ציונים (השאר ריק לביטול)</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {SCORE_KEYS.map((key, i) => {
+                    if (editingId === type.id) {
+                      return (
+                        <Input
+                          key={key}
+                          placeholder={`ציון ${i + 1}`}
+                          value={editScores[key]}
+                          onChange={(e) => setEditScores((prev) => ({ ...prev, [key]: e.target.value }))}
+                          className="text-xs"
+                        />
+                      );
+                    }
+                    const label = type[key];
+                    return label ? (
+                      <span key={key} className="text-xs bg-background border rounded px-2 py-1">
+                        {i + 1}. {label}
+                      </span>
+                    ) : (
+                      <span key={key} className="text-xs text-muted-foreground/50 px-2 py-1">
+                        {i + 1}. —
+                      </span>
+                    );
+                  })}
                 </div>
-                <Button size="sm" onClick={() => handleEdit(type.id)} disabled={loading} aria-label="שמור">
-                  <Check className="w-4 h-4" />
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} aria-label="ביטול">
-                  <X className="w-4 h-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <span className="flex-1 font-medium">{type.name}</span>
-                <Badge variant={type.isActive ? "default" : "secondary"}>
-                  {type.isActive ? "פעיל" : "לא פעיל"}
-                </Badge>
-                <Switch
-                  checked={type.isActive}
-                  onCheckedChange={() => handleToggleActive(type)}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label="ערוך סוג פעילות"
-                  onClick={() => {
-                    setEditingId(type.id);
-                    setEditName(type.name);
-                    setEditIcon(type.icon);
-                  }}
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger
-                    render={<Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" aria-label="מחק סוג פעילות" />}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>מחיקת סוג פעילות</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        האם אתה בטוח שברצונך למחוק את &quot;{type.name}&quot;?
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>ביטול</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleDelete(type.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        מחק
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
+              </div>
             )}
           </div>
         ))}
