@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, ChevronDown } from "lucide-react";
+import { Plus, ChevronDown, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
@@ -11,6 +11,7 @@ import { effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
 import { CreateActivityForm } from "@/components/activities/CreateActivityForm";
+import { BulkImportActivitiesDialog } from "@/components/activities/BulkImportActivitiesDialog";
 import {
   Dialog,
   DialogContent,
@@ -172,6 +173,7 @@ export default function ActivitiesPage() {
   const [sortMode, setSortMode] = useState<SortMode>("date-desc");
   const [sortOpen, setSortOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
   const [notifying, setNotifying] = useState(false);
 
@@ -213,6 +215,13 @@ export default function ActivitiesPage() {
     setCreateOpen(false);
     toast.success("הפעילות נוצרה בהצלחה");
     setPendingActivityId(activityId);
+  }
+
+  function handleBulkSuccess(created: number, skipped: number) {
+    setBulkOpen(false);
+    const parts = [`${created} פעילויות יובאו בהצלחה`];
+    if (skipped > 0) parts.push(`(${skipped} דולגו — כבר קיימות)`);
+    toast.success(parts.join(" "));
   }
 
   async function handleNotify() {
@@ -277,12 +286,20 @@ export default function ActivitiesPage() {
             )}
           </div>
           {canCreate && (
-            <button
-              type="button" onClick={() => setCreateOpen(true)}
-              className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
-            >
-              <Plus size={15} /> הוסף פעילות
-            </button>
+            <>
+              <button
+                type="button" onClick={() => setBulkOpen(true)}
+                className="hidden md:flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors shrink-0"
+              >
+                <Upload size={15} /> ייבוא
+              </button>
+              <button
+                type="button" onClick={() => setCreateOpen(true)}
+                className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
+              >
+                <Plus size={15} /> הוסף פעילות
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -333,6 +350,16 @@ export default function ActivitiesPage() {
         >
           <Plus size={24} />
         </button>
+      )}
+
+      {canCreate && selectedCycleId && platoonOptions.length > 0 && (
+        <BulkImportActivitiesDialog
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          cycleId={selectedCycleId}
+          platoonOptions={platoonOptions}
+          onSuccess={handleBulkSuccess}
+        />
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

@@ -286,6 +286,25 @@ Open requests are sorted with "assigned to me" first.
 - Non-admin data access is scoped via `getActivityScope()` (activities) or `getRequestScope()` (requests) which resolve the user's role and unit IDs for a given cycle
 - Polymorphic FK: `UserCycleAssignment.unitId` points to `companies`, `platoons`, or `squads` depending on `unitType`. Referential integrity is enforced at the application layer, not by the DB.
 
+## Bulk Import Pattern (Spreadsheet Upload)
+
+Both soldiers and activities support bulk import from Excel/CSV spreadsheets. The pattern is the same:
+
+1. **Client-side dialog** parses the file with `xlsx`, validates rows against known values (squad names, activity type names), shows a preview table with per-row errors, and POSTs valid rows to a `/bulk` API route.
+2. **API route** validates with Zod, checks scope permissions, and creates records in a Prisma `$transaction`.
+
+### Activity bulk import specifics
+
+- **UI:** `BulkImportActivitiesDialog` in `src/components/activities/`. User selects one platoon for the entire batch. Template uses real activity type names from `/api/activity-types`.
+- **API:** `POST /api/activities/bulk` — only `platoon_commander` (own platoon) and `admin` can create. Activity types are matched by UUID (resolved client-side by name). Duplicates (same name + date + type + platoon) are skipped, not errored.
+- **Defaults:** `isRequired` = true, `status` = draft (consistent with single-create form).
+- **Excel date handling:** Dates in spreadsheets may arrive as Excel serial numbers (e.g. `46113`) when using `raw: true` in `sheet_to_json`. The parser uses `XLSX.SSF.parse_date_code()` to convert these. String dates in `YYYY-MM-DD` format also work.
+
+### Soldier bulk import
+
+- **UI:** `BulkImportDialog` in `src/components/soldiers/`. Squad can be selected per-batch or read from a column in the file.
+- **API:** `POST /api/soldiers/bulk` — scoped by role (squad/platoon/company commander or admin). Returns `activeActivityCount` to trigger "mark as N/A" prompt for late joiners.
+
 ## PWA / Service Worker Architecture
 
 ### Why `@serwist/turbopack` (not `@ducanh2912/next-pwa`)
@@ -416,7 +435,7 @@ Detail pages (`/activities/[id]`, `/soldiers/[id]`, `/requests/[id]`) and the ho
 
 ### Unit Tests (Vitest)
 
-Unit tests live in `__tests__/` directories alongside the code they test. Run with `npm test`. Coverage is ~98% line coverage across 321 tests.
+Unit tests live in `__tests__/` directories alongside the code they test. Run with `npm test`. Coverage is ~98% line coverage across 408 tests.
 
 Configuration is in `vitest.config.ts`. Tests use `vi.mock()` for Prisma, NextAuth, and other server dependencies. PowerSync hooks are mocked at the module level.
 
