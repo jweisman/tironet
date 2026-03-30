@@ -6,7 +6,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 
 - **Training hierarchy** — Cycles → Companies → Platoons → Squads → Soldiers
 - **Role-based access** — Admins, cycle commanders, company commanders, platoon commanders, and squad commanders each see only their slice of the hierarchy
-- **Activity management** — Create training activities, assign them to platoons, and record per-soldier results (pass / fail / N/A) with optional grades and notes
+- **Activity management** — Create training activities, assign them to platoons, and record per-soldier results (pass / fail / N/A) with up to 6 labeled scores per activity type and notes
 - **Bulk reporting** — Update an entire squad's activity results in one action
 - **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), denial reasons, and full offline support
 - **Dashboard** — Live summary of activity completion rates, gap counts, and missing reports per platoon/squad
@@ -46,7 +46,7 @@ The app is designed to work reliably in low-connectivity field environments. All
 - **Soldier detail pages** (`/soldiers/[id]`) — View soldier profile, status, and gap activities. Any soldier can be viewed offline — the service worker caches a single HTML shell that works for all soldier IDs.
 - **Activity list** (`/activities`) — Browse all activities assigned to the user's platoons.
 - **Activity detail pages** (`/activities/[id]`) — View and manage per-soldier results. Same shell caching as soldier detail pages — any activity can be viewed offline.
-- **Recording activity reports** — Pass/fail/N/A results, grades, and notes can be saved while offline. Writes go to local SQLite instantly; the connector uploads them to the server when connectivity is restored.
+- **Recording activity reports** — Pass/fail/N/A results, multiple scores, and notes can be saved while offline. Writes go to local SQLite instantly; the connector uploads them to the server when connectivity is restored.
 - **Bulk squad updates** — The bulk "mark all" action also works offline under the same mechanism.
 - **Editing soldiers** — Soldier profile fields (name, rank, status) can be updated offline.
 - **Requests** — Creating requests and performing workflow actions (approve, deny, acknowledge) all work offline. Changes sync when connectivity is restored.
