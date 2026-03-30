@@ -204,6 +204,28 @@ export default function ActivitiesPage() {
 
   const showPlatoon = role === "company_commander";
 
+  // Group activities by platoon for company commanders
+  const activitiesByPlatoon = useMemo(() => {
+    if (role !== "company_commander") return null;
+    const platoonOrder = (companyPlatoons ?? []).map((p) => p.id);
+    const map = new Map<string, { platoonName: string; activities: ActivitySummary[] }>();
+    for (const activity of filtered) {
+      const pid = activity.platoon.id;
+      if (!map.has(pid)) {
+        map.set(pid, { platoonName: activity.platoon.name, activities: [] });
+      }
+      map.get(pid)!.activities.push(activity);
+    }
+    // Sort platoon groups by the sort_order from the COMPANY_PLATOONS_QUERY
+    return Array.from(map.entries())
+      .sort(([a], [b]) => {
+        const ai = platoonOrder.indexOf(a);
+        const bi = platoonOrder.indexOf(b);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      })
+      .map(([, group]) => group);
+  }, [filtered, role, companyPlatoons]);
+
   const platoonOptions = useMemo(() => {
     if (!selectedAssignment) return [];
     if (role === "platoon_commander") return [{ id: selectedAssignment.unitId, name: "המחלקה שלי" }];
@@ -327,7 +349,31 @@ export default function ActivitiesPage() {
             {filter === "all" && canCreate && <p className="text-sm text-muted-foreground">לחץ על + כדי ליצור פעילות חדשה</p>}
           </div>
         )}
-        {filtered.length > 0 && (
+        {filtered.length > 0 && activitiesByPlatoon && (
+          <div>
+            {activitiesByPlatoon.map((platoonGroup) => (
+              <div key={platoonGroup.platoonName}>
+                <div className="sticky top-[52px] z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between border-b border-border">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {platoonGroup.platoonName}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {platoonGroup.activities.length}
+                  </span>
+                </div>
+                {platoonGroup.activities.map((activity) => (
+                  <ActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    showPlatoon={false}
+                    onClick={() => router.push(`/activities/${activity.id}`)}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+        {filtered.length > 0 && !activitiesByPlatoon && (
           <div>
             {filtered.map((activity) => (
               <ActivityCard

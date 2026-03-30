@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BulkUpdateBar } from "./BulkUpdateBar";
+import { BulkImportReportsDialog } from "./BulkImportReportsDialog";
 import { ReportRow } from "./ReportRow";
 import { ActivityTypeIcon } from "./ActivityTypeIcon";
 import type { ActivityResult } from "@/types";
@@ -59,6 +60,7 @@ interface SquadSoldier {
   rank: string | null;
   profileImage: string | null;
   status: string;
+  idNumber: string | null;
   report: SoldierReport;
 }
 
@@ -118,6 +120,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [importReportsOpen, setImportReportsOpen] = useState(false);
 
   const scoreLabels = data.activityType.scoreLabels;
 
@@ -276,6 +279,41 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     }
   }
 
+  async function handleImportReports(imported: Map<string, SoldierReport>) {
+    setSaveError(null);
+    const updates = new Map<string, SoldierReport>();
+
+    for (const [soldierId, report] of imported) {
+      if (report.id) {
+        // UPDATE existing
+        await db.execute(
+          "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
+          [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, report.id]
+        );
+        updates.set(soldierId, report);
+      } else if (report.result !== null) {
+        // INSERT new
+        const newId = crypto.randomUUID();
+        await db.execute(
+          "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [newId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
+        );
+        updates.set(soldierId, { ...report, id: newId });
+      }
+    }
+
+    setReports((prev) => {
+      const next = new Map(prev);
+      for (const [soldierId, updated] of updates) {
+        next.set(soldierId, updated);
+      }
+      return next;
+    });
+
+    setImportReportsOpen(false);
+    toast.success(`${updates.size} דיווחים יובאו בהצלחה`);
+  }
+
   async function handleMetadataSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMetaSubmitting(true);
@@ -417,13 +455,22 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           )}
 
           {data.canEditReports && (
-            <Button
-              size="sm"
-              variant={editingReports ? "default" : "outline"}
-              onClick={() => setEditingReports((v) => !v)}
-            >
-              {editingReports ? "סיים עריכה" : "ערוך דיווח"}
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setImportReportsOpen(true)}
+              >
+                ייבוא דיווחים
+              </Button>
+              <Button
+                size="sm"
+                variant={editingReports ? "default" : "outline"}
+                onClick={() => setEditingReports((v) => !v)}
+              >
+                {editingReports ? "סיים עריכה" : "ערוך דיווח"}
+              </Button>
+            </>
           )}
         </div>
 
@@ -558,6 +605,29 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           );
         })}
       </div>
+
+      {/* Import reports dialog */}
+      {data.canEditReports && (
+        <BulkImportReportsDialog
+          open={importReportsOpen}
+          onOpenChange={setImportReportsOpen}
+          activityId={data.id}
+          activityTypeId={data.activityType.id}
+          scoreLabels={scoreLabels}
+          soldiers={data.squads
+            .filter((sq) => sq.canEdit)
+            .flatMap((sq) =>
+              sq.soldiers.map((s) => ({
+                id: s.id,
+                idNumber: s.idNumber,
+                givenName: s.givenName,
+                familyName: s.familyName,
+              }))
+            )}
+          existingReports={reports}
+          onImport={handleImportReports}
+        />
+      )}
 
       {/* Delete confirmation dialog */}
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>

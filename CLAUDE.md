@@ -300,6 +300,17 @@ Both soldiers and activities support bulk import from Excel/CSV spreadsheets. Th
 - **Defaults:** `isRequired` = true, `status` = draft (consistent with single-create form).
 - **Excel date handling:** Dates in spreadsheets may arrive as Excel serial numbers (e.g. `46113`) when using `raw: true` in `sheet_to_json`. The parser uses `XLSX.SSF.parse_date_code()` to convert these. String dates in `YYYY-MM-DD` format also work.
 
+### Activity report bulk import (column mapping)
+
+Unlike soldier/activity import, report import uses **user-defined column mapping** because spreadsheet formats vary. Key differences from the other bulk imports:
+
+- **UI:** `BulkImportReportsDialog` in `src/components/activities/`. Accessed from the activity detail page ("ייבוא דיווחים" button). Only visible to users with `canEditReports`.
+- **No API route** — reports are written to the local PowerSync SQLite DB via `db.execute()`, matching the existing `saveReport` pattern. The connector handles upload automatically.
+- **Column mapping step:** After file upload, the user maps spreadsheet columns to report fields (personal number, result, note, and dynamic score columns based on activity type). Mappings are auto-detected from known Hebrew header names and persisted to `localStorage` keyed by `activityTypeId` (`tironet:report-mapping:${activityTypeId}`).
+- **Soldier lookup:** Soldiers are matched by `idNumber` (מספר אישי). The `SOLDIERS_QUERY` in the activity detail page fetches `id_number` for this purpose.
+- **Result values:** Accepts Hebrew (עבר/נכשל/לא רלוונטי), English (passed/failed/na), and numeric (1/0).
+- **Upsert behavior:** Existing reports are overwritten (same as manual edits). New reports are INSERTed with `crypto.randomUUID()`.
+
 ### Soldier bulk import
 
 - **UI:** `BulkImportDialog` in `src/components/soldiers/`. Squad can be selected per-batch or read from a column in the file.

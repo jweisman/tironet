@@ -42,7 +42,7 @@ const SQUADS_QUERY = `
 `;
 
 const SOLDIERS_QUERY = `
-  SELECT id, given_name, family_name, rank, profile_image, status, squad_id
+  SELECT id, given_name, family_name, rank, profile_image, status, squad_id, id_number
   FROM soldiers
   WHERE cycle_id = ? AND status = 'active'
   ORDER BY family_name ASC, given_name ASC
@@ -66,6 +66,7 @@ interface RawSquad { id: string; name: string; sort_order: number; }
 interface RawSoldier {
   id: string; given_name: string; family_name: string;
   rank: string | null; profile_image: string | null; status: string; squad_id: string;
+  id_number: string | null;
 }
 interface RawReport {
   id: string; soldier_id: string; result: string;
@@ -158,6 +159,7 @@ export default function ActivityPage() {
               rank: s.rank,
               profileImage: s.profile_image,
               status: s.status,
+              idNumber: s.id_number,
               report: report
                 ? {
                     id: report.id,
