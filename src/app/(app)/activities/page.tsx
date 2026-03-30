@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, ChevronDown, Upload } from "lucide-react";
+import { Plus, ChevronDown, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
@@ -313,7 +313,7 @@ export default function ActivitiesPage() {
                 type="button" onClick={() => setBulkOpen(true)}
                 className="hidden md:flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors shrink-0"
               >
-                <Upload size={15} /> ייבוא
+                <FileUp size={15} /> ייבוא
               </button>
               <button
                 type="button" onClick={() => setCreateOpen(true)}
@@ -387,15 +387,24 @@ export default function ActivitiesPage() {
         )}
       </div>
 
-      {/* Mobile FAB */}
+      {/* Mobile FABs */}
       {canCreate && (
-        <button
-          type="button" onClick={() => setCreateOpen(true)}
-          className="md:hidden fixed bottom-20 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
-          aria-label="הוסף פעילות"
-        >
-          <Plus size={24} />
-        </button>
+        <>
+          <button
+            type="button" onClick={() => setBulkOpen(true)}
+            className="md:hidden fixed bottom-20 end-20 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-lg transition-transform active:scale-95"
+            aria-label="ייבוא פעילויות"
+          >
+            <FileUp size={20} />
+          </button>
+          <button
+            type="button" onClick={() => setCreateOpen(true)}
+            className="md:hidden fixed bottom-20 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+            aria-label="הוסף פעילות"
+          >
+            <Plus size={24} />
+          </button>
+        </>
       )}
 
       {canCreate && selectedCycleId && platoonOptions.length > 0 && (
