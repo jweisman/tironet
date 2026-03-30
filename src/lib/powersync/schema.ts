@@ -32,6 +32,12 @@ const activity_types = new Table({
   icon: column.text,
   is_active: column.integer,
   sort_order: column.integer,
+  score1_label: column.text,
+  score2_label: column.text,
+  score3_label: column.text,
+  score4_label: column.text,
+  score5_label: column.text,
+  score6_label: column.text,
 });
 
 const soldiers = new Table({
@@ -59,7 +65,12 @@ const activity_reports = new Table({
   activity_id: column.text,
   soldier_id: column.text,
   result: column.text,
-  grade: column.real,
+  grade1: column.real,
+  grade2: column.real,
+  grade3: column.real,
+  grade4: column.real,
+  grade5: column.real,
+  grade6: column.real,
   note: column.text,
 });
 

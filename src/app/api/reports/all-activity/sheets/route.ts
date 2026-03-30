@@ -86,7 +86,12 @@ export async function POST(request: NextRequest) {
             select: {
               activityId: true,
               result: true,
-              grade: true,
+              grade1: true,
+              grade2: true,
+              grade3: true,
+              grade4: true,
+              grade5: true,
+              grade6: true,
             },
             where: {
               activity: {
@@ -194,10 +199,15 @@ export async function POST(request: NextRequest) {
           );
           if (!report) {
             row.push("");
-          } else if (report.grade != null) {
-            row.push(String(Number(report.grade)));
           } else {
-            row.push(RESULT_LABELS[report.result] || report.result);
+            const grades = [report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6]
+              .filter((g) => g != null)
+              .map((g) => String(Number(g)));
+            if (grades.length > 0) {
+              row.push(grades.join(" / "));
+            } else {
+              row.push(RESULT_LABELS[report.result] || report.result);
+            }
           }
         }
         return row;

@@ -101,7 +101,12 @@ export class TironetConnector implements PowerSyncBackendConnector {
               activityId: d.activity_id,
               soldierId: d.soldier_id,
               result: d.result,
-              grade: d.grade,
+              grade1: d.grade1,
+              grade2: d.grade2,
+              grade3: d.grade3,
+              grade4: d.grade4,
+              grade5: d.grade5,
+              grade6: d.grade6,
               note: d.note,
             });
           } else if (opType === UpdateType.PATCH) {

@@ -105,7 +105,7 @@ const fullActivity = {
       },
     ],
   },
-  reports: [{ id: "r1", soldierId: "s1", result: "passed", grade: null, note: null }],
+  reports: [{ id: "r1", soldierId: "s1", result: "passed", grade1: null, grade2: null, grade3: null, grade4: null, grade5: null, grade6: null, note: null }],
 };
 
 // ---------------------------------------------------------------------------

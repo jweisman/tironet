@@ -47,7 +47,7 @@ export function ActivityCard({ activity, showPlatoon = false, onClick }: Props) 
       className={cn(
         "flex w-full flex-col gap-1.5 py-3 px-4 text-start transition-colors hover:bg-muted/50 active:bg-muted border-b border-b-border border-s-2",
         hasIssues
-          ? "border-s-amber-400 bg-amber-50/50 dark:bg-transparent dark:border-s-amber-600"
+          ? "border-s-amber-400 bg-amber-50/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 dark:border-s-amber-600"
           : "border-s-transparent"
       )}
     >

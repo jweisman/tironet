@@ -9,7 +9,11 @@ config:
 streams:
   activity_types:
     auto_subscribe: true
-    query: SELECT id, name, icon, is_active, sort_order FROM activity_types
+    query: >
+      SELECT id, name, icon, is_active, sort_order,
+             score1_label, score2_label, score3_label,
+             score4_label, score5_label, score6_label
+      FROM activity_types
 
   cycles:
     auto_subscribe: true
@@ -56,7 +60,8 @@ streams:
   activity_reports:
     auto_subscribe: true
     query: >
-      SELECT id, activity_id, soldier_id, result, grade, note
+      SELECT id, activity_id, soldier_id, result,
+             grade1, grade2, grade3, grade4, grade5, grade6, note
       FROM activity_reports
       WHERE activity_id IN (
         SELECT id FROM activities WHERE platoon_id IN auth.parameter('platoon_ids')

@@ -90,13 +90,15 @@ const SOLDIER_QUERY = `
 
 const REPORTS_QUERY = `
   SELECT
-    ar.id, ar.result, ar.grade, ar.note,
+    ar.id, ar.result, ar.grade1, ar.grade2, ar.grade3, ar.grade4, ar.grade5, ar.grade6, ar.note,
     a.id   AS activity_id,
     a.name AS activity_name,
     a.date AS activity_date,
     a.status AS activity_status,
     a.is_required,
-    at.name AS activity_type_name
+    at.name AS activity_type_name,
+    at.score1_label, at.score2_label, at.score3_label,
+    at.score4_label, at.score5_label, at.score6_label
   FROM activity_reports ar
   JOIN activities a    ON a.id  = ar.activity_id
   JOIN activity_types at ON at.id = a.activity_type_id
@@ -160,10 +162,15 @@ interface RawSoldier {
   squad_name: string; platoon_id: string; platoon_name: string;
 }
 interface RawReport {
-  id: string; result: string; grade: number | null; note: string | null;
+  id: string; result: string;
+  grade1: number | null; grade2: number | null; grade3: number | null;
+  grade4: number | null; grade5: number | null; grade6: number | null;
+  note: string | null;
   activity_id: string; activity_name: string; activity_date: string;
   activity_status: string; is_required: number;
   activity_type_name: string;
+  score1_label: string | null; score2_label: string | null; score3_label: string | null;
+  score4_label: string | null; score5_label: string | null; score6_label: string | null;
 }
 interface RawMissing {
   id: string; name: string; date: string; activity_type_name: string;
@@ -359,9 +366,15 @@ export default function SoldierDetailPage() {
                   <p className="text-xs text-muted-foreground">
                     {r.activity_type_name} · {formatDate(r.activity_date)}
                   </p>
-                  {r.grade !== null && (
-                    <p className="text-xs text-muted-foreground">ציון: {r.grade}</p>
-                  )}
+                  {(() => {
+                    const labels = [r.score1_label, r.score2_label, r.score3_label, r.score4_label, r.score5_label, r.score6_label];
+                    const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
+                    const active = labels.map((l, i) => l ? { label: l, grade: grades[i] } : null).filter(Boolean) as { label: string; grade: number | null }[];
+                    const withValues = active.filter((a) => a.grade != null);
+                    if (withValues.length === 0) return null;
+                    if (withValues.length === 1) return <p className="text-xs text-muted-foreground">{withValues[0].label}: {withValues[0].grade}</p>;
+                    return <p className="text-xs text-muted-foreground">{withValues.map((a) => `${a.label}: ${a.grade}`).join(" · ")}</p>;
+                  })()}
                   {r.note && (
                     <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
                   )}

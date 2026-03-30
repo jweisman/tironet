@@ -165,9 +165,11 @@ export default function ActivitySummaryPage() {
                         <th className="text-start px-3 py-2 font-semibold">
                           כיתה
                         </th>
-                        <th className="text-start px-3 py-2 font-semibold">
-                          ממוצע
-                        </th>
+                        {(activity.scoreLabels ?? ["ממוצע"]).map((label, i) => (
+                          <th key={i} className="text-start px-3 py-2 font-semibold">
+                            {label}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
@@ -185,9 +187,11 @@ export default function ActivitySummaryPage() {
                           <td className="px-3 py-2">{row.company}</td>
                           <td className="px-3 py-2">{row.platoon}</td>
                           <td className="px-3 py-2">{row.squad}</td>
-                          <td className="px-3 py-2">
-                            {row.average != null ? row.average : "—"}
-                          </td>
+                          {row.averages.map((avg, j) => (
+                            <td key={j} className="px-3 py-2">
+                              {avg != null ? avg : "—"}
+                            </td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>

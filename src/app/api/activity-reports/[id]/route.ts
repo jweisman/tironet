@@ -4,9 +4,16 @@ import { getActivityScope } from "@/lib/api/activity-scope";
 import { z } from "zod";
 import type { SessionUser } from "@/types";
 
+const gradeSchema = z.number().min(0).max(100).nullable().optional();
+
 const patchSchema = z.object({
   result: z.enum(["passed", "failed", "na"]).optional(),
-  grade: z.number().min(0).max(100).nullable().optional(),
+  grade1: gradeSchema,
+  grade2: gradeSchema,
+  grade3: gradeSchema,
+  grade4: gradeSchema,
+  grade5: gradeSchema,
+  grade6: gradeSchema,
   note: z.string().nullable().optional(),
 });
 
@@ -49,7 +56,9 @@ export async function PATCH(
   };
 
   if (parsed.data.result !== undefined) updateData.result = parsed.data.result;
-  if ("grade" in parsed.data) updateData.grade = parsed.data.grade ?? null;
+  for (const k of ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"] as const) {
+    if (k in parsed.data) updateData[k] = parsed.data[k] ?? null;
+  }
   if ("note" in parsed.data) updateData.note = parsed.data.note ?? null;
 
   const updated = await prisma.activityReport.update({
@@ -60,7 +69,12 @@ export async function PATCH(
   return NextResponse.json({
     report: {
       ...updated,
-      grade: updated.grade ? Number(updated.grade) : null,
+      grade1: updated.grade1 ? Number(updated.grade1) : null,
+      grade2: updated.grade2 ? Number(updated.grade2) : null,
+      grade3: updated.grade3 ? Number(updated.grade3) : null,
+      grade4: updated.grade4 ? Number(updated.grade4) : null,
+      grade5: updated.grade5 ? Number(updated.grade5) : null,
+      grade6: updated.grade6 ? Number(updated.grade6) : null,
     },
   });
 }

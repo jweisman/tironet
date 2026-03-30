@@ -30,12 +30,27 @@ import { ActivityTypeIcon } from "./ActivityTypeIcon";
 import type { ActivityResult } from "@/types";
 import { useEffect, useRef } from "react";
 
-interface SoldierReport {
+export type GradeKey = "grade1" | "grade2" | "grade3" | "grade4" | "grade5" | "grade6";
+export const GRADE_KEYS: GradeKey[] = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"];
+
+export interface SoldierReport {
   id: string | null;
   result: ActivityResult | null;
-  grade: number | null;
+  grade1: number | null;
+  grade2: number | null;
+  grade3: number | null;
+  grade4: number | null;
+  grade5: number | null;
+  grade6: number | null;
   note: string | null;
 }
+
+export const EMPTY_REPORT: SoldierReport = {
+  id: null, result: null,
+  grade1: null, grade2: null, grade3: null,
+  grade4: null, grade5: null, grade6: null,
+  note: null,
+};
 
 interface SquadSoldier {
   id: string;
@@ -60,7 +75,7 @@ export interface ActivityDetailData {
   date: string;
   status: "draft" | "active";
   isRequired: boolean;
-  activityType: { id: string; name: string; icon: string };
+  activityType: { id: string; name: string; icon: string; scoreLabels: string[] };
   platoon: { id: string; name: string; companyName: string };
   role: string;
   canEditMetadata: boolean;
@@ -103,6 +118,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const scoreLabels = data.activityType.scoreLabels;
 
   // Local reports state: Map<soldierId, SoldierReport>
   const [reports, setReports] = useState<Map<string, SoldierReport>>(() => {
@@ -149,20 +166,15 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
       try {
         if (report.id) {
-          // Update existing report in local PowerSync DB.
-          // The connector will PATCH the server when online.
           await db.execute(
-            "UPDATE activity_reports SET result = ?, grade = ?, note = ? WHERE id = ?",
-            [report.result, report.grade, report.note, report.id]
+            "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
+            [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, report.id]
           );
         } else if (report.result !== null) {
-          // Create new report locally with a client-generated UUID.
-          // The connector will POST the server when online (sending the same id
-          // so the server record matches what's already in the local DB).
           const newId = crypto.randomUUID();
           await db.execute(
-            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade, note) VALUES (?, ?, ?, ?, ?, ?)",
-            [newId, data.id, soldierId, report.result, report.grade ?? null, report.note ?? null]
+            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [newId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
           );
           setReports((prev) => {
             const next = new Map(prev);
@@ -170,7 +182,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             return next;
           });
         }
-        // result === null with no existing id: nothing to save
       } catch {
         setSaveError("שגיאה בשמירת הדיווח");
       } finally {
@@ -185,18 +196,16 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   );
 
   const handleReportChange = useCallback(
-    (soldierId: string, field: "result" | "grade" | "note", value: unknown) => {
+    (soldierId: string, field: "result" | GradeKey | "note", value: unknown) => {
       setReports((prev) => {
         const next = new Map(prev);
-        const current = next.get(soldierId) ?? { id: null, result: null, grade: null, note: null };
+        const current = next.get(soldierId) ?? { ...EMPTY_REPORT };
         const updated = { ...current, [field]: value };
         next.set(soldierId, updated);
 
         if (field === "result") {
-          // Save immediately for result changes
           saveReport(soldierId, updated);
         } else {
-          // Debounce for grade/note
           const existing = debounceRefs.current.get(soldierId);
           if (existing) clearTimeout(existing);
           const timeout = setTimeout(() => {
@@ -215,12 +224,11 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     setBulkLoading(true);
     setSaveError(null);
 
-    // Collect soldiers without a report from squads the user can edit.
     const targets: Array<{ soldierId: string; report: SoldierReport }> = [];
     for (const squad of data.squads) {
       if (squad.canEdit) {
         for (const soldier of squad.soldiers) {
-          const report = reports.get(soldier.id) ?? { id: null, result: null, grade: null, note: null };
+          const report = reports.get(soldier.id) ?? { ...EMPTY_REPORT };
           if (!report.result) {
             targets.push({ soldierId: soldier.id, report });
           }
@@ -246,8 +254,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         } else {
           const newId = crypto.randomUUID();
           await db.execute(
-            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade, note) VALUES (?, ?, ?, ?, ?, ?)",
-            [newId, data.id, soldierId, result, report.grade ?? null, report.note ?? null]
+            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [newId, data.id, soldierId, result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
           );
           updates.set(soldierId, { ...report, result, id: newId });
         }
@@ -473,7 +481,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                   <ReportRow
                     key={soldier.id}
                     soldier={soldier}
-                    report={reports.get(soldier.id) ?? { id: null, result: null, grade: null, note: null }}
+                    report={reports.get(soldier.id) ?? { ...EMPTY_REPORT }}
+                    scoreLabels={scoreLabels}
                     disabled={saving.has(soldier.id)}
                     onChange={handleReportChange}
                   />
@@ -482,7 +491,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             ) : (
               <div className="divide-y divide-border">
                 {visibleSoldiers.map((soldier) => {
-                  const report = reports.get(soldier.id) ?? { id: null, result: null, grade: null, note: null };
+                  const report = reports.get(soldier.id) ?? { ...EMPTY_REPORT };
+                  const hasGrades = GRADE_KEYS.some((k, i) => i < scoreLabels.length && report[k] != null);
                   return (
                     <div
                       key={soldier.id}
@@ -498,10 +508,23 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                           </span>
                         )}
                       </div>
-                      {(report.grade != null || report.note) && (
+                      {(hasGrades || report.note) && (
                         <div className="flex items-center gap-2 text-xs shrink-0 mx-2">
-                          {report.grade != null && (
-                            <span className="font-medium">{report.grade}</span>
+                          {scoreLabels.length === 1 && report.grade1 != null && (
+                            <span className="font-medium">{report.grade1}</span>
+                          )}
+                          {scoreLabels.length > 1 && (
+                            <div className="flex gap-1.5">
+                              {scoreLabels.map((label, i) => {
+                                const val = report[GRADE_KEYS[i]];
+                                if (val == null) return null;
+                                return (
+                                  <span key={i} className="font-medium" title={label}>
+                                    {val}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           )}
                           {report.note && (
                             <span className="text-muted-foreground max-w-[140px] truncate">{report.note}</span>

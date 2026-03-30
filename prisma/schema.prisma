@@ -257,13 +257,19 @@ enum ActivityResult {
 }
 
 model ActivityType {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  icon      String
-  isActive  Boolean  @default(true) @map("is_active")
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  icon        String
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  score1Label String?  @default("ציון") @map("score1_label")
+  score2Label String?  @map("score2_label")
+  score3Label String?  @map("score3_label")
+  score4Label String?  @map("score4_label")
+  score5Label String?  @map("score5_label")
+  score6Label String?  @map("score6_label")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   activities Activity[]
 
@@ -299,7 +305,12 @@ model ActivityReport {
   activityId      String         @map("activity_id") @db.Uuid
   soldierId       String         @map("soldier_id") @db.Uuid
   result          ActivityResult
-  grade           Decimal?       @db.Decimal
+  grade1          Decimal?       @db.Decimal
+  grade2          Decimal?       @db.Decimal
+  grade3          Decimal?       @db.Decimal
+  grade4          Decimal?       @db.Decimal
+  grade5          Decimal?       @db.Decimal
+  grade6          Decimal?       @db.Decimal
   note            String?
   updatedByUserId String         @map("updated_by_user_id") @db.Uuid
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz()

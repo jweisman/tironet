@@ -67,7 +67,12 @@ export async function GET(
         select: {
           id: true,
           result: true,
-          grade: true,
+          grade1: true,
+          grade2: true,
+          grade3: true,
+          grade4: true,
+          grade5: true,
+          grade6: true,
           note: true,
           activity: {
             select: {

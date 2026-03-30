@@ -3,10 +3,18 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/api/admin-guard";
 
+const scoreLabelSchema = z.string().min(1).nullable().optional();
+
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   icon: z.string().min(1).optional(),
   isActive: z.boolean().optional(),
+  score1Label: scoreLabelSchema,
+  score2Label: scoreLabelSchema,
+  score3Label: scoreLabelSchema,
+  score4Label: scoreLabelSchema,
+  score5Label: scoreLabelSchema,
+  score6Label: scoreLabelSchema,
 });
 
 export async function PATCH(

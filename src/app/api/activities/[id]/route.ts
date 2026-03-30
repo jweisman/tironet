@@ -53,7 +53,12 @@ export async function GET(
           id: true,
           soldierId: true,
           result: true,
-          grade: true,
+          grade1: true,
+          grade2: true,
+          grade3: true,
+          grade4: true,
+          grade5: true,
+          grade6: true,
           note: true,
         },
       },
@@ -120,10 +125,15 @@ export async function GET(
               ? {
                   id: report.id,
                   result: report.result,
-                  grade: report.grade ? Number(report.grade) : null,
+                  grade1: report.grade1 ? Number(report.grade1) : null,
+                  grade2: report.grade2 ? Number(report.grade2) : null,
+                  grade3: report.grade3 ? Number(report.grade3) : null,
+                  grade4: report.grade4 ? Number(report.grade4) : null,
+                  grade5: report.grade5 ? Number(report.grade5) : null,
+                  grade6: report.grade6 ? Number(report.grade6) : null,
                   note: report.note,
                 }
-              : { id: null, result: null, grade: null, note: null },
+              : { id: null, result: null, grade1: null, grade2: null, grade3: null, grade4: null, grade5: null, grade6: null, note: null },
           };
         }),
       };
