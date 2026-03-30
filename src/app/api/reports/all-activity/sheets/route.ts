@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       },
     },
     include: {
-      platoon: { select: { name: true } },
+      platoon: { select: { id: true, name: true } },
       soldiers: {
         where: { status: "active", cycleId },
         select: {
@@ -120,22 +120,26 @@ export async function POST(request: NextRequest) {
       status: "active",
     },
     include: {
-      activityType: { select: { name: true } },
+      activityType: {
+        select: {
+          name: true,
+          score1Label: true, score2Label: true, score3Label: true,
+          score4Label: true, score5Label: true, score6Label: true,
+        },
+      },
     },
     orderBy: { date: "asc" },
   });
 
-  // Build activity ID → column index map
-  const activityIds = activities.map((a) => a.id);
-  const activityHeaders = activities.map(
-    (a) => `${a.activityType.name} - ${a.name}`
-  );
+  const SCORE_LABEL_KEYS = [
+    "score1Label", "score2Label", "score3Label",
+    "score4Label", "score5Label", "score6Label",
+  ] as const;
+  const GRADE_KEYS = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"] as const;
 
-  const RESULT_LABELS: Record<string, string> = {
-    passed: "עבר",
-    failed: "נכשל",
-    na: "לא רלוונטי",
-  };
+  function getScoreLabels(a: typeof activities[number]) {
+    return SCORE_LABEL_KEYS.map((k) => a.activityType[k]).filter((l): l is string => l != null);
+  }
 
   try {
     // 1. Create spreadsheet with one sheet per squad
@@ -187,26 +191,47 @@ export async function POST(request: NextRequest) {
     const spreadsheet = await createRes.json();
     const spreadsheetId = spreadsheet.spreadsheetId;
 
-    // 2. Write values to each sheet
-    const valueRanges = squads.map((squad, index) => {
+    // 2. Build two header rows + data rows (per squad, filtered to platoon's activities)
+    const squadSheetData = squads.map((squad, index) => {
       const sheetTitle = sheetProperties[index].properties.title;
-      const headerRow = ["חייל", ...activityHeaders];
+      const squadActivities = activities.filter((a) => a.platoonId === squad.platoon.id);
+      const scoreLabelsPerActivity = squadActivities.map((a) => getScoreLabels(a));
+      const colCounts = scoreLabelsPerActivity.map((labels) => Math.max(labels.length, 1));
+      const totalCols = colCounts.reduce((a, b) => a + b, 0);
+
+      // Row 1: activity names (merged across score columns)
+      const activityNameRow: string[] = [""];
+      for (let ai = 0; ai < squadActivities.length; ai++) {
+        const a = squadActivities[ai];
+        activityNameRow.push(`${a.activityType.name} - ${a.name}`);
+        for (let c = 1; c < colCounts[ai]; c++) activityNameRow.push("");
+      }
+
+      // Row 2: score labels
+      const scoreLabelRow: string[] = ["חייל"];
+      for (let ai = 0; ai < squadActivities.length; ai++) {
+        const labels = scoreLabelsPerActivity[ai];
+        if (labels.length <= 1) {
+          scoreLabelRow.push(labels[0] ?? "ציון");
+        } else {
+          for (const label of labels) scoreLabelRow.push(label);
+        }
+      }
+
+      // Data rows
       const dataRows = squad.soldiers.map((soldier) => {
         const row = [`${soldier.familyName} ${soldier.givenName}`];
-        for (const actId of activityIds) {
+        for (let ai = 0; ai < squadActivities.length; ai++) {
           const report = soldier.activityReports.find(
-            (r) => r.activityId === actId
+            (r) => r.activityId === squadActivities[ai].id
           );
+          const colCount = colCounts[ai];
           if (!report) {
-            row.push("");
+            for (let c = 0; c < colCount; c++) row.push("");
           } else {
-            const grades = [report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6]
-              .filter((g) => g != null)
-              .map((g) => String(Number(g)));
-            if (grades.length > 0) {
-              row.push(grades.join(" / "));
-            } else {
-              row.push(RESULT_LABELS[report.result] || report.result);
+            for (let c = 0; c < colCount; c++) {
+              const g = report[GRADE_KEYS[c]];
+              row.push(g != null ? String(Number(g)) : "");
             }
           }
         }
@@ -214,10 +239,18 @@ export async function POST(request: NextRequest) {
       });
 
       return {
-        range: `'${sheetTitle}'!A1`,
-        values: [headerRow, ...dataRows],
+        sheetTitle,
+        sheetIndex: index,
+        colCounts,
+        totalCols,
+        valueRange: {
+          range: `'${sheetTitle}'!A1`,
+          values: [activityNameRow, scoreLabelRow, ...dataRows],
+        },
       };
     });
+
+    const valueRanges = squadSheetData.map((s) => s.valueRange);
 
     const batchUpdateRes = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
@@ -241,50 +274,75 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Apply formatting: bold headers, freeze first row + column, auto column widths
-    const formatRequests = squads.flatMap((_, index) => [
-      // Bold header row
-      {
-        repeatCell: {
-          range: {
-            sheetId: index,
-            startRowIndex: 0,
-            endRowIndex: 1,
+    // 3. Apply formatting: bold headers, freeze rows + column, merges, auto column widths
+    const formatRequests = squadSheetData.flatMap((sd) => {
+      // Merge cells for activity name row (row 0) — one merge per activity group
+      const mergeRequests: object[] = [];
+      let colOffset = 1; // skip soldier name column
+      for (const colCount of sd.colCounts) {
+        if (colCount > 1) {
+          mergeRequests.push({
+            mergeCells: {
+              range: {
+                sheetId: sd.sheetIndex,
+                startRowIndex: 0,
+                endRowIndex: 1,
+                startColumnIndex: colOffset,
+                endColumnIndex: colOffset + colCount,
+              },
+              mergeType: "MERGE_ALL",
+            },
+          });
+        }
+        colOffset += colCount;
+      }
+
+      return [
+        ...mergeRequests,
+        // Bold + background on both header rows
+        {
+          repeatCell: {
+            range: {
+              sheetId: sd.sheetIndex,
+              startRowIndex: 0,
+              endRowIndex: 2,
+            },
+            cell: {
+              userEnteredFormat: {
+                textFormat: { bold: true },
+                backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 },
+                horizontalAlignment: "CENTER",
+              },
+            },
+            fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment)",
           },
-          cell: {
-            userEnteredFormat: {
-              textFormat: { bold: true },
-              backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 },
+        },
+        // Freeze first 2 rows and first column
+        {
+          updateSheetProperties: {
+            properties: {
+              sheetId: sd.sheetIndex,
+              gridProperties: {
+                frozenRowCount: 2,
+                frozenColumnCount: 1,
+              },
+            },
+            fields: "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
+          },
+        },
+        // Auto-resize columns
+        {
+          autoResizeDimensions: {
+            dimensions: {
+              sheetId: sd.sheetIndex,
+              dimension: "COLUMNS",
+              startIndex: 0,
+              endIndex: sd.totalCols + 1,
             },
           },
-          fields: "userEnteredFormat(textFormat,backgroundColor)",
         },
-      },
-      // Freeze first row and first column
-      {
-        updateSheetProperties: {
-          properties: {
-            sheetId: index,
-            gridProperties: {
-              frozenRowCount: 1,
-              frozenColumnCount: 1,
-            },
-          },
-          fields: "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
-        },
-      },
-      // Auto-resize columns
-      {
-        autoResizeDimensions: {
-          dimensions: {
-            sheetId: index,
-            dimension: "COLUMNS",
-            startIndex: 0,
-            endIndex: activityHeaders.length + 1,
-          },
-        },
-      },
-    ]);
+      ];
+    });
 
     const formatRes = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,

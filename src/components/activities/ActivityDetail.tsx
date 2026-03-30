@@ -489,54 +489,69 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 ))}
               </div>
             ) : (
-              <div className="divide-y divide-border">
+              <div>
+                {/* Score column headers (only for multi-score activity types) */}
+                {scoreLabels.length > 1 && (
+                  <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border">
+                    <div className="flex-1" />
+                    <div className="flex shrink-0 mx-2">
+                      {scoreLabels.map((label, i) => (
+                        <span key={i} className="w-10 text-center text-[10px] text-muted-foreground truncate">
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="shrink-0 w-6" />
+                  </div>
+                )}
+                <div className="divide-y divide-border">
                 {visibleSoldiers.map((soldier) => {
                   const report = reports.get(soldier.id) ?? { ...EMPTY_REPORT };
                   const hasGrades = GRADE_KEYS.some((k, i) => i < scoreLabels.length && report[k] != null);
                   return (
-                    <div
-                      key={soldier.id}
-                      className="flex items-center gap-3 px-4 py-3"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium">
-                          {soldier.familyName} {soldier.givenName}
-                        </span>
-                        {soldier.rank && (
-                          <span className="ms-2 text-xs text-muted-foreground">
-                            {soldier.rank}
+                    <div key={soldier.id} className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium">
+                            {soldier.familyName} {soldier.givenName}
                           </span>
-                        )}
-                      </div>
-                      {(hasGrades || report.note) && (
-                        <div className="flex items-center gap-2 text-xs shrink-0 mx-2">
-                          {scoreLabels.length === 1 && report.grade1 != null && (
-                            <span className="font-medium">{report.grade1}</span>
-                          )}
-                          {scoreLabels.length > 1 && (
-                            <div className="flex gap-1.5">
-                              {scoreLabels.map((label, i) => {
-                                const val = report[GRADE_KEYS[i]];
-                                if (val == null) return null;
-                                return (
-                                  <span key={i} className="font-medium" title={label}>
-                                    {val}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-                          {report.note && (
-                            <span className="text-muted-foreground max-w-[140px] truncate">{report.note}</span>
+                          {soldier.rank && (
+                            <span className="ms-2 text-xs text-muted-foreground">
+                              {soldier.rank}
+                            </span>
                           )}
                         </div>
-                      )}
-                      <div className="shrink-0 text-base w-6 text-center">
-                        {getResultIcon(report.result)}
+                        {hasGrades && (
+                          <div className="flex shrink-0 mx-2">
+                            {scoreLabels.length === 1 && report.grade1 != null && (
+                              <span className="text-xs font-medium">{report.grade1}</span>
+                            )}
+                            {scoreLabels.length > 1 && scoreLabels.map((_, i) => {
+                              const val = report[GRADE_KEYS[i]];
+                              return (
+                                <span key={i} className="w-10 text-center text-xs font-medium">
+                                  {val != null ? val : "—"}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {!hasGrades && scoreLabels.length > 1 && (
+                          <div className="shrink-0 mx-2" style={{ width: scoreLabels.length * 40 }} />
+                        )}
+                        <div className="shrink-0 text-base w-6 text-center">
+                          {getResultIcon(report.result)}
+                        </div>
                       </div>
+                      {report.note && (
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {report.note}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </div>
