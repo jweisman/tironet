@@ -76,6 +76,7 @@ const SOLDIERS_QUERY = `
         AND a.cycle_id = s.cycle_id
         AND a.is_required = 1
         AND a.status = 'active'
+        AND a.date < DATE('now')
         AND (
           NOT EXISTS (
             SELECT 1 FROM activity_reports ar
