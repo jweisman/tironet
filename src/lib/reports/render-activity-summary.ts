@@ -42,7 +42,7 @@ function roundAvg(nums: number[]): number | null {
 // Data fetching
 // ---------------------------------------------------------------------------
 
-export async function fetchActivitySummary(cycleId: string, platoonIds: string[]) {
+export async function fetchActivitySummary(cycleId: string, platoonIds: string[], activityTypeIds?: string[]) {
   const cycle = await prisma.cycle.findUnique({
     where: { id: cycleId },
     select: { name: true },
@@ -50,7 +50,12 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
   if (!cycle) return null;
 
   const activities = await prisma.activity.findMany({
-    where: { cycleId, platoonId: { in: platoonIds }, status: "active" },
+    where: {
+      cycleId,
+      platoonId: { in: platoonIds },
+      status: "active",
+      ...(activityTypeIds && activityTypeIds.length > 0 ? { activityTypeId: { in: activityTypeIds } } : {}),
+    },
     include: {
       activityType: { select: { name: true, score1Label: true, score2Label: true, score3Label: true, score4Label: true, score5Label: true, score6Label: true } },
       reports: {
