@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Ensure VAPID env vars are set so ensureVapidConfigured() doesn't early-return.
+process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = "test-public-key";
+process.env.VAPID_PRIVATE_KEY = "test-private-key";
+
 vi.mock("web-push", () => ({
   default: {
     setVapidDetails: vi.fn(),
@@ -88,6 +92,24 @@ describe("sendPushToUser", () => {
 
     await sendPushToUser("user-1", payload);
     expect(mockDeleteSub).not.toHaveBeenCalled();
+  });
+});
+
+describe("sendPushToUser — missing VAPID keys", () => {
+  it("no-ops when VAPID keys are not configured", async () => {
+    const origPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const origPrivate = process.env.VAPID_PRIVATE_KEY;
+    delete process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    delete process.env.VAPID_PRIVATE_KEY;
+
+    // Reset the lazy-init flag by re-importing a fresh module
+    vi.resetModules();
+    const { sendPushToUser: freshSend } = await import("../send");
+    await freshSend("user-1", payload);
+    expect(mockFindSubs).not.toHaveBeenCalled();
+
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = origPublic;
+    process.env.VAPID_PRIVATE_KEY = origPrivate;
   });
 });
 

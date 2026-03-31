@@ -1,12 +1,23 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/db/prisma";
 
-// Configure VAPID credentials once at module load.
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY!;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@tironet.app";
+// Configure VAPID credentials lazily so the module can be imported even when
+// env vars are missing (e.g. in CI/e2e where push is not needed).
+let vapidConfigured = false;
 
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+function ensureVapidConfigured(): boolean {
+  if (vapidConfigured) return true;
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) {
+    console.warn("[push] VAPID keys not configured — push notifications disabled");
+    return false;
+  }
+  const subject = process.env.VAPID_SUBJECT ?? "mailto:admin@tironet.app";
+  webpush.setVapidDetails(subject, publicKey, privateKey);
+  vapidConfigured = true;
+  return true;
+}
 
 export interface PushPayload {
   title: string;
@@ -23,6 +34,8 @@ export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
 ): Promise<void> {
+  if (!ensureVapidConfigured()) return;
+
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
   });
