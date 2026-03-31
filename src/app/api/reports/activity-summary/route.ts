@@ -14,7 +14,10 @@ export async function GET(request: NextRequest) {
   const { scope, error } = await getReportScope(cycleId);
   if (error) return error;
 
-  const data = await fetchActivitySummary(cycleId, scope!.platoonIds);
+  const typesParam = request.nextUrl.searchParams.get("activityTypeIds");
+  const activityTypeIds = typesParam ? typesParam.split(",").filter(Boolean) : undefined;
+
+  const data = await fetchActivitySummary(cycleId, scope!.platoonIds, activityTypeIds);
   if (!data) {
     return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
   }

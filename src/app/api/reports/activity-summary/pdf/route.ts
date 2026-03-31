@@ -55,8 +55,11 @@ export async function GET(request: NextRequest) {
   const { scope, error } = await getReportScope(cycleId);
   if (error) return error;
 
+  const typesParam = request.nextUrl.searchParams.get("activityTypeIds");
+  const activityTypeIds = typesParam ? typesParam.split(",").filter(Boolean) : undefined;
+
   // Fetch data and render HTML in-process (no separate print route needed)
-  const data = await fetchActivitySummary(cycleId, scope!.platoonIds);
+  const data = await fetchActivitySummary(cycleId, scope!.platoonIds, activityTypeIds);
   if (!data) {
     return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
   }

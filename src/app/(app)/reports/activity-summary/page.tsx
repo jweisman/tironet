@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
@@ -14,15 +14,20 @@ import { cn } from "@/lib/utils";
 
 export default function ActivitySummaryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { selectedCycleId, isLoading: cycleLoading } = useCycle();
   const [data, setData] = useState<ActivitySummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  const typesParam = searchParams.get("types") ?? "";
+
   useEffect(() => {
     if (!selectedCycleId) return;
     setLoading(true);
-    fetch(`/api/reports/activity-summary?cycleId=${selectedCycleId}`)
+    const params = new URLSearchParams({ cycleId: selectedCycleId });
+    if (typesParam) params.set("activityTypeIds", typesParam);
+    fetch(`/api/reports/activity-summary?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
         return res.json();
@@ -30,14 +35,16 @@ export default function ActivitySummaryPage() {
       .then((d: ActivitySummaryData) => setData(d))
       .catch(() => toast.error("שגיאה בטעינת הדוח"))
       .finally(() => setLoading(false));
-  }, [selectedCycleId]);
+  }, [selectedCycleId, typesParam]);
 
   async function handleExportPdf() {
     if (!selectedCycleId) return;
     setPdfLoading(true);
     try {
+      const params = new URLSearchParams({ cycleId: selectedCycleId });
+      if (typesParam) params.set("activityTypeIds", typesParam);
       const res = await fetch(
-        `/api/reports/activity-summary/pdf?cycleId=${selectedCycleId}`
+        `/api/reports/activity-summary/pdf?${params}`
       );
       if (!res.ok) throw new Error("PDF generation failed");
       const blob = await res.blob();

@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "cycleId is required" }, { status: 400 });
   }
 
+  const typesParam = request.nextUrl.searchParams.get("activityTypeIds");
+  const activityTypeIds = typesParam ? typesParam.split(",").filter(Boolean) : undefined;
+
   const { scope, error, user } = await getReportScope(cycleId);
   if (error) return error;
 
@@ -98,6 +101,7 @@ export async function POST(request: NextRequest) {
                 cycleId,
                 status: "active",
                 platoonId: { in: scope!.platoonIds },
+                ...(activityTypeIds?.length ? { activityTypeId: { in: activityTypeIds } } : {}),
               },
             },
           },
@@ -118,6 +122,7 @@ export async function POST(request: NextRequest) {
       cycleId,
       platoonId: { in: scope!.platoonIds },
       status: "active",
+      ...(activityTypeIds?.length ? { activityTypeId: { in: activityTypeIds } } : {}),
     },
     include: {
       activityType: {
