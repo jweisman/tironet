@@ -101,6 +101,7 @@ const SQUADS_QUERY = `
          WHERE a.platoon_id = sq.platoon_id
            AND a.cycle_id = (SELECT id FROM cycle)
            AND a.status = 'active' AND a.is_required = 1
+           AND a.date < DATE('now')
            AND (
              NOT EXISTS (SELECT 1 FROM activity_reports ar
                          WHERE ar.activity_id = a.id AND ar.soldier_id = s.id)
@@ -116,6 +117,7 @@ const SQUADS_QUERY = `
      WHERE a.platoon_id = sq.platoon_id
        AND a.cycle_id = (SELECT id FROM cycle)
        AND a.status = 'active' AND a.is_required = 1
+       AND a.date < DATE('now')
        AND NOT EXISTS (
          SELECT 1 FROM soldiers s
          WHERE s.squad_id = sq.id AND s.status = 'active'
@@ -130,6 +132,7 @@ const SQUADS_QUERY = `
      WHERE a.platoon_id = sq.platoon_id
        AND a.cycle_id = (SELECT id FROM cycle)
        AND a.status = 'active' AND a.is_required = 1
+       AND a.date < DATE('now')
        AND EXISTS (
          SELECT 1 FROM soldiers s
          WHERE s.squad_id = sq.id AND s.status = 'active'
@@ -182,6 +185,7 @@ const TOP_GAPS_QUERY = `
     JOIN activities a ON a.platoon_id = sq.platoon_id
       AND a.status = 'active' AND a.is_required = 1
       AND a.cycle_id = (SELECT id FROM cycle)
+      AND a.date < DATE('now')
     WHERE sq.id IN (SELECT squad_id FROM scope)
   ) g
   WHERE g.gap_count > 0

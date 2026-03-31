@@ -119,6 +119,7 @@ const MISSING_QUERY = `
   )
   AND a.status = 'active'
   AND a.is_required = 1
+  AND a.date < DATE('now')
   AND NOT EXISTS (
     SELECT 1 FROM activity_reports ar
     WHERE ar.activity_id = a.id AND ar.soldier_id = ?
@@ -253,8 +254,9 @@ export default function SoldierDetailPage() {
     profileImage: raw.profile_image,
   };
 
+  const todayStr = new Date().toISOString().split("T")[0];
   const failedReports = (reportRows ?? []).filter(
-    (r) => r.activity_status === "active" && Number(r.is_required) === 1 && r.result === "failed"
+    (r) => r.activity_status === "active" && Number(r.is_required) === 1 && r.result === "failed" && r.activity_date.split("T")[0] < todayStr
   );
   const gapCount = failedReports.length + (missingRows ?? []).length;
 

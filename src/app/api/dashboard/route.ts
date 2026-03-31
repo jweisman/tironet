@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
       platoonId: { in: scope.platoonIds },
       status: "active",
       isRequired: true,
+      date: { lt: new Date() },
     },
     select: { id: true, name: true, platoonId: true },
   });

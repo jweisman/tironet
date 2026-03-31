@@ -125,6 +125,7 @@ export async function GET(req: NextRequest) {
       platoonId: { in: platoonIds },
       status: "active",
       isRequired: true,
+      date: { lt: new Date() },
     },
     select: {
       id: true,

@@ -75,10 +75,10 @@ The dashboard is personalized and shows appropriate data for each user role. The
 
 A squad summary is shown for each squad in the user's hierarchy. It has three sections:
 * _Soldiers_: Total and with gaps. Tapping total bring the user to the soldiers screen. Tapping with gaps brings the user to the Soldiers screen filtered on Gaps.
-* _Activities_: Reported activities shows the number of activities for which all reports have been provided (even if there are failures. Tapping bring the user to the activities screen. Missing reports shows *required* activities for which reports are missing. Tapping brings the user to the activities screen filtered on gaps.
+* _Activities_: Reported activities shows the number of activities for which all reports have been provided (even if there are failures. Tapping bring the user to the activities screen. Missing reports shows *required* activities (whose date is in the past) for which reports are missing. Tapping brings the user to the activities screen filtered on gaps.
 * _Gaps_: 3 activities with the highest number of gaps. Clicking the activity brings the user to the activity detail screen filtered on gaps.
 
-*Gaps* are defined as any *required* activity for which a soldier has either not completed (missing activity report record) or has failed.
+*Gaps* are defined as any *required* activity whose date is in the past and for which a soldier has either not completed (missing activity report record) or has failed.
 
 For example:
 ````

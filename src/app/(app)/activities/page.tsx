@@ -188,7 +188,7 @@ export default function ActivitiesPage() {
     if (filter === "week") {
       list = list.filter((a) => { const d = a.date.split("T")[0]; return d >= weekAgoStr && d <= todayStr; });
     } else if (filter === "gaps") {
-      list = list.filter((a) => a.isRequired && (a.missingCount > 0 || a.failedCount > 0));
+      list = list.filter((a) => a.isRequired && a.date.split("T")[0] < todayStr && (a.missingCount > 0 || a.failedCount > 0));
     } else if (filter === "draft") {
       list = list.filter((a) => a.status === "draft");
     }

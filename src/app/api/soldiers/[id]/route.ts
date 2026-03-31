@@ -118,6 +118,7 @@ export async function GET(
       platoonId: soldier.squad.platoonId,
       status: "active",
       isRequired: true,
+      date: { lt: new Date() },
       reports: { none: { soldierId: soldier.id } },
     },
     select: {

@@ -378,6 +378,9 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
   const isGap = (soldierId: string) => {
     if (!data.isRequired) return false;
+    const activityDate = data.date.split("T")[0];
+    const today = new Date().toISOString().split("T")[0];
+    if (activityDate >= today) return false;
     const r = reports.get(soldierId);
     return !r || r.result === null || r.result === "failed";
   };
