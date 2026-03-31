@@ -182,17 +182,18 @@ export function BulkImportDialog({
     [squads, platoonId]
   );
 
-  const [squadId, setSquadId] = useState(defaultSquadId ?? squads[0]?.id ?? "");
+  const [squadId, setSquadId] = useState(defaultSquadId ?? "");
+  // Sync squadId when squads arrive after initial mount (PowerSync async)
   useEffect(() => {
-    if (!squadId && squads.length > 0) {
-      setSquadId(defaultSquadId ?? squads[0].id);
+    if (!squadId && defaultSquadId && squads.length > 0) {
+      setSquadId(defaultSquadId);
     }
   }, [squads, defaultSquadId, squadId]);
 
-  // Reset squad when platoon filter changes
+  // Reset squad when platoon filter changes and current selection is no longer valid
   useEffect(() => {
-    if (platoonId && squadId !== FROM_FILE && filteredSquads.length > 0 && !filteredSquads.some((s) => s.id === squadId)) {
-      setSquadId(filteredSquads[0].id);
+    if (platoonId && squadId && squadId !== FROM_FILE && filteredSquads.length > 0 && !filteredSquads.some((s) => s.id === squadId)) {
+      setSquadId("");
     }
   }, [platoonId, filteredSquads, squadId]);
 

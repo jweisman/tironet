@@ -218,11 +218,6 @@ export function BulkImportActivitiesDialog({
   const [platoonId, setPlatoonId] = useState(
     platoonOptions.length === 1 ? platoonOptions[0].id : ""
   );
-  useEffect(() => {
-    if (!platoonId && platoonOptions.length > 0) {
-      setPlatoonId(platoonOptions[0].id);
-    }
-  }, [platoonOptions, platoonId]);
 
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
