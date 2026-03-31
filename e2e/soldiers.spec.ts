@@ -62,11 +62,11 @@ test.describe("Soldiers — platoon commander", () => {
     await page.fill('input[name="givenName"], input[placeholder*="שם פרטי"]', "Ziv");
     await page.fill('input[name="familyName"], input[placeholder*="שם משפחה"]', "Test");
 
-    // Select squad if needed
+    // Select squad if needed (no default — user must pick one)
     const squadSelect = page.getByText("בחר כיתה");
     if (await squadSelect.isVisible()) {
       await squadSelect.click();
-      await page.getByText("Squad A").click();
+      await page.getByRole("option", { name: "Squad A" }).click();
     }
 
     // Submit
