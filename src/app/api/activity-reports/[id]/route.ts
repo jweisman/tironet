@@ -4,7 +4,7 @@ import { getActivityScope } from "@/lib/api/activity-scope";
 import { z } from "zod";
 import type { SessionUser } from "@/types";
 
-const gradeSchema = z.number().min(0).max(100).nullable().optional();
+const gradeSchema = z.number().min(0).nullable().optional();
 
 const patchSchema = z.object({
   result: z.enum(["passed", "failed", "na"]).optional(),

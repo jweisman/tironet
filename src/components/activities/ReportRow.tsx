@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
+import { parseGradeInput } from "@/lib/score-format";
 import type { ActivityResult } from "@/types";
 import type { GradeKey } from "./ActivityDetail";
 
@@ -70,7 +71,7 @@ export function ReportRow({ soldier, report, scoreLabels, disabled = false, onCh
     const existing = debounceRefs.current.get(gradeKey);
     if (existing) clearTimeout(existing);
     debounceRefs.current.set(gradeKey, setTimeout(() => {
-      const num = raw === "" ? null : Number(raw);
+      const num = parseGradeInput(raw);
       onChange(soldier.id, gradeKey, num);
     }, 500));
   }
@@ -160,9 +161,8 @@ export function ReportRow({ soldier, report, scoreLabels, disabled = false, onCh
           {scoreLabels.map((label, i) => (
             <input
               key={GRADE_KEYS[i]}
-              type="number"
-              min={0}
-              max={100}
+              type="text"
+              inputMode="decimal"
               defaultValue={report[GRADE_KEYS[i]] ?? ""}
               onChange={(e) => handleGradeChange(GRADE_KEYS[i], e)}
               placeholder={label}

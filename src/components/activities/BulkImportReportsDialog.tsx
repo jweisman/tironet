@@ -2,6 +2,7 @@
 
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
+import { parseGradeInput } from "@/lib/score-format";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -216,13 +217,13 @@ function parseRows(
         if (colIdx === UNMAPPED) return null;
         const raw = get(colIdx);
         if (!raw) return null;
-        const num = Number(raw);
-        if (isNaN(num)) {
+        const num = parseGradeInput(String(raw));
+        if (num === null) {
           errors.push(`${scoreLabels[scoreIdx]}: ערך לא חוקי "${raw}"`);
           return null;
         }
-        if (num < 0 || num > 100) {
-          errors.push(`${scoreLabels[scoreIdx]}: ערך מחוץ לטווח (0-100)`);
+        if (num < 0) {
+          errors.push(`${scoreLabels[scoreIdx]}: ערך לא חוקי "${raw}"`);
           return null;
         }
         return num;
