@@ -34,6 +34,8 @@ model User {
   activityReportsEdited ActivityReport[]
   requestsCreated       Request[]
   googleExportToken     GoogleExportToken?
+  pushSubscriptions     PushSubscription[]
+  notificationPreference NotificationPreference?
 
   @@map("users")
 }
@@ -391,6 +393,35 @@ model Request {
   @@index([cycleId, status], name: "idx_requests_cycle_status")
   @@index([soldierId], name: "idx_requests_soldier")
   @@map("requests")
+}
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+
+model PushSubscription {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], name: "idx_push_subscriptions_user")
+  @@map("push_subscriptions")
+}
+
+model NotificationPreference {
+  id                       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                   String  @unique @map("user_id") @db.Uuid
+  dailyTasksEnabled        Boolean @default(true) @map("daily_tasks_enabled")
+  requestAssignmentEnabled Boolean @default(true) @map("request_assignment_enabled")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
 }
 
 // ---------------------------------------------------------------------------
