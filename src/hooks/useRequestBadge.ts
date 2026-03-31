@@ -11,6 +11,8 @@ import { useCycle } from "@/contexts/CycleContext";
 const BADGE_QUERY = `
   SELECT COUNT(*) as count
   FROM requests r
+  JOIN soldiers s ON s.id = r.soldier_id
+  JOIN squads sq ON sq.id = s.squad_id
   WHERE r.cycle_id = ?
     AND r.assigned_role = ?
 `;
