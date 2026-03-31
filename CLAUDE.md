@@ -2,6 +2,16 @@
 
 This file captures architectural decisions, constraints, and gotchas for Claude when working on this codebase.
 
+## Definition of Done
+
+Before considering any issue or task complete, always:
+
+1. **Tests** – Evaluate whether the changes require new or updated unit or e2e tests. If so, write them. Do not close out a task without test coverage for new behavior.
+
+2. **CLAUDE.md** – Check if the changes affect how this project should be worked on (setup steps, conventions, architecture decisions). If so, update this file.
+
+3. **README.md** – Check if the changes affect user-facing behavior, configuration, installation, or usage. If so, update the README to reflect the current state.
+
 ## Tech Stack Summary
 
 - **Next.js 16** App Router, TypeScript, Tailwind CSS v4
@@ -507,3 +517,54 @@ This creates a separate `tironet_test` database so e2e tests don't touch the dev
 - `POWERSYNC_JWT_SECRET` is the raw secret (used by Next.js to sign tokens) — no `PS_` prefix needed since Next.js reads it directly
 - `PS_JWT_SECRET_B64URL` is its base64url encoding (used by PowerSync to verify tokens via JWKS) — needs `PS_` prefix
 - `PS_JWT_AUDIENCE` is the allowed JWT audience value (must match `NEXT_PUBLIC_POWERSYNC_URL`)
+
+## Push Notifications
+
+### Architecture
+
+Push notifications use the **Web Push API** (W3C standard) with **VAPID** authentication. No Firebase or Apple Developer account needed — the `web-push` npm package handles FCM (Chrome/Android) and Apple Push (Safari/iOS) endpoints transparently.
+
+Key components:
+- `src/lib/push/send.ts` — server-side utility for sending push via `web-push`. Handles stale subscription cleanup (410/404) and per-user preference checking.
+- `src/hooks/usePushSubscription.ts` — client-side hook for managing browser push subscription state, permission, and iOS detection.
+- `src/app/sw.ts` — `push` and `notificationclick` event listeners in the service worker.
+- `src/app/api/push/subscribe/route.ts` — POST/DELETE for managing push subscriptions.
+- `src/app/api/push/preferences/route.ts` — GET/PATCH for notification preference toggles.
+- `src/app/api/cron/daily-tasks/route.ts` — Vercel Cron job for nightly squad commander reminders.
+
+### Database models
+
+- **`PushSubscription`** — per-device subscription (endpoint, p256dh, auth). One user can have multiple devices. Keyed by `endpoint` (unique).
+- **`NotificationPreference`** — per-user opt-out toggles. One-to-one with User. Missing row = both enabled (opt-out model).
+
+Neither model is synced via PowerSync — they are server-only.
+
+### VAPID keys
+
+Generated once with `npx web-push generate-vapid-keys`. Stored as environment variables:
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — used client-side in `PushManager.subscribe()`
+- `VAPID_PRIVATE_KEY` — server-only, used to sign push messages
+- `VAPID_SUBJECT` — `mailto:` URI identifying the application server
+
+**Do not rotate VAPID keys** — all existing subscriptions become invalid if the public key changes.
+
+### Notification types
+
+1. **Daily Tasks** (scheduled) — Vercel Cron at 20:00 Israel time (17:00 UTC) via `vercel.json`. Counts missing activity reports for today/yesterday per squad commander. Opt-out via `dailyTasksEnabled`.
+
+2. **Request Assignment** (event-driven) — fires inline from `PATCH /api/requests/[id]` when a workflow action sets a new `assignedRole`. Notifies all users with that role in the cycle. Opt-out via `requestAssignmentEnabled`.
+
+### iOS limitations
+
+iOS Safari only supports push for PWAs **installed to the Home Screen** (since iOS 16.4). The `usePushSubscription` hook detects non-installed iOS and shows guidance. `iosRequiresInstall` is `true` when the user is on iOS but not in standalone mode.
+
+### Cron security
+
+The `/api/cron/daily-tasks` endpoint validates `Authorization: Bearer <CRON_SECRET>`. Vercel automatically sends this header for configured cron jobs. Set `CRON_SECRET` in Vercel environment variables.
+
+### Adding new notification types
+
+1. Add a new preference field to `NotificationPreference` (Prisma schema + migration).
+2. Add a toggle in the profile page's notifications section.
+3. Call `sendPushToUsers()` with the new preference field name from the trigger point.
+4. The push payload's `url` field determines where the notification click navigates.

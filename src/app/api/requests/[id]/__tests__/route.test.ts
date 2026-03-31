@@ -16,6 +16,10 @@ vi.mock("@/lib/requests/workflow", () => ({
   canActOnRequest: vi.fn(() => true),
 }));
 
+vi.mock("@/lib/push/send", () => ({
+  sendPushToUsers: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { GET, PATCH, DELETE } from "../route";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";

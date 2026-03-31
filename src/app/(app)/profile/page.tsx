@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { UserAvatar, PROFILE_IMAGE_UPDATED_EVENT } from "@/components/layout/UserAvatar";
 import dynamic from "next/dynamic";
 
@@ -16,7 +17,8 @@ const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").the
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
 import { useTheme, type ThemePreference } from "@/contexts/ThemeContext";
-import { Monitor, Sun, Moon } from "lucide-react";
+import { usePushSubscription } from "@/hooks/usePushSubscription";
+import { Monitor, Sun, Moon, Bell } from "lucide-react";
 import type { Role } from "@/types";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
@@ -33,6 +35,43 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Push notification state
+  const push = usePushSubscription();
+  const [dailyTasksEnabled, setDailyTasksEnabled] = useState(true);
+  const [requestAssignmentEnabled, setRequestAssignmentEnabled] = useState(true);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+
+  // Load notification preferences from server
+  useEffect(() => {
+    fetch("/api/push/preferences")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) {
+          setDailyTasksEnabled(data.dailyTasksEnabled);
+          setRequestAssignmentEnabled(data.requestAssignmentEnabled);
+        }
+        setPrefsLoaded(true);
+      })
+      .catch(() => setPrefsLoaded(true));
+  }, []);
+
+  const updatePreference = useCallback(
+    async (field: "dailyTasksEnabled" | "requestAssignmentEnabled", value: boolean) => {
+      const res = await fetch("/api/push/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) {
+        toast.error("שגיאה בשמירת העדפות התראות");
+        // Revert
+        if (field === "dailyTasksEnabled") setDailyTasksEnabled(!value);
+        else setRequestAssignmentEnabled(!value);
+      }
+    },
+    [],
+  );
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -175,6 +214,90 @@ export default function ProfilePage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Notifications */}
+      <Separator />
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Bell size={18} />
+          <Label className="text-base font-semibold">התראות</Label>
+        </div>
+
+        {push.permission === "unsupported" ? (
+          <p className="text-sm text-muted-foreground">
+            הדפדפן אינו תומך בהתראות.
+          </p>
+        ) : push.iosRequiresInstall ? (
+          <p className="text-sm text-muted-foreground">
+            כדי לקבל התראות ב-iPhone, יש להוסיף את האפליקציה למסך הבית תחילה.
+          </p>
+        ) : push.permission === "denied" ? (
+          <p className="text-sm text-muted-foreground">
+            התראות חסומות. יש לאפשר התראות בהגדרות הדפדפן.
+          </p>
+        ) : !push.isSubscribed ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              אפשר התראות כדי לקבל עדכונים על בקשות ודיווחים חסרים.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={push.loading}
+              onClick={async () => {
+                const ok = await push.subscribe();
+                if (ok) toast.success("התראות הופעלו בהצלחה");
+                else if (Notification.permission === "denied") toast.error("התראות חסומות בהגדרות הדפדפן");
+              }}
+            >
+              {push.loading ? "מפעיל..." : "הפעל התראות"}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">דיווחי פעילויות חסרים</p>
+                <p className="text-xs text-muted-foreground">תזכורת יומית על דיווחים חסרים</p>
+              </div>
+              <Switch
+                checked={dailyTasksEnabled}
+                disabled={!prefsLoaded}
+                onCheckedChange={(v) => {
+                  setDailyTasksEnabled(v);
+                  updatePreference("dailyTasksEnabled", v);
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">בקשות ממתינות</p>
+                <p className="text-xs text-muted-foreground">כאשר בקשה מוקצית לתפקידך</p>
+              </div>
+              <Switch
+                checked={requestAssignmentEnabled}
+                disabled={!prefsLoaded}
+                onCheckedChange={(v) => {
+                  setRequestAssignmentEnabled(v);
+                  updatePreference("requestAssignmentEnabled", v);
+                }}
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              disabled={push.loading}
+              onClick={async () => {
+                await push.unsubscribe();
+                toast.success("התראות בוטלו");
+              }}
+            >
+              {push.loading ? "מבטל..." : "בטל התראות במכשיר זה"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Cycle assignments (read-only) */}

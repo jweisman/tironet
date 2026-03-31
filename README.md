@@ -14,6 +14,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Invitation system** — Admins invite users by email; each invitation scopes the user to a specific unit and role
 - **Authentication** — Google OAuth, email magic link (Nodemailer), and WhatsApp OTP (Twilio Verify)
 - **Admin panel** — Manage cycles, companies, platoons, squads, activity types, and users
+- **Push notifications** — Daily task reminders for squad commanders (missing activity reports) and real-time request assignment alerts; opt-out per notification type in the profile page
 - **Offline-first** — Activity reports can be recorded and bulk-updated without a network connection; changes sync automatically when connectivity is restored
 - **PWA** — Installable on iOS (Add to Home Screen) and Android; works as a standalone app with full offline support
 
@@ -31,6 +32,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 | Image processing | browser-image-compression, react-easy-crop |
 | Drag & drop | dnd-kit |
 | Excel import | xlsx |
+| Push notifications | web-push (VAPID / Web Push API) |
 | PWA / Service Worker | @serwist/turbopack |
 | Offline sync | PowerSync (Sync Streams edition 3, self-hosted via Docker) |
 | Deployment | Vercel (production), Docker Compose (local dev) |
@@ -179,7 +181,7 @@ npm run make-admin -- --email you@example.com
 npm test
 ```
 
-Runs 408 unit tests with ~98% line coverage. Tests cover API routes, auth logic, PowerSync connector, React components, and utility functions. Configuration is in `vitest.config.ts`.
+Runs 433 unit tests with ~98% line coverage. Tests cover API routes, auth logic, PowerSync connector, React components, and utility functions. Configuration is in `vitest.config.ts`.
 
 ### E2E Tests (Playwright)
 
@@ -260,6 +262,14 @@ PS_JWT_SECRET_B64URL="..."
 # JWT audience — must match NEXT_PUBLIC_POWERSYNC_URL (dev: http://localhost:8080)
 PS_JWT_AUDIENCE="http://localhost:8080"
 
+# Push notifications (VAPID) — generate with: npx web-push generate-vapid-keys
+NEXT_PUBLIC_VAPID_PUBLIC_KEY="..."
+VAPID_PRIVATE_KEY="..."
+VAPID_SUBJECT="mailto:admin@yourdomain.com"
+
+# Cron secret — generate with: openssl rand -base64 32
+CRON_SECRET="..."
+
 # Public app URL (used in invitation emails)
 NEXT_PUBLIC_APP_URL="http://localhost:3001"
 ```
@@ -319,6 +329,10 @@ Set all of the following in your Vercel project settings (Settings → Environme
 | `POWERSYNC_JWT_SECRET` | Random secret shared with PowerSync |
 | `PS_JWT_SECRET_B64URL` | base64url encoding of the secret |
 | `PS_JWT_AUDIENCE` | Must match `NEXT_PUBLIC_POWERSYNC_URL` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | VAPID public key (generate with `npx web-push generate-vapid-keys`) |
+| `VAPID_PRIVATE_KEY` | VAPID private key |
+| `VAPID_SUBJECT` | `mailto:admin@yourdomain.com` |
+| `CRON_SECRET` | Random secret for authenticating cron job requests |
 | `NEXT_PUBLIC_APP_URL` | `https://yourdomain.com` |
 
 ### 7. Deploy
@@ -342,7 +356,7 @@ src/
 │   │   ├── admin/           # Admin panel (cycles, structure, activity types)
 │   │   └── profile/         # User profile
 │   ├── (public)/            # Unauthenticated pages (login, invite)
-│   ├── api/                 # API routes (auth, activities, soldiers, etc.)
+│   ├── api/                 # API routes (auth, activities, push, cron, etc.)
 │   ├── serwist/[path]/      # Service worker compilation route handler
 │   └── sw.ts                # Service worker source (compiled by esbuild)
 ├── components/              # Shared UI components
@@ -351,6 +365,7 @@ src/
 │   ├── db/                  # Prisma client
 │   ├── api/                 # Server-side helpers (hierarchy, scoping)
 │   ├── email/               # Email templates
+│   ├── push/                # Web Push notification utilities (VAPID, send)
 │   └── powersync/           # PowerSync schema, connector, database singleton, sync-config.yaml
 ├── hooks/                   # React hooks (useOnlineStatus, etc.)
 └── types/                   # TypeScript type definitions
@@ -358,4 +373,61 @@ prisma/
 ├── schema.prisma            # Database schema
 ├── migrations/              # Prisma migration history
 └── seed.ts                  # Reference data seed
+```
+
+## Email Forwarding (AWS SES + Terraform)
+
+This project includes a simple email forwarding setup using AWS SES.
+
+### Overview
+
+Inbound email for a specific address (e.g. `support@sitename.org.il`) is:
+
+1. Received by AWS SES
+2. Stored in S3
+3. Processed by a Lambda function
+4. Forwarded to another email address
+
+The original email is attached to the forwarded message as a `.eml` file.
+
+---
+
+## Configuration
+
+All configuration is defined in `infra/terraform.tfvars`:
+
+```hcl
+aws_region       = "us-east-1"
+domain_name      = "sitename.org.il"
+zone_name        = "sitename.org.il"
+recipient_email  = "support@sitename.org.il"
+forward_to_email = "your@email.com"
+from_email       = "forwarder@sitename.org.il"
+bucket_name      = "tironet-inbound-email"
+rule_set_name    = "default-inbound"
+rule_name        = "forward-support"
+s3_prefix        = "inbound"
+```
+
+Key variables
+* `recipient_email` – the address that receives incoming mail
+* `forward_to_email` – where the email is forwarded
+* `from_email` – sender used by SES when forwarding (must be verified in SES)
+* `aws_region` – must support SES receiving
+
+### Usage
+*Initial setup:*
+```bash
+cd infra
+terraform init
+terraform plan
+terraform apply
+```
+
+*Updating*
+To change configuration (e.g. forwarding address), update terraform.tfvars and run:
+```bash
+cd infra
+terraform plan
+terraform apply
 ```

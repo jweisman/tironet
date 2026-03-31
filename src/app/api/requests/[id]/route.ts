@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";
 import { getNextState } from "@/lib/requests/workflow";
 import { canActOnRequest } from "@/lib/requests/workflow";
+import { sendPushToUsers } from "@/lib/push/send";
 import { z } from "zod";
 import type { RequestStatus, RequestType, Role } from "@/types";
 
@@ -123,6 +124,14 @@ export async function PATCH(
       },
     });
 
+    // Send push notification to users with the newly assigned role
+    if (transition.newAssignedRole) {
+      // Fire and forget — don't block the response
+      notifyAssignedRole(req.cycleId, transition.newAssignedRole).catch((err) =>
+        console.warn("[push] request assignment notification failed:", err),
+      );
+    }
+
     return NextResponse.json({ request: updated });
   }
 
@@ -204,4 +213,35 @@ export async function DELETE(
 
   await prisma.request.delete({ where: { id } });
   return NextResponse.json({ success: true });
+}
+
+/**
+ * Find all users assigned to the given role in the cycle and send them
+ * a push notification about a new request requiring their action.
+ */
+async function notifyAssignedRole(cycleId: string, assignedRole: string): Promise<void> {
+  // For company_commander assignments, also include deputy_company_commander
+  const roles: Role[] = assignedRole === "company_commander"
+    ? ["company_commander", "deputy_company_commander"]
+    : [assignedRole as Role];
+
+  const assignments = await prisma.userCycleAssignment.findMany({
+    where: {
+      cycleId,
+      role: { in: roles },
+    },
+    select: { userId: true },
+  });
+
+  const userIds = [...new Set(assignments.map((a) => a.userId))];
+
+  await sendPushToUsers(
+    userIds,
+    {
+      title: "בקשה חדשה ממתינה לטיפולך",
+      body: "יש בקשה שדורשת את פעולתך",
+      url: "/requests?filter=action",
+    },
+    "requestAssignmentEnabled",
+  );
 }

@@ -17,6 +17,13 @@ type FetchEvent = Event & {
   respondWith(response: Promise<Response>): void;
 };
 type ExtendableEvent = Event & { waitUntil(p: Promise<unknown>): void };
+type PushEvent = ExtendableEvent & {
+  readonly data?: { json(): unknown; text(): string } | null;
+};
+type NotificationEvent = ExtendableEvent & {
+  readonly notification: { close(): void; data?: unknown };
+  readonly action: string;
+};
 
 // ---------------------------------------------------------------------------
 // Build identity — derived from precache manifest content hashes.
@@ -318,6 +325,46 @@ function offlineFallbackResponse(): Response {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+
+(self as unknown as { addEventListener(t: string, h: (e: PushEvent) => void): void }).addEventListener(
+  "push",
+  (event) => {
+    if (!event.data) return;
+    try {
+      const payload = event.data.json() as { title?: string; body?: string; url?: string };
+      const title = payload.title ?? "Tironet";
+      const options: NotificationOptions & { data?: { url?: string } } = {
+        body: payload.body ?? "",
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        dir: "rtl" as NotificationDirection,
+        data: { url: payload.url },
+      };
+      event.waitUntil(
+        (self as unknown as { registration: { showNotification(t: string, o: unknown): Promise<void> } }).registration.showNotification(title, options),
+      );
+    } catch (err) {
+      swLog("push parse error", err);
+    }
+  },
+);
+
+(self as unknown as { addEventListener(t: string, h: (e: NotificationEvent) => void): void }).addEventListener(
+  "notificationclick",
+  (event) => {
+    event.notification.close();
+    const url = (event.notification.data as { url?: string })?.url;
+    if (url) {
+      event.waitUntil(
+        (self as unknown as { clients: { openWindow(u: string): Promise<unknown> } }).clients.openWindow(url),
+      );
+    }
+  },
+);
 
 const serwist = new Serwist({
   precacheEntries,
