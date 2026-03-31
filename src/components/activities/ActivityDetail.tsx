@@ -346,7 +346,10 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         date: updated.date,
         status: updated.status,
         isRequired: updated.isRequired,
-        activityType: updated.activityType,
+        activityType: {
+          ...prev.activityType,
+          ...updated.activityType,
+        },
       }));
       setEditingMetadata(false);
       toast.success("הפעילות עודכנה בהצלחה");

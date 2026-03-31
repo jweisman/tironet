@@ -38,7 +38,8 @@ function formatDate(isoString: string): string {
 }
 
 export function ActivityCard({ activity, showPlatoon = false, onClick }: Props) {
-  const hasIssues = activity.isRequired && (activity.missingCount > 0 || activity.failedCount > 0);
+  const isPast = activity.date.split("T")[0] < new Date().toISOString().split("T")[0];
+  const hasIssues = activity.isRequired && isPast && (activity.missingCount > 0 || activity.failedCount > 0);
 
   return (
     <button

@@ -35,16 +35,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Types
 // ---------------------------------------------------------------------------
 
-type FilterPill = "all" | "week" | "gaps" | "draft";
+type FilterPill = "open" | "completed" | "gaps" | "week" | "draft";
 type SortMode = "date-desc" | "date-asc" | "name-asc" | "name-desc";
 
 const FILTER_LABELS: Record<FilterPill, string> = {
-  all: "כולם",
-  week: "השבוע",
+  open: "פתוחות",
+  completed: "הושלמו",
   gaps: "עם פערים",
+  week: "השבוע",
   draft: "טיוטה",
 };
-const FILTER_PILLS: FilterPill[] = ["all", "week", "gaps", "draft"];
+const FILTER_PILLS: FilterPill[] = ["open", "completed", "gaps", "week", "draft"];
 
 const SORT_LABELS: Record<SortMode, string> = {
   "date-desc": "תאריך (חדש לישן)",
@@ -166,9 +167,9 @@ export default function ActivitiesPage() {
   );
 
   // -------- UI state --------
-  const initialFilter = (searchParams.get("filter") as FilterPill | null) ?? "all";
+  const initialFilter = (searchParams.get("filter") as FilterPill | null) ?? "open";
   const [filter, setFilter] = useState<FilterPill>(
-    (["all", "week", "gaps", "draft"] as FilterPill[]).includes(initialFilter) ? initialFilter : "all"
+    (FILTER_PILLS as readonly string[]).includes(initialFilter) ? initialFilter as FilterPill : "open"
   );
   const [sortMode, setSortMode] = useState<SortMode>("date-desc");
   const [sortOpen, setSortOpen] = useState(false);
@@ -183,9 +184,22 @@ export default function ActivitiesPage() {
     return d.toISOString().split("T")[0];
   }, []);
 
+  // An activity is "completed" when its date is in the past and it has no gaps.
+  // Non-required activities can't have gaps, so past date alone is sufficient.
+  const isCompleted = (a: ActivitySummary) => {
+    const isPast = a.date.split("T")[0] < todayStr;
+    if (!isPast) return false;
+    if (a.isRequired && (a.missingCount > 0 || a.failedCount > 0)) return false;
+    return true;
+  };
+
   const filtered = useMemo(() => {
     let list = [...allActivities];
-    if (filter === "week") {
+    if (filter === "open") {
+      list = list.filter((a) => !isCompleted(a));
+    } else if (filter === "completed") {
+      list = list.filter(isCompleted);
+    } else if (filter === "week") {
       list = list.filter((a) => { const d = a.date.split("T")[0]; return d >= weekAgoStr && d <= todayStr; });
     } else if (filter === "gaps") {
       list = list.filter((a) => a.isRequired && a.date.split("T")[0] < todayStr && (a.missingCount > 0 || a.failedCount > 0));
@@ -328,7 +342,7 @@ export default function ActivitiesPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {filtered.length === 0 && !syncStatus.hasSynced && filter === "all" && (
+        {filtered.length === 0 && !syncStatus.hasSynced && filter === "open" && (
           <div className="divide-y divide-border">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -342,11 +356,11 @@ export default function ActivitiesPage() {
             ))}
           </div>
         )}
-        {filtered.length === 0 && (syncStatus.hasSynced || filter !== "all") && (
+        {filtered.length === 0 && (syncStatus.hasSynced || filter !== "open") && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין פעילויות</p>
-            {filter !== "all" && <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>}
-            {filter === "all" && canCreate && <p className="text-sm text-muted-foreground">לחץ על + כדי ליצור פעילות חדשה</p>}
+            {filter !== "open" && <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>}
+            {filter === "open" && canCreate && <p className="text-sm text-muted-foreground">לחץ על + כדי ליצור פעילות חדשה</p>}
           </div>
         )}
         {filtered.length > 0 && activitiesByPlatoon && (
