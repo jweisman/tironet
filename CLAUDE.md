@@ -304,6 +304,16 @@ Admin users access scoped data (activities, soldiers, requests, reports) through
 
 **Do not** add `if (user.isAdmin)` early returns in scope functions or inline scope checks in API routes. This was a prior bug (issue #41) where admins with a platoon_commander assignment saw data from all platoons.
 
+### Soldiers are always viewed by scope
+
+All soldier-facing views (soldiers page, requests page, activity reports) filter soldiers by the user's scope:
+
+- **Squad commanders** see only soldiers in their own squad
+- **Platoon commanders** see only soldiers in their platoon's squads
+- **Company commanders** see soldiers across all platoons in their company
+
+PowerSync sync streams deliver all soldiers within the user's `platoon_ids` for offline access (needed for activity reports). Client-side pages must further filter by squad when the role is `squad_commander`. The soldiers page and requests page both use `selectedAssignment.unitId` with `role` to filter the query results client-side. Server-side API routes use `getRequestScope().soldierIds` which is already correctly scoped.
+
 ## Bulk Import Pattern (Spreadsheet Upload)
 
 Both soldiers and activities support bulk import from Excel/CSV spreadsheets. The pattern is the same:
@@ -499,7 +509,7 @@ This creates a separate `tironet_test` database so e2e tests don't touch the dev
    - `{ exact: true }` to avoid substring matches (e.g. `getByRole("button", { name: "טיוטה", exact: true })`)
    - Scope to `page.getByRole("main")` to avoid matching sidebar text (e.g. "Squad Commander" matching `getByText("Squad C")`)
 
-5. **Sync scopes by `cycle_id`, not `squad_id`** — Squad commanders see ALL soldiers in their cycle, not just their squad. This is intentional — the sync stream filters by `cycle_id`. Don't write tests asserting squad commanders can't see other squads' soldiers.
+5. **Sync delivers full platoon, but UI filters by squad** — PowerSync sync streams deliver all soldiers within the user's `platoon_ids` (not filtered by squad). However, the UI pages (soldiers, requests) filter client-side so squad commanders only see their own squad's soldiers. E2E tests should assert that squad commanders see only their squad's soldiers on these pages.
 
 6. **Mailhog quoted-printable encoding** — Email bodies use `=3D` for `=` and soft line breaks (`=\r\n`). The `extractVerificationUrl` helper in `e2e/helpers/mailhog.ts` handles decoding.
 

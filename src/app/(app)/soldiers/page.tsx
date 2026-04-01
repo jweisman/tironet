@@ -177,8 +177,13 @@ export default function SoldiersPage() {
       const squad = squadMap.get(s.squad_id);
       if (squad) squad.soldiers.push(mapSoldier(s));
     }
-    return Array.from(squadMap.values()).filter((sq) => sq.soldiers.length > 0);
-  }, [rawSoldiers, rawSquads]);
+    let squads = Array.from(squadMap.values()).filter((sq) => sq.soldiers.length > 0);
+    // Squad commanders see only their own squad
+    if (role === "squad_commander" && selectedAssignment?.unitId) {
+      squads = squads.filter((sq) => sq.id === selectedAssignment.unitId);
+    }
+    return squads;
+  }, [rawSoldiers, rawSquads, role, selectedAssignment?.unitId]);
 
   // -------- Sticky header offset --------
   const stickyBarRef = useRef<HTMLDivElement>(null);

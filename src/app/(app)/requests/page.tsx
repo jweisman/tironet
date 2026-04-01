@@ -38,7 +38,9 @@ const REQUESTS_QUERY = `
     r.id, r.type, r.status, r.assigned_role, r.description, r.urgent,
     r.created_at,
     s.family_name || ' ' || s.given_name AS soldier_name,
-    sq.name AS squad_name
+    s.squad_id,
+    sq.name AS squad_name,
+    sq.platoon_id
   FROM requests r
   JOIN soldiers s ON s.id = r.soldier_id
   JOIN squads sq ON sq.id = s.squad_id
@@ -55,7 +57,9 @@ interface RawRequest {
   urgent: number | null;
   created_at: string;
   soldier_name: string;
+  squad_id: string;
   squad_name: string;
+  platoon_id: string;
 }
 
 function mapRequest(raw: RawRequest): RequestSummary {
@@ -65,7 +69,9 @@ function mapRequest(raw: RawRequest): RequestSummary {
     status: raw.status as RequestStatus,
     assignedRole: (raw.assigned_role as Role) ?? null,
     soldierName: raw.soldier_name,
+    squadId: raw.squad_id,
     squadName: raw.squad_name,
+    platoonId: raw.platoon_id,
     createdAt: raw.created_at,
     description: raw.description,
     urgent: raw.urgent != null ? Boolean(raw.urgent) : null,
@@ -97,10 +103,18 @@ export default function RequestsPage() {
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
   const { data: rawRequests } = useQuery<RawRequest>(REQUESTS_QUERY, queryParams);
 
-  const allRequests = useMemo(
-    () => (rawRequests ?? []).map(mapRequest),
-    [rawRequests],
-  );
+  const allRequests = useMemo(() => {
+    const mapped = (rawRequests ?? []).map(mapRequest);
+    const unitId = selectedAssignment?.unitId;
+    if (!unitId || !role) return mapped;
+    if (role === "squad_commander") {
+      return mapped.filter((r) => r.squadId === unitId);
+    }
+    if (role === "platoon_commander") {
+      return mapped.filter((r) => r.platoonId === unitId);
+    }
+    return mapped;
+  }, [rawRequests, role, selectedAssignment?.unitId]);
 
   // UI state — initialise from URL params
   const [viewTab, setViewTab] = useState<ViewTab>(

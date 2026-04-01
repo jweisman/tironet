@@ -18,7 +18,9 @@ export interface RequestSummary {
   status: RequestStatus;
   assignedRole: Role | null;
   soldierName: string;
+  squadId: string;
   squadName: string;
+  platoonId: string;
   createdAt: string;
   description: string | null;
   urgent: boolean | null;
