@@ -29,6 +29,8 @@ import { BulkImportReportsDialog } from "./BulkImportReportsDialog";
 import { ReportRow } from "./ReportRow";
 import { ActivityTypeIcon } from "./ActivityTypeIcon";
 import type { ActivityResult } from "@/types";
+import type { ActiveScore } from "@/types/score-config";
+import { formatGradeDisplay } from "@/lib/score-format";
 import { useEffect, useRef } from "react";
 
 export type GradeKey = "grade1" | "grade2" | "grade3" | "grade4" | "grade5" | "grade6";
@@ -77,7 +79,7 @@ export interface ActivityDetailData {
   date: string;
   status: "draft" | "active";
   isRequired: boolean;
-  activityType: { id: string; name: string; icon: string; scoreLabels: string[] };
+  activityType: { id: string; name: string; icon: string; activeScores: ActiveScore[] };
   platoon: { id: string; name: string; companyName: string };
   role: string;
   canEditMetadata: boolean;
@@ -122,7 +124,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [importReportsOpen, setImportReportsOpen] = useState(false);
 
-  const scoreLabels = data.activityType.scoreLabels;
+  const activeScores = data.activityType.activeScores;
 
   // Local reports state: Map<soldierId, SoldierReport>
   const [reports, setReports] = useState<Map<string, SoldierReport>>(() => {
@@ -535,7 +537,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                     key={soldier.id}
                     soldier={soldier}
                     report={reports.get(soldier.id) ?? { ...EMPTY_REPORT }}
-                    scoreLabels={scoreLabels}
+                    activeScores={activeScores}
                     disabled={saving.has(soldier.id)}
                     onChange={handleReportChange}
                   />
@@ -544,13 +546,13 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             ) : (
               <div>
                 {/* Score column headers (only for multi-score activity types) */}
-                {scoreLabels.length > 1 && (
+                {activeScores.length > 1 && (
                   <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border">
                     <div className="flex-1" />
                     <div className="flex shrink-0 mx-2">
-                      {scoreLabels.map((label, i) => (
-                        <span key={i} className="w-10 text-center text-[10px] text-muted-foreground truncate">
-                          {label}
+                      {activeScores.map((score) => (
+                        <span key={score.key} className="w-10 text-center text-[10px] text-muted-foreground truncate">
+                          {score.label}
                         </span>
                       ))}
                     </div>
@@ -560,7 +562,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 <div className="divide-y divide-border">
                 {visibleSoldiers.map((soldier) => {
                   const report = reports.get(soldier.id) ?? { ...EMPTY_REPORT };
-                  const hasGrades = GRADE_KEYS.some((k, i) => i < scoreLabels.length && report[k] != null);
+                  const hasGrades = activeScores.some((s) => report[s.gradeKey] != null);
                   return (
                     <div key={soldier.id} className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -576,21 +578,23 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                         </div>
                         {hasGrades && (
                           <div className="flex shrink-0 mx-2">
-                            {scoreLabels.length === 1 && report.grade1 != null && (
-                              <span className="text-xs font-medium">{report.grade1}</span>
+                            {activeScores.length === 1 && report[activeScores[0].gradeKey] != null && (
+                              <span className="text-xs font-medium">
+                                {formatGradeDisplay(report[activeScores[0].gradeKey], activeScores[0].format)}
+                              </span>
                             )}
-                            {scoreLabels.length > 1 && scoreLabels.map((_, i) => {
-                              const val = report[GRADE_KEYS[i]];
+                            {activeScores.length > 1 && activeScores.map((score) => {
+                              const val = report[score.gradeKey];
                               return (
-                                <span key={i} className="w-10 text-center text-xs font-medium">
-                                  {val != null ? val : "—"}
+                                <span key={score.key} className="w-10 text-center text-xs font-medium">
+                                  {val != null ? formatGradeDisplay(val, score.format) : "—"}
                                 </span>
                               );
                             })}
                           </div>
                         )}
-                        {!hasGrades && scoreLabels.length > 1 && (
-                          <div className="shrink-0 mx-2" style={{ width: scoreLabels.length * 40 }} />
+                        {!hasGrades && activeScores.length > 1 && (
+                          <div className="shrink-0 mx-2" style={{ width: activeScores.length * 40 }} />
                         )}
                         <div className="shrink-0 text-base w-6 text-center">
                           {getResultIcon(report.result)}
@@ -619,7 +623,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           onOpenChange={setImportReportsOpen}
           activityId={data.id}
           activityTypeId={data.activityType.id}
-          scoreLabels={scoreLabels}
+          activeScores={activeScores}
           soldiers={data.squads
             .filter((sq) => sq.canEdit)
             .flatMap((sq) =>

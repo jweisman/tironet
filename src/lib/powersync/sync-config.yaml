@@ -10,9 +10,7 @@ streams:
   activity_types:
     auto_subscribe: true
     query: >
-      SELECT id, name, icon, is_active, sort_order,
-             score1_label, score2_label, score3_label,
-             score4_label, score5_label, score6_label
+      SELECT id, name, icon, is_active, sort_order, score_config
       FROM activity_types
 
   cycles:

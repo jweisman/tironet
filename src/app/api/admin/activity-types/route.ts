@@ -3,17 +3,24 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/api/admin-guard";
 
-const scoreLabelSchema = z.string().min(1).nullable().optional();
+const scoreSlotSchema = z.object({
+  label: z.string().min(1),
+  format: z.enum(["number", "time"]),
+}).nullable();
+
+const scoreConfigSchema = z.object({
+  score1: scoreSlotSchema,
+  score2: scoreSlotSchema,
+  score3: scoreSlotSchema,
+  score4: scoreSlotSchema,
+  score5: scoreSlotSchema,
+  score6: scoreSlotSchema,
+}).optional();
 
 const createSchema = z.object({
   name: z.string().min(1),
   icon: z.string().min(1),
-  score1Label: scoreLabelSchema,
-  score2Label: scoreLabelSchema,
-  score3Label: scoreLabelSchema,
-  score4Label: scoreLabelSchema,
-  score5Label: scoreLabelSchema,
-  score6Label: scoreLabelSchema,
+  scoreConfig: scoreConfigSchema,
 });
 
 export async function GET() {

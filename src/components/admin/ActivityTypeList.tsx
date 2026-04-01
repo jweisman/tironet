@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -19,9 +26,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-const SCORE_KEYS = ["score1Label", "score2Label", "score3Label", "score4Label", "score5Label", "score6Label"] as const;
-type ScoreKey = (typeof SCORE_KEYS)[number];
+import type { ScoreConfig, ScoreSlot } from "@/types/score-config";
+import { SCORE_KEYS, getActiveScores } from "@/types/score-config";
 
 type ActivityType = {
   id: string;
@@ -29,17 +35,17 @@ type ActivityType = {
   icon: string;
   isActive: boolean;
   sortOrder: number;
-  score1Label: string | null;
-  score2Label: string | null;
-  score3Label: string | null;
-  score4Label: string | null;
-  score5Label: string | null;
-  score6Label: string | null;
+  scoreConfig: ScoreConfig | null;
 };
 
 type Props = {
   initialTypes: ActivityType[];
 };
+
+interface EditScoreSlot {
+  label: string;
+  format: "number" | "time";
+}
 
 function LucideIcon({ name, className }: { name: string; className?: string }) {
   const icons = LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
@@ -53,8 +59,13 @@ function LucideIcon({ name, className }: { name: string; className?: string }) {
 }
 
 function activeScoreCount(type: ActivityType): number {
-  return SCORE_KEYS.filter((k) => type[k] != null).length;
+  return getActiveScores(type.scoreConfig).length;
 }
+
+const FORMAT_LABELS: Record<string, string> = {
+  number: "מספר",
+  time: "זמן (M:SS)",
+};
 
 export default function ActivityTypeList({ initialTypes }: Props) {
   const [types, setTypes] = useState<ActivityType[]>(initialTypes);
@@ -64,10 +75,9 @@ export default function ActivityTypeList({ initialTypes }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editIcon, setEditIcon] = useState("");
-  const [editScores, setEditScores] = useState<Record<ScoreKey, string>>({
-    score1Label: "ציון", score2Label: "", score3Label: "",
-    score4Label: "", score5Label: "", score6Label: "",
-  });
+  const [editScores, setEditScores] = useState<EditScoreSlot[]>(
+    Array.from({ length: 6 }, () => ({ label: "", format: "number" as const }))
+  );
   const [scoresExpandedId, setScoresExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -75,23 +85,23 @@ export default function ActivityTypeList({ initialTypes }: Props) {
     setEditingId(type.id);
     setEditName(type.name);
     setEditIcon(type.icon);
-    setEditScores({
-      score1Label: type.score1Label ?? "",
-      score2Label: type.score2Label ?? "",
-      score3Label: type.score3Label ?? "",
-      score4Label: type.score4Label ?? "",
-      score5Label: type.score5Label ?? "",
-      score6Label: type.score6Label ?? "",
-    });
+    const config = type.scoreConfig;
+    setEditScores(
+      SCORE_KEYS.map((k) => {
+        const slot = config?.[k];
+        return slot ? { label: slot.label, format: slot.format ?? "number" } : { label: "", format: "number" as const };
+      })
+    );
     setScoresExpandedId(type.id);
   }
 
-  function scorePayload(scores: Record<ScoreKey, string>): Record<ScoreKey, string | null> {
-    const out = {} as Record<ScoreKey, string | null>;
-    for (const k of SCORE_KEYS) {
-      out[k] = scores[k].trim() || null;
-    }
-    return out;
+  function buildScoreConfig(scores: EditScoreSlot[]): ScoreConfig {
+    const config = {} as ScoreConfig;
+    SCORE_KEYS.forEach((k, i) => {
+      const slot = scores[i];
+      config[k] = slot.label.trim() ? { label: slot.label.trim(), format: slot.format } : null;
+    });
+    return config;
   }
 
   async function handleAdd() {
@@ -133,7 +143,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
       body: JSON.stringify({
         name: editName.trim(),
         icon: editIcon.trim(),
-        ...scorePayload(editScores),
+        scoreConfig: buildScoreConfig(editScores),
       }),
     });
     if (res.ok) {
@@ -297,30 +307,64 @@ export default function ActivityTypeList({ initialTypes }: Props) {
               )}
             </div>
 
-            {/* Score labels section (view or edit) */}
+            {/* Score config section (view or edit) */}
             {scoresExpandedId === type.id && (
               <div className="border-t px-3 py-3 bg-muted/20 space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground">תוויות ציונים (השאר ריק לביטול)</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <p className="text-xs font-semibold text-muted-foreground">הגדרות ציונים (השאר ריק לביטול)</p>
+                <div className="space-y-2">
                   {SCORE_KEYS.map((key, i) => {
                     if (editingId === type.id) {
                       return (
-                        <Input
-                          key={key}
-                          placeholder={`ציון ${i + 1}`}
-                          value={editScores[key]}
-                          onChange={(e) => setEditScores((prev) => ({ ...prev, [key]: e.target.value }))}
-                          className="text-xs"
-                        />
+                        <div key={key} className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}.</span>
+                          <Input
+                            placeholder={`ציון ${i + 1}`}
+                            value={editScores[i].label}
+                            onChange={(e) => setEditScores((prev) => {
+                              const next = [...prev];
+                              next[i] = { ...next[i], label: e.target.value };
+                              return next;
+                            })}
+                            className="text-xs flex-1"
+                          />
+                          <Select
+                            value={editScores[i].format}
+                            onValueChange={(v) => {
+                              if (!v) return;
+                              setEditScores((prev) => {
+                                const next = [...prev];
+                                next[i] = { ...next[i], format: v as "number" | "time" };
+                                return next;
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="w-28 text-xs h-8">
+                              <SelectValue>
+                                {FORMAT_LABELS[editScores[i].format]}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="number">מספר</SelectItem>
+                              <SelectItem value="time">זמן (M:SS)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       );
                     }
-                    const label = type[key];
-                    return label ? (
-                      <span key={key} className="text-xs bg-background border rounded px-2 py-1">
-                        {i + 1}. {label}
-                      </span>
+                    const slot: ScoreSlot | null = type.scoreConfig?.[key] ?? null;
+                    return slot ? (
+                      <div key={key} className="flex items-center gap-2">
+                        <span className="text-xs bg-background border rounded px-2 py-1">
+                          {i + 1}. {slot.label}
+                        </span>
+                        {slot.format === "time" && (
+                          <span className="text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+                            M:SS
+                          </span>
+                        )}
+                      </div>
                     ) : (
-                      <span key={key} className="text-xs text-muted-foreground/50 px-2 py-1">
+                      <span key={key} className="text-xs text-muted-foreground/50 px-2 py-1 block">
                         {i + 1}. —
                       </span>
                     );

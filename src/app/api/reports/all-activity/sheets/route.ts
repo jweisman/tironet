@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db/prisma";
 import { getReportScope } from "@/lib/api/report-scope";
 import { refreshAccessToken } from "@/lib/reports/google-oauth";
 import type { SessionUser } from "@/types";
+import type { ScoreConfig } from "@/types/score-config";
+import { getActiveScores } from "@/types/score-config";
+import { formatGradeDisplay } from "@/lib/score-format";
 
 export const maxDuration = 60;
 
@@ -128,22 +131,15 @@ export async function POST(request: NextRequest) {
       activityType: {
         select: {
           name: true,
-          score1Label: true, score2Label: true, score3Label: true,
-          score4Label: true, score5Label: true, score6Label: true,
+          scoreConfig: true,
         },
       },
     },
     orderBy: { date: "asc" },
   });
 
-  const SCORE_LABEL_KEYS = [
-    "score1Label", "score2Label", "score3Label",
-    "score4Label", "score5Label", "score6Label",
-  ] as const;
-  const GRADE_KEYS = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"] as const;
-
-  function getScoreLabels(a: typeof activities[number]) {
-    return SCORE_LABEL_KEYS.map((k) => a.activityType[k]).filter((l): l is string => l != null);
+  function getActivityScores(a: typeof activities[number]) {
+    return getActiveScores(a.activityType.scoreConfig as ScoreConfig | null);
   }
 
   try {
@@ -200,8 +196,8 @@ export async function POST(request: NextRequest) {
     const squadSheetData = squads.map((squad, index) => {
       const sheetTitle = sheetProperties[index].properties.title;
       const squadActivities = activities.filter((a) => a.platoonId === squad.platoon.id);
-      const scoreLabelsPerActivity = squadActivities.map((a) => getScoreLabels(a));
-      const colCounts = scoreLabelsPerActivity.map((labels) => Math.max(labels.length, 1));
+      const scoresPerActivity = squadActivities.map((a) => getActivityScores(a));
+      const colCounts = scoresPerActivity.map((scores) => Math.max(scores.length, 1));
       const totalCols = colCounts.reduce((a, b) => a + b, 0);
 
       // Row 1: activity names (merged across score columns)
@@ -215,11 +211,11 @@ export async function POST(request: NextRequest) {
       // Row 2: score labels
       const scoreLabelRow: string[] = ["חייל"];
       for (let ai = 0; ai < squadActivities.length; ai++) {
-        const labels = scoreLabelsPerActivity[ai];
-        if (labels.length <= 1) {
-          scoreLabelRow.push(labels[0] ?? "ציון");
+        const scores = scoresPerActivity[ai];
+        if (scores.length <= 1) {
+          scoreLabelRow.push(scores[0]?.label ?? "ציון");
         } else {
-          for (const label of labels) scoreLabelRow.push(label);
+          for (const s of scores) scoreLabelRow.push(s.label);
         }
       }
 
@@ -230,13 +226,15 @@ export async function POST(request: NextRequest) {
           const report = soldier.activityReports.find(
             (r) => r.activityId === squadActivities[ai].id
           );
+          const scores = scoresPerActivity[ai];
           const colCount = colCounts[ai];
           if (!report) {
             for (let c = 0; c < colCount; c++) row.push("");
           } else {
             for (let c = 0; c < colCount; c++) {
-              const g = report[GRADE_KEYS[c]];
-              row.push(g != null ? String(Number(g)) : "");
+              const gradeKey = scores[c]?.gradeKey ?? (`grade${c + 1}` as keyof typeof report);
+              const g = report[gradeKey];
+              row.push(g != null ? formatGradeDisplay(Number(g), scores[c]?.format) : "");
             }
           }
         }

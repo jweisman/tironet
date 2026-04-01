@@ -2,7 +2,8 @@
 
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { parseGradeInput } from "@/lib/score-format";
+import { parseGradeInput, formatGradeDisplay } from "@/lib/score-format";
+import type { ActiveScore } from "@/types/score-config";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -40,7 +41,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   activityId: string;
   activityTypeId: string;
-  scoreLabels: string[];
+  activeScores: ActiveScore[];
   soldiers: SoldierInfo[];
   existingReports: Map<string, SoldierReport>;
   onImport: (reports: Map<string, SoldierReport>) => Promise<void>;
@@ -121,7 +122,7 @@ function loadMapping(activityTypeId: string): ColumnMapping | null {
 
 function autoDetectMapping(
   headers: string[],
-  scoreLabels: string[],
+  activeScores: ActiveScore[],
   saved: ColumnMapping | null
 ): ColumnMapping {
   // If we have a saved mapping and all indices are within bounds, use it
@@ -149,8 +150,8 @@ function autoDetectMapping(
   const result = findCol(RESULT_HINTS);
   const note = findCol(NOTE_HINTS);
 
-  const grades: (number | -1)[] = scoreLabels.map((label) => {
-    const idx = lower.findIndex((h) => h.includes(label.toLowerCase()));
+  const grades: (number | -1)[] = activeScores.map((score) => {
+    const idx = lower.findIndex((h) => h.includes(score.label.toLowerCase()));
     return idx >= 0 ? idx : UNMAPPED;
   });
 
@@ -171,7 +172,7 @@ function parseRows(
   headerRowIndex: number,
   mapping: ColumnMapping,
   soldiersByIdNumber: Map<string, SoldierInfo>,
-  scoreLabels: string[]
+  activeScores: ActiveScore[]
 ): ParsedReportRow[] {
   const seenIdNumbers = new Set<string>();
 
@@ -217,13 +218,13 @@ function parseRows(
         if (colIdx === UNMAPPED) return null;
         const raw = get(colIdx);
         if (!raw) return null;
-        const num = parseGradeInput(String(raw));
+        const num = parseGradeInput(String(raw), activeScores[scoreIdx].format);
         if (num === null) {
-          errors.push(`${scoreLabels[scoreIdx]}: ערך לא חוקי "${raw}"`);
+          errors.push(`${activeScores[scoreIdx].label}: ערך לא חוקי "${raw}"`);
           return null;
         }
         if (num < 0) {
-          errors.push(`${scoreLabels[scoreIdx]}: ערך לא חוקי "${raw}"`);
+          errors.push(`${activeScores[scoreIdx].label}: ערך לא חוקי "${raw}"`);
           return null;
         }
         return num;
@@ -254,7 +255,7 @@ export function BulkImportReportsDialog({
   onOpenChange,
   activityId,
   activityTypeId,
-  scoreLabels,
+  activeScores,
   soldiers,
   existingReports,
   onImport,
@@ -268,7 +269,7 @@ export function BulkImportReportsDialog({
     idNumber: 0,
     result: UNMAPPED,
     note: UNMAPPED,
-    grades: scoreLabels.map(() => UNMAPPED),
+    grades: activeScores.map(() => UNMAPPED),
   });
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -291,8 +292,8 @@ export function BulkImportReportsDialog({
   // Parse rows whenever mapping or data changes
   const parsedRows = useMemo(() => {
     if (dataRows.length === 0) return [];
-    return parseRows(dataRows, headerRowIndex, mapping, soldiersByIdNumber, scoreLabels);
-  }, [dataRows, headerRowIndex, mapping, soldiersByIdNumber, scoreLabels]);
+    return parseRows(dataRows, headerRowIndex, mapping, soldiersByIdNumber, activeScores);
+  }, [dataRows, headerRowIndex, mapping, soldiersByIdNumber, activeScores]);
 
   const validRows = parsedRows.filter((r) => r.errors.length === 0);
   const errorRows = parsedRows.filter((r) => r.errors.length > 0);
@@ -352,7 +353,7 @@ export function BulkImportReportsDialog({
 
         // Load saved mapping or auto-detect
         const saved = loadMapping(activityTypeId);
-        const detected = autoDetectMapping(hdrs, scoreLabels, saved);
+        const detected = autoDetectMapping(hdrs, activeScores, saved);
         setMapping(detected);
       } catch {
         setImportError("לא ניתן לקרוא את הקובץ");
@@ -473,10 +474,10 @@ export function BulkImportReportsDialog({
               />
 
               {/* Score columns (dynamic) */}
-              {scoreLabels.map((label, i) => (
+              {activeScores.map((score, i) => (
                 <MappingSelect
-                  key={i}
-                  label={label}
+                  key={score.key}
+                  label={score.label}
                   value={mapping.grades[i] ?? UNMAPPED}
                   options={columnOptions}
                   onChange={(v) => updateMapping(`grade_${i}`, v)}
@@ -521,9 +522,9 @@ export function BulkImportReportsDialog({
                       <th className="text-end px-2 py-1.5 font-medium">מ.א.</th>
                       <th className="text-end px-2 py-1.5 font-medium">חייל</th>
                       <th className="text-end px-2 py-1.5 font-medium">תוצאה</th>
-                      {scoreLabels.map((label, i) => (
-                        <th key={i} className="text-end px-2 py-1.5 font-medium">
-                          {label}
+                      {activeScores.map((score) => (
+                        <th key={score.key} className="text-end px-2 py-1.5 font-medium">
+                          {score.label}
                         </th>
                       ))}
                     </tr>
@@ -560,12 +561,12 @@ export function BulkImportReportsDialog({
                                 ? "לא רלוונטי"
                                 : "—"}
                         </td>
-                        {scoreLabels.map((_, i) => (
+                        {activeScores.map((score, i) => (
                           <td
-                            key={i}
+                            key={score.key}
                             className="px-2 py-1.5 text-muted-foreground"
                           >
-                            {row.grades[i] != null ? row.grades[i] : "—"}
+                            {row.grades[i] != null ? formatGradeDisplay(row.grades[i], score.format) : "—"}
                           </td>
                         ))}
                       </tr>

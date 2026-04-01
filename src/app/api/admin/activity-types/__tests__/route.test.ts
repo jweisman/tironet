@@ -155,33 +155,38 @@ describe("POST /api/admin/activity-types", () => {
     expect(res.status).toBe(400);
   });
 
-  it("creates activity type with score labels", async () => {
+  it("creates activity type with scoreConfig", async () => {
     adminSuccess();
     mockAggregate.mockResolvedValue({ _max: { sortOrder: 1 } } as never);
+    const scoreConfig = {
+      score1: { label: "מתח", format: "number" },
+      score2: { label: "בנץ׳", format: "number" },
+      score3: { label: "מקבילים", format: "number" },
+      score4: { label: "ריצה", format: "time" },
+      score5: { label: "ספרינט", format: "time" },
+      score6: { label: "ציון סופי", format: "number" },
+    };
     const created = {
       id: "t4", name: "כש״ג", icon: "shield", sortOrder: 2, isActive: true,
-      score1Label: "מתח", score2Label: "בנץ׳", score3Label: "מקבילים",
-      score4Label: "ריצה", score5Label: "ספרינט", score6Label: "ציון סופי",
+      scoreConfig,
     };
     mockCreate.mockResolvedValue(created as never);
 
     const req = createMockRequest("POST", "/api/admin/activity-types", {
       name: "כש״ג",
       icon: "shield",
-      score1Label: "מתח", score2Label: "בנץ׳", score3Label: "מקבילים",
-      score4Label: "ריצה", score5Label: "ספרינט", score6Label: "ציון סופי",
+      scoreConfig,
     });
 
     const res = await POST(req);
     expect(res.status).toBe(201);
 
     const body = await res.json();
-    expect(body.score1Label).toBe("מתח");
-    expect(body.score6Label).toBe("ציון סופי");
+    expect(body.scoreConfig.score1.label).toBe("מתח");
+    expect(body.scoreConfig.score6.label).toBe("ציון סופי");
     expect(mockCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        score1Label: "מתח",
-        score6Label: "ציון סופי",
+        scoreConfig,
       }),
     });
   });

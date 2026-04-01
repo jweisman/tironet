@@ -11,6 +11,7 @@ import type {
   ActivitySummaryRow,
 } from "@/app/api/reports/activity-summary/route";
 import { cn } from "@/lib/utils";
+import { formatGradeDisplay } from "@/lib/score-format";
 
 export default function ActivitySummaryPage() {
   const router = useRouter();
@@ -196,7 +197,7 @@ export default function ActivitySummaryPage() {
                           <td className="px-3 py-2">{row.squad}</td>
                           {row.averages.map((avg, j) => (
                             <td key={j} className="px-3 py-2">
-                              {avg != null ? avg : "—"}
+                              {avg != null ? formatGradeDisplay(avg, activity.scoreFormats?.[j]) : "—"}
                             </td>
                           ))}
                         </tr>

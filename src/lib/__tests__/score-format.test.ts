@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseGradeInput } from "../score-format";
+import { parseGradeInput, formatGradeDisplay } from "../score-format";
 
 describe("parseGradeInput", () => {
   it("returns null for empty string", () => {
@@ -35,5 +35,57 @@ describe("parseGradeInput", () => {
   it("handles whitespace", () => {
     expect(parseGradeInput(" 3:15 ")).toBe(195);
     expect(parseGradeInput(" 85 ")).toBe(85);
+  });
+
+  it("rejects M:SS when format is number", () => {
+    expect(parseGradeInput("3:15", "number")).toBeNull();
+    expect(parseGradeInput("0:30", "number")).toBeNull();
+  });
+
+  it("accepts plain numbers when format is number", () => {
+    expect(parseGradeInput("85", "number")).toBe(85);
+    expect(parseGradeInput("99.5", "number")).toBe(99.5);
+  });
+
+  it("accepts M:SS when format is time", () => {
+    expect(parseGradeInput("3:15", "time")).toBe(195);
+  });
+
+  it("accepts plain numbers when format is time", () => {
+    expect(parseGradeInput("195", "time")).toBe(195);
+  });
+});
+
+describe("formatGradeDisplay", () => {
+  it("returns empty string for null", () => {
+    expect(formatGradeDisplay(null)).toBe("");
+    expect(formatGradeDisplay(null, "time")).toBe("");
+  });
+
+  it("formats number as plain string", () => {
+    expect(formatGradeDisplay(85)).toBe("85");
+    expect(formatGradeDisplay(99.5)).toBe("99.5");
+    expect(formatGradeDisplay(0)).toBe("0");
+  });
+
+  it("formats number with explicit number format", () => {
+    expect(formatGradeDisplay(85, "number")).toBe("85");
+  });
+
+  it("formats seconds as M:SS for time format", () => {
+    expect(formatGradeDisplay(195, "time")).toBe("3:15");
+    expect(formatGradeDisplay(30, "time")).toBe("0:30");
+    expect(formatGradeDisplay(60, "time")).toBe("1:00");
+    expect(formatGradeDisplay(725, "time")).toBe("12:05");
+  });
+
+  it("rounds fractional seconds", () => {
+    expect(formatGradeDisplay(195.4, "time")).toBe("3:15");
+    expect(formatGradeDisplay(195.6, "time")).toBe("3:16");
+  });
+
+  it("pads seconds to two digits", () => {
+    expect(formatGradeDisplay(5, "time")).toBe("0:05");
+    expect(formatGradeDisplay(61, "time")).toBe("1:01");
   });
 });

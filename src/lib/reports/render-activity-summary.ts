@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
+import type { ScoreConfig } from "@/types/score-config";
+import { getActiveScores } from "@/types/score-config";
+import { formatGradeDisplay } from "@/lib/score-format";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,6 +21,7 @@ export interface ActivitySummaryItem {
   activityTypeName: string;
   date: string;
   scoreLabels: string[];
+  scoreFormats: ("number" | "time")[];
   passedCount: number;
   failedCount: number;
   naCount: number;
@@ -29,9 +33,6 @@ export interface ActivitySummaryData {
   cycleName: string;
   activities: ActivitySummaryItem[];
 }
-
-const GRADE_FIELDS = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"] as const;
-const SCORE_LABEL_FIELDS = ["score1Label", "score2Label", "score3Label", "score4Label", "score5Label", "score6Label"] as const;
 
 function roundAvg(nums: number[]): number | null {
   if (nums.length === 0) return null;
@@ -57,7 +58,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       ...(activityTypeIds && activityTypeIds.length > 0 ? { activityTypeId: { in: activityTypeIds } } : {}),
     },
     include: {
-      activityType: { select: { name: true, score1Label: true, score2Label: true, score3Label: true, score4Label: true, score5Label: true, score6Label: true } },
+      activityType: { select: { name: true, scoreConfig: true } },
       reports: {
         include: {
           soldier: {
@@ -81,10 +82,10 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
 
   const result: ActivitySummaryItem[] = activities.map((activity) => {
     const at = activity.activityType;
-    const scoreLabels = SCORE_LABEL_FIELDS
-      .map((f) => at[f])
-      .filter((l): l is string => l != null);
-    const scoreCount = scoreLabels.length;
+    const activeScores = getActiveScores(at.scoreConfig as ScoreConfig | null);
+    const scoreLabels = activeScores.map((s) => s.label);
+    const scoreFormats = activeScores.map((s) => s.format);
+    const scoreCount = activeScores.length;
 
     const activeReports = activity.reports.filter((r) => r.soldier.status === "active");
     const passedCount = activeReports.filter((r) => r.result === "passed").length;
@@ -106,7 +107,8 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       }
       const entry = squadMap.get(key)!;
       for (let i = 0; i < scoreCount; i++) {
-        const val = report[GRADE_FIELDS[i]];
+        const gradeField = activeScores[i].gradeKey;
+        const val = report[gradeField];
         if (val != null) entry.grades[i].push(Number(val));
       }
     }
@@ -160,6 +162,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       activityTypeName: activity.activityType.name,
       date: activity.date.toISOString().split("T")[0],
       scoreLabels,
+      scoreFormats,
       passedCount, failedCount, naCount,
       totalSoldiers: activeReports.length,
       rows: mergedRows,
@@ -232,7 +235,7 @@ export function renderActivitySummaryHtml(
 
     const tableRows = activity.rows.map((row) => {
       const cls = row.level === "company" ? ' class="row-company"' : row.level === "platoon" ? ' class="row-platoon"' : "";
-      const avgCells = row.averages.map((a) => `<td>${a != null ? a : "—"}</td>`).join("");
+      const avgCells = row.averages.map((a, ai) => `<td>${a != null ? formatGradeDisplay(a, activity.scoreFormats[ai]) : "—"}</td>`).join("");
       return `<tr${cls}><td>${row.company}</td><td>${row.platoon}</td><td>${row.squad}</td>${avgCells}</tr>`;
     }).join("\n");
 

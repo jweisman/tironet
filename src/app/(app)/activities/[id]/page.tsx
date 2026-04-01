@@ -13,6 +13,7 @@ import {
 } from "@/components/activities/ActivityDetail";
 import type { ActivityResult, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { parseScoreConfig, getActiveScores } from "@/types/score-config";
 
 // ---------------------------------------------------------------------------
 // SQL queries (PowerSync local SQLite)
@@ -23,8 +24,7 @@ const ACTIVITY_QUERY = `
     a.id, a.name, a.date, a.status, a.is_required,
     a.platoon_id, a.cycle_id,
     at.id AS activity_type_id, at.name AS activity_type_name, at.icon AS activity_type_icon,
-    at.score1_label, at.score2_label, at.score3_label,
-    at.score4_label, at.score5_label, at.score6_label,
+    at.score_config,
     p.name AS platoon_name,
     c.name AS company_name
   FROM activities a
@@ -58,8 +58,7 @@ interface RawActivity {
   id: string; name: string; date: string; status: string; is_required: number;
   platoon_id: string; cycle_id: string;
   activity_type_id: string; activity_type_name: string; activity_type_icon: string;
-  score1_label: string | null; score2_label: string | null; score3_label: string | null;
-  score4_label: string | null; score5_label: string | null; score6_label: string | null;
+  score_config: string | null;
   platoon_name: string; company_name: string;
 }
 interface RawSquad { id: string; name: string; sort_order: number; }
@@ -184,6 +183,9 @@ export default function ActivityPage() {
       role === "company_commander";
     const canEditReports = role !== "";
 
+    const scoreConfig = parseScoreConfig(activity.score_config);
+    const activeScores = getActiveScores(scoreConfig);
+
     return {
       id: activity.id,
       name: activity.name,
@@ -194,10 +196,7 @@ export default function ActivityPage() {
         id: activity.activity_type_id,
         name: activity.activity_type_name,
         icon: activity.activity_type_icon,
-        scoreLabels: [
-          activity.score1_label, activity.score2_label, activity.score3_label,
-          activity.score4_label, activity.score5_label, activity.score6_label,
-        ].filter((l): l is string => l != null),
+        activeScores,
       },
       platoon: {
         id: activity.platoon_id,

@@ -28,6 +28,8 @@ import {
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { parseScoreConfig, getActiveScores } from "@/types/score-config";
+import { formatGradeDisplay } from "@/lib/score-format";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -99,8 +101,7 @@ const REPORTS_QUERY = `
     a.status AS activity_status,
     a.is_required,
     at.name AS activity_type_name,
-    at.score1_label, at.score2_label, at.score3_label,
-    at.score4_label, at.score5_label, at.score6_label
+    at.score_config
   FROM activity_reports ar
   JOIN activities a    ON a.id  = ar.activity_id
   JOIN activity_types at ON at.id = a.activity_type_id
@@ -172,8 +173,7 @@ interface RawReport {
   activity_id: string; activity_name: string; activity_date: string;
   activity_status: string; is_required: number;
   activity_type_name: string;
-  score1_label: string | null; score2_label: string | null; score3_label: string | null;
-  score4_label: string | null; score5_label: string | null; score6_label: string | null;
+  score_config: string | null;
 }
 interface RawMissing {
   id: string; name: string; date: string; activity_type_name: string;
@@ -407,13 +407,13 @@ export default function SoldierDetailPage() {
                     {r.activity_type_name} · {formatDate(r.activity_date)}
                   </p>
                   {(() => {
-                    const labels = [r.score1_label, r.score2_label, r.score3_label, r.score4_label, r.score5_label, r.score6_label];
+                    const scores = getActiveScores(parseScoreConfig(r.score_config));
                     const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
-                    const active = labels.map((l, i) => l ? { label: l, grade: grades[i] } : null).filter(Boolean) as { label: string; grade: number | null }[];
-                    const withValues = active.filter((a) => a.grade != null);
+                    const withValues = scores
+                      .map((s) => ({ label: s.label, format: s.format, grade: grades[parseInt(s.key.replace("score", "")) - 1] }))
+                      .filter((a) => a.grade != null);
                     if (withValues.length === 0) return null;
-                    if (withValues.length === 1) return <p className="text-xs text-muted-foreground">{withValues[0].label}: {withValues[0].grade}</p>;
-                    return <p className="text-xs text-muted-foreground">{withValues.map((a) => `${a.label}: ${a.grade}`).join(" · ")}</p>;
+                    return <p className="text-xs text-muted-foreground">{withValues.map((a) => `${a.label}: ${formatGradeDisplay(a.grade, a.format)}`).join(" · ")}</p>;
                   })()}
                   {r.note && (
                     <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>

@@ -264,12 +264,7 @@ model ActivityType {
   icon        String
   isActive    Boolean  @default(true) @map("is_active")
   sortOrder   Int      @default(0) @map("sort_order")
-  score1Label String?  @default("ציון") @map("score1_label")
-  score2Label String?  @map("score2_label")
-  score3Label String?  @map("score3_label")
-  score4Label String?  @map("score4_label")
-  score5Label String?  @map("score5_label")
-  score6Label String?  @map("score6_label")
+  scoreConfig Json?    @map("score_config") @db.JsonB
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 

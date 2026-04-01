@@ -117,31 +117,36 @@ describe("PATCH /api/admin/activity-types/[id]", () => {
     });
   });
 
-  it("updates score labels", async () => {
+  it("updates scoreConfig", async () => {
     adminSuccess();
+    const scoreConfig = {
+      score1: { label: "מתח", format: "number" as const },
+      score2: { label: "בנץ׳", format: "number" as const },
+      score3: null,
+      score4: null,
+      score5: null,
+      score6: null,
+    };
     const updated = {
       id: "type-1", name: "כש״ג", icon: "shield", isActive: true,
-      score1Label: "מתח", score2Label: "בנץ׳", score3Label: null,
-      score4Label: null, score5Label: null, score6Label: null,
+      scoreConfig,
     };
     mockUpdate.mockResolvedValue(updated as never);
 
     const req = createMockRequest("PATCH", "/api/admin/activity-types/type-1", {
-      score1Label: "מתח",
-      score2Label: "בנץ׳",
-      score3Label: null,
+      scoreConfig,
     });
 
     const res = await PATCH(req, idParams);
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(body.score1Label).toBe("מתח");
-    expect(body.score2Label).toBe("בנץ׳");
-    expect(body.score3Label).toBeNull();
+    expect(body.scoreConfig.score1.label).toBe("מתח");
+    expect(body.scoreConfig.score2.label).toBe("בנץ׳");
+    expect(body.scoreConfig.score3).toBeNull();
     expect(mockUpdate).toHaveBeenCalledWith({
       where: { id: "type-1" },
-      data: { score1Label: "מתח", score2Label: "בנץ׳", score3Label: null },
+      data: { scoreConfig },
     });
   });
 

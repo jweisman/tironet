@@ -2,11 +2,10 @@
 
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
-import { parseGradeInput } from "@/lib/score-format";
+import { parseGradeInput, formatGradeDisplay } from "@/lib/score-format";
 import type { ActivityResult } from "@/types";
 import type { GradeKey } from "./ActivityDetail";
-
-const GRADE_KEYS: GradeKey[] = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"];
+import type { ActiveScore } from "@/types/score-config";
 
 interface ReportRowProps {
   soldier: {
@@ -27,7 +26,7 @@ interface ReportRowProps {
     grade6: number | null;
     note: string | null;
   };
-  scoreLabels: string[];
+  activeScores: ActiveScore[];
   disabled?: boolean;
   onChange: (
     soldierId: string,
@@ -55,7 +54,7 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash];
 }
 
-export function ReportRow({ soldier, report, scoreLabels, disabled = false, onChange }: ReportRowProps) {
+export function ReportRow({ soldier, report, activeScores, disabled = false, onChange }: ReportRowProps) {
   const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const initials = (soldier.givenName[0] ?? "") + (soldier.familyName[0] ?? "");
@@ -66,12 +65,19 @@ export function ReportRow({ soldier, report, scoreLabels, disabled = false, onCh
     onChange(soldier.id, "result", newResult);
   }
 
-  function handleGradeChange(gradeKey: GradeKey, e: React.ChangeEvent<HTMLInputElement>) {
+  function handleGradeChange(gradeKey: GradeKey, format: "number" | "time", e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
+    const el = e.target;
+    const trimmed = raw.trim();
+    const isInvalid = trimmed !== "" && parseGradeInput(raw, format) === null;
+    el.style.borderColor = isInvalid ? "var(--color-destructive)" : "";
+    el.style.boxShadow = isInvalid ? "0 0 0 1px var(--color-destructive)" : "";
+
     const existing = debounceRefs.current.get(gradeKey);
     if (existing) clearTimeout(existing);
+    if (isInvalid) return; // don't save invalid input
     debounceRefs.current.set(gradeKey, setTimeout(() => {
-      const num = parseGradeInput(raw);
+      const num = parseGradeInput(raw, format);
       onChange(soldier.id, gradeKey, num);
     }, 500));
   }
@@ -158,15 +164,15 @@ export function ReportRow({ soldier, report, scoreLabels, disabled = false, onCh
       {/* Grades + note (only shown when result is set) */}
       {report.result !== null && (
         <div className="flex flex-wrap gap-2 mt-2 ps-[52px]">
-          {scoreLabels.map((label, i) => (
+          {activeScores.map((score) => (
             <input
-              key={GRADE_KEYS[i]}
+              key={score.gradeKey}
               type="text"
-              inputMode="text"
-              defaultValue={report[GRADE_KEYS[i]] ?? ""}
-              onChange={(e) => handleGradeChange(GRADE_KEYS[i], e)}
-              placeholder={label}
-              aria-label={label}
+              inputMode={score.format === "time" ? "text" : "numeric"}
+              defaultValue={formatGradeDisplay(report[score.gradeKey], score.format)}
+              onChange={(e) => handleGradeChange(score.gradeKey, score.format, e)}
+              placeholder={score.label}
+              aria-label={score.label}
               className="w-28 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               dir="ltr"
             />
