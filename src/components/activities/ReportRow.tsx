@@ -162,7 +162,7 @@ export function ReportRow({ soldier, report, scoreLabels, disabled = false, onCh
             <input
               key={GRADE_KEYS[i]}
               type="text"
-              inputMode="decimal"
+              inputMode="text"
               defaultValue={report[GRADE_KEYS[i]] ?? ""}
               onChange={(e) => handleGradeChange(GRADE_KEYS[i], e)}
               placeholder={label}
