@@ -111,7 +111,6 @@ function canEditReport(
   squadId: string
 ): boolean {
   if (!scope) return false;
-  if (scope.role === "admin") return true;
   if (scope.role === "platoon_commander") return scope.platoonIds.includes(platoonId);
   if (scope.role === "company_commander") return scope.platoonIds.includes(platoonId);
   if (scope.role === "squad_commander") return scope.squadId === squadId;

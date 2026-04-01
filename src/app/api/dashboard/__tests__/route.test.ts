@@ -146,14 +146,14 @@ describe("GET /api/dashboard", () => {
   it("returns empty squads when no platoons in scope", async () => {
     mockGetScope.mockResolvedValue({
       scope: {
-        role: "admin",
+        role: "platoon_commander",
         platoonIds: [],
         platoons: [],
         canCreate: true,
-        canEditMetadataForPlatoon: () => true,
+        canEditMetadataForPlatoon: () => false,
       },
       error: null,
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser(),
     });
 
     mockPlatoonFindMany.mockResolvedValue([] as never);

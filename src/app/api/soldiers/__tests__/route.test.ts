@@ -110,12 +110,19 @@ describe("GET /api/soldiers", () => {
     expect(body.squads[0].soldiers[0].givenName).toBe("John");
   });
 
-  it("returns soldiers for admin across all squads", async () => {
+  it("scopes admin by cycle assignment, not isAdmin flag", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({
+        isAdmin: true,
+        cycleAssignments: [mockAssignment({
+          cycleId: CYCLE,
+          role: "company_commander",
+          unitType: "company",
+          unitId: COMP,
+        })],
+      }),
     } as never);
 
-    vi.mocked(prisma.company.findMany).mockResolvedValue([{ id: COMP }] as never);
     vi.mocked(prisma.platoon.findMany).mockResolvedValue([{ id: PLATOON }] as never);
     mockSquadFindMany
       .mockResolvedValueOnce([{ id: SQUAD }] as never)
@@ -126,7 +133,7 @@ describe("GET /api/soldiers", () => {
     const res = await GET(req);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.role).toBe("admin");
+    expect(body.role).toBe("company_commander");
   });
 });
 
@@ -181,11 +188,13 @@ describe("POST /api/soldiers", () => {
 
   it("returns 404 when squad does not belong to the cycle", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({
+          cycleId: CYCLE, role: "platoon_commander", unitType: "platoon", unitId: PLATOON,
+        })],
+      }),
     } as never);
 
-    vi.mocked(prisma.company.findMany).mockResolvedValue([{ id: COMP }] as never);
-    vi.mocked(prisma.platoon.findMany).mockResolvedValue([{ id: PLATOON }] as never);
     mockSquadFindMany.mockResolvedValue([{ id: SQUAD }] as never);
     mockSquadFindUnique.mockResolvedValue({
       id: SQUAD, platoonId: PLATOON,
@@ -201,13 +210,15 @@ describe("POST /api/soldiers", () => {
     expect(body.error).toBe("Squad not found in cycle");
   });
 
-  it("creates a soldier and returns 201 for admin", async () => {
+  it("creates a soldier for platoon_commander within their platoon", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({
+          cycleId: CYCLE, role: "platoon_commander", unitType: "platoon", unitId: PLATOON,
+        })],
+      }),
     } as never);
 
-    vi.mocked(prisma.company.findMany).mockResolvedValue([{ id: COMP }] as never);
-    vi.mocked(prisma.platoon.findMany).mockResolvedValue([{ id: PLATOON }] as never);
     mockSquadFindMany.mockResolvedValue([{ id: SQUAD }] as never);
     mockSquadFindUnique.mockResolvedValue({
       id: SQUAD, platoonId: PLATOON,
@@ -231,13 +242,15 @@ describe("POST /api/soldiers", () => {
     expect(body.activeActivityCount).toBe(3);
   });
 
-  it("creates a soldier with idNumber for admin", async () => {
+  it("creates a soldier with idNumber", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({
+          cycleId: CYCLE, role: "platoon_commander", unitType: "platoon", unitId: PLATOON,
+        })],
+      }),
     } as never);
 
-    vi.mocked(prisma.company.findMany).mockResolvedValue([{ id: COMP }] as never);
-    vi.mocked(prisma.platoon.findMany).mockResolvedValue([{ id: PLATOON }] as never);
     mockSquadFindMany.mockResolvedValue([{ id: SQUAD }] as never);
     mockSquadFindUnique.mockResolvedValue({
       id: SQUAD, platoonId: PLATOON,

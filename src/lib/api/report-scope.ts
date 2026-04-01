@@ -5,7 +5,7 @@ import type { SessionUser, CycleAssignment } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 
 export interface ReportScope {
-  role: "platoon_commander" | "company_commander" | "admin";
+  role: "platoon_commander" | "company_commander";
   platoonIds: string[];
   companyId?: string;
 }
@@ -28,23 +28,7 @@ export async function getReportScope(cycleId: string): Promise<ScopeResult> {
 
   const user = session.user as SessionUser;
 
-  // Admin sees everything
-  if (user.isAdmin) {
-    const platoons = await prisma.platoon.findMany({
-      where: { company: { cycleId } },
-      select: { id: true },
-    });
-    return {
-      scope: {
-        role: "admin",
-        platoonIds: platoons.map((p) => p.id),
-      },
-      error: null,
-      user,
-    };
-  }
-
-  // Find the assignment for this cycle
+  // Admins are scoped by their cycle assignment, not by isAdmin flag
   const assignment: CycleAssignment | undefined = user.cycleAssignments.find(
     (a) => a.cycleId === cycleId
   );

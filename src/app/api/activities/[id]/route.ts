@@ -87,7 +87,6 @@ export async function GET(
   const canEditReports =
     scope.role === "platoon_commander" ||
     scope.role === "company_commander" ||
-    scope.role === "admin" ||
     scope.role === "squad_commander";
 
   // Build reports map
@@ -103,7 +102,6 @@ export async function GET(
     })
     .map((squad) => {
       const canEdit =
-        scope.role === "admin" ||
         scope.role === "platoon_commander" ||
         scope.role === "company_commander" ||
         (scope.role === "squad_commander" && squad.id === scope.squadId);

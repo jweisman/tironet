@@ -143,29 +143,6 @@ describe("POST /api/requests", () => {
     expect(createCall.data.assignedRole).toBe("company_commander");
   });
 
-  it("creates request as admin → assigns to platoon_commander", async () => {
-    mockGetScope.mockResolvedValue({
-      scope: {
-        role: "admin",
-        soldierIds: [validBody.soldierId],
-        squadIds: ["sq-1"],
-        platoonIds: ["pl-1"],
-        canCreate: true,
-      },
-      error: null,
-      user: mockSessionUser({ isAdmin: true }),
-    });
-
-    mockRequestCreate.mockResolvedValue({ id: "req-3" } as never);
-
-    const req = createMockRequest("POST", "/api/requests", validBody);
-    const res = await POST(req);
-    expect(res.status).toBe(201);
-
-    const createCall = mockRequestCreate.mock.calls[0][0] as { data: Record<string, unknown> };
-    expect(createCall.data.assignedRole).toBe("platoon_commander");
-  });
-
   it("uses client-provided id when present", async () => {
     const clientId = "c3d4e5f6-a7b8-4c9d-8e1f-2a3b4c5d6e7f";
     mockGetScope.mockResolvedValue({

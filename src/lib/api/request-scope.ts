@@ -5,7 +5,7 @@ import type { SessionUser, CycleAssignment, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 
 export interface RequestScope {
-  role: Role | "admin";
+  role: Role;
   /** Soldier IDs the user can see/create requests for */
   soldierIds: string[];
   /** Squad IDs the user commands (for scope checks) */
@@ -33,30 +33,7 @@ export async function getRequestScope(cycleId: string): Promise<ScopeResult> {
 
   const user = session.user as SessionUser;
 
-  if (user.isAdmin) {
-    const soldiers = await prisma.soldier.findMany({
-      where: { cycleId },
-      select: { id: true, squadId: true },
-    });
-    const squads = await prisma.squad.findMany({
-      where: { platoon: { company: { cycleId } } },
-      select: { id: true, platoonId: true },
-    });
-    const platoonIds = [...new Set(squads.map((s) => s.platoonId))];
-
-    return {
-      scope: {
-        role: "admin",
-        soldierIds: soldiers.map((s) => s.id),
-        squadIds: squads.map((s) => s.id),
-        platoonIds,
-        canCreate: true,
-      },
-      error: null,
-      user,
-    };
-  }
-
+  // Admins are scoped by their cycle assignment, not by isAdmin flag
   const assignment: CycleAssignment | undefined = user.cycleAssignments.find(
     (a) => a.cycleId === cycleId,
   );

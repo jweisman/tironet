@@ -219,17 +219,17 @@ describe("POST /api/activities/bulk", () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it("admin can create for any platoon", async () => {
-    const user = mockSessionUser({ isAdmin: true });
+  it("platoon_commander can create for platoon in scope", async () => {
+    const user = mockSessionUser();
     const scope: ActivityScope = {
-      role: "admin",
+      role: "platoon_commander",
       platoonIds: [PLATOON, PLATOON_OTHER],
       platoons: [
         { id: PLATOON, name: "A" },
         { id: PLATOON_OTHER, name: "B" },
       ],
       canCreate: true,
-      canEditMetadataForPlatoon: () => true,
+      canEditMetadataForPlatoon: (pid: string) => [PLATOON, PLATOON_OTHER].includes(pid),
     };
     mockGetActivityScope.mockResolvedValue({ scope, error: null, user });
     mockPrisma.platoon.findFirst.mockResolvedValue({ id: PLATOON_OTHER } as never);

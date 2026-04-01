@@ -38,23 +38,40 @@ describe("getActivityScope", () => {
     expect(result.error!.status).toBe(401);
   });
 
-  it("returns all platoons for admin", async () => {
-    const user = mockSessionUser({ isAdmin: true });
+  it("scopes admin by cycle assignment, not isAdmin flag", async () => {
+    const user = mockSessionUser({
+      isAdmin: true,
+      cycleAssignments: [
+        mockAssignment({
+          cycleId: "cycle-1",
+          role: "platoon_commander",
+          unitType: "platoon",
+          unitId: "platoon-1",
+        }),
+      ],
+    });
     mockAuth.mockResolvedValue({ user } as never);
-
-    const platoons = [
-      { id: "p1", name: "Platoon 1" },
-      { id: "p2", name: "Platoon 2" },
-    ];
-    mockPrisma.platoon.findMany.mockResolvedValue(platoons as never);
+    mockPrisma.platoon.findUnique.mockResolvedValue({
+      id: "platoon-1",
+      name: "Platoon A",
+    } as never);
 
     const result = await getActivityScope("cycle-1");
     expect(result.error).toBeNull();
-    expect(result.scope!.role).toBe("admin");
-    expect(result.scope!.platoonIds).toEqual(["p1", "p2"]);
-    expect(result.scope!.platoons).toEqual(platoons);
+    expect(result.scope!.role).toBe("platoon_commander");
+    expect(result.scope!.platoonIds).toEqual(["platoon-1"]);
     expect(result.scope!.canCreate).toBe(true);
-    expect(result.scope!.canEditMetadataForPlatoon("any-id")).toBe(true);
+    expect(result.scope!.canEditMetadataForPlatoon("platoon-1")).toBe(true);
+    expect(result.scope!.canEditMetadataForPlatoon("other")).toBe(false);
+  });
+
+  it("returns 403 for admin without cycle assignment", async () => {
+    const user = mockSessionUser({ isAdmin: true });
+    mockAuth.mockResolvedValue({ user } as never);
+
+    const result = await getActivityScope("cycle-1");
+    expect(result.scope).toBeNull();
+    expect(result.error!.status).toBe(403);
   });
 
   it("returns 403 when user has no assignment for cycle", async () => {

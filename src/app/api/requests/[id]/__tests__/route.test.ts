@@ -132,26 +132,6 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 403 when admin tries workflow action", async () => {
-    mockRequestFindUnique.mockResolvedValue(baseRequest as never);
-    mockGetScope.mockResolvedValue({
-      scope: {
-        role: "admin",
-        soldierIds: ["sol-1"],
-        squadIds: ["sq-1"],
-        platoonIds: ["pl-1"],
-        canCreate: true,
-      },
-      error: null,
-      user: mockSessionUser({ isAdmin: true }),
-    });
-
-    const req = createMockRequest("PATCH", "/api/requests/req-1", { action: "approve" });
-    const res = await PATCH(req, makeParams("req-1"));
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error).toBe("Admins cannot perform workflow actions");
-  });
 
   it("returns 400 when transition is invalid", async () => {
     mockRequestFindUnique.mockResolvedValue(baseRequest as never);
@@ -281,18 +261,18 @@ describe("PATCH /api/requests/[id] — field edits", () => {
     expect(res.status).toBe(403);
   });
 
-  it("allows admin to edit fields", async () => {
+  it("allows assigned role to edit fields", async () => {
     mockRequestFindUnique.mockResolvedValue(baseRequest as never);
     mockGetScope.mockResolvedValue({
       scope: {
-        role: "admin",
+        role: "platoon_commander",
         soldierIds: ["sol-1"],
         squadIds: ["sq-1"],
         platoonIds: ["pl-1"],
         canCreate: true,
       },
       error: null,
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser(),
     });
     mockRequestUpdate.mockResolvedValue({ ...baseRequest, description: "Updated" } as never);
 

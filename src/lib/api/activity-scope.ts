@@ -5,11 +5,11 @@ import type { SessionUser, CycleAssignment } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 
 export interface ActivityScope {
-  role: "squad_commander" | "platoon_commander" | "company_commander" | "admin";
+  role: "squad_commander" | "platoon_commander" | "company_commander";
   platoonIds: string[];
   platoons: { id: string; name: string }[]; // id + name for create form
   squadId?: string; // only for squad_commander
-  canCreate: boolean; // platoon_commander or admin
+  canCreate: boolean; // platoon_commander only
   canEditMetadataForPlatoon: (platoonId: string) => boolean;
 }
 
@@ -31,25 +31,7 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
 
   const user = session.user as SessionUser;
 
-  // Admin sees everything
-  if (user.isAdmin) {
-    // Get all platoons for this cycle
-    const platoons = await prisma.platoon.findMany({
-      where: { company: { cycleId } },
-      select: { id: true, name: true },
-    });
-
-    const scope: ActivityScope = {
-      role: "admin",
-      platoonIds: platoons.map((p) => p.id),
-      platoons,
-      canCreate: true,
-      canEditMetadataForPlatoon: () => true,
-    };
-    return { scope, error: null, user };
-  }
-
-  // Find the assignment for this cycle
+  // Find the assignment for this cycle (admins are scoped by assignment too)
   const assignment: CycleAssignment | undefined = user.cycleAssignments.find(
     (a) => a.cycleId === cycleId
   );

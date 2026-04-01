@@ -293,8 +293,16 @@ Open requests are sorted with "assigned to me" first.
 
 - All protected routes call `auth()` from `@/lib/auth/auth` and check `session.user`
 - Admin routes use `requireAdmin()` from `@/lib/api/admin-guard`
-- Non-admin data access is scoped via `getActivityScope()` (activities) or `getRequestScope()` (requests) which resolve the user's role and unit IDs for a given cycle
+- Non-admin data access is scoped via `getActivityScope()` (activities), `getRequestScope()` (requests), or `getReportScope()` (reports) which resolve the user's role and unit IDs for a given cycle
 - Polymorphic FK: `UserCycleAssignment.unitId` points to `companies`, `platoons`, or `squads` depending on `unitType`. Referential integrity is enforced at the application layer, not by the DB.
+
+### `isAdmin` is for admin routes only — never for scope expansion
+
+The `isAdmin` flag on `User` controls access to **admin pages** (cycle management, activity types, user invitations, etc.) via `requireAdmin()`. It must **never** be used to bypass or expand data scope in scope functions (`getActivityScope`, `getRequestScope`, `getReportScope`) or in API route handlers like `/api/soldiers`.
+
+Admin users access scoped data (activities, soldiers, requests, reports) through their `UserCycleAssignment` like everyone else. An admin without a cycle assignment gets a 403 on scoped endpoints — they use admin pages for system management, not scoped views.
+
+**Do not** add `if (user.isAdmin)` early returns in scope functions or inline scope checks in API routes. This was a prior bug (issue #41) where admins with a platoon_commander assignment saw data from all platoons.
 
 ## Bulk Import Pattern (Spreadsheet Upload)
 

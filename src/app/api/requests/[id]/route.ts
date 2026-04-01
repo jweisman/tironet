@@ -93,11 +93,6 @@ export async function PATCH(
 
   // Handle workflow action
   if (data.action) {
-    if (scope.role === "admin") {
-      // Admin can't perform workflow actions
-      return NextResponse.json({ error: "Admins cannot perform workflow actions" }, { status: 403 });
-    }
-
     const transition = getNextState(
       req.status as RequestStatus,
       req.assignedRole as Role,
@@ -136,7 +131,7 @@ export async function PATCH(
   }
 
   // Handle field edits — only the assigned role can edit
-  if (scope.role !== "admin" && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
+  if (!canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
     return NextResponse.json({ error: "Only the assigned role can edit" }, { status: 403 });
   }
 

@@ -56,9 +56,6 @@ export async function POST(request: NextRequest) {
   } else if (scope.role === "platoon_commander") {
     // Platoon commander creates → goes directly to company commander
     assignedRole = "company_commander";
-  } else if (scope.role === "admin") {
-    // Admin-created requests go to platoon commander for initial review
-    assignedRole = "platoon_commander";
   } else {
     return NextResponse.json({ error: "Cannot determine assignment" }, { status: 400 });
   }

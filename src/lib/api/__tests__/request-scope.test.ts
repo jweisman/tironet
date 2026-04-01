@@ -34,26 +34,44 @@ describe("getRequestScope", () => {
     expect(result.error!.status).toBe(401);
   });
 
-  it("returns admin scope with all soldiers in cycle", async () => {
-    const user = mockSessionUser({ isAdmin: true });
+  it("scopes admin by cycle assignment, not isAdmin flag", async () => {
+    const user = mockSessionUser({
+      isAdmin: true,
+      cycleAssignments: [
+        mockAssignment({
+          cycleId: "cycle-1",
+          role: "platoon_commander",
+          unitType: "platoon",
+          unitId: "pl-1",
+        }),
+      ],
+    });
     mockAuth.mockResolvedValue({ user } as never);
-
-    mockPrisma.soldier.findMany.mockResolvedValue([
-      { id: "sol-1", squadId: "sq-1" },
-      { id: "sol-2", squadId: "sq-2" },
-    ] as never);
     mockPrisma.squad.findMany.mockResolvedValue([
-      { id: "sq-1", platoonId: "pl-1" },
-      { id: "sq-2", platoonId: "pl-1" },
+      { id: "sq-1" },
+      { id: "sq-2" },
+    ] as never);
+    mockPrisma.soldier.findMany.mockResolvedValue([
+      { id: "sol-1" },
+      { id: "sol-2" },
     ] as never);
 
     const result = await getRequestScope("cycle-1");
     expect(result.error).toBeNull();
-    expect(result.scope!.role).toBe("admin");
+    expect(result.scope!.role).toBe("platoon_commander");
     expect(result.scope!.soldierIds).toEqual(["sol-1", "sol-2"]);
     expect(result.scope!.squadIds).toEqual(["sq-1", "sq-2"]);
     expect(result.scope!.platoonIds).toEqual(["pl-1"]);
     expect(result.scope!.canCreate).toBe(true);
+  });
+
+  it("returns 403 for admin without cycle assignment", async () => {
+    const user = mockSessionUser({ isAdmin: true });
+    mockAuth.mockResolvedValue({ user } as never);
+
+    const result = await getRequestScope("cycle-1");
+    expect(result.scope).toBeNull();
+    expect(result.error!.status).toBe(403);
   });
 
   it("returns 403 when user has no assignment for cycle", async () => {

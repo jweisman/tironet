@@ -45,22 +45,7 @@ async function getScopeSquadIds(
     });
     return squads.map((s) => s.id);
   }
-  // admin: all squads in cycle
-  const companies = await prisma.company.findMany({
-    where: { cycleId },
-    select: { id: true },
-  });
-  const companyIds = companies.map((c) => c.id);
-  const platoons = await prisma.platoon.findMany({
-    where: { companyId: { in: companyIds } },
-    select: { id: true },
-  });
-  const platoonIds = platoons.map((p) => p.id);
-  const squads = await prisma.squad.findMany({
-    where: { platoonId: { in: platoonIds } },
-    select: { id: true },
-  });
-  return squads.map((s) => s.id);
+  return [];
 }
 
 export async function GET(req: NextRequest) {
@@ -75,20 +60,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "cycleId required" }, { status: 400 });
   }
 
-  const isAdmin = session.user.isAdmin;
-  let role = "admin";
-  let unitId = "";
-
-  if (!isAdmin) {
-    const assignment = session.user.cycleAssignments.find(
-      (a) => a.cycleId === cycleId
-    );
-    if (!assignment) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    role = assignment.role;
-    unitId = assignment.unitId;
+  const assignment = session.user.cycleAssignments.find(
+    (a) => a.cycleId === cycleId
+  );
+  if (!assignment) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const role = assignment.role;
+  const unitId = assignment.unitId;
 
   const scopeSquadIds = await getScopeSquadIds(role, unitId, cycleId);
 
@@ -203,25 +182,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: imageError }, { status: 422 });
   }
 
-  const isAdmin = session.user.isAdmin;
+  const assignment = session.user.cycleAssignments.find(
+    (a) => a.cycleId === cycleId
+  );
+  if (!assignment) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  if (!isAdmin) {
-    const assignment = session.user.cycleAssignments.find(
-      (a) => a.cycleId === cycleId
-    );
-    if (!assignment) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Validate squad is in scope
-    const scopeSquadIds = await getScopeSquadIds(
-      assignment.role,
-      assignment.unitId,
-      cycleId
-    );
-    if (!scopeSquadIds.includes(squadId)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  // Validate squad is in scope
+  const scopeSquadIds = await getScopeSquadIds(
+    assignment.role,
+    assignment.unitId,
+    cycleId
+  );
+  if (!scopeSquadIds.includes(squadId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   // Verify squad exists and belongs to this cycle
