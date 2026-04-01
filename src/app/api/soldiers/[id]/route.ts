@@ -133,6 +133,50 @@ export async function GET(
   return NextResponse.json({ ...soldier, missingActivities });
 }
 
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const soldier = await prisma.soldier.findUnique({
+    where: { id },
+    select: { cycleId: true, squadId: true },
+  });
+  if (!soldier) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const assignment = session.user.cycleAssignments.find(
+    (a) => a.cycleId === soldier.cycleId
+  );
+  if (!assignment) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const role = effectiveRole(assignment.role as Role);
+
+  // Only platoon_commander and above can delete (matches activity deletion logic)
+  if (role === "squad_commander") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const inScope = await isSquadInScope(assignment.role, assignment.unitId, soldier.squadId);
+  if (!inScope) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Activity reports and requests cascade-delete via Prisma schema
+  await prisma.soldier.delete({ where: { id } });
+
+  return new NextResponse(null, { status: 204 });
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

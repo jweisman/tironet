@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    soldier: { findUnique: vi.fn(), update: vi.fn() },
+    soldier: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
     squad: { findUnique: vi.fn() },
     activity: { findMany: vi.fn() },
     activityReport: { findMany: vi.fn(), createMany: vi.fn() },
@@ -13,7 +13,7 @@ vi.mock("@/lib/auth/auth", () => ({
   auth: vi.fn(),
 }));
 
-import { GET, PATCH } from "../route";
+import { GET, PATCH, DELETE } from "../route";
 import { POST as markNaPost } from "../mark-na/route";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
@@ -26,6 +26,7 @@ import {
 const mockAuth = vi.mocked(auth);
 const mockSoldierFindUnique = vi.mocked(prisma.soldier.findUnique);
 const mockSoldierUpdate = vi.mocked(prisma.soldier.update);
+const mockSoldierDelete = vi.mocked(prisma.soldier.delete);
 const mockSquadFindUnique = vi.mocked(prisma.squad.findUnique);
 const mockActivityFindMany = vi.mocked(prisma.activity.findMany);
 const mockReportFindMany = vi.mocked(prisma.activityReport.findMany);
@@ -402,6 +403,134 @@ describe("PATCH /api/soldiers/[id]", () => {
       where: { id: "s1" },
       data: { idNumber: null },
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/soldiers/[id]
+// ---------------------------------------------------------------------------
+describe("DELETE /api/soldiers/[id]", () => {
+  it("returns 401 when unauthenticated", async () => {
+    mockAuth.mockResolvedValue(null as never);
+
+    const req = createMockRequest("DELETE", "/api/soldiers/s1");
+    const res = await DELETE(req, makeParams("s1"));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when soldier not found", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({ role: "platoon_commander", unitType: "platoon", unitId: "platoon-1" })],
+      }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue(null as never);
+
+    const req = createMockRequest("DELETE", "/api/soldiers/s1");
+    const res = await DELETE(req, makeParams("s1"));
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when user has no assignment for soldier's cycle", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [] }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      squadId: "squad-1",
+    } as never);
+
+    const req = createMockRequest("DELETE", "/api/soldiers/s1");
+    const res = await DELETE(req, makeParams("s1"));
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 for squad_commander", async () => {
+    const assignment = mockAssignment({
+      role: "squad_commander",
+      unitType: "squad",
+      unitId: "squad-1",
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      squadId: "squad-1",
+    } as never);
+
+    const req = createMockRequest("DELETE", "/api/soldiers/s1");
+    const res = await DELETE(req, makeParams("s1"));
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when squad is out of scope for platoon_commander", async () => {
+    const assignment = mockAssignment({
+      role: "platoon_commander",
+      unitType: "platoon",
+      unitId: "platoon-other",
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      squadId: "squad-1",
+    } as never);
+    mockSquadFindUnique.mockResolvedValue({
+      platoonId: "platoon-1",
+    } as never);
+
+    const req = createMockRequest("DELETE", "/api/soldiers/s1");
+    const res = await DELETE(req, makeParams("s1"));
+    expect(res.status).toBe(403);
+  });
+
+  it("deletes soldier for platoon_commander in scope", async () => {
+    const assignment = mockAssignment({
+      role: "platoon_commander",
+      unitType: "platoon",
+      unitId: "platoon-1",
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      squadId: "squad-1",
+    } as never);
+    mockSquadFindUnique.mockResolvedValue({
+      platoonId: "platoon-1",
+    } as never);
+    mockSoldierDelete.mockResolvedValue({} as never);
+
+    const req = createMockRequest("DELETE", "/api/soldiers/s1");
+    const res = await DELETE(req, makeParams("s1"));
+    expect(res.status).toBe(204);
+    expect(mockSoldierDelete).toHaveBeenCalledWith({ where: { id: "s1" } });
+  });
+
+  it("deletes soldier for company_commander in scope", async () => {
+    const assignment = mockAssignment({
+      role: "company_commander",
+      unitType: "company",
+      unitId: "comp-1",
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      squadId: "squad-1",
+    } as never);
+    mockSquadFindUnique.mockResolvedValue({
+      platoon: { companyId: "comp-1" },
+    } as never);
+    mockSoldierDelete.mockResolvedValue({} as never);
+
+    const req = createMockRequest("DELETE", "/api/soldiers/s1");
+    const res = await DELETE(req, makeParams("s1"));
+    expect(res.status).toBe(204);
   });
 });
 

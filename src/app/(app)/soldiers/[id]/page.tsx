@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Pencil, CheckCircle, Plus, FileText } from "lucide-react";
+import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -198,11 +200,34 @@ export default function SoldierDetailPage() {
   }, []);
 
   const [editOpen, setEditOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [requestTypeMenuOpen, setRequestTypeMenuOpen] = useState(false);
   const [createRequestType, setCreateRequestType] = useState<RequestType | null>(null);
   const { selectedCycleId, selectedAssignment } = useCycle();
   const rawUserRole = (selectedAssignment?.role ?? "") as Role | "";
   const userRole = rawUserRole ? effectiveRole(rawUserRole) : "";
+  const canDelete = userRole === "platoon_commander" || userRole === "company_commander";
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/soldiers/${soldierId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setDeleteError(err.error ?? "שגיאה במחיקה");
+        return;
+      }
+      toast.success("החייל נמחק");
+      router.push("/soldiers");
+    } catch {
+      setDeleteError("שגיאה במחיקה");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   // Grace period: give PowerSync time to hydrate local SQLite after an
   // offline shell load before showing "not found". The timeout is a hard
@@ -309,14 +334,27 @@ export default function SoldierDetailPage() {
                   <p className="text-sm text-muted-foreground">מ.א. {raw.id_number}</p>
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => setEditOpen(true)}
-                aria-label="ערוך פרטי חייל"
-              >
-                <Pencil size={14} />
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {canDelete && (
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={() => setConfirmDelete(true)}
+                    aria-label="מחק חייל"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setEditOpen(true)}
+                  aria-label="ערוך פרטי חייל"
+                >
+                  <Pencil size={14} />
+                </Button>
+              </div>
             </div>
 
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -523,6 +561,37 @@ export default function SoldierDetailPage() {
             onSuccess={() => { setEditOpen(false); toast.success("החייל עודכן בהצלחה"); }}
             onCancel={() => setEditOpen(false)}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>מחיקת חייל</DialogTitle>
+            <DialogDescription>
+              האם למחוק את &quot;{raw.family_name} {raw.given_name}&quot;? פעולה זו תמחק גם את כל הדיווחים והבקשות הקשורים ולא ניתן לבטלה.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+            >
+              ביטול
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "מוחק..." : "מחק"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
