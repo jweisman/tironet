@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Table2, Loader2, Check } from "lucide-react";
+import { FileText, Table2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSession } from "next-auth/react";
 import { effectiveRole } from "@/lib/auth/permissions";
-import { cn } from "@/lib/utils";
 import type { Role } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -31,9 +30,9 @@ export default function ReportsPage() {
   const [sheetsLoading, setSheetsLoading] = useState(false);
   const [sheetsUrl, setSheetsUrl] = useState<string | null>(null);
 
-  // Activity type filter state
+  // Activity type filter state — "" means all types
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
-  const [selectedTypeIds, setSelectedTypeIds] = useState<Set<string>>(new Set());
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
   const [typesLoaded, setTypesLoaded] = useState(false);
 
   // Fetch activity types
@@ -45,7 +44,6 @@ export default function ReportsPage() {
       })
       .then((types: ActivityType[]) => {
         setActivityTypes(types);
-        setSelectedTypeIds(new Set(types.map((t) => t.id)));
         setTypesLoaded(true);
       })
       .catch(() => {
@@ -81,26 +79,8 @@ export default function ReportsPage() {
     );
   }
 
-  const allSelected = selectedTypeIds.size === activityTypes.length;
-  const typesParam = allSelected ? "" : [...selectedTypeIds].join(",");
-
-  function toggleType(id: string) {
-    setSelectedTypeIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        // Don't allow deselecting all
-        if (next.size === 1) return prev;
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
-
-  function selectAll() {
-    setSelectedTypeIds(new Set(activityTypes.map((t) => t.id)));
-  }
+  // "" = all types, otherwise a single type ID
+  const typesParam = selectedTypeId;
 
   async function handleSheetsExport() {
     if (!navigator.onLine) {
@@ -157,42 +137,20 @@ export default function ReportsPage() {
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">דוחות פעילויות</h2>
 
-          {/* Activity type filter chips */}
+          {/* Activity type filter */}
           {typesLoaded && activityTypes.length > 1 && (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={selectAll}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  allSelected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-muted-foreground hover:bg-muted/50"
-                )}
-              >
-                {allSelected && <Check size={12} />}
-                הכל
-              </button>
-              {activityTypes.map((type) => {
-                const selected = selectedTypeIds.has(type.id);
-                return (
-                  <button
-                    key={type.id}
-                    type="button"
-                    onClick={() => toggleType(type.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                      selected
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-background text-muted-foreground hover:bg-muted/50"
-                    )}
-                  >
-                    {selected && <Check size={12} />}
-                    {type.name}
-                  </button>
-                );
-              })}
-            </div>
+            <select
+              value={selectedTypeId}
+              onChange={(e) => setSelectedTypeId(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground max-w-full"
+            >
+              <option value="">כל סוגי הפעילויות</option>
+              {activityTypes.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))}
+            </select>
           )}
 
           {/* Activity Summary report card */}
