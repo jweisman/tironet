@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Table2, Loader2 } from "lucide-react";
+import { FileText, Table2, Loader2, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSession } from "next-auth/react";
@@ -79,6 +79,9 @@ export default function ReportsPage() {
     );
   }
 
+  // Request type filter state — "" means all types
+  const [selectedRequestType, setSelectedRequestType] = useState<string>("");
+
   // "" = all types, otherwise a single type ID
   const typesParam = selectedTypeId;
 
@@ -122,6 +125,17 @@ export default function ReportsPage() {
     const url = typesParam
       ? `/reports/activity-summary?types=${typesParam}`
       : "/reports/activity-summary";
+    router.push(url);
+  }
+
+  function handleRequestSummary() {
+    if (!navigator.onLine) {
+      toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
+      return;
+    }
+    const url = selectedRequestType
+      ? `/reports/request-summary?types=${selectedRequestType}`
+      : "/reports/request-summary";
     router.push(url);
   }
 
@@ -222,6 +236,45 @@ export default function ReportsPage() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* Request reports section */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground">דוחות בקשות</h2>
+
+          {/* Request type filter */}
+          <select
+            value={selectedRequestType}
+            onChange={(e) => setSelectedRequestType(e.target.value)}
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground max-w-full"
+          >
+            <option value="">כל סוגי הבקשות</option>
+            <option value="leave">בקשת יציאה</option>
+            <option value="medical">רפואה</option>
+            <option value="hardship">בקשת ת&quot;ש</option>
+          </select>
+
+          {/* Request Summary report card */}
+          <button
+            type="button"
+            onClick={handleRequestSummary}
+            className="flex w-full items-start gap-4 rounded-xl border border-border bg-background p-4 text-start hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ClipboardList size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold">סיכום בקשות</p>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  PDF
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                בקשות מאושרות לפי חייל — מקובצות לפי כיתות ומחלקות
+              </p>
+            </div>
+          </button>
         </section>
       </div>
     </div>
