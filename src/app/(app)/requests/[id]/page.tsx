@@ -23,6 +23,7 @@ import {
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/requests/workflow";
+import { effectiveRole } from "@/lib/auth/permissions";
 import type { RequestType, RequestStatus, Role, Transportation } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -66,7 +67,8 @@ interface RawRequest {
   appointment_type: string | null;
   sick_leave_days: number | null;
   special_conditions: number | null;
-  denial_reason: string | null;
+  platoon_commander_note: string | null;
+  company_commander_note: string | null;
   created_at: string;
   updated_at: string;
   soldier_given_name: string;
@@ -144,8 +146,9 @@ export default function RequestDetailPage() {
   const rawUserRole = (selectedAssignment?.role ?? "") as Role | "";
 
   const [acting, setActing] = useState(false);
-  const [denyDialogOpen, setDenyDialogOpen] = useState(false);
-  const [denialReason, setDenialReason] = useState("");
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteDialogAction, setNoteDialogAction] = useState<"approve" | "deny">("approve");
+  const [actionNote, setActionNote] = useState("");
 
   if (!raw && timedOut) {
     return (
@@ -175,6 +178,19 @@ export default function RequestDetailPage() {
     : [];
 
   const isAssignedToMe = assignedRole !== null && rawUserRole !== "" && canActOnRequest(rawUserRole as Role, assignedRole);
+
+  // Determine which note column to write based on the user's effective role
+  const noteColumn = rawUserRole
+    ? effectiveRole(rawUserRole as Role) === "company_commander"
+      ? "company_commander_note"
+      : "platoon_commander_note"
+    : null;
+
+  function openNoteDialog(action: "approve" | "deny") {
+    setActionNote("");
+    setNoteDialogAction(action);
+    setNoteDialogOpen(true);
+  }
 
   async function handleAction(action: "approve" | "deny" | "acknowledge") {
     if (!assignedRole) return;
@@ -207,25 +223,29 @@ export default function RequestDetailPage() {
     }
   }
 
-  async function confirmDeny() {
-    if (!assignedRole) return;
-    const transition = getNextState(requestStatus, assignedRole, "deny", requestType);
+  async function confirmActionWithNote() {
+    if (!assignedRole || !noteColumn) return;
+    const transition = getNextState(requestStatus, assignedRole, noteDialogAction, requestType);
     if (!transition) return;
 
     setActing(true);
     try {
       await db.execute(
-        `UPDATE requests SET status = ?, assigned_role = ?, denial_reason = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE requests SET status = ?, assigned_role = ?, ${noteColumn} = ?, updated_at = ? WHERE id = ?`,
         [
           transition.newStatus,
           transition.newAssignedRole,
-          denialReason.trim() || null,
+          actionNote.trim() || null,
           new Date().toISOString(),
           raw.id,
         ],
       );
-      toast.success("הבקשה נדחתה");
-      setDenyDialogOpen(false);
+      const messages: Record<string, string> = {
+        approve: "הבקשה אושרה",
+        deny: "הבקשה נדחתה",
+      };
+      toast.success(messages[noteDialogAction]);
+      setNoteDialogOpen(false);
     } catch {
       toast.error("שגיאה בביצוע הפעולה");
     } finally {
@@ -357,11 +377,17 @@ export default function RequestDetailPage() {
         )}
       </div>
 
-      {/* Denial reason */}
-      {requestStatus === "denied" && raw.denial_reason && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-1">
-          <h2 className="text-sm font-semibold text-destructive">סיבת הדחייה</h2>
-          <p className="text-sm whitespace-pre-wrap">{raw.denial_reason}</p>
+      {/* Commander notes */}
+      {raw.platoon_commander_note && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-1">
+          <h2 className="text-sm font-semibold text-muted-foreground">הערת מפקד מחלקה</h2>
+          <p className="text-sm whitespace-pre-wrap">{raw.platoon_commander_note}</p>
+        </div>
+      )}
+      {raw.company_commander_note && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-1">
+          <h2 className="text-sm font-semibold text-muted-foreground">הערת מפקד פלוגה</h2>
+          <p className="text-sm whitespace-pre-wrap">{raw.company_commander_note}</p>
         </div>
       )}
 
@@ -370,7 +396,7 @@ export default function RequestDetailPage() {
         <div className="flex gap-2">
           {actions.includes("approve") && (
             <Button
-              onClick={() => handleAction("approve")}
+              onClick={() => openNoteDialog("approve")}
               disabled={acting}
               className="flex-1 bg-emerald-600 hover:bg-emerald-700"
             >
@@ -381,7 +407,7 @@ export default function RequestDetailPage() {
           {actions.includes("deny") && (
             <Button
               variant="destructive"
-              onClick={() => { setDenialReason(""); setDenyDialogOpen(true); }}
+              onClick={() => openNoteDialog("deny")}
               disabled={acting}
               className="flex-1"
             >
@@ -402,29 +428,41 @@ export default function RequestDetailPage() {
         </div>
       )}
 
-      {/* Deny dialog */}
-      <Dialog open={denyDialogOpen} onOpenChange={setDenyDialogOpen}>
+      {/* Approve / Deny note dialog */}
+      <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>דחיית בקשה</DialogTitle>
+            <DialogTitle>
+              {noteDialogAction === "approve" ? "אישור בקשה" : "דחיית בקשה"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">סיבת הדחייה (אופציונלי)</label>
+            <label className="text-sm text-muted-foreground">הערה (אופציונלי)</label>
             <textarea
-              value={denialReason}
-              onChange={(e) => setDenialReason(e.target.value)}
+              value={actionNote}
+              onChange={(e) => setActionNote(e.target.value)}
               className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              placeholder="הוסף סיבה..."
+              placeholder="הוסף הערה..."
               rows={3}
             />
           </div>
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={() => setDenyDialogOpen(false)} className="flex-1">
+            <Button variant="outline" onClick={() => setNoteDialogOpen(false)} className="flex-1">
               ביטול
             </Button>
-            <Button variant="destructive" onClick={confirmDeny} disabled={acting} className="flex-1">
-              דחה
-            </Button>
+            {noteDialogAction === "approve" ? (
+              <Button
+                onClick={confirmActionWithNote}
+                disabled={acting}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              >
+                אשר
+              </Button>
+            ) : (
+              <Button variant="destructive" onClick={confirmActionWithNote} disabled={acting} className="flex-1">
+                דחה
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

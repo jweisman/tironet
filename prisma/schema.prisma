@@ -380,8 +380,9 @@ model Request {
   // Hardship fields
   specialConditions Boolean?    @map("special_conditions")
 
-  // Denial
-  denialReason    String?       @map("denial_reason")
+  // Commander notes (set on approve, deny, or acknowledge)
+  platoonCommanderNote String?  @map("platoon_commander_note")
+  companyCommanderNote String?  @map("company_commander_note")
 
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()

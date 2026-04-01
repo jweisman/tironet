@@ -156,7 +156,8 @@ export class TironetConnector implements PowerSyncBackendConnector {
               paramedic_date: "paramedicDate", appointment_date: "appointmentDate",
               appointment_place: "appointmentPlace", appointment_type: "appointmentType",
               sick_leave_days: "sickLeaveDays", special_conditions: "specialConditions",
-              denial_reason: "denialReason",
+              platoon_commander_note: "platoonCommanderNote",
+              company_commander_note: "companyCommanderNote",
             };
             for (const [key, value] of Object.entries(d)) {
               body[mapping[key] ?? key] = value;

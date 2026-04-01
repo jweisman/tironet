@@ -269,9 +269,9 @@ squad_commander creates → platoon_commander (approve/deny)
 
 **Key implementation detail:** the `acknowledge` action passes the decision down the chain without changing the status. Only approve/deny change the status.
 
-### Denial reason
+### Commander notes
 
-When denying a request, commanders can provide a free-text denial reason. The deny button opens a dialog with an optional text field. The reason is stored in `Request.denialReason` and displayed on the detail page for denied requests.
+Both approve and deny actions open a dialog with an optional note field. Notes are stored in role-specific columns: `Request.platoonCommanderNote` (for platoon commanders) and `Request.companyCommanderNote` (for company commanders). The detail page displays both notes when present, regardless of request status. The `effectiveRole()` function determines which column to write to — platoon commanders (including platoon sergeants) write to `platoon_commander_note`, company commanders (including deputies) write to `company_commander_note`.
 
 ### Offline writes
 

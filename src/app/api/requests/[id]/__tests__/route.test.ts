@@ -206,7 +206,7 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
     expect(updateCall.data.assignedRole).toBe("company_commander");
   });
 
-  it("stores denial reason on deny action", async () => {
+  it("stores platoon commander note on deny action", async () => {
     mockRequestFindUnique.mockResolvedValue(baseRequest as never);
     mockGetScope.mockResolvedValue({
       scope: {
@@ -224,13 +224,41 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
 
     const req = createMockRequest("PATCH", "/api/requests/req-1", {
       action: "deny",
-      denialReason: "Insufficient documentation",
+      platoonCommanderNote: "Insufficient documentation",
     });
     const res = await PATCH(req, makeParams("req-1"));
     expect(res.status).toBe(200);
 
     const updateCall = mockRequestUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
-    expect(updateCall.data.denialReason).toBe("Insufficient documentation");
+    expect(updateCall.data.platoonCommanderNote).toBe("Insufficient documentation");
+  });
+
+  it("stores company commander note on approve action", async () => {
+    const ccRequest = { ...baseRequest, assignedRole: "company_commander" };
+    mockRequestFindUnique.mockResolvedValue(ccRequest as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "company_commander",
+        soldierIds: ["sol-1"],
+        squadIds: ["sq-1"],
+        platoonIds: ["pl-1"],
+        canCreate: true,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+    mockGetNextState.mockReturnValue({ newStatus: "approved", newAssignedRole: "platoon_commander" });
+    mockRequestUpdate.mockResolvedValue({ ...ccRequest, status: "approved" } as never);
+
+    const req = createMockRequest("PATCH", "/api/requests/req-1", {
+      action: "approve",
+      companyCommanderNote: "Approved with conditions",
+    });
+    const res = await PATCH(req, makeParams("req-1"));
+    expect(res.status).toBe(200);
+
+    const updateCall = mockRequestUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(updateCall.data.companyCommanderNote).toBe("Approved with conditions");
   });
 });
 

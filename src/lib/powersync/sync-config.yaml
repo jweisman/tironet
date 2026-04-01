@@ -75,6 +75,6 @@ streams:
              place, departure_at, return_at, transportation,
              urgent, paramedic_date, appointment_date, appointment_place,
              appointment_type, sick_leave_days,
-             special_conditions, denial_reason, created_at, updated_at
+             special_conditions, platoon_commander_note, company_commander_note, created_at, updated_at
       FROM requests
       WHERE cycle_id IN auth.parameter('cycle_ids')

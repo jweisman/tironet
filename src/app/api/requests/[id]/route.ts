@@ -23,7 +23,8 @@ const patchSchema = z.object({
   appointmentType: z.string().nullable().optional(),
   sickLeaveDays: z.number().int().min(0).nullable().optional(),
   specialConditions: z.boolean().nullable().optional(),
-  denialReason: z.string().nullable().optional(),
+  platoonCommanderNote: z.string().nullable().optional(),
+  companyCommanderNote: z.string().nullable().optional(),
   // Status/assignment override from connector (offline sync)
   status: z.enum(["open", "approved", "denied"]).optional(),
   assignedRole: z.enum(["squad_commander", "platoon_commander", "company_commander"]).nullable().optional(),
@@ -108,14 +109,21 @@ export async function PATCH(
       return NextResponse.json({ error: "Not assigned to you" }, { status: 403 });
     }
 
+    // Determine which note field to set based on the user's role
+    const noteData: Record<string, unknown> = {};
+    if (data.platoonCommanderNote !== undefined) {
+      noteData.platoonCommanderNote = data.platoonCommanderNote;
+    }
+    if (data.companyCommanderNote !== undefined) {
+      noteData.companyCommanderNote = data.companyCommanderNote;
+    }
+
     const updated = await prisma.request.update({
       where: { id },
       data: {
         status: transition.newStatus,
         assignedRole: transition.newAssignedRole,
-        ...(data.action === "deny" && data.denialReason !== undefined
-          ? { denialReason: data.denialReason }
-          : {}),
+        ...noteData,
       },
     });
 
@@ -154,7 +162,8 @@ export async function PATCH(
         ...(data.appointmentType !== undefined ? { appointmentType: data.appointmentType } : {}),
         ...(data.sickLeaveDays !== undefined ? { sickLeaveDays: data.sickLeaveDays } : {}),
         ...(data.specialConditions !== undefined ? { specialConditions: data.specialConditions } : {}),
-        ...(data.denialReason !== undefined ? { denialReason: data.denialReason } : {}),
+        ...(data.platoonCommanderNote !== undefined ? { platoonCommanderNote: data.platoonCommanderNote } : {}),
+        ...(data.companyCommanderNote !== undefined ? { companyCommanderNote: data.companyCommanderNote } : {}),
       },
     });
     return NextResponse.json({ request: updated });
