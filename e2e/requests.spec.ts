@@ -222,8 +222,13 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
     const approveBtn = platoonPage.getByRole("button", { name: "אשר" });
     await expect(approveBtn).toBeVisible({ timeout: 60000 });
 
-    // Click approve
+    // Click approve — opens note dialog
     await approveBtn.click();
+
+    // Confirm in the note dialog
+    const approveDialog = platoonPage.getByRole("dialog");
+    await expect(approveDialog).toBeVisible();
+    await approveDialog.getByRole("button", { name: "אשר" }).click();
 
     // Toast should confirm
     await expect(platoonPage.getByText("הבקשה אושרה")).toBeVisible({
@@ -335,8 +340,8 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     const denyDialog = platoonPage.getByRole("dialog");
     await expect(denyDialog).toBeVisible();
 
-    // Fill denial reason
-    await denyDialog.getByPlaceholder("הוסף סיבה...").fill("E2E denial reason");
+    // Fill commander note
+    await denyDialog.getByPlaceholder("הוסף הערה...").fill("E2E denial reason");
 
     // Confirm denial
     await denyDialog.getByRole("button", { name: "דחה" }).click();
@@ -357,7 +362,7 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     await platoonPage.close();
     await platoonContext.close();
 
-    // --- Step 3: Squad commander sees denial reason and acknowledges ---
+    // --- Step 3: Squad commander sees commander note and acknowledges ---
     const squadContext2 = await browser.newContext({
       storageState: "e2e/.auth/squad-cmd.json",
       locale: "he-IL",
@@ -370,9 +375,9 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     const ackBtn = squadPage2.getByRole("button", { name: "קבלתי" });
     await expect(ackBtn).toBeVisible({ timeout: 60000 });
 
-    // Denial reason should be displayed
+    // Commander note should be displayed
     await expect(squadPage2.getByText("E2E denial reason")).toBeVisible();
-    await expect(squadPage2.getByText("סיבת הדחייה")).toBeVisible();
+    await expect(squadPage2.getByText("הערת מפקד מחלקה")).toBeVisible();
 
     // Acknowledge
     await ackBtn.click();

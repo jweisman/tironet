@@ -8,7 +8,8 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Role-based access** — Admins, cycle commanders, company commanders, platoon commanders, and squad commanders each see only their slice of the hierarchy
 - **Activity management** — Create training activities, assign them to platoons, and record per-soldier results (pass / fail / N/A) with up to 6 labeled scores per activity type and notes; bulk import activities from Excel/CSV
 - **Bulk reporting** — Update an entire squad's activity results in one action; import reports from Excel/CSV with user-defined column mapping (saved per activity type)
-- **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), denial reasons, and full offline support
+- **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), commander notes on approve/deny, and full offline support
+- **Reports** — Activity summary (PDF with pie charts and grade tables by unit), all-activity matrix (Google Sheets), and approved request summary (PDF grouped by unit); all scoped by role and filterable by type
 - **Dashboard** — Live summary of activity completion rates, gap counts, and missing reports per platoon/squad
 - **Soldier profiles** — Photo upload with in-browser cropping and compression; bulk import from Excel
 - **Invitation system** — Admins invite users by email; each invitation scopes the user to a specific unit and role
@@ -208,7 +209,7 @@ npm run e2e        # headless run
 npm run e2e:ui     # Playwright UI (interactive)
 ```
 
-The test suite (81 tests across 12 spec files) takes ~1 minute locally (~5–6 minutes in CI). Tests cover authentication, navigation guards, admin CRUD (cycles, structure, activity types, users), invitation flow, dashboard, activities, soldiers, and the requests workflow (creation, approval chain, denial with reason, cross-role handoffs).
+The test suite (81 tests across 12 spec files) takes ~1 minute locally (~5–6 minutes in CI). Tests cover authentication, navigation guards, admin CRUD (cycles, structure, activity types, users), invitation flow, dashboard, activities, soldiers, and the requests workflow (creation, approval chain, denial with notes, cross-role handoffs).
 
 The setup phase automatically:
 1. Runs Prisma migrations against the test database
@@ -352,6 +353,7 @@ src/
 │   │   ├── activities/      # Activity management & reporting
 │   │   ├── soldiers/        # Soldier roster
 │   │   ├── requests/        # Leave, medical & hardship requests workflow
+│   │   ├── reports/         # Activity summary, request summary (PDF), Sheets export
 │   │   ├── users/           # User management (admin)
 │   │   ├── admin/           # Admin panel (cycles, structure, activity types)
 │   │   └── profile/         # User profile
@@ -366,6 +368,7 @@ src/
 │   ├── api/                 # Server-side helpers (hierarchy, scoping)
 │   ├── email/               # Email templates
 │   ├── push/                # Web Push notification utilities (VAPID, send)
+│   ├── reports/             # Report data fetching and HTML/PDF rendering
 │   └── powersync/           # PowerSync schema, connector, database singleton, sync-config.yaml
 ├── hooks/                   # React hooks (useOnlineStatus, etc.)
 └── types/                   # TypeScript type definitions
