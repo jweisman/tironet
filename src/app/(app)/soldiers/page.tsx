@@ -473,9 +473,12 @@ export default function SoldiersPage() {
           <div>
             {squadsByPlatoon.map((platoonGroup) => (
               <div key={platoonGroup.platoonName}>
-                <div ref={platoonHeaderRef} className="sticky z-[11] bg-background border-b border-border px-4 py-2" style={{ top: stickyTop }}>
+                <div ref={platoonHeaderRef} className="sticky z-[11] bg-background border-b border-border px-4 py-2 flex items-center justify-between" style={{ top: stickyTop }}>
                   <span className="text-sm font-semibold">
                     {platoonGroup.platoonName}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {platoonGroup.squads.reduce((sum, sq) => sum + sq.soldiers.length, 0)}
                   </span>
                 </div>
                 {platoonGroup.squads.map((squad) => (

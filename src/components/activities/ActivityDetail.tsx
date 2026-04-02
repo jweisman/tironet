@@ -425,7 +425,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           {data.isRequired && (
             <Badge variant="secondary">דרוש</Badge>
           )}
@@ -435,51 +435,53 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
           <div className="flex-1" />
 
-          {data.canEditMetadata && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setMetaName(data.name);
-                  setMetaDate(data.date.split("T")[0]);
-                  setMetaActivityTypeId(data.activityType.id);
-                  setMetaIsRequired(data.isRequired);
-                  setMetaStatus(data.status);
-                  setEditingMetadata(true);
-                }}
-              >
-                ערוך פרטים
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => setConfirmDelete(true)}
-              >
-                מחק
-              </Button>
-            </>
-          )}
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {data.canEditMetadata && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setMetaName(data.name);
+                    setMetaDate(data.date.split("T")[0]);
+                    setMetaActivityTypeId(data.activityType.id);
+                    setMetaIsRequired(data.isRequired);
+                    setMetaStatus(data.status);
+                    setEditingMetadata(true);
+                  }}
+                >
+                  ערוך פרטים
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  מחק
+                </Button>
+              </>
+            )}
 
-          {data.canEditReports && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setImportReportsOpen(true)}
-              >
-                ייבוא דיווחים
-              </Button>
-              <Button
-                size="sm"
-                variant={editingReports ? "default" : "outline"}
-                onClick={() => setEditingReports((v) => !v)}
-              >
-                {editingReports ? "סיים עריכה" : "ערוך דיווח"}
-              </Button>
-            </>
-          )}
+            {data.canEditReports && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImportReportsOpen(true)}
+                >
+                  ייבוא דיווחים
+                </Button>
+                <Button
+                  size="sm"
+                  variant={editingReports ? "default" : "outline"}
+                  onClick={() => setEditingReports((v) => !v)}
+                >
+                  {editingReports ? "סיים עריכה" : "ערוך דיווח"}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         {gapsCount > 0 && (
