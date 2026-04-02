@@ -156,8 +156,6 @@ export class TironetConnector implements PowerSyncBackendConnector {
               paramedic_date: "paramedicDate", appointment_date: "appointmentDate",
               appointment_place: "appointmentPlace", appointment_type: "appointmentType",
               sick_leave_days: "sickLeaveDays", special_conditions: "specialConditions",
-              platoon_commander_note: "platoonCommanderNote",
-              company_commander_note: "companyCommanderNote",
             };
             for (const [key, value] of Object.entries(d)) {
               body[mapping[key] ?? key] = value;
@@ -169,6 +167,18 @@ export class TironetConnector implements PowerSyncBackendConnector {
           } else if (opType === UpdateType.DELETE) {
             await apiRequest(`/api/requests/${id}`, "DELETE");
           }
+        } else if (table === "request_actions") {
+          if (opType === UpdateType.PUT) {
+            const d = opData as Record<string, unknown>;
+            await apiRequest("/api/request-actions", "POST", {
+              id,
+              requestId: d.request_id,
+              action: d.action,
+              note: d.note,
+              userName: d.user_name,
+            });
+          }
+          // Actions are immutable — no PATCH or DELETE
         } else if (table === "soldiers") {
           const soldierMapping: Record<string, string> = {
             cycle_id: "cycleId", squad_id: "squadId",

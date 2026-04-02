@@ -28,9 +28,8 @@ export interface RequestSummaryItem {
   sickLeaveDays: number | null;
   // Hardship fields
   specialConditions: boolean | null;
-  // Commander notes
-  platoonCommanderNote: string | null;
-  companyCommanderNote: string | null;
+  // Audit trail notes (from approve/deny actions)
+  notes: { action: string; userName: string; note: string }[];
 }
 
 export interface RequestSummaryGroup {
@@ -99,6 +98,11 @@ export async function fetchRequestSummary(
           },
         },
       },
+      actions: {
+        where: { note: { not: null } },
+        orderBy: { createdAt: "asc" },
+        select: { action: true, userName: true, note: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -124,8 +128,9 @@ export async function fetchRequestSummary(
     appointmentType: r.appointmentType,
     sickLeaveDays: r.sickLeaveDays,
     specialConditions: r.specialConditions,
-    platoonCommanderNote: r.platoonCommanderNote,
-    companyCommanderNote: r.companyCommanderNote,
+    notes: (r.actions ?? [])
+      .filter((a): a is typeof a & { note: string } => a.note != null)
+      .map((a) => ({ action: a.action, userName: a.userName, note: a.note })),
   }));
 
   // Group by platoon → squad
@@ -224,11 +229,9 @@ function renderRequestDetails(req: RequestSummaryItem): string {
     }
   }
 
-  if (req.platoonCommanderNote) {
-    rows.push(`<span class="detail-label">הערת מ"מ:</span> ${escapeHtml(req.platoonCommanderNote)}`);
-  }
-  if (req.companyCommanderNote) {
-    rows.push(`<span class="detail-label">הערת מ"פ:</span> ${escapeHtml(req.companyCommanderNote)}`);
+  for (const n of req.notes) {
+    const actionLabel = n.action === "approve" ? "אישור" : n.action === "deny" ? "דחיה" : n.action;
+    rows.push(`<span class="detail-label">${escapeHtml(n.userName)} (${actionLabel}):</span> ${escapeHtml(n.note)}`);
   }
 
   return rows.join('<span class="sep">·</span>');

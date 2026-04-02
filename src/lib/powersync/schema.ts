@@ -91,11 +91,17 @@ const requests = new Table({
   sick_leave_days: column.integer,
   // Hardship fields
   special_conditions: column.integer,
-  // Commander notes
-  platoon_commander_note: column.text,
-  company_commander_note: column.text,
   created_at: column.text,
   updated_at: column.text,
+});
+
+const request_actions = new Table({
+  request_id: column.text,
+  user_id: column.text,
+  action: column.text,
+  note: column.text,
+  user_name: column.text,
+  created_at: column.text,
 });
 
 export const AppSchema = new Schema({
@@ -108,6 +114,7 @@ export const AppSchema = new Schema({
   activities,
   activity_reports,
   requests,
+  request_actions,
 });
 
 export type Database = (typeof AppSchema)["types"];

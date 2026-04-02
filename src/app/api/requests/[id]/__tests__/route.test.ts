@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     request: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    requestAction: { create: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -32,6 +34,7 @@ const mockRequestFindUnique = vi.mocked(prisma.request.findUnique);
 const mockRequestUpdate = vi.mocked(prisma.request.update);
 const mockRequestDelete = vi.mocked(prisma.request.delete);
 const mockGetNextState = vi.mocked(getNextState);
+const mockTransaction = vi.mocked(prisma.$transaction);
 
 const makeParams = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -47,6 +50,15 @@ const baseRequest = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Mock $transaction to resolve array transactions and return first element
+  mockTransaction.mockImplementation(async (ops: unknown) => {
+    if (Array.isArray(ops)) {
+      const results = await Promise.all(ops);
+      return results;
+    }
+    return ops;
+  });
+  vi.mocked(prisma.requestAction.create).mockResolvedValue({} as never);
 });
 
 // ---------------------------------------------------------------------------
@@ -206,7 +218,7 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
     expect(updateCall.data.assignedRole).toBe("company_commander");
   });
 
-  it("stores platoon commander note on deny action", async () => {
+  it("creates audit trail action with note on deny", async () => {
     mockRequestFindUnique.mockResolvedValue(baseRequest as never);
     mockGetScope.mockResolvedValue({
       scope: {
@@ -224,16 +236,25 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
 
     const req = createMockRequest("PATCH", "/api/requests/req-1", {
       action: "deny",
-      platoonCommanderNote: "Insufficient documentation",
+      note: "Insufficient documentation",
     });
     const res = await PATCH(req, makeParams("req-1"));
     expect(res.status).toBe(200);
 
-    const updateCall = mockRequestUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
-    expect(updateCall.data.platoonCommanderNote).toBe("Insufficient documentation");
+    // Verify audit trail action was created with note
+    expect(prisma.requestAction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          requestId: "req-1",
+          action: "deny",
+          note: "Insufficient documentation",
+          userId: "user-1",
+        }),
+      }),
+    );
   });
 
-  it("stores company commander note on approve action", async () => {
+  it("creates audit trail action with note on approve", async () => {
     const ccRequest = { ...baseRequest, assignedRole: "company_commander" };
     mockRequestFindUnique.mockResolvedValue(ccRequest as never);
     mockGetScope.mockResolvedValue({
@@ -252,13 +273,21 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
 
     const req = createMockRequest("PATCH", "/api/requests/req-1", {
       action: "approve",
-      companyCommanderNote: "Approved with conditions",
+      note: "Approved with conditions",
     });
     const res = await PATCH(req, makeParams("req-1"));
     expect(res.status).toBe(200);
 
-    const updateCall = mockRequestUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
-    expect(updateCall.data.companyCommanderNote).toBe("Approved with conditions");
+    expect(prisma.requestAction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          requestId: "req-1",
+          action: "approve",
+          note: "Approved with conditions",
+          userId: "user-1",
+        }),
+      }),
+    );
   });
 });
 

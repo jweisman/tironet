@@ -65,8 +65,10 @@ function RequestDetails({ req }: { req: RequestSummaryItem }) {
     details.push({ label: "אוכלוסיות מיוחדות", value: req.specialConditions ? "כן" : "לא" });
   }
 
-  if (req.platoonCommanderNote) details.push({ label: 'הערת מ"מ', value: req.platoonCommanderNote });
-  if (req.companyCommanderNote) details.push({ label: 'הערת מ"פ', value: req.companyCommanderNote });
+  for (const n of req.notes ?? []) {
+    const actionLabel = n.action === "approve" ? "אישור" : n.action === "deny" ? "דחיה" : n.action;
+    details.push({ label: `${n.userName} (${actionLabel})`, value: n.note });
+  }
 
   if (details.length === 0) return null;
 

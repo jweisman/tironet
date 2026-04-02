@@ -33,6 +33,7 @@ model User {
   activitiesCreated     Activity[]
   activityReportsEdited ActivityReport[]
   requestsCreated       Request[]
+  requestActions        RequestAction[]
   googleExportToken     GoogleExportToken?
   pushSubscriptions     PushSubscription[]
   notificationPreference NotificationPreference?
@@ -375,20 +376,33 @@ model Request {
   // Hardship fields
   specialConditions Boolean?    @map("special_conditions")
 
-  // Commander notes (set on approve, deny, or acknowledge)
-  platoonCommanderNote String?  @map("platoon_commander_note")
-  companyCommanderNote String?  @map("company_commander_note")
-
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
 
   cycle           Cycle         @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   soldier         Soldier       @relation(fields: [soldierId], references: [id], onDelete: Cascade)
   createdBy       User          @relation(fields: [createdByUserId], references: [id])
+  actions         RequestAction[]
 
   @@index([cycleId, status], name: "idx_requests_cycle_status")
   @@index([soldierId], name: "idx_requests_soldier")
   @@map("requests")
+}
+
+model RequestAction {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId String   @map("request_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String   // create, approve, deny, acknowledge
+  note      String?
+  userName  String   @map("user_name")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([requestId], name: "idx_request_actions_request")
+  @@map("request_actions")
 }
 
 // ---------------------------------------------------------------------------

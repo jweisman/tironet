@@ -269,13 +269,17 @@ squad_commander creates → platoon_commander (approve/deny)
 
 **Key implementation detail:** the `acknowledge` action passes the decision down the chain without changing the status. Only approve/deny change the status.
 
-### Commander notes
+### Audit trail (`RequestAction`)
 
-Both approve and deny actions open a dialog with an optional note field. Notes are stored in role-specific columns: `Request.platoonCommanderNote` (for platoon commanders) and `Request.companyCommanderNote` (for company commanders). The detail page displays both notes when present, regardless of request status. The `effectiveRole()` function determines which column to write to — platoon commanders (including platoon sergeants) write to `platoon_commander_note`, company commanders (including deputies) write to `company_commander_note`.
+Every workflow event (create, approve, deny, acknowledge) is recorded in the `request_actions` table. Each action stores `userId`, `action`, optional `note`, `userName` (denormalized for offline display), and `created_at`. The detail page renders a chronological timeline of all actions under "מהלך הטיפול".
+
+Approve and deny actions open a dialog with an optional note field. The note is stored on the `RequestAction` row, not on the `Request` itself.
+
+The `userName` column is denormalized from the user's `familyName givenName` at write time so the timeline renders correctly offline (the `users` table is not synced via PowerSync).
 
 ### Offline writes
 
-Request creation and workflow actions (approve/deny/acknowledge) write to the local PowerSync SQLite DB via `db.execute()`. The connector uploads them via PATCH/POST to the API. The `uploadData` handler in `connector.ts` maps snake_case columns to camelCase for the API.
+Request creation and workflow actions (approve/deny/acknowledge) write to the local PowerSync SQLite DB via `db.execute()`. Each workflow action writes **two rows**: an UPDATE to `requests` (status/assignedRole) and an INSERT to `request_actions` (audit entry). The connector uploads them separately — the request UPDATE via PATCH to `/api/requests/[id]` and the action INSERT via POST to `/api/request-actions`. The server-side PATCH handler also creates a `RequestAction` when it receives an explicit `action` field (online path), but the connector does NOT pass `action` in the PATCH body, avoiding duplicates.
 
 ### Request scoping (`getRequestScope`)
 

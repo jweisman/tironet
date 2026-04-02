@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useSession } from "next-auth/react";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,7 @@ export function CreateRequestForm({
   onCancel,
 }: Props) {
   const db = usePowerSync();
+  const { data: session } = useSession();
 
   const isSquadRole = userRole === "squad_commander";
   const soldierQuery = isSquadRole
@@ -184,6 +186,16 @@ export function CreateRequestForm({
       await db.execute(
         `INSERT INTO requests (${columns.join(", ")}) VALUES (${placeholders})`,
         values,
+      );
+
+      // Insert audit trail entry for the "create" action
+      const user = session?.user as { id?: string; familyName?: string; givenName?: string } | undefined;
+      const actionUserName = user
+        ? `${user.familyName ?? ""} ${user.givenName ?? ""}`.trim()
+        : "";
+      await db.execute(
+        `INSERT INTO request_actions (id, request_id, user_id, action, note, user_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [crypto.randomUUID(), id, user?.id ?? "", "create", null, actionUserName, now],
       );
 
       onSuccess(id);

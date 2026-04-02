@@ -5,11 +5,13 @@ import { getNextState } from "@/lib/requests/workflow";
 import { canActOnRequest } from "@/lib/requests/workflow";
 import { sendPushToUsers } from "@/lib/push/send";
 import { z } from "zod";
-import type { RequestStatus, RequestType, Role } from "@/types";
+import type { RequestStatus, RequestType, Role, SessionUser } from "@/types";
 
 const patchSchema = z.object({
   // Workflow action
   action: z.enum(["approve", "deny", "acknowledge"]).optional(),
+  // Optional note (stored as a RequestAction)
+  note: z.string().nullable().optional(),
   // Editable fields (only by assigned role)
   description: z.string().nullable().optional(),
   place: z.string().nullable().optional(),
@@ -23,8 +25,6 @@ const patchSchema = z.object({
   appointmentType: z.string().nullable().optional(),
   sickLeaveDays: z.number().int().min(0).nullable().optional(),
   specialConditions: z.boolean().nullable().optional(),
-  platoonCommanderNote: z.string().nullable().optional(),
-  companyCommanderNote: z.string().nullable().optional(),
   // Status/assignment override from connector (offline sync)
   status: z.enum(["open", "approved", "denied"]).optional(),
   assignedRole: z.enum(["squad_commander", "platoon_commander", "company_commander"]).nullable().optional(),
@@ -83,7 +83,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { scope, error } = await getRequestScope(req.cycleId);
+  const { scope, error, user } = await getRequestScope(req.cycleId);
   if (error || !scope) return error!;
 
   if (!scope.soldierIds.includes(req.soldierId)) {
@@ -91,6 +91,7 @@ export async function PATCH(
   }
 
   const data = parsed.data;
+  const sessionUser = user as SessionUser;
 
   // Handle workflow action
   if (data.action) {
@@ -109,23 +110,24 @@ export async function PATCH(
       return NextResponse.json({ error: "Not assigned to you" }, { status: 403 });
     }
 
-    // Determine which note field to set based on the user's role
-    const noteData: Record<string, unknown> = {};
-    if (data.platoonCommanderNote !== undefined) {
-      noteData.platoonCommanderNote = data.platoonCommanderNote;
-    }
-    if (data.companyCommanderNote !== undefined) {
-      noteData.companyCommanderNote = data.companyCommanderNote;
-    }
-
-    const updated = await prisma.request.update({
-      where: { id },
-      data: {
-        status: transition.newStatus,
-        assignedRole: transition.newAssignedRole,
-        ...noteData,
-      },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.request.update({
+        where: { id },
+        data: {
+          status: transition.newStatus,
+          assignedRole: transition.newAssignedRole,
+        },
+      }),
+      prisma.requestAction.create({
+        data: {
+          requestId: id,
+          userId: sessionUser.id,
+          action: data.action,
+          note: data.note ?? null,
+          userName: `${sessionUser.familyName} ${sessionUser.givenName}`,
+        },
+      }),
+    ]);
 
     // Send push notification to users with the newly assigned role
     if (transition.newAssignedRole) {
@@ -162,8 +164,6 @@ export async function PATCH(
         ...(data.appointmentType !== undefined ? { appointmentType: data.appointmentType } : {}),
         ...(data.sickLeaveDays !== undefined ? { sickLeaveDays: data.sickLeaveDays } : {}),
         ...(data.specialConditions !== undefined ? { specialConditions: data.specialConditions } : {}),
-        ...(data.platoonCommanderNote !== undefined ? { platoonCommanderNote: data.platoonCommanderNote } : {}),
-        ...(data.companyCommanderNote !== undefined ? { companyCommanderNote: data.companyCommanderNote } : {}),
       },
     });
     return NextResponse.json({ request: updated });

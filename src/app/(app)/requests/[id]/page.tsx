@@ -2,8 +2,9 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowRight, Check, X, Bell } from "lucide-react";
+import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward } from "lucide-react";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { Badge } from "@/components/ui/badge";
@@ -23,8 +24,7 @@ import {
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/requests/workflow";
-import { effectiveRole } from "@/lib/auth/permissions";
-import type { RequestType, RequestStatus, Role, Transportation } from "@/types";
+import type { RequestType, RequestStatus, Role, Transportation, RequestActionType } from "@/types";
 
 // ---------------------------------------------------------------------------
 // SQL queries
@@ -44,8 +44,12 @@ const REQUEST_QUERY = `
   WHERE r.id = ?
 `;
 
-// Resolve user's role for this request's cycle from local user_cycle_assignments
-// We don't have user_cycle_assignments in PowerSync. Use the CycleContext instead.
+const ACTIONS_QUERY = `
+  SELECT id, action, note, user_name, created_at
+  FROM request_actions
+  WHERE request_id = ?
+  ORDER BY created_at ASC
+`;
 
 interface RawRequest {
   id: string;
@@ -67,14 +71,20 @@ interface RawRequest {
   appointment_type: string | null;
   sick_leave_days: number | null;
   special_conditions: number | null;
-  platoon_commander_note: string | null;
-  company_commander_note: string | null;
   created_at: string;
   updated_at: string;
   soldier_given_name: string;
   soldier_family_name: string;
   squad_name: string;
   platoon_name: string;
+}
+
+interface RawAction {
+  id: string;
+  action: string;
+  note: string | null;
+  user_name: string;
+  created_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +123,29 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
   );
 }
 
+const ACTION_LABELS: Record<RequestActionType, string> = {
+  create: "נוצרה",
+  approve: "אושרה",
+  deny: "נדחתה",
+  acknowledge: "אישר קבלה",
+};
+
+function ActionIcon({ action }: { action: string }) {
+  const iconClass = "h-4 w-4";
+  switch (action) {
+    case "create":
+      return <Plus className={`${iconClass} text-blue-500`} />;
+    case "approve":
+      return <ThumbsUp className={`${iconClass} text-emerald-500`} />;
+    case "deny":
+      return <ThumbsDown className={`${iconClass} text-red-500`} />;
+    case "acknowledge":
+      return <Forward className={`${iconClass} text-muted-foreground`} />;
+    default:
+      return <Plus className={`${iconClass} text-muted-foreground`} />;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
@@ -121,6 +154,7 @@ export default function RequestDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const db = usePowerSync();
+  const { data: session } = useSession();
 
   // App shell pattern: read real ID from URL
   const [requestId, setRequestId] = useState(params.id);
@@ -141,6 +175,8 @@ export default function RequestDetailPage() {
   const requestParams = useMemo(() => [requestId], [requestId]);
   const { data: requestRows } = useQuery<RawRequest>(REQUEST_QUERY, requestParams);
   const raw = requestRows?.[0] ?? null;
+
+  const { data: actionRows } = useQuery<RawAction>(ACTIONS_QUERY, requestParams);
 
   const { selectedAssignment } = useCycle();
   const rawUserRole = (selectedAssignment?.role ?? "") as Role | "";
@@ -179,17 +215,23 @@ export default function RequestDetailPage() {
 
   const isAssignedToMe = assignedRole !== null && rawUserRole !== "" && canActOnRequest(rawUserRole as Role, assignedRole);
 
-  // Determine which note column to write based on the user's effective role
-  const noteColumn = rawUserRole
-    ? effectiveRole(rawUserRole as Role) === "company_commander"
-      ? "company_commander_note"
-      : "platoon_commander_note"
-    : null;
+  const userName = session?.user
+    ? `${(session.user as { familyName?: string }).familyName ?? ""} ${(session.user as { givenName?: string }).givenName ?? ""}`.trim()
+    : "";
 
   function openNoteDialog(action: "approve" | "deny") {
     setActionNote("");
     setNoteDialogAction(action);
     setNoteDialogOpen(true);
+  }
+
+  async function insertAction(action: string, note: string | null) {
+    const actionId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await db.execute(
+      `INSERT INTO request_actions (id, request_id, user_id, action, note, user_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [actionId, raw.id, session?.user?.id ?? "", action, note, userName, now],
+    );
   }
 
   async function handleAction(action: "approve" | "deny" | "acknowledge") {
@@ -199,7 +241,6 @@ export default function RequestDetailPage() {
 
     setActing(true);
     try {
-      // Write directly to local PowerSync DB
       await db.execute(
         `UPDATE requests SET status = ?, assigned_role = ?, updated_at = ? WHERE id = ?`,
         [
@@ -209,11 +250,12 @@ export default function RequestDetailPage() {
           raw.id,
         ],
       );
+      await insertAction(action, null);
 
       const messages: Record<string, string> = {
         approve: "הבקשה אושרה",
         deny: "הבקשה נדחתה",
-        acknowledge: "הבקשה הועברה",
+        acknowledge: "הבקשה התקבלה",
       };
       toast.success(messages[action]);
     } catch {
@@ -224,22 +266,23 @@ export default function RequestDetailPage() {
   }
 
   async function confirmActionWithNote() {
-    if (!assignedRole || !noteColumn) return;
+    if (!assignedRole) return;
     const transition = getNextState(requestStatus, assignedRole, noteDialogAction, requestType);
     if (!transition) return;
 
     setActing(true);
     try {
       await db.execute(
-        `UPDATE requests SET status = ?, assigned_role = ?, ${noteColumn} = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE requests SET status = ?, assigned_role = ?, updated_at = ? WHERE id = ?`,
         [
           transition.newStatus,
           transition.newAssignedRole,
-          actionNote.trim() || null,
           new Date().toISOString(),
           raw.id,
         ],
       );
+      await insertAction(noteDialogAction, actionNote.trim() || null);
+
       const messages: Record<string, string> = {
         approve: "הבקשה אושרה",
         deny: "הבקשה נדחתה",
@@ -377,17 +420,39 @@ export default function RequestDetailPage() {
         )}
       </div>
 
-      {/* Commander notes */}
-      {raw.platoon_commander_note && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-1">
-          <h2 className="text-sm font-semibold text-muted-foreground">הערת מפקד מחלקה</h2>
-          <p className="text-sm whitespace-pre-wrap">{raw.platoon_commander_note}</p>
-        </div>
-      )}
-      {raw.company_commander_note && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-1">
-          <h2 className="text-sm font-semibold text-muted-foreground">הערת מפקד פלוגה</h2>
-          <p className="text-sm whitespace-pre-wrap">{raw.company_commander_note}</p>
+      {/* Audit trail */}
+      {actionRows && actionRows.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground">מהלך הטיפול</h2>
+          <div className="space-y-0">
+            {actionRows.map((a, i) => (
+              <div key={a.id} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                    <ActionIcon action={a.action} />
+                  </div>
+                  {i < actionRows.length - 1 && (
+                    <div className="flex-1 w-px bg-border my-1" />
+                  )}
+                </div>
+                <div className="pb-3 min-w-0">
+                  <p className="text-sm font-medium">
+                    {ACTION_LABELS[a.action as RequestActionType] ?? a.action}
+                    {" · "}
+                    <span className="text-muted-foreground font-normal">{a.user_name}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(a.created_at)}
+                  </p>
+                  {a.note && (
+                    <p className="text-sm mt-1 whitespace-pre-wrap text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
+                      {a.note}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

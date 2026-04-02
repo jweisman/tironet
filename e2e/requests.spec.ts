@@ -375,9 +375,9 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     const ackBtn = squadPage2.getByRole("button", { name: "קבלתי" });
     await expect(ackBtn).toBeVisible({ timeout: 60000 });
 
-    // Commander note should be displayed
+    // Denial note should be displayed in the audit trail timeline
     await expect(squadPage2.getByText("E2E denial reason")).toBeVisible();
-    await expect(squadPage2.getByText("הערת מפקד מחלקה")).toBeVisible();
+    await expect(squadPage2.getByText("מהלך הטיפול")).toBeVisible();
 
     // Acknowledge
     await ackBtn.click();
