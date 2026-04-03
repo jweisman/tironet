@@ -53,6 +53,8 @@ const EMAILS = {
 };
 
 async function teardown() {
+  await prisma.requestAction.deleteMany();
+  await prisma.request.deleteMany();
   await prisma.activityReport.deleteMany();
   await prisma.activity.deleteMany();
   await prisma.activityType.deleteMany();

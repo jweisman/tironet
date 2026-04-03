@@ -180,18 +180,15 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
     const squadPage = await squadContext.newPage();
 
     await gotoRequestsPage(squadPage);
-    const soldierName = await createHardshipRequest(
-      squadPage,
-      "E2E workflow test",
-    );
+    await createHardshipRequest(squadPage, "E2E workflow test");
 
-    // Verify request appears
-    await expect(squadPage.getByText(soldierName).first()).toBeVisible({
+    // Verify request appears — use description to find the specific request
+    await expect(squadPage.getByText("E2E workflow test").first()).toBeVisible({
       timeout: 10000,
     });
 
-    // Get the request URL by clicking into it
-    await squadPage.getByText(soldierName).first().click();
+    // Click the specific request card by its unique description
+    await squadPage.getByText("E2E workflow test").first().click();
     await expect(squadPage).toHaveURL(/\/requests\//, { timeout: 15000 });
     const requestUrl = squadPage.url();
     const requestId = requestUrl.match(/\/requests\/([^/]+)/)?.[1];
@@ -298,17 +295,15 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     const squadPage = await squadContext.newPage();
 
     await gotoRequestsPage(squadPage);
-    const soldierName = await createHardshipRequest(
-      squadPage,
-      "E2E deny test",
-    );
+    await createHardshipRequest(squadPage, "E2E deny test");
 
-    await expect(squadPage.getByText(soldierName).first()).toBeVisible({
+    // Verify request appears — use description to find the specific request
+    await expect(squadPage.getByText("E2E deny test").first()).toBeVisible({
       timeout: 10000,
     });
 
-    // Get request ID
-    await squadPage.getByText(soldierName).first().click();
+    // Click the specific request card by its unique description
+    await squadPage.getByText("E2E deny test").first().click();
     await expect(squadPage).toHaveURL(/\/requests\//, { timeout: 15000 });
     const requestId = squadPage.url().match(/\/requests\/([^/]+)/)?.[1];
     expect(requestId).toBeTruthy();
