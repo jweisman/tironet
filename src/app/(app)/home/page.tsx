@@ -388,7 +388,10 @@ export default function HomePage() {
 
       {/* No cycle selected */}
       {!selectedCycleId && (
-        <p className="text-muted-foreground text-sm">בחר מחזור כדי לצפות בלוח הבקרה.</p>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
+          <p className="text-lg font-medium">בחר מחזור</p>
+          <p className="text-muted-foreground text-sm">בחר מחזור פעיל כדי לצפות בלוח הבקרה.</p>
+        </div>
       )}
 
       {selectedCycleId && (

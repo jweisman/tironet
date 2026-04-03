@@ -266,7 +266,7 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
     await ackBtn.click();
 
     // Toast should confirm
-    await expect(squadPage2.getByText("הבקשה הועברה")).toBeVisible({
+    await expect(squadPage2.getByText("הבקשה התקבלה")).toBeVisible({
       timeout: 10000,
     });
 
@@ -382,7 +382,7 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     // Acknowledge
     await ackBtn.click();
 
-    await expect(squadPage2.getByText("הבקשה הועברה")).toBeVisible({
+    await expect(squadPage2.getByText("הבקשה התקבלה")).toBeVisible({
       timeout: 10000,
     });
 
