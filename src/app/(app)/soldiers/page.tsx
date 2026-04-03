@@ -8,7 +8,7 @@ import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
 import { effectiveRole } from "@/lib/auth/permissions";
-import type { Role } from "@/types";
+import type { Role, RequestType } from "@/types";
 import { SoldierCard, type SoldierSummary } from "@/components/soldiers/SoldierCard";
 import { AddSoldierForm } from "@/components/soldiers/AddSoldierForm";
 import dynamic from "next/dynamic";
@@ -100,6 +100,24 @@ const SOLDIERS_QUERY = `
   ORDER BY s.family_name ASC, s.given_name ASC
 `;
 
+const APPROVED_REQUESTS_QUERY = `
+  SELECT r.soldier_id, r.type
+  FROM requests r
+  WHERE r.cycle_id = ?
+    AND r.status = 'approved'
+    AND r.assigned_role IS NULL
+    AND (
+      (r.type = 'leave' AND r.departure_at >= DATE('now'))
+      OR (r.type = 'medical' AND r.appointment_date >= DATE('now'))
+      OR r.type = 'hardship'
+    )
+`;
+
+interface RawApprovedRequest {
+  soldier_id: string;
+  type: string;
+}
+
 const SQUADS_QUERY = `
   SELECT sq.id, sq.name, sq.platoon_id,
          p.name AS platoon_name
@@ -130,7 +148,7 @@ interface RawSquad {
   platoon_name: string;
 }
 
-function mapSoldier(raw: RawSoldier): SoldierSummary {
+function mapSoldier(raw: RawSoldier, approvedTypes: RequestType[]): SoldierSummary {
   return {
     id: raw.id,
     givenName: raw.given_name,
@@ -141,6 +159,7 @@ function mapSoldier(raw: RawSoldier): SoldierSummary {
     profileImage: raw.profile_image ?? null,
     gapCount: Number(raw.gap_count ?? 0),
     openRequestCount: Number(raw.open_request_count ?? 0),
+    approvedRequestTypes: approvedTypes,
   };
 }
 
@@ -161,8 +180,17 @@ export default function SoldiersPage() {
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
   const { data: rawSoldiers } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
+  const { data: rawApprovedRequests } = useQuery<RawApprovedRequest>(APPROVED_REQUESTS_QUERY, queryParams);
 
   const allSquads: SquadData[] = useMemo(() => {
+    // Build soldier → approved request types map
+    const approvedMap = new Map<string, RequestType[]>();
+    for (const ar of rawApprovedRequests ?? []) {
+      const types = approvedMap.get(ar.soldier_id);
+      if (types) types.push(ar.type as RequestType);
+      else approvedMap.set(ar.soldier_id, [ar.type as RequestType]);
+    }
+
     const squadMap = new Map<string, SquadData>();
     for (const sq of rawSquads ?? []) {
       squadMap.set(sq.id, {
@@ -175,7 +203,7 @@ export default function SoldiersPage() {
     }
     for (const s of rawSoldiers ?? []) {
       const squad = squadMap.get(s.squad_id);
-      if (squad) squad.soldiers.push(mapSoldier(s));
+      if (squad) squad.soldiers.push(mapSoldier(s, approvedMap.get(s.id) ?? []));
     }
     let squads = Array.from(squadMap.values()).filter((sq) => sq.soldiers.length > 0);
     // Squad commanders see only their own squad
@@ -183,7 +211,7 @@ export default function SoldiersPage() {
       squads = squads.filter((sq) => sq.id === selectedAssignment.unitId);
     }
     return squads;
-  }, [rawSoldiers, rawSquads, role, selectedAssignment?.unitId]);
+  }, [rawSoldiers, rawSquads, rawApprovedRequests, role, selectedAssignment?.unitId]);
 
   // -------- Sticky header offset --------
   const stickyBarRef = useRef<HTMLDivElement>(null);

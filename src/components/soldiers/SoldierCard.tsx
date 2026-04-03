@@ -2,7 +2,8 @@
 
 import { ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { SoldierStatus } from "@/types";
+import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
+import type { SoldierStatus, RequestType } from "@/types";
 
 export interface SoldierSummary {
   id: string;
@@ -14,6 +15,7 @@ export interface SoldierSummary {
   profileImage: string | null;
   gapCount: number;
   openRequestCount: number;
+  approvedRequestTypes: RequestType[];
 }
 
 interface Props {
@@ -87,13 +89,20 @@ export function SoldierCard({ soldier, onClick }: Props) {
 
       {/* Info */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-center gap-2">
           <span className="font-medium text-sm leading-none truncate">
             {soldier.familyName} {soldier.givenName}
           </span>
           {soldier.rank && (
             <span className="shrink-0 text-xs text-muted-foreground">
               {soldier.rank}
+            </span>
+          )}
+          {soldier.approvedRequestTypes.length > 0 && (
+            <span className="flex items-center gap-0.5 shrink-0">
+              {soldier.approvedRequestTypes.map((type, i) => (
+                <RequestTypeIcon key={`${type}-${i}`} type={type} size={14} className="text-emerald-600" />
+              ))}
             </span>
           )}
         </div>
