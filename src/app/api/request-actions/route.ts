@@ -7,7 +7,7 @@ import type { SessionUser } from "@/types";
 const createSchema = z.object({
   id: z.string().uuid().optional(),
   requestId: z.string().uuid(),
-  action: z.enum(["create", "approve", "deny", "acknowledge"]),
+  action: z.enum(["create", "approve", "deny", "acknowledge", "note"]),
   note: z.string().nullable().optional(),
   userName: z.string().optional(),
 });

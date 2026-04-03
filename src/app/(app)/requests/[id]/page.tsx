@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward } from "lucide-react";
+import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward, MessageSquare, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { usePowerSync, useQuery } from "@powersync/react";
@@ -45,7 +45,7 @@ const REQUEST_QUERY = `
 `;
 
 const ACTIONS_QUERY = `
-  SELECT id, action, note, user_name, created_at
+  SELECT id, user_id, action, note, user_name, created_at
   FROM request_actions
   WHERE request_id = ?
   ORDER BY created_at ASC
@@ -81,6 +81,7 @@ interface RawRequest {
 
 interface RawAction {
   id: string;
+  user_id: string;
   action: string;
   note: string | null;
   user_name: string;
@@ -128,6 +129,7 @@ const ACTION_LABELS: Record<RequestActionType, string> = {
   approve: "אושרה",
   deny: "נדחתה",
   acknowledge: "אישר קבלה",
+  note: "הערה",
 };
 
 function ActionIcon({ action }: { action: string }) {
@@ -141,6 +143,8 @@ function ActionIcon({ action }: { action: string }) {
       return <ThumbsDown className={`${iconClass} text-red-500`} />;
     case "acknowledge":
       return <Forward className={`${iconClass} text-muted-foreground`} />;
+    case "note":
+      return <MessageSquare className={`${iconClass} text-blue-400`} />;
     default:
       return <Plus className={`${iconClass} text-muted-foreground`} />;
   }
@@ -185,6 +189,14 @@ export default function RequestDetailPage() {
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteDialogAction, setNoteDialogAction] = useState<"approve" | "deny">("approve");
   const [actionNote, setActionNote] = useState("");
+
+  // Add-note dialog
+  const [addNoteOpen, setAddNoteOpen] = useState(false);
+  const [addNoteText, setAddNoteText] = useState("");
+
+  // Inline note editing
+  const [editingActionId, setEditingActionId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
 
   if (!raw && timedOut) {
     return (
@@ -232,6 +244,38 @@ export default function RequestDetailPage() {
       `INSERT INTO request_actions (id, request_id, user_id, action, note, user_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [actionId, raw.id, session?.user?.id ?? "", action, note, userName, now],
     );
+  }
+
+  async function handleAddNote() {
+    const text = addNoteText.trim();
+    if (!text) return;
+    setActing(true);
+    try {
+      await insertAction("note", text);
+      toast.success("הערה נוספה");
+      setAddNoteOpen(false);
+      setAddNoteText("");
+    } catch {
+      toast.error("שגיאה בהוספת הערה");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function handleEditNote(actionId: string) {
+    setActing(true);
+    try {
+      await db.execute(
+        `UPDATE request_actions SET note = ? WHERE id = ?`,
+        [editingNoteText.trim() || null, actionId],
+      );
+      toast.success("הערה עודכנה");
+      setEditingActionId(null);
+    } catch {
+      toast.error("שגיאה בעדכון הערה");
+    } finally {
+      setActing(false);
+    }
   }
 
   async function handleAction(action: "approve" | "deny" | "acknowledge") {
@@ -423,35 +467,107 @@ export default function RequestDetailPage() {
       {/* Audit trail */}
       {actionRows && actionRows.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground">מהלך הטיפול</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-muted-foreground">מהלך הטיפול</h2>
+            {rawUserRole && (
+              <button
+                type="button"
+                onClick={() => { setAddNoteText(""); setAddNoteOpen(true); }}
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <MessageSquare size={14} />
+                הוסף הערה
+              </button>
+            )}
+          </div>
           <div className="space-y-0">
-            {actionRows.map((a, i) => (
-              <div key={a.id} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <ActionIcon action={a.action} />
+            {actionRows.map((a, i) => {
+              const isOwn = a.user_id === session?.user?.id;
+              const canEdit = isOwn && assignedRole !== null;
+              const isEditing = editingActionId === a.id;
+
+              return (
+                <div key={a.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <ActionIcon action={a.action} />
+                    </div>
+                    {i < actionRows.length - 1 && (
+                      <div className="flex-1 w-px bg-border my-1" />
+                    )}
                   </div>
-                  {i < actionRows.length - 1 && (
-                    <div className="flex-1 w-px bg-border my-1" />
-                  )}
-                </div>
-                <div className="pb-3 min-w-0">
-                  <p className="text-sm font-medium">
-                    {ACTION_LABELS[a.action as RequestActionType] ?? a.action}
-                    {" · "}
-                    <span className="text-muted-foreground font-normal">{a.user_name}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateTime(a.created_at)}
-                  </p>
-                  {a.note && (
-                    <p className="text-sm mt-1 whitespace-pre-wrap text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
-                      {a.note}
+                  <div className="pb-3 min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      {ACTION_LABELS[a.action as RequestActionType] ?? a.action}
+                      {" · "}
+                      <span className="text-muted-foreground font-normal">{a.user_name}</span>
                     </p>
-                  )}
+                    <p className="text-xs text-muted-foreground">
+                      {formatDateTime(a.created_at)}
+                    </p>
+                    {isEditing ? (
+                      <div className="mt-1 space-y-1.5">
+                        <textarea
+                          value={editingNoteText}
+                          onChange={(e) => setEditingNoteText(e.target.value)}
+                          className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          rows={2}
+                        />
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditNote(a.id)}
+                            disabled={acting}
+                            className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            <Check size={12} />
+                            שמור
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingActionId(null)}
+                            className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+                          >
+                            <X size={12} />
+                            ביטול
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {a.note && (
+                          <div className="flex items-start gap-1 mt-1">
+                            <p className="flex-1 text-sm whitespace-pre-wrap text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
+                              {a.note}
+                            </p>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => { setEditingActionId(a.id); setEditingNoteText(a.note ?? ""); }}
+                                className="shrink-0 mt-1.5 text-muted-foreground hover:text-foreground"
+                                title="ערוך הערה"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {!a.note && canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => { setEditingActionId(a.id); setEditingNoteText(""); }}
+                            className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil size={10} />
+                            הוסף הערה
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -492,6 +608,37 @@ export default function RequestDetailPage() {
           )}
         </div>
       )}
+
+      {/* Add note dialog */}
+      <Dialog open={addNoteOpen} onOpenChange={setAddNoteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>הוספת הערה</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <textarea
+              value={addNoteText}
+              onChange={(e) => setAddNoteText(e.target.value)}
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              placeholder="כתוב הערה..."
+              rows={3}
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" onClick={() => setAddNoteOpen(false)} className="flex-1">
+              ביטול
+            </Button>
+            <Button
+              onClick={handleAddNote}
+              disabled={acting || !addNoteText.trim()}
+              className="flex-1"
+            >
+              <MessageSquare size={16} className="ml-2" />
+              הוסף
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Approve / Deny note dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>

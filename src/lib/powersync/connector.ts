@@ -177,8 +177,13 @@ export class TironetConnector implements PowerSyncBackendConnector {
               note: d.note,
               userName: d.user_name,
             });
+          } else if (opType === UpdateType.PATCH) {
+            const d = opData as Record<string, unknown>;
+            await apiRequest(`/api/request-actions/${id}`, "PATCH", {
+              note: d.note ?? null,
+            });
           }
-          // Actions are immutable — no PATCH or DELETE
+          // No DELETE for actions
         } else if (table === "soldiers") {
           const soldierMapping: Record<string, string> = {
             cycle_id: "cycleId", squad_id: "squadId",

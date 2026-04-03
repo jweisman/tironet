@@ -271,9 +271,11 @@ squad_commander creates → platoon_commander (approve/deny)
 
 ### Audit trail (`RequestAction`)
 
-Every workflow event (create, approve, deny, acknowledge) is recorded in the `request_actions` table. Each action stores `userId`, `action`, optional `note`, `userName` (denormalized for offline display), and `created_at`. The detail page renders a chronological timeline of all actions under "מהלך הטיפול".
+Every workflow event (create, approve, deny, acknowledge, note) is recorded in the `request_actions` table. Each action stores `userId`, `action`, optional `note`, `userName` (denormalized for offline display), and `created_at`. The detail page renders a chronological timeline of all actions under "מהלך הטיפול".
 
 Approve and deny actions open a dialog with an optional note field. The note is stored on the `RequestAction` row, not on the `Request` itself.
+
+**Standalone notes:** Users can add a "note" action at any time via the "הוסף הערה" link. Notes have no effect on the workflow (no status or assignedRole change). Users can also edit the note text on their own actions as long as the request is not completed (`assignedRole !== null`). Edits are written to local SQLite via `db.execute("UPDATE request_actions SET note = ? WHERE id = ?", ...)` and synced by the connector via `PATCH /api/request-actions/[id]`.
 
 The `userName` column is denormalized from the user's `familyName givenName` at write time so the timeline renders correctly offline (the `users` table is not synced via PowerSync).
 

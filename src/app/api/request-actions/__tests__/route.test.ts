@@ -103,6 +103,31 @@ describe("POST /api/request-actions", () => {
     expect(createCall.data.id).toBe(clientId);
   });
 
+  it("creates a note action", async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: "user-1", familyName: "Cohen", givenName: "Avi" },
+    } as never);
+    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId } as never);
+    mockActionCreate.mockResolvedValue({ id: "action-note" } as never);
+
+    const req = createMockRequest("POST", "/api/request-actions", {
+      requestId: validBody.requestId,
+      action: "note",
+      note: "Just a comment",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+
+    expect(mockActionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "note",
+          note: "Just a comment",
+        }),
+      }),
+    );
+  });
+
   it("accepts null note", async () => {
     mockAuth.mockResolvedValue({
       user: { id: "user-1", familyName: "Cohen", givenName: "Avi" },

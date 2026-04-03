@@ -21,7 +21,7 @@ export type RequestType = "leave" | "medical" | "hardship";
 
 export type RequestStatus = "open" | "approved" | "denied";
 
-export type RequestActionType = "create" | "approve" | "deny" | "acknowledge";
+export type RequestActionType = "create" | "approve" | "deny" | "acknowledge" | "note";
 
 export type Transportation =
   | "public_transit"
