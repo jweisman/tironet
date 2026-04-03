@@ -188,43 +188,30 @@ export default function RequestsPage() {
     <div className="-mx-4 -my-6">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2">
-        <div className="flex items-center gap-2">
-          {/* View tabs */}
-          <div className="flex gap-1.5 flex-1">
-            {(["open", "approved"] as ViewTab[]).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setViewTab(tab)}
-                className={cn(
-                  "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                  viewTab === tab
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {tab === "open" ? "פתוחות" : "אושרו"}
-                {tab === "open" && openRequests.length > 0 && (
-                  <span className="mr-1">({openRequests.length})</span>
-                )}
-                {tab === "approved" && approvedRequests.length > 0 && (
-                  <span className="mr-1">({approvedRequests.length})</span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {canCreate && (
+        <div className="flex items-center gap-1.5">
+          {/* View tabs + require action */}
+          {(["open", "approved"] as ViewTab[]).map((tab) => (
             <button
+              key={tab}
               type="button"
-              onClick={() => setTypeMenuOpen(true)}
-              className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
+              onClick={() => setViewTab(tab)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                viewTab === tab
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground",
+              )}
             >
-              <Plus size={15} /> בקשה חדשה
+              {tab === "open" ? "פתוחות" : "אושרו"}
+              {tab === "open" && openRequests.length > 0 && (
+                <span className="mr-1">({openRequests.length})</span>
+              )}
+              {tab === "approved" && approvedRequests.length > 0 && (
+                <span className="mr-1">({approvedRequests.length})</span>
+              )}
             </button>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
+          ))}
+
           {viewTab === "open" && role && (
             <button
               type="button"
@@ -240,6 +227,18 @@ export default function RequestsPage() {
               <span>דורשות טיפולי</span>
             </button>
           )}
+
+          {canCreate && (
+            <button
+              type="button"
+              onClick={() => setTypeMenuOpen(true)}
+              className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0 ms-auto"
+            >
+              <Plus size={15} /> בקשה חדשה
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
           {(["all", "leave", "medical", "hardship"] as const).map((t) => (
             <button
               key={t}
