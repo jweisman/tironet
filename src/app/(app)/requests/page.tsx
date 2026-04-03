@@ -123,18 +123,19 @@ export default function RequestsPage() {
   const [showMineOnly, setShowMineOnly] = useState(
     searchParams.get("filter") === "mine"
   );
+  const [filterType, setFilterType] = useState<RequestType | "all">("all");
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [createType, setCreateType] = useState<RequestType | null>(null);
 
   // Filtered lists
   const openRequests = useMemo(
-    () => allRequests.filter((r) => r.assignedRole !== null),
-    [allRequests],
+    () => allRequests.filter((r) => r.assignedRole !== null && (filterType === "all" || r.type === filterType)),
+    [allRequests, filterType],
   );
 
   const approvedRequests = useMemo(
-    () => allRequests.filter((r) => r.status === "approved" && r.assignedRole === null),
-    [allRequests],
+    () => allRequests.filter((r) => r.status === "approved" && r.assignedRole === null && (filterType === "all" || r.type === filterType)),
+    [allRequests, filterType],
   );
 
   // Group approved by day
@@ -223,8 +224,8 @@ export default function RequestsPage() {
             </button>
           )}
         </div>
-        {viewTab === "open" && role && (
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {viewTab === "open" && role && (
             <button
               type="button"
               onClick={() => setShowMineOnly((v) => !v)}
@@ -238,8 +239,23 @@ export default function RequestsPage() {
               <Bell size={12} />
               <span>דורשות טיפולי</span>
             </button>
-          </div>
-        )}
+          )}
+          {(["all", "leave", "medical", "hardship"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setFilterType(t)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                filterType === t
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t === "all" ? "הכל" : REQUEST_TYPE_LABELS[t]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
