@@ -43,6 +43,7 @@ export function CycleProvider({ children }: { children: React.ReactNode }) {
       setSelectedCycleIdState(activeCycles[0].cycleId);
       localStorage.setItem("selectedCycleId", activeCycles[0].cycleId);
     }
+    setAutoSelectRan(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleKey]);
 
@@ -55,11 +56,18 @@ export function CycleProvider({ children }: { children: React.ReactNode }) {
     ? activeCycles.find((a) => a.cycleId === selectedCycleId) ?? null
     : null;
 
+  // Track whether the auto-select useEffect has run at least once.
+  // Without this, isLoading stays true forever when there are multiple
+  // cycles and the user hasn't picked one (the effect doesn't auto-select
+  // when length > 1), causing the home page to render blank.
+  const [autoSelectRan, setAutoSelectRan] = useState(false);
+
   // Still loading if session hasn't resolved, or if we have cycles but
-  // the useEffect hasn't auto-selected yet (selectedCycleId still null).
+  // the useEffect hasn't auto-selected yet (selectedCycleId still null
+  // and the effect hasn't had a chance to run).
   const isLoading =
     status === "loading" ||
-    (activeCycles.length > 0 && selectedCycleId === null);
+    (activeCycles.length > 0 && selectedCycleId === null && !autoSelectRan);
 
   return (
     <CycleContext.Provider

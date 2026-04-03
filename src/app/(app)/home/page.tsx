@@ -7,7 +7,6 @@ import { Bell } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
-import { CyclePicker } from "@/components/CyclePicker";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import type { SquadSummary } from "@/app/api/dashboard/route";
 import { effectiveRole } from "@/lib/auth/permissions";
@@ -325,13 +324,8 @@ export default function HomePage() {
     );
   }
 
-  // Multiple cycles, none selected
-  if (!selectedAssignment && activeCycles.length > 1) {
-    return <CyclePicker />;
-  }
-
   const user = session?.user;
-  const cycleName = selectedAssignment?.cycleName ?? activeCycles[0]?.cycleName ?? "";
+  const cycleName = selectedAssignment?.cycleName ?? "";
 
   // Group squads by platoon for company commander view
   const platoonMap = new Map<string, { platoonId: string; platoonName: string; squads: SquadSummary[] }>();
