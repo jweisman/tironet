@@ -467,19 +467,7 @@ export default function RequestDetailPage() {
       {/* Audit trail */}
       {actionRows && actionRows.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-muted-foreground">מהלך הטיפול</h2>
-            {rawUserRole && (
-              <button
-                type="button"
-                onClick={() => { setAddNoteText(""); setAddNoteOpen(true); }}
-                className="flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                <MessageSquare size={14} />
-                הוסף הערה
-              </button>
-            )}
-          </div>
+          <h2 className="text-sm font-semibold text-muted-foreground">מהלך הטיפול</h2>
           <div className="space-y-0">
             {actionRows.map((a, i) => {
               const isOwn = a.user_id === session?.user?.id;
@@ -569,6 +557,16 @@ export default function RequestDetailPage() {
               );
             })}
           </div>
+          {rawUserRole && (
+            <button
+              type="button"
+              onClick={() => { setAddNoteText(""); setAddNoteOpen(true); }}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <MessageSquare size={16} />
+              הוסף הערה
+            </button>
+          )}
         </div>
       )}
 
