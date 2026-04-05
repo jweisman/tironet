@@ -247,10 +247,14 @@ export default function ActivitiesPage() {
     return [];
   }, [selectedAssignment, role, companyPlatoons]);
 
-  function handleCreateSuccess(activityId: string) {
+  function handleCreateSuccess(activityId: string, platoonCount: number) {
     setCreateOpen(false);
-    toast.success("הפעילות נוצרה בהצלחה");
-    setPendingActivityId(activityId);
+    if (platoonCount > 1) {
+      toast.success(`הפעילות נוצרה בהצלחה ב-${platoonCount} מחלקות`);
+    } else {
+      toast.success("הפעילות נוצרה בהצלחה");
+      setPendingActivityId(activityId);
+    }
   }
 
   function handleBulkSuccess(created: number, skipped: number) {

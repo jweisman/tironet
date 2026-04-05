@@ -286,32 +286,42 @@ export function BulkImportActivitiesDialog({
     const validRows = rows.filter((r) => r.errors.length === 0);
     if (validRows.length === 0) return;
 
+    const targetIds = platoonId === "__all__"
+      ? platoonOptions.map((p) => p.id)
+      : [platoonId];
+
     setImporting(true);
     setImportError(null);
     try {
-      const res = await fetch("/api/activities/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cycleId,
-          platoonId,
-          activities: validRows.map((r) => ({
-            activityTypeId: r.resolvedActivityTypeId,
-            name: r.name,
-            date: r.date,
-            isRequired: r.isRequired,
-            status: r.status,
-          })),
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setImportError(data.error ?? "שגיאה בייבוא");
-        return;
+      let totalCreated = 0;
+      let totalSkipped = 0;
+      for (const pid of targetIds) {
+        const res = await fetch("/api/activities/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cycleId,
+            platoonId: pid,
+            activities: validRows.map((r) => ({
+              activityTypeId: r.resolvedActivityTypeId,
+              name: r.name,
+              date: r.date,
+              isRequired: r.isRequired,
+              status: r.status,
+            })),
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setImportError(data.error ?? "שגיאה בייבוא");
+          return;
+        }
+        const { created, skipped } = await res.json();
+        totalCreated += created;
+        totalSkipped += skipped;
       }
-      const { created, skipped } = await res.json();
       reset();
-      onSuccess(created, skipped);
+      onSuccess(totalCreated, totalSkipped);
     } catch {
       setImportError("שגיאה בייבוא");
     } finally {
@@ -339,10 +349,13 @@ export function BulkImportActivitiesDialog({
               <Select value={platoonId} onValueChange={(v) => v && setPlatoonId(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="בחר מחלקה">
-                    {platoonOptions.find((p) => p.id === platoonId)?.name ?? "בחר מחלקה"}
+                    {platoonId === "__all__"
+                      ? "כל המחלקות"
+                      : platoonOptions.find((p) => p.id === platoonId)?.name ?? "בחר מחלקה"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__all__">כל המחלקות</SelectItem>
                   {platoonOptions.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}

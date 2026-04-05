@@ -27,7 +27,7 @@ interface PlatoonOption {
 interface Props {
   cycleId: string;
   platoonOptions: PlatoonOption[];
-  onSuccess: (activityId: string) => void;
+  onSuccess: (activityId: string, platoonCount: number) => void;
   onCancel: () => void;
 }
 
@@ -70,6 +70,10 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
     setNameOverridden(val !== "");
   }
 
+  const targetPlatoonIds = platoonId === "__all__"
+    ? platoonOptions.map((p) => p.id)
+    : [platoonId];
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!activityTypeId || !name.trim() || !date || !platoonId) {
@@ -81,28 +85,33 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
     setError(null);
 
     try {
-      const res = await fetch("/api/activities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cycleId,
-          platoonId,
-          activityTypeId,
-          name: name.trim(),
-          date,
-          isRequired,
-          status,
-        }),
-      });
+      let firstActivityId = "";
+      for (const pid of targetPlatoonIds) {
+        const res = await fetch("/api/activities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cycleId,
+            platoonId: pid,
+            activityTypeId,
+            name: name.trim(),
+            date,
+            isRequired,
+            status,
+          }),
+        });
 
-      if (!res.ok) {
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.error ?? "שגיאה ביצירת הפעילות");
+          return;
+        }
+
         const data = await res.json();
-        setError(data.error ?? "שגיאה ביצירת הפעילות");
-        return;
+        if (!firstActivityId) firstActivityId = data.activity.id;
       }
 
-      const data = await res.json();
-      onSuccess(data.activity.id);
+      onSuccess(firstActivityId, targetPlatoonIds.length);
     } catch {
       setError("שגיאה ביצירת הפעילות");
     } finally {
@@ -119,10 +128,13 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
           <Select value={platoonId} onValueChange={(v) => { if (v !== null) setPlatoonId(v); }}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="בחר מחלקה">
-                {platoonOptions.find((p) => p.id === platoonId)?.name ?? "בחר מחלקה"}
+                {platoonId === "__all__"
+                  ? "כל המחלקות"
+                  : platoonOptions.find((p) => p.id === platoonId)?.name ?? "בחר מחלקה"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__all__">כל המחלקות</SelectItem>
               {platoonOptions.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name}
