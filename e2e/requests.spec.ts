@@ -172,6 +172,9 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
   test("squad cmd creates → platoon cmd approves → squad cmd acknowledges", async ({
     browser,
   }) => {
+    // Unique description prevents retry contamination (stale requests from attempt 1)
+    const desc = `E2E workflow ${Date.now()}`;
+
     // --- Step 1: Squad commander creates a hardship request ---
     const squadContext = await browser.newContext({
       storageState: "e2e/.auth/squad-cmd.json",
@@ -180,15 +183,15 @@ test.describe("Requests — hardship approval workflow (cross-role)", () => {
     const squadPage = await squadContext.newPage();
 
     await gotoRequestsPage(squadPage);
-    await createHardshipRequest(squadPage, "E2E workflow test");
+    await createHardshipRequest(squadPage, desc);
 
     // Verify request appears — use description to find the specific request
-    await expect(squadPage.getByText("E2E workflow test").first()).toBeVisible({
+    await expect(squadPage.getByText(desc).first()).toBeVisible({
       timeout: 10000,
     });
 
     // Click the specific request card by its unique description
-    await squadPage.getByText("E2E workflow test").first().click();
+    await squadPage.getByText(desc).first().click();
     await expect(squadPage).toHaveURL(/\/requests\//, { timeout: 15000 });
     const requestUrl = squadPage.url();
     const requestId = requestUrl.match(/\/requests\/([^/]+)/)?.[1];
@@ -287,6 +290,9 @@ test.describe("Requests — denial workflow (cross-role)", () => {
   test("squad cmd creates → platoon cmd denies with reason → squad cmd acknowledges", async ({
     browser,
   }) => {
+    // Unique description prevents retry contamination (stale requests from attempt 1)
+    const desc = `E2E deny ${Date.now()}`;
+
     // --- Step 1: Squad commander creates a hardship request ---
     const squadContext = await browser.newContext({
       storageState: "e2e/.auth/squad-cmd.json",
@@ -295,15 +301,15 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     const squadPage = await squadContext.newPage();
 
     await gotoRequestsPage(squadPage);
-    await createHardshipRequest(squadPage, "E2E deny test");
+    await createHardshipRequest(squadPage, desc);
 
     // Verify request appears — use description to find the specific request
-    await expect(squadPage.getByText("E2E deny test").first()).toBeVisible({
+    await expect(squadPage.getByText(desc).first()).toBeVisible({
       timeout: 10000,
     });
 
     // Click the specific request card by its unique description
-    await squadPage.getByText("E2E deny test").first().click();
+    await squadPage.getByText(desc).first().click();
     await expect(squadPage).toHaveURL(/\/requests\//, { timeout: 15000 });
     const requestId = squadPage.url().match(/\/requests\/([^/]+)/)?.[1];
     expect(requestId).toBeTruthy();

@@ -129,13 +129,13 @@ export async function POST(request: NextRequest) {
   const { scope, error, user } = await getActivityScope(cycleId);
   if (error || !scope || !user) return error!;
 
-  // Only platoon_commander for their own platoon or admin can create
+  // Only platoon_commander / company_commander for their own platoons, or admin can create
   if (!scope.canCreate) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Platoon commander can only create for their own platoon
-  if (scope.role === "platoon_commander" && !scope.platoonIds.includes(platoonId)) {
+  // Verify the target platoon is within the user's scope
+  if (!scope.platoonIds.includes(platoonId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

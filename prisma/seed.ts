@@ -15,16 +15,33 @@ const ACTIVITY_TYPES = [
       score1: { label: "ציון סופי", format: "number" },
       score2: { label: "מתח", format: "number" },
       score3: { label: "בנץ׳", format: "number" },
-      score4: { label: "מקבילים", format: "number" },
+      score4: { label: "טראפ בר", format: "number" },
       score5: { label: "ריצה", format: "time" },
       score6: { label: "ספרינט", format: "time" },
     },
   },
-  { name: "ירי", icon: "crosshair", sortOrder: 3 },
+  { name: "ירי", icon: "crosshair", sortOrder: 3,
+    scoreConfig: {
+      score1: { label: "ציון", format: "number" }
+    }
+  },
   { name: "שיעורים", icon: "book-open", sortOrder: 4 },
-  { name: "בוחנים", icon: "clipboard-check", sortOrder: 5 },
-  { name: "הסמכות", icon: "award", sortOrder: 6 },
+  { name: "בוחנים", icon: "clipboard-check", sortOrder: 5,
+    scoreConfig: {
+      score1: { label: "ציון", format: "number" }
+    }
+  },
+  { name: "הסמכות", icon: "award", sortOrder: 6,
+    scoreConfig: {
+      score1: { label: "ציון", format: "number" }
+    }
+  },
   { name: "שיחות מפקד", icon: "message-circle", sortOrder: 7 },
+  { name: "בחמ״ס", icon: "timer", sortOrder: 8,
+    scoreConfig: {
+      score1: { label: "זמן", format: "time" }
+    }
+  },
 ];
 
 async function main() {

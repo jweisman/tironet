@@ -9,7 +9,7 @@ export interface ActivityScope {
   platoonIds: string[];
   platoons: { id: string; name: string }[]; // id + name for create form
   squadId?: string; // only for squad_commander
-  canCreate: boolean; // platoon_commander only
+  canCreate: boolean; // platoon_commander & company_commander
   canEditMetadataForPlatoon: (platoonId: string) => boolean;
 }
 
@@ -97,8 +97,8 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
       role: "company_commander",
       platoonIds: platoons.map((p) => p.id),
       platoons,
-      canCreate: false,
-      canEditMetadataForPlatoon: () => false,
+      canCreate: true,
+      canEditMetadataForPlatoon: (pid: string) => platoons.some((p) => p.id === pid),
     };
     return { scope, error: null, user };
   }
