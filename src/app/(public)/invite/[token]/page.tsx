@@ -125,7 +125,7 @@ export default async function InvitePage({
                 ? `כדי לקבל את ההזמנה, יש להתחבר עם מספר הטלפון ${displayPhone}.`
                 : `כדי לקבל את ההזמנה, יש להתחבר עם האימייל ${invitation.email}.`}
             </p>
-            <Button render={<Link href={`/login?callbackUrl=/invite/${token}`} />} nativeButton={false} className="w-full">
+            <Button render={<Link href={`/login?callbackUrl=/invite/${token}${isPhoneOnly ? "&invitePhone=1" : ""}`} />} nativeButton={false} className="w-full">
               התחבר וקבל הזמנה
             </Button>
           </div>

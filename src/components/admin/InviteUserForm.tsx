@@ -200,7 +200,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
         <Input
           id="invite-phone"
           type="tel"
-          placeholder="050-123-4567"
+          placeholder="לדוגמה: 050-123-4567"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           autoComplete="off"

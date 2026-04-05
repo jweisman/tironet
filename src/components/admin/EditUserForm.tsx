@@ -140,7 +140,7 @@ export function EditUserForm({ user, onSuccess, onCancel, showAdminToggle = true
         <Input
           id="edit-phone"
           type="tel"
-          placeholder="050-123-4567"
+          placeholder="לדוגמה: 050-123-4567"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           dir="ltr"

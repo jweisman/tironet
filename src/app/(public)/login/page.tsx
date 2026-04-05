@@ -17,14 +17,15 @@ function LoginForm() {
   const t = useTranslations("auth");
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/home";
+  const isPhoneInvite = searchParams.get("invitePhone") === "1";
 
   // Magic link state
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
-  // WhatsApp OTP state
-  const [waStep, setWaStep] = useState<WhatsAppStep>("idle");
+  // WhatsApp OTP state — auto-expand phone input when coming from a phone-only invite
+  const [waStep, setWaStep] = useState<WhatsAppStep>(isPhoneInvite ? "phone" : "idle");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [waSending, setWaSending] = useState(false);
@@ -108,6 +109,68 @@ function LoginForm() {
             <p className="font-medium">{t("magicLinkSent")}</p>
             <p className="text-sm text-muted-foreground">{t("checkEmail")}</p>
           </div>
+        ) : isPhoneInvite ? (
+          /* Phone-only invite: show only SMS login */
+          <div className="space-y-6">
+            {waStep === "phone" && (
+              <form onSubmit={handlePhoneSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="wa-phone">מספר טלפון</Label>
+                  <Input
+                    id="wa-phone"
+                    type="tel"
+                    placeholder="לדוגמה: 050-123-4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                    dir="ltr"
+                    autoFocus
+                  />
+                </div>
+                {waError && <p className="text-sm text-destructive">{waError}</p>}
+                <Button type="submit" className="w-full" disabled={waSending}>
+                  {waSending ? "שולח..." : "שלח קוד"}
+                </Button>
+              </form>
+            )}
+
+            {waStep === "sent" && (
+              <form onSubmit={handleCodeSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="wa-code">קוד SMS</Label>
+                  <p className="text-sm text-muted-foreground">
+                    קוד אימות נשלח ב-SMS לטלפון שלך
+                  </p>
+                  <Input
+                    id="wa-code"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="123456"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    required
+                    dir="ltr"
+                    autoFocus
+                  />
+                </div>
+                {waError && <p className="text-sm text-destructive">{waError}</p>}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => { setWaStep("phone"); setCode(""); setWaError(null); }}
+                  >
+                    חזרה
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={waVerifying}>
+                    {waVerifying ? "מאמת..." : "כניסה"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
         ) : (
           <div className="space-y-6">
             {/* Google */}
@@ -168,7 +231,7 @@ function LoginForm() {
                   <Input
                     id="wa-phone"
                     type="tel"
-                    placeholder="050-123-4567"
+                    placeholder="לדוגמה: 050-123-4567"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     required

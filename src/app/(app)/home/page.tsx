@@ -3,13 +3,14 @@
 import { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import type { SquadSummary } from "@/app/api/dashboard/route";
-import { effectiveRole } from "@/lib/auth/permissions";
+import { effectiveRole, ROLE_LABELS } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -241,6 +242,17 @@ export default function HomePage() {
   const { selectedCycleId, selectedAssignment, activeCycles, isLoading: cycleLoading } = useCycle();
   const requestBadge = useRequestBadge();
 
+  // Check for pending invitations when user has no cycle assignments
+  const [pendingInvites, setPendingInvites] = useState<{ token: string; role: string; cycleName: string }[]>([]);
+  useEffect(() => {
+    if (!cycleLoading && activeCycles.length === 0) {
+      fetch("/api/invitations/pending")
+        .then((r) => r.json())
+        .then((data) => setPendingInvites(data.invitations ?? []))
+        .catch(() => {});
+    }
+  }, [cycleLoading, activeCycles.length]);
+
   // Grace period before showing "no data" — useQuery returns cached local
   // SQLite data almost instantly for returning users, but on first load
   // there is a brief window before PowerSync hydrates. Extended to 3s as
@@ -319,7 +331,22 @@ export default function HomePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
         <p className="text-lg font-medium">אין לך גישה למחזור פעיל</p>
-        <p className="text-muted-foreground text-sm">פנה למפקד שלך כדי לקבל הזמנה.</p>
+        {pendingInvites.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-sm">נמצאו הזמנות ממתינות:</p>
+            {pendingInvites.map((inv) => (
+              <Link
+                key={inv.token}
+                href={`/invite/${inv.token}`}
+                className="block rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+              >
+                {inv.cycleName} — {ROLE_LABELS[inv.role as Role] ?? inv.role}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">פנה למפקד שלך כדי לקבל הזמנה.</p>
+        )}
       </div>
     );
   }

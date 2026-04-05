@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
@@ -8,6 +8,7 @@ export function AcceptInviteButton({ token }: { token: string }) {
   const { update } = useSession();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoAccepted = useRef(false);
 
   async function accept() {
     setLoading(true);
@@ -39,6 +40,14 @@ export function AcceptInviteButton({ token }: { token: string }) {
       setLoading(false);
     }
   }
+
+  // Auto-accept on mount — reduces friction for users redirected from login
+  useEffect(() => {
+    if (!autoAccepted.current) {
+      autoAccepted.current = true;
+      accept();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-2">
