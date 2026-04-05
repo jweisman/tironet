@@ -215,6 +215,14 @@ export default function SoldiersPage() {
     return squads;
   }, [rawSoldiers, rawSquads, rawApprovedRequests, role, selectedAssignment?.unitId]);
 
+  const existingIdNumbers = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of rawSoldiers ?? []) {
+      if (s.id_number) set.add(s.id_number);
+    }
+    return set;
+  }, [rawSoldiers]);
+
   // -------- Sticky header offset --------
   const stickyBarRef = useRef<HTMLDivElement>(null);
   const platoonHeaderRef = useRef<HTMLDivElement>(null);
@@ -297,9 +305,12 @@ export default function SoldiersPage() {
     return Array.from(map.values());
   }, [filteredSquads, role]);
 
-  function handleImportSuccess(created: number, activeActivityCount: number, soldierIds?: string[]) {
+  function handleImportSuccess(created: number, updated: number, activeActivityCount: number, soldierIds?: string[]) {
     setImportOpen(false);
-    toast.success(`${created} חיילים יובאו בהצלחה`);
+    const parts: string[] = [];
+    if (created > 0) parts.push(`${created} חיילים נוספו`);
+    if (updated > 0) parts.push(`${updated} חיילים עודכנו`);
+    toast.success(parts.join(", ") || "הייבוא הושלם");
     if (activeActivityCount > 0 && created > 0 && soldierIds?.length) {
       setLateJoinerInfo({ count: activeActivityCount, soldierId: "__bulk__", soldierIds });
     }
@@ -582,6 +593,7 @@ export default function SoldiersPage() {
           cycleId={selectedCycleId}
           squads={squadsForForm}
           defaultSquadId={defaultSquadId}
+          existingIdNumbers={existingIdNumbers}
           onSuccess={handleImportSuccess}
         />
       )}

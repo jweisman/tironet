@@ -115,9 +115,42 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Create all soldiers in a transaction
-  const created = await prisma.$transaction(
-    soldiers.map((s) =>
+  // Look up existing soldiers by idNumber within cycle + scope for upsert
+  const nonNullIdNumbers = soldiers
+    .map((s) => s.idNumber)
+    .filter((id): id is string => !!id);
+
+  const existingMap = new Map<string, { id: string; squadId: string }>();
+  if (nonNullIdNumbers.length > 0) {
+    const allScopeSquadIds = scopeSquadIds ?? uniqueSquadIds;
+    const existing = await prisma.soldier.findMany({
+      where: {
+        cycleId,
+        idNumber: { in: nonNullIdNumbers },
+        squadId: { in: allScopeSquadIds },
+      },
+      select: { id: true, idNumber: true, squadId: true },
+    });
+    for (const s of existing) {
+      if (s.idNumber) existingMap.set(s.idNumber, { id: s.id, squadId: s.squadId });
+    }
+  }
+
+  // Split into creates and updates
+  const toCreate: typeof soldiers = [];
+  const toUpdate: { id: string; data: typeof soldiers[number] }[] = [];
+  for (const s of soldiers) {
+    const match = s.idNumber ? existingMap.get(s.idNumber) : undefined;
+    if (match) {
+      toUpdate.push({ id: match.id, data: s });
+    } else {
+      toCreate.push(s);
+    }
+  }
+
+  // Execute creates and updates in a transaction
+  const ops = [
+    ...toCreate.map((s) =>
       prisma.soldier.create({
         data: {
           cycleId,
@@ -132,8 +165,25 @@ export async function POST(req: NextRequest) {
         },
         select: { id: true },
       })
-    )
-  );
+    ),
+    ...toUpdate.map(({ id, data: s }) =>
+      prisma.soldier.update({
+        where: { id },
+        data: {
+          givenName: s.givenName.trim(),
+          familyName: s.familyName.trim(),
+          rank: s.rank ?? null,
+          status: s.status ?? "active",
+          phone: s.phone ? (toE164(s.phone) ?? null) : null,
+          emergencyPhone: s.emergencyPhone ? (toE164(s.emergencyPhone) ?? null) : null,
+        },
+        select: { id: true },
+      })
+    ),
+  ];
+
+  const results = await prisma.$transaction(ops);
+  const createdIds = results.slice(0, toCreate.length).map((s) => s.id);
 
   // Count active activities for the unique platoons involved (for late-joiner hint)
   const platoonIds = [...new Set(squads.map((s) => s.platoonId))];
@@ -146,8 +196,9 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({
-    created: soldiers.length,
+    created: toCreate.length,
+    updated: toUpdate.length,
     activeActivityCount,
-    soldierIds: created.map((s) => s.id),
+    soldierIds: createdIds,
   }, { status: 201 });
 }

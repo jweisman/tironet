@@ -5,7 +5,7 @@ vi.mock("@/lib/db/prisma", () => ({
     squad: { findMany: vi.fn() },
     platoon: { findMany: vi.fn() },
     company: { findMany: vi.fn() },
-    soldier: { create: vi.fn() },
+    soldier: { create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
     activity: { count: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -26,6 +26,7 @@ import {
 
 const mockAuth = vi.mocked(auth);
 const mockSquadFindMany = vi.mocked(prisma.squad.findMany);
+const mockSoldierFindMany = vi.mocked(prisma.soldier.findMany);
 const mockTransaction = vi.mocked(prisma.$transaction);
 const mockActivityCount = vi.mocked(prisma.activity.count);
 
@@ -182,6 +183,7 @@ describe("POST /api/soldiers/bulk", () => {
         },
       ] as never);
 
+    mockSoldierFindMany.mockResolvedValue([] as never);
     mockTransaction.mockResolvedValue([] as never);
     mockActivityCount.mockResolvedValue(3 as never);
 
@@ -216,6 +218,7 @@ describe("POST /api/soldiers/bulk", () => {
         },
       ] as never);
 
+    mockSoldierFindMany.mockResolvedValue([] as never);
     mockTransaction.mockResolvedValue([] as never);
     mockActivityCount.mockResolvedValue(1 as never);
 
@@ -239,7 +242,8 @@ describe("POST /api/soldiers/bulk", () => {
       },
     ] as never);
 
-    mockTransaction.mockResolvedValue([] as never);
+    mockSoldierFindMany.mockResolvedValue([] as never);
+    mockTransaction.mockResolvedValue([{ id: "new1" }, { id: "new2" }] as never);
     mockActivityCount.mockResolvedValue(0 as never);
 
     const req = createMockRequest("POST", "/api/soldiers/bulk", {
@@ -261,7 +265,6 @@ describe("POST /api/soldiers/bulk", () => {
       user: mockSessionUser({ isAdmin: true }),
     } as never);
 
-    // Admin: scopeSquadIds is null (not called), goes straight to validation
     mockSquadFindMany.mockResolvedValueOnce([
       {
         id: SQUAD, platoonId: PLATOON,
@@ -269,7 +272,8 @@ describe("POST /api/soldiers/bulk", () => {
       },
     ] as never);
 
-    mockTransaction.mockResolvedValue([] as never);
+    mockSoldierFindMany.mockResolvedValue([] as never);
+    mockTransaction.mockResolvedValue([{ id: "s1" }, { id: "s2" }] as never);
     mockActivityCount.mockResolvedValue(5 as never);
 
     const req = createMockRequest("POST", "/api/soldiers/bulk", {
@@ -283,6 +287,74 @@ describe("POST /api/soldiers/bulk", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.created).toBe(2);
+    expect(body.updated).toBe(0);
     expect(body.activeActivityCount).toBe(5);
+  });
+
+  it("updates existing soldiers matched by idNumber and creates new ones", async () => {
+    const EXISTING_SOLDIER_ID = "00000000-0000-4000-8000-000000000020";
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+
+    mockSquadFindMany.mockResolvedValueOnce([
+      {
+        id: SQUAD, platoonId: PLATOON,
+        platoon: { company: { cycleId: CYCLE } },
+      },
+    ] as never);
+
+    // Existing soldier with idNumber "111" in scope
+    mockSoldierFindMany.mockResolvedValue([
+      { id: EXISTING_SOLDIER_ID, idNumber: "111", squadId: SQUAD },
+    ] as never);
+    mockTransaction.mockResolvedValue([{ id: "new1" }, { id: EXISTING_SOLDIER_ID }] as never);
+    mockActivityCount.mockResolvedValue(0 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [
+        { squadId: SQUAD, givenName: "Alice", familyName: "A", idNumber: "999" },
+        { squadId: SQUAD, givenName: "Bob", familyName: "B", idNumber: "111" },
+      ],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.created).toBe(1);
+    expect(body.updated).toBe(1);
+    // Only newly created soldier IDs returned
+    expect(body.soldierIds).toEqual(["new1"]);
+  });
+
+  it("does not match soldiers without idNumber for update", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+
+    mockSquadFindMany.mockResolvedValueOnce([
+      {
+        id: SQUAD, platoonId: PLATOON,
+        platoon: { company: { cycleId: CYCLE } },
+      },
+    ] as never);
+
+    // No soldiers with non-null idNumbers in payload, so findMany not called with any
+    mockSoldierFindMany.mockResolvedValue([] as never);
+    mockTransaction.mockResolvedValue([{ id: "new1" }, { id: "new2" }] as never);
+    mockActivityCount.mockResolvedValue(0 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/bulk", {
+      cycleId: CYCLE,
+      soldiers: [
+        { squadId: SQUAD, givenName: "Alice", familyName: "A", idNumber: null },
+        { squadId: SQUAD, givenName: "Bob", familyName: "B" },
+      ],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.created).toBe(2);
+    expect(body.updated).toBe(0);
   });
 });

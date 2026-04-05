@@ -37,7 +37,8 @@ interface Props {
   cycleId: string;
   squads: SquadOption[];
   defaultSquadId?: string;
-  onSuccess: (created: number, activeActivityCount: number, soldierIds?: string[]) => void;
+  existingIdNumbers?: Set<string>;
+  onSuccess: (created: number, updated: number, activeActivityCount: number, soldierIds?: string[]) => void;
 }
 
 interface ParsedRow {
@@ -51,6 +52,7 @@ interface ParsedRow {
   emergencyPhone: string;
   squadName: string;
   resolvedSquadId: string | null;
+  isUpdate: boolean;
   errors: string[];
 }
 
@@ -84,7 +86,8 @@ function downloadTemplate() {
 function parseSheet(
   workbook: XLSX.WorkBook,
   squads: SquadOption[],
-  squadMode: "select" | "file"
+  squadMode: "select" | "file",
+  existingIdNumbers?: Set<string>
 ): ParsedRow[] {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as string[][];
@@ -157,6 +160,8 @@ function parseSheet(
       }
     }
 
+    const isUpdate = !!(idNumber && existingIdNumbers?.has(idNumber));
+
     parsed.push({
       rowIndex: i + headerIdx + 2,
       familyName,
@@ -168,6 +173,7 @@ function parseSheet(
       emergencyPhone,
       squadName,
       resolvedSquadId,
+      isUpdate,
       errors,
     });
   });
@@ -181,6 +187,7 @@ export function BulkImportDialog({
   cycleId,
   squads,
   defaultSquadId,
+  existingIdNumbers,
   onSuccess,
 }: Props) {
   // Platoon filter — only shown when there are multiple platoons
@@ -224,7 +231,7 @@ export function BulkImportDialog({
   // Re-parse when squad mode or platoon filter changes
   useEffect(() => {
     if (workbook) {
-      const parsed = parseSheet(workbook, filteredSquads, squadMode);
+      const parsed = parseSheet(workbook, filteredSquads, squadMode, existingIdNumbers);
       setRows(parsed);
     }
   }, [squadMode, workbook, filteredSquads]);
@@ -253,7 +260,7 @@ export function BulkImportDialog({
         const data = ev.target?.result;
         const wb = XLSX.read(data, { type: "array" });
         setWorkbook(wb);
-        const parsed = parseSheet(wb, filteredSquads, squadMode);
+        const parsed = parseSheet(wb, filteredSquads, squadMode, existingIdNumbers);
         setRows(parsed);
       } catch {
         setImportError("לא ניתן לקרוא את הקובץ");
@@ -295,9 +302,9 @@ export function BulkImportDialog({
         setImportError(data.error ?? "שגיאה בייבוא");
         return;
       }
-      const { created, activeActivityCount, soldierIds } = await res.json();
+      const { created, updated, activeActivityCount, soldierIds } = await res.json();
       reset();
-      onSuccess(created, activeActivityCount, soldierIds);
+      onSuccess(created, updated, activeActivityCount, soldierIds);
     } catch {
       setImportError("שגיאה בייבוא");
     } finally {
@@ -307,6 +314,8 @@ export function BulkImportDialog({
 
   const validRows = rows?.filter((r) => r.errors.length === 0) ?? [];
   const errorRows = rows?.filter((r) => r.errors.length > 0) ?? [];
+  const newRows = validRows.filter((r) => !r.isUpdate);
+  const updateRows = validRows.filter((r) => r.isUpdate);
   const hasErrors = errorRows.length > 0;
   const canImport = rows && validRows.length > 0 && (squadMode === "file" || squadId);
 
@@ -423,7 +432,11 @@ export function BulkImportDialog({
                   )}
                 </p>
                 {validRows.length > 0 && (
-                  <p className="text-xs text-muted-foreground">{validRows.length} יוובאו</p>
+                  <p className="text-xs text-muted-foreground">
+                    {newRows.length > 0 && `${newRows.length} חדשים`}
+                    {newRows.length > 0 && updateRows.length > 0 && ", "}
+                    {updateRows.length > 0 && `${updateRows.length} עדכונים`}
+                  </p>
                 )}
               </div>
 
@@ -445,6 +458,9 @@ export function BulkImportDialog({
                         )}
                         <th className="text-end px-2 py-1.5 font-medium">דרגה</th>
                         <th className="text-end px-2 py-1.5 font-medium">סטטוס</th>
+                        {updateRows.length > 0 && (
+                          <th className="text-end px-2 py-1.5 font-medium">פעולה</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -498,6 +514,15 @@ export function BulkImportDialog({
                           >
                             {row.status || "פעיל"}
                           </td>
+                          {updateRows.length > 0 && (
+                            <td className="px-2 py-1.5 text-xs">
+                              {row.isUpdate ? (
+                                <span className="text-amber-500">עדכון</span>
+                              ) : (
+                                <span className="text-green-500">חדש</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -535,7 +560,11 @@ export function BulkImportDialog({
             onClick={handleImport}
             disabled={importing || !canImport}
           >
-            {importing ? "מייבא..." : `ייבא ${validRows.length > 0 ? validRows.length : ""} חיילים`}
+            {importing
+              ? "מייבא..."
+              : updateRows.length > 0
+                ? `ייבא ${newRows.length} חדשים, עדכן ${updateRows.length}`
+                : `ייבא ${validRows.length > 0 ? validRows.length : ""} חיילים`}
           </Button>
         </DialogFooter>
       </DialogContent>
