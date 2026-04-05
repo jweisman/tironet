@@ -44,6 +44,9 @@ const soldiers = new Table({
   rank: column.text,
   status: column.text,
   profile_image: column.text,
+  phone: column.text,
+  emergency_phone: column.text,
+  notes: column.text,
 });
 
 const activities = new Table({

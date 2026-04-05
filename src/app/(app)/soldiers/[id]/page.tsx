@@ -28,6 +28,7 @@ import {
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { toIsraeliDisplay } from "@/lib/phone";
 import { parseScoreConfig, getActiveScores } from "@/types/score-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 
@@ -83,7 +84,7 @@ function formatDate(dateStr: string) {
 const SOLDIER_QUERY = `
   SELECT
     s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
-    s.id_number, s.cycle_id, s.squad_id,
+    s.id_number, s.cycle_id, s.squad_id, s.phone, s.emergency_phone, s.notes,
     sq.name AS squad_name, sq.platoon_id,
     p.id AS platoon_id, p.name AS platoon_name
   FROM soldiers s
@@ -162,6 +163,7 @@ interface RawSoldierRequest {
 interface RawSoldier {
   id: string; given_name: string; family_name: string;
   id_number: string | null; rank: string | null; status: string; profile_image: string | null;
+  phone: string | null; emergency_phone: string | null; notes: string | null;
   cycle_id: string; squad_id: string;
   squad_name: string; platoon_id: string; platoon_name: string;
 }
@@ -277,6 +279,9 @@ export default function SoldierDetailPage() {
     rank: raw.rank,
     status: raw.status as SoldierStatus,
     profileImage: raw.profile_image,
+    phone: raw.phone,
+    emergencyPhone: raw.emergency_phone,
+    notes: raw.notes,
   };
 
   const todayStr = new Date().toISOString().split("T")[0];
@@ -380,6 +385,30 @@ export default function SoldierDetailPage() {
             </p>
           </div>
         </div>
+
+        {/* Contact info & notes */}
+        {(raw.phone || raw.emergency_phone || raw.notes) && (
+          <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+            {raw.phone && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">טלפון:</span>
+                <a href={`tel:${raw.phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.phone)}</a>
+              </div>
+            )}
+            {raw.emergency_phone && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">טלפון חירום:</span>
+                <a href={`tel:${raw.emergency_phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.emergency_phone)}</a>
+              </div>
+            )}
+            {raw.notes && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground shrink-0">הערות:</span>
+                <span className="whitespace-pre-wrap">{raw.notes}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Gap activities section */}

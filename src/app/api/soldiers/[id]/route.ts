@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
 import { validateProfileImage } from "@/lib/api/validate-image";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { toE164 } from "@/lib/phone";
 import type { Role } from "@/types";
 
 const patchSchema = z.object({
@@ -13,6 +14,9 @@ const patchSchema = z.object({
   rank: z.string().nullable().optional(),
   status: z.enum(["active", "transferred", "dropped", "injured"]).optional(),
   profileImage: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  emergencyPhone: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 async function isSquadInScope(
@@ -235,6 +239,25 @@ export async function PATCH(
   if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
   if (parsed.data.profileImage !== undefined)
     updateData.profileImage = parsed.data.profileImage;
+  if (parsed.data.phone !== undefined) {
+    if (parsed.data.phone) {
+      const e164 = toE164(parsed.data.phone);
+      if (!e164) return NextResponse.json({ error: "מספר טלפון לא תקין" }, { status: 422 });
+      updateData.phone = e164;
+    } else {
+      updateData.phone = null;
+    }
+  }
+  if (parsed.data.emergencyPhone !== undefined) {
+    if (parsed.data.emergencyPhone) {
+      const e164 = toE164(parsed.data.emergencyPhone);
+      if (!e164) return NextResponse.json({ error: "מספר טלפון חירום לא תקין" }, { status: 422 });
+      updateData.emergencyPhone = e164;
+    } else {
+      updateData.emergencyPhone = null;
+    }
+  }
+  if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
 
   const soldier = await prisma.soldier.update({
     where: { id },

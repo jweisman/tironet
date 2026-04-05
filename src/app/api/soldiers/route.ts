@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
 import { validateProfileImage } from "@/lib/api/validate-image";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { toE164 } from "@/lib/phone";
 import type { Role } from "@/types";
 
 const postSchema = z.object({
@@ -15,6 +16,9 @@ const postSchema = z.object({
   rank: z.string().nullable().optional(),
   status: z.enum(["active", "transferred", "dropped", "injured"]).optional(),
   profileImage: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  emergencyPhone: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 async function getScopeSquadIds(
@@ -174,7 +178,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { cycleId, squadId, givenName, familyName, idNumber, rank, status, profileImage } =
+  const { cycleId, squadId, givenName, familyName, idNumber, rank, status, profileImage, phone, emergencyPhone, notes } =
     parsed.data;
 
   const imageError = validateProfileImage(profileImage);
@@ -222,6 +226,9 @@ export async function POST(req: NextRequest) {
       rank: rank ?? null,
       status: status ?? "active",
       profileImage: profileImage ?? null,
+      phone: phone ? (toE164(phone) ?? null) : null,
+      emergencyPhone: emergencyPhone ? (toE164(emergencyPhone) ?? null) : null,
+      notes: notes ?? null,
     },
   });
 

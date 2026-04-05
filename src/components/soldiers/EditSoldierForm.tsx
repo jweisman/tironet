@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import dynamic from "next/dynamic";
 import { RANKS } from "@/lib/auth/permissions";
+import { toIsraeliDisplay } from "@/lib/phone";
 
 const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
 import type { SoldierStatus } from "@/types";
@@ -25,6 +26,9 @@ interface SoldierData {
   rank: string | null;
   status: SoldierStatus;
   profileImage: string | null;
+  phone: string | null;
+  emergencyPhone: string | null;
+  notes: string | null;
 }
 
 interface Props {
@@ -39,6 +43,9 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
   const [idNumber, setIdNumber] = useState(soldier.idNumber ?? "");
   const [rank, setRank] = useState(soldier.rank ?? "");
   const [status, setStatus] = useState<SoldierStatus>(soldier.status);
+  const [phone, setPhone] = useState(soldier.phone ? toIsraeliDisplay(soldier.phone) : "");
+  const [emergencyPhone, setEmergencyPhone] = useState(soldier.emergencyPhone ? toIsraeliDisplay(soldier.emergencyPhone) : "");
+  const [notes, setNotes] = useState(soldier.notes ?? "");
   const [imagePreview, setImagePreview] = useState<string | null>(
     soldier.profileImage
   );
@@ -66,6 +73,9 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
           rank: rank || null,
           status,
           profileImage: imageBase64,
+          phone: phone.trim() || null,
+          emergencyPhone: emergencyPhone.trim() || null,
+          notes: notes.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -210,6 +220,43 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-phone">טלפון</Label>
+          <Input
+            id="edit-phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="050-1234567"
+            dir="ltr"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-emergency-phone">טלפון חירום</Label>
+          <Input
+            id="edit-emergency-phone"
+            type="tel"
+            value={emergencyPhone}
+            onChange={(e) => setEmergencyPhone(e.target.value)}
+            placeholder="050-9876543"
+            dir="ltr"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="edit-notes">הערות</Label>
+        <textarea
+          id="edit-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="הערות על החייל"
+          rows={3}
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

@@ -229,9 +229,12 @@ model Soldier {
   familyName   String        @map("family_name")
   idNumber     String?       @map("id_number")
   rank         String?
-  status       SoldierStatus @default(active)
-  profileImage String?       @map("profile_image")
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  status         SoldierStatus @default(active)
+  profileImage   String?       @map("profile_image")
+  phone          String?
+  emergencyPhone String?       @map("emergency_phone")
+  notes          String?
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
 
   cycle           Cycle            @relation(fields: [cycleId], references: [id], onDelete: Cascade)

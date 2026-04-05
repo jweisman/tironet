@@ -12,6 +12,8 @@ Before considering any issue or task complete, always:
 
 3. **README.md** – Check if the changes affect user-facing behavior, configuration, installation, or usage. If so, update the README to reflect the current state.
 
+4. **Schema changes** – When modifying the Prisma schema, always run `npx prisma migrate dev --name <name>` to create and apply the migration. When modifying PowerSync schemas (`sync-config.yaml`, `schema.ts`), restart the local PowerSync container with `docker compose restart powersync` so it picks up the new config. When summarizing changes to the user, remind them that the sync config needs to be deployed (PowerSync Cloud or Docker) for production.
+
 ## Tech Stack Summary
 
 - **Next.js 16** App Router, TypeScript, Tailwind CSS v4

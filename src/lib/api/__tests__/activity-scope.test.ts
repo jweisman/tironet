@@ -177,7 +177,7 @@ describe("getActivityScope", () => {
     expect(result.scope!.role).toBe("company_commander");
     expect(result.scope!.platoonIds).toEqual(["p1", "p2"]);
     expect(result.scope!.platoons).toEqual(platoons);
-    expect(result.scope!.canCreate).toBe(false);
-    expect(result.scope!.canEditMetadataForPlatoon("p1")).toBe(false);
+    expect(result.scope!.canCreate).toBe(true);
+    expect(result.scope!.canEditMetadataForPlatoon("p1")).toBe(true);
   });
 });

@@ -19,6 +19,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { isValidIsraeliPhone } from "@/lib/phone";
 import { Download, Upload } from "lucide-react";
 
 type SoldierStatus = "active" | "transferred" | "dropped" | "injured";
@@ -46,6 +47,8 @@ interface ParsedRow {
   idNumber: string;
   rank: string;
   status: string;
+  phone: string;
+  emergencyPhone: string;
   squadName: string;
   resolvedSquadId: string | null;
   errors: string[];
@@ -62,7 +65,7 @@ const VALID_STATUSES: Record<string, SoldierStatus> = {
   injured: "injured",
 };
 
-const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "כיתה", "דרגה", "סטטוס"];
+const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום"];
 
 const FROM_FILE = "__from_file__";
 
@@ -70,10 +73,10 @@ function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    ["כהן", "דוד", "1234567", "כיתה א", "טוראי", "פעיל"],
-    ["לוי", "רחל", "", "", "", ""],
+    ["כהן", "דוד", "1234567", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543"],
+    ["לוי", "רחל", "", "", "", "", "", ""],
   ]);
-  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, ws, "חיילים");
   XLSX.writeFile(wb, "תבנית-חיילים.xlsx");
 }
@@ -104,6 +107,8 @@ function parseSheet(
   const squadIdx = headers.findIndex((h) => h === "כיתה");
   const rankIdx = headers.findIndex((h) => h === "דרגה");
   const statusIdx = headers.findIndex((h) => h === "סטטוס");
+  const phoneIdx = headers.findIndex((h) => h === "טלפון");
+  const emergencyPhoneIdx = headers.findIndex((h) => h === "טלפון חירום");
 
   // Build squad name → id lookup (case-insensitive, trimmed)
   const squadLookup = new Map<string, string>();
@@ -122,14 +127,22 @@ function parseSheet(
     const squadName = get(squadIdx);
     const rank = get(rankIdx);
     const status = get(statusIdx);
+    const phone = get(phoneIdx);
+    const emergencyPhone = get(emergencyPhoneIdx);
 
-    if (!familyName && !givenName && !rank && !status && !idNumber && !squadName) return;
+    if (!familyName && !givenName && !rank && !status && !idNumber && !squadName && !phone && !emergencyPhone) return;
 
     const errors: string[] = [];
     if (!familyName) errors.push("שם משפחה חסר");
     if (!givenName) errors.push("שם פרטי חסר");
     if (status && !VALID_STATUSES[status]) {
       errors.push(`סטטוס לא חוקי: "${status}"`);
+    }
+    if (phone && !isValidIsraeliPhone(phone)) {
+      errors.push(`טלפון לא תקין: "${phone}"`);
+    }
+    if (emergencyPhone && !isValidIsraeliPhone(emergencyPhone)) {
+      errors.push(`טלפון חירום לא תקין: "${emergencyPhone}"`);
     }
 
     let resolvedSquadId: string | null = null;
@@ -151,6 +164,8 @@ function parseSheet(
       idNumber,
       rank,
       status,
+      phone,
+      emergencyPhone,
       squadName,
       resolvedSquadId,
       errors,
@@ -270,6 +285,8 @@ export function BulkImportDialog({
             idNumber: r.idNumber || null,
             rank: r.rank || null,
             status: (VALID_STATUSES[r.status] ?? "active") as SoldierStatus,
+            phone: r.phone || null,
+            emergencyPhone: r.emergencyPhone || null,
           })),
         }),
       });

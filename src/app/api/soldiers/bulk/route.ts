@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { toE164 } from "@/lib/phone";
 import type { Role } from "@/types";
 
 const soldierSchema = z.object({
@@ -12,6 +13,8 @@ const soldierSchema = z.object({
   idNumber: z.string().nullable().optional(),
   rank: z.string().nullable().optional(),
   status: z.enum(["active", "transferred", "dropped", "injured"]).optional(),
+  phone: z.string().nullable().optional(),
+  emergencyPhone: z.string().nullable().optional(),
 });
 
 const bulkSchema = z.object({
@@ -124,6 +127,8 @@ export async function POST(req: NextRequest) {
           idNumber: s.idNumber ?? null,
           rank: s.rank ?? null,
           status: s.status ?? "active",
+          phone: s.phone ? (toE164(s.phone) ?? null) : null,
+          emergencyPhone: s.emergencyPhone ? (toE164(s.emergencyPhone) ?? null) : null,
         },
         select: { id: true },
       })

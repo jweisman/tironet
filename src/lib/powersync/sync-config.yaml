@@ -30,7 +30,7 @@ streams:
   soldiers:
     auto_subscribe: true
     query: >
-      SELECT id, cycle_id, squad_id, given_name, family_name, id_number, rank, status, profile_image
+      SELECT id, cycle_id, squad_id, given_name, family_name, id_number, rank, status, profile_image, phone, emergency_phone, notes
       FROM soldiers
       WHERE cycle_id IN auth.parameter('cycle_ids')
 
