@@ -94,6 +94,7 @@ const SOLDIERS_QUERY = `
       WHERE r.soldier_id = s.id
         AND r.cycle_id = s.cycle_id
         AND r.assigned_role IS NOT NULL
+        AND r.status != 'approved'
     ) AS open_request_count
   FROM soldiers s
   WHERE s.cycle_id = ?
@@ -105,7 +106,6 @@ const APPROVED_REQUESTS_QUERY = `
   FROM requests r
   WHERE r.cycle_id = ?
     AND r.status = 'approved'
-    AND r.assigned_role IS NULL
     AND (
       (r.type = 'leave' AND r.departure_at >= DATE('now'))
       OR (r.type = 'medical' AND r.appointment_date >= DATE('now'))

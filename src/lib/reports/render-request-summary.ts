@@ -77,7 +77,6 @@ export async function fetchRequestSummary(
     where: {
       cycleId,
       status: "approved",
-      assignedRole: null, // workflow complete
       soldier: {
         squad: {
           platoon: { id: { in: platoonIds } },

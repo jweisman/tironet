@@ -92,7 +92,7 @@ export function RequestCard({ request, userRole, onClick }: Props) {
             }`}
           >
             {isAssignedToMe
-              ? "דורש טיפול"
+              ? (request.status === "approved" || request.status === "denied" ? "ממתין לאישור קבלה" : "דורש טיפול")
               : `ממתין ל${ASSIGNED_ROLE_LABELS[request.assignedRole]}`}
           </span>
         )}

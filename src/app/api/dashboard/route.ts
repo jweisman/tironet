@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
     if (!sqId) continue;
     if (!requestsBySquad.has(sqId)) requestsBySquad.set(sqId, { approved: 0, inProgress: 0 });
     const entry = requestsBySquad.get(sqId)!;
-    if (row.status === "approved" && row.assignedRole === null) {
+    if (row.status === "approved") {
       entry.approved += row._count;
     } else if (row.assignedRole !== null) {
       entry.inProgress += row._count;

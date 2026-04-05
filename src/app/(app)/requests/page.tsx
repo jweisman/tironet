@@ -27,7 +27,7 @@ import { canActOnRequest } from "@/lib/requests/workflow";
 // Types
 // ---------------------------------------------------------------------------
 
-type ViewTab = "open" | "approved";
+type ViewTab = "open" | "approved" | "mine";
 
 // ---------------------------------------------------------------------------
 // SQL queries (PowerSync local SQLite)
@@ -118,10 +118,11 @@ export default function RequestsPage() {
 
   // UI state — initialise from URL params
   const [viewTab, setViewTab] = useState<ViewTab>(
-    searchParams.get("tab") === "approved" ? "approved" : "open"
-  );
-  const [showMineOnly, setShowMineOnly] = useState(
     searchParams.get("filter") === "mine"
+      ? "mine"
+      : searchParams.get("tab") === "approved"
+        ? "approved"
+        : "open"
   );
   const [filterType, setFilterType] = useState<RequestType | "all">("all");
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
@@ -129,12 +130,12 @@ export default function RequestsPage() {
 
   // Filtered lists
   const openRequests = useMemo(
-    () => allRequests.filter((r) => r.assignedRole !== null && (filterType === "all" || r.type === filterType)),
+    () => allRequests.filter((r) => r.assignedRole !== null && r.status !== "approved" && (filterType === "all" || r.type === filterType)),
     [allRequests, filterType],
   );
 
   const approvedRequests = useMemo(
-    () => allRequests.filter((r) => r.status === "approved" && r.assignedRole === null && (filterType === "all" || r.type === filterType)),
+    () => allRequests.filter((r) => r.status === "approved" && (filterType === "all" || r.type === filterType)),
     [allRequests, filterType],
   );
 
@@ -149,19 +150,23 @@ export default function RequestsPage() {
     return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a));
   }, [approvedRequests]);
 
-  // Sort open: assigned to me first; optionally filter to mine only
+  // Sort open: assigned to me first
   const sortedOpen = useMemo(() => {
-    let list = openRequests;
-    if (showMineOnly && rawRole) {
-      list = list.filter((r) => r.assignedRole !== null && canActOnRequest(rawRole as Role, r.assignedRole));
-    }
-    if (!rawRole) return list;
-    return [...list].sort((a, b) => {
+    if (!rawRole) return openRequests;
+    return [...openRequests].sort((a, b) => {
       const aMe = a.assignedRole !== null && canActOnRequest(rawRole as Role, a.assignedRole) ? 0 : 1;
       const bMe = b.assignedRole !== null && canActOnRequest(rawRole as Role, b.assignedRole) ? 0 : 1;
       return aMe - bMe;
     });
-  }, [openRequests, rawRole, showMineOnly]);
+  }, [openRequests, rawRole]);
+
+  // "Requires my action" — all requests assigned to current user (open + approved pending ack)
+  const mineRequests = useMemo(() => {
+    if (!rawRole) return [];
+    return allRequests.filter(
+      (r) => r.assignedRole !== null && canActOnRequest(rawRole as Role, r.assignedRole) && (filterType === "all" || r.type === filterType),
+    );
+  }, [allRequests, rawRole, filterType]);
 
   function handleTypeSelect(type: RequestType) {
     setTypeMenuOpen(false);
@@ -182,49 +187,54 @@ export default function RequestsPage() {
     );
   }
 
-  const displayList = viewTab === "open" ? sortedOpen : [];
-
   return (
     <div className="-mx-4 -my-6">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2">
         <div className="flex items-center gap-1.5">
-          {/* View tabs + require action */}
-          {(["open", "approved"] as ViewTab[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setViewTab(tab)}
-              className={cn(
-                "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                viewTab === tab
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {tab === "open" ? "פתוחות" : "אושרו"}
-              {tab === "open" && openRequests.length > 0 && (
-                <span className="mr-1">({openRequests.length})</span>
-              )}
-              {tab === "approved" && approvedRequests.length > 0 && (
-                <span className="mr-1">({approvedRequests.length})</span>
-              )}
-            </button>
-          ))}
+          {/* View tabs */}
+          <button
+            type="button"
+            onClick={() => setViewTab("open")}
+            className={cn(
+              "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              viewTab === "open"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+          >
+            פתוחות
+            {openRequests.length > 0 && <span className="mr-1">({openRequests.length})</span>}
+          </button>
 
-          {viewTab === "open" && role && (
+          <button
+            type="button"
+            onClick={() => setViewTab("approved")}
+            className={cn(
+              "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              viewTab === "approved"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+          >
+            אושרו
+            {approvedRequests.length > 0 && <span className="mr-1">({approvedRequests.length})</span>}
+          </button>
+
+          {role && (
             <button
               type="button"
-              onClick={() => setShowMineOnly((v) => !v)}
+              onClick={() => setViewTab("mine")}
               className={cn(
                 "shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                showMineOnly
-                  ? "bg-amber-100 text-amber-800"
+                viewTab === "mine"
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-800/60 dark:text-amber-100"
                   : "bg-muted text-muted-foreground hover:text-foreground",
               )}
             >
               <Bell size={12} />
               <span>דורשות טיפולי</span>
+              {mineRequests.length > 0 && <span className="mr-1">({mineRequests.length})</span>}
             </button>
           )}
 
@@ -262,7 +272,7 @@ export default function RequestsPage() {
         {/* Open requests */}
         {viewTab === "open" && (
           <>
-            {displayList.length === 0 && !syncStatus.hasSynced && (
+            {sortedOpen.length === 0 && !syncStatus.hasSynced && (
               <div className="divide-y divide-border">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -276,7 +286,7 @@ export default function RequestsPage() {
                 ))}
               </div>
             )}
-            {displayList.length === 0 && syncStatus.hasSynced && (
+            {sortedOpen.length === 0 && syncStatus.hasSynced && (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
                 <p className="font-medium">אין בקשות פתוחות</p>
                 {canCreate && (
@@ -284,9 +294,32 @@ export default function RequestsPage() {
                 )}
               </div>
             )}
-            {displayList.length > 0 && (
+            {sortedOpen.length > 0 && (
               <div className="divide-y divide-border">
-                {displayList.map((r) => (
+                {sortedOpen.map((r) => (
+                  <RequestCard
+                    key={r.id}
+                    request={r}
+                    userRole={rawRole as Role}
+                    onClick={() => router.push(`/requests/${r.id}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Requires my action */}
+        {viewTab === "mine" && (
+          <>
+            {mineRequests.length === 0 && syncStatus.hasSynced && (
+              <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
+                <p className="font-medium">אין בקשות הדורשות טיפולך</p>
+              </div>
+            )}
+            {mineRequests.length > 0 && (
+              <div className="divide-y divide-border">
+                {mineRequests.map((r) => (
                   <RequestCard
                     key={r.id}
                     request={r}
