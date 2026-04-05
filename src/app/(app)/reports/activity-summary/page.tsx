@@ -22,12 +22,14 @@ export default function ActivitySummaryPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const typesParam = searchParams.get("types") ?? "";
+  const dateRange = searchParams.get("dateRange") ?? "";
 
   useEffect(() => {
     if (!selectedCycleId) return;
     setLoading(true);
     const params = new URLSearchParams({ cycleId: selectedCycleId });
     if (typesParam) params.set("activityTypeIds", typesParam);
+    if (dateRange) params.set("dateRange", dateRange);
     fetch(`/api/reports/activity-summary?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
@@ -36,7 +38,7 @@ export default function ActivitySummaryPage() {
       .then((d: ActivitySummaryData) => setData(d))
       .catch(() => toast.error("שגיאה בטעינת הדוח"))
       .finally(() => setLoading(false));
-  }, [selectedCycleId, typesParam]);
+  }, [selectedCycleId, typesParam, dateRange]);
 
   async function handleExportPdf() {
     if (!selectedCycleId) return;
@@ -44,6 +46,7 @@ export default function ActivitySummaryPage() {
     try {
       const params = new URLSearchParams({ cycleId: selectedCycleId });
       if (typesParam) params.set("activityTypeIds", typesParam);
+      if (dateRange) params.set("dateRange", dateRange);
       const res = await fetch(
         `/api/reports/activity-summary/pdf?${params}`
       );
@@ -102,7 +105,9 @@ export default function ActivitySummaryPage() {
         </div>
         {data && (
           <p className="text-xs text-muted-foreground mt-1">
-            {data.cycleName} — {data.activities.length} פעילויות
+            מחזור {data.cycleName} — {data.activities.length} פעילויות
+            {dateRange === "week" && " · שבוע אחרון"}
+            {dateRange === "month" && " · חודש אחרון"}
           </p>
         )}
       </div>

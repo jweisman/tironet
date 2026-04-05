@@ -34,6 +34,8 @@ export default function ReportsPage() {
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<string>("");
   const [typesLoaded, setTypesLoaded] = useState(false);
+  // Date range filter — "" means all, "week" = last 7 days, "month" = last 30 days
+  const [activityDateRange, setActivityDateRange] = useState<string>("");
 
   // Fetch activity types
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function ReportsPage() {
 
   // Request type filter state — "" means all types
   const [selectedRequestType, setSelectedRequestType] = useState<string>("");
+  const [requestDateRange, setRequestDateRange] = useState<string>("");
 
   // "" = all types, otherwise a single type ID
   const typesParam = selectedTypeId;
@@ -95,6 +98,7 @@ export default function ReportsPage() {
     try {
       const params = new URLSearchParams({ cycleId: selectedCycleId! });
       if (typesParam) params.set("activityTypeIds", typesParam);
+      if (activityDateRange) params.set("dateRange", activityDateRange);
       const res = await fetch(`/api/reports/all-activity/sheets?${params}`, {
         method: "POST",
       });
@@ -122,10 +126,11 @@ export default function ReportsPage() {
       toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
       return;
     }
-    const url = typesParam
-      ? `/reports/activity-summary?types=${typesParam}`
-      : "/reports/activity-summary";
-    router.push(url);
+    const params = new URLSearchParams();
+    if (typesParam) params.set("types", typesParam);
+    if (activityDateRange) params.set("dateRange", activityDateRange);
+    const qs = params.toString();
+    router.push(`/reports/activity-summary${qs ? `?${qs}` : ""}`);
   }
 
   function handleRequestSummary() {
@@ -133,10 +138,11 @@ export default function ReportsPage() {
       toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
       return;
     }
-    const url = selectedRequestType
-      ? `/reports/request-summary?types=${selectedRequestType}`
-      : "/reports/request-summary";
-    router.push(url);
+    const params = new URLSearchParams();
+    if (selectedRequestType) params.set("types", selectedRequestType);
+    if (requestDateRange) params.set("dateRange", requestDateRange);
+    const qs = params.toString();
+    router.push(`/reports/request-summary${qs ? `?${qs}` : ""}`);
   }
 
   return (
@@ -151,21 +157,32 @@ export default function ReportsPage() {
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">דוחות פעילויות</h2>
 
-          {/* Activity type filter */}
-          {typesLoaded && activityTypes.length > 1 && (
+          {/* Activity filters */}
+          <div className="flex flex-wrap gap-2">
+            {typesLoaded && activityTypes.length > 1 && (
+              <select
+                value={selectedTypeId}
+                onChange={(e) => setSelectedTypeId(e.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                <option value="">כל סוגי הפעילויות</option>
+                {activityTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <select
-              value={selectedTypeId}
-              onChange={(e) => setSelectedTypeId(e.target.value)}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground max-w-full"
+              value={activityDateRange}
+              onChange={(e) => setActivityDateRange(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             >
-              <option value="">כל סוגי הפעילויות</option>
-              {activityTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
+              <option value="">כל התאריכים</option>
+              <option value="week">שבוע אחרון</option>
+              <option value="month">חודש אחרון</option>
             </select>
-          )}
+          </div>
 
           {/* Activity Summary report card */}
           <button
@@ -242,17 +259,28 @@ export default function ReportsPage() {
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">דוחות בקשות</h2>
 
-          {/* Request type filter */}
-          <select
-            value={selectedRequestType}
-            onChange={(e) => setSelectedRequestType(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground max-w-full"
-          >
-            <option value="">כל סוגי הבקשות</option>
-            <option value="leave">בקשת יציאה</option>
-            <option value="medical">רפואה</option>
-            <option value="hardship">בקשת ת&quot;ש</option>
-          </select>
+          {/* Request filters */}
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={selectedRequestType}
+              onChange={(e) => setSelectedRequestType(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="">כל סוגי הבקשות</option>
+              <option value="leave">בקשת יציאה</option>
+              <option value="medical">רפואה</option>
+              <option value="hardship">בקשת ת&quot;ש</option>
+            </select>
+            <select
+              value={requestDateRange}
+              onChange={(e) => setRequestDateRange(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="">כל התאריכים</option>
+              <option value="week">שבוע אחרון</option>
+              <option value="month">חודש אחרון</option>
+            </select>
+          </div>
 
           {/* Request Summary report card */}
           <button

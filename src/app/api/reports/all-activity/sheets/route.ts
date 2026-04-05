@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getReportScope } from "@/lib/api/report-scope";
 import { refreshAccessToken } from "@/lib/reports/google-oauth";
+import { dateRangeToAfterDate } from "@/lib/reports/date-range";
 import type { SessionUser } from "@/types";
 import type { ScoreConfig } from "@/types/score-config";
 import { getActiveScores } from "@/types/score-config";
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
 
   const typesParam = request.nextUrl.searchParams.get("activityTypeIds");
   const activityTypeIds = typesParam ? typesParam.split(",").filter(Boolean) : undefined;
+  const afterDate = dateRangeToAfterDate(request.nextUrl.searchParams.get("dateRange"));
 
   const { scope, error, user } = await getReportScope(cycleId);
   if (error) return error;
@@ -105,6 +107,7 @@ export async function POST(request: NextRequest) {
                 status: "active",
                 platoonId: { in: scope!.platoonIds },
                 ...(activityTypeIds?.length ? { activityTypeId: { in: activityTypeIds } } : {}),
+                ...(afterDate ? { date: { gte: afterDate } } : {}),
               },
             },
           },
@@ -126,6 +129,7 @@ export async function POST(request: NextRequest) {
       platoonId: { in: scope!.platoonIds },
       status: "active",
       ...(activityTypeIds?.length ? { activityTypeId: { in: activityTypeIds } } : {}),
+      ...(afterDate ? { date: { gte: afterDate } } : {}),
     },
     include: {
       activityType: {

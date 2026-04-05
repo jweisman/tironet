@@ -4,6 +4,7 @@ import {
   fetchActivitySummary,
   renderActivitySummaryHtml,
 } from "@/lib/reports/render-activity-summary";
+import { dateRangeToAfterDate } from "@/lib/reports/date-range";
 
 // Vercel Functions: Node.js runtime, 60s max duration
 export const runtime = "nodejs";
@@ -57,9 +58,10 @@ export async function GET(request: NextRequest) {
 
   const typesParam = request.nextUrl.searchParams.get("activityTypeIds");
   const activityTypeIds = typesParam ? typesParam.split(",").filter(Boolean) : undefined;
+  const afterDate = dateRangeToAfterDate(request.nextUrl.searchParams.get("dateRange"));
 
   // Fetch data and render HTML in-process (no separate print route needed)
-  const data = await fetchActivitySummary(cycleId, scope!.platoonIds, activityTypeIds);
+  const data = await fetchActivitySummary(cycleId, scope!.platoonIds, activityTypeIds, afterDate);
   if (!data) {
     return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
   }

@@ -65,6 +65,7 @@ export async function fetchRequestSummary(
   cycleId: string,
   platoonIds: string[],
   requestTypes?: string[],
+  afterDate?: Date,
 ): Promise<RequestSummaryData | null> {
   const cycle = await prisma.cycle.findUnique({
     where: { id: cycleId },
@@ -85,6 +86,7 @@ export async function fetchRequestSummary(
       ...(requestTypes && requestTypes.length > 0
         ? { type: { in: requestTypes as RequestType[] } }
         : {}),
+      ...(afterDate ? { createdAt: { gte: afterDate } } : {}),
     },
     include: {
       soldier: {

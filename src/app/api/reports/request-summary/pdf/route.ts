@@ -4,6 +4,7 @@ import {
   fetchRequestSummary,
   renderRequestSummaryHtml,
 } from "@/lib/reports/render-request-summary";
+import { dateRangeToAfterDate } from "@/lib/reports/date-range";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -55,8 +56,9 @@ export async function GET(request: NextRequest) {
 
   const typesParam = request.nextUrl.searchParams.get("requestTypes");
   const requestTypes = typesParam ? typesParam.split(",").filter(Boolean) : undefined;
+  const afterDate = dateRangeToAfterDate(request.nextUrl.searchParams.get("dateRange"));
 
-  const data = await fetchRequestSummary(cycleId, scope!.platoonIds, requestTypes);
+  const data = await fetchRequestSummary(cycleId, scope!.platoonIds, requestTypes, afterDate);
   if (!data) {
     return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
   }

@@ -96,12 +96,14 @@ export default function RequestSummaryPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const typesParam = searchParams.get("types") ?? "";
+  const dateRange = searchParams.get("dateRange") ?? "";
 
   useEffect(() => {
     if (!selectedCycleId) return;
     setLoading(true);
     const params = new URLSearchParams({ cycleId: selectedCycleId });
     if (typesParam) params.set("requestTypes", typesParam);
+    if (dateRange) params.set("dateRange", dateRange);
     fetch(`/api/reports/request-summary?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
@@ -110,7 +112,7 @@ export default function RequestSummaryPage() {
       .then((d: RequestSummaryData) => setData(d))
       .catch(() => toast.error("שגיאה בטעינת הדוח"))
       .finally(() => setLoading(false));
-  }, [selectedCycleId, typesParam]);
+  }, [selectedCycleId, typesParam, dateRange]);
 
   async function handleExportPdf() {
     if (!selectedCycleId) return;
@@ -118,6 +120,7 @@ export default function RequestSummaryPage() {
     try {
       const params = new URLSearchParams({ cycleId: selectedCycleId });
       if (typesParam) params.set("requestTypes", typesParam);
+      if (dateRange) params.set("dateRange", dateRange);
       const res = await fetch(`/api/reports/request-summary/pdf?${params}`);
       if (!res.ok) throw new Error("PDF generation failed");
       const blob = await res.blob();
@@ -174,7 +177,9 @@ export default function RequestSummaryPage() {
         </div>
         {data && (
           <p className="text-xs text-muted-foreground mt-1">
-            {data.cycleName} — {data.totalCount} בקשות מאושרות
+            מחזור {data.cycleName} — {data.totalCount} בקשות מאושרות
+            {dateRange === "week" && " · שבוע אחרון"}
+            {dateRange === "month" && " · חודש אחרון"}
           </p>
         )}
       </div>
