@@ -45,8 +45,7 @@ test.describe("Soldiers — platoon commander", () => {
     await expect(page).toHaveURL(/\/soldiers\//, { timeout: 5000 });
 
     // Should show soldier name
-    await expect(page.getByText("Cohen")).toBeVisible({ timeout: 60000 });
-    await expect(page.getByText("Avi")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Cohen Avi" })).toBeVisible({ timeout: 60000 });
   });
 
   test("add soldier form", async ({ page }) => {

@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2 } from "lucide-react";
+import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
@@ -397,6 +397,15 @@ export default function SoldierDetailPage() {
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">טלפון:</span>
                 <a href={`tel:${raw.phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.phone)}</a>
+                <a
+                  href={`https://wa.me/${raw.phone.replace("+", "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-600 hover:text-emerald-700 transition-colors"
+                  aria-label="שלח הודעת WhatsApp"
+                >
+                  <MessageCircle size={16} />
+                </a>
               </div>
             )}
             {raw.emergency_phone && (
