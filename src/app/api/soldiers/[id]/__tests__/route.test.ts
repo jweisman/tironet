@@ -4,6 +4,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     soldier: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
     squad: { findUnique: vi.fn() },
+    platoon: { findUnique: vi.fn(), findMany: vi.fn() },
     activity: { findMany: vi.fn() },
     activityReport: { findMany: vi.fn(), createMany: vi.fn() },
   },
@@ -28,6 +29,7 @@ const mockSoldierFindUnique = vi.mocked(prisma.soldier.findUnique);
 const mockSoldierUpdate = vi.mocked(prisma.soldier.update);
 const mockSoldierDelete = vi.mocked(prisma.soldier.delete);
 const mockSquadFindUnique = vi.mocked(prisma.squad.findUnique);
+const mockPlatoonFindUnique = vi.mocked(prisma.platoon.findUnique);
 const mockActivityFindMany = vi.mocked(prisma.activity.findMany);
 const mockReportFindMany = vi.mocked(prisma.activityReport.findMany);
 const mockReportCreateMany = vi.mocked(prisma.activityReport.createMany);
@@ -538,8 +540,31 @@ describe("DELETE /api/soldiers/[id]", () => {
 // POST /api/soldiers/[id]/mark-na
 // ---------------------------------------------------------------------------
 describe("POST /api/soldiers/[id]/mark-na", () => {
+  const soldierData = {
+    id: "s1",
+    cycleId: "cycle-1",
+    squadId: "squad-1",
+    squad: { platoonId: "platoon-1" },
+  };
+
+  /** Mock auth with a platoon_commander who owns platoon-1 */
+  function mockPlatoonCommander(userId = "user-1") {
+    const assignment = mockAssignment({
+      cycleId: "cycle-1",
+      role: "platoon_commander",
+      unitType: "platoon",
+      unitId: "platoon-1",
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ id: userId, cycleAssignments: [assignment] }),
+    } as never);
+    // getActivityScope calls platoon.findUnique for platoon_commander
+    mockPlatoonFindUnique.mockResolvedValue({ id: "platoon-1", name: "Platoon 1" } as never);
+  }
+
   it("returns 401 when unauthenticated", async () => {
     mockAuth.mockResolvedValue(null as never);
+    mockSoldierFindUnique.mockResolvedValue(soldierData as never);
 
     const req = createMockRequest("POST", "/api/soldiers/s1/mark-na");
     const res = await markNaPost(req, makeParams("s1"));
@@ -547,9 +572,6 @@ describe("POST /api/soldiers/[id]/mark-na", () => {
   });
 
   it("returns 404 when soldier not found", async () => {
-    mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
-    } as never);
     mockSoldierFindUnique.mockResolvedValue(null as never);
 
     const req = createMockRequest("POST", "/api/soldiers/s1/mark-na");
@@ -557,17 +579,39 @@ describe("POST /api/soldiers/[id]/mark-na", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns count 0 when no missing activities", async () => {
+  it("returns 403 when user has no assignment for the soldier's cycle", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ id: "user-1", isAdmin: true }),
+      user: mockSessionUser({ cycleAssignments: [] }),
     } as never);
+    mockSoldierFindUnique.mockResolvedValue(soldierData as never);
 
-    mockSoldierFindUnique.mockResolvedValue({
-      id: "s1",
+    const req = createMockRequest("POST", "/api/soldiers/s1/mark-na");
+    const res = await markNaPost(req, makeParams("s1"));
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when squad_commander targets soldier in another squad", async () => {
+    const assignment = mockAssignment({
       cycleId: "cycle-1",
-      squadId: "squad-1",
-      squad: { platoonId: "platoon-1" },
+      role: "squad_commander",
+      unitType: "squad",
+      unitId: "other-squad",
+    });
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ cycleAssignments: [assignment] }),
     } as never);
+    mockSoldierFindUnique.mockResolvedValue(soldierData as never);
+    // getActivityScope calls squad.findUnique for squad_commander
+    mockSquadFindUnique.mockResolvedValue({ platoonId: "platoon-1" } as never);
+
+    const req = createMockRequest("POST", "/api/soldiers/s1/mark-na");
+    const res = await markNaPost(req, makeParams("s1"));
+    expect(res.status).toBe(403);
+  });
+
+  it("returns count 0 when no missing activities", async () => {
+    mockPlatoonCommander();
+    mockSoldierFindUnique.mockResolvedValue(soldierData as never);
 
     mockActivityFindMany.mockResolvedValue([
       { id: "act-1" },
@@ -589,16 +633,8 @@ describe("POST /api/soldiers/[id]/mark-na", () => {
   });
 
   it("creates NA reports for missing activities", async () => {
-    mockAuth.mockResolvedValue({
-      user: mockSessionUser({ id: "user-1", isAdmin: true }),
-    } as never);
-
-    mockSoldierFindUnique.mockResolvedValue({
-      id: "s1",
-      cycleId: "cycle-1",
-      squadId: "squad-1",
-      squad: { platoonId: "platoon-1" },
-    } as never);
+    mockPlatoonCommander();
+    mockSoldierFindUnique.mockResolvedValue(soldierData as never);
 
     mockActivityFindMany.mockResolvedValue([
       { id: "act-1" },

@@ -79,19 +79,14 @@ export async function POST(req: NextRequest) {
   }
 
   const { cycleId, soldiers } = parsed.data;
-  const isAdmin = session.user.isAdmin;
 
-  let scopeSquadIds: string[] | null = null;
-
-  if (!isAdmin) {
-    const assignment = session.user.cycleAssignments.find(
-      (a) => a.cycleId === cycleId
-    );
-    if (!assignment) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    scopeSquadIds = await getScopeSquadIds(assignment.role, assignment.unitId, cycleId);
+  const assignment = session.user.cycleAssignments.find(
+    (a) => a.cycleId === cycleId
+  );
+  if (!assignment) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const scopeSquadIds = await getScopeSquadIds(assignment.role, assignment.unitId, cycleId);
 
   // Validate all squadIds are in scope and belong to the cycle
   const uniqueSquadIds = [...new Set(soldiers.map((s) => s.squadId))];
@@ -110,7 +105,7 @@ export async function POST(req: NextRequest) {
     if (!sq || sq.platoon.company.cycleId !== cycleId) {
       return NextResponse.json({ error: "Squad not found in cycle" }, { status: 400 });
     }
-    if (scopeSquadIds && !scopeSquadIds.includes(sqId)) {
+    if (!scopeSquadIds.includes(sqId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
@@ -122,7 +117,7 @@ export async function POST(req: NextRequest) {
 
   const existingMap = new Map<string, { id: string; squadId: string }>();
   if (nonNullIdNumbers.length > 0) {
-    const allScopeSquadIds = scopeSquadIds ?? uniqueSquadIds;
+    const allScopeSquadIds = scopeSquadIds;
     const existing = await prisma.soldier.findMany({
       where: {
         cycleId,

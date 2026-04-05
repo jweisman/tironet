@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth } from "@/lib/auth/auth";
+import { getActivityScope } from "@/lib/api/activity-scope";
 
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id: soldierId } = await params;
 
   // Find soldier with squad/platoon info
@@ -26,6 +21,19 @@ export async function POST(
 
   if (!soldier) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Scope check: user must have access to this soldier's cycle and unit
+  const { scope, error, user } = await getActivityScope(soldier.cycleId);
+  if (error || !scope || !user) return error!;
+
+  const canEdit =
+    scope.role === "squad_commander"
+      ? scope.squadId === soldier.squadId
+      : scope.platoonIds.includes(soldier.squad.platoonId);
+
+  if (!canEdit) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   // Find all active activities for soldier's platoon in this cycle
@@ -62,7 +70,7 @@ export async function POST(
       activityId: a.id,
       soldierId: soldierId,
       result: "na",
-      updatedByUserId: session.user.id,
+      updatedByUserId: user.id,
     })),
     skipDuplicates: true,
   });

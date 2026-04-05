@@ -26,6 +26,7 @@ import {
 
 const mockAuth = vi.mocked(auth);
 const mockSquadFindMany = vi.mocked(prisma.squad.findMany);
+const mockPlatoonFindMany = vi.mocked(prisma.platoon.findMany);
 const mockSoldierFindMany = vi.mocked(prisma.soldier.findMany);
 const mockTransaction = vi.mocked(prisma.$transaction);
 const mockActivityCount = vi.mocked(prisma.activity.count);
@@ -37,6 +38,20 @@ const SQUAD_MINE = "00000000-0000-4000-8000-000000000003";
 const PLATOON = "00000000-0000-4000-8000-000000000004";
 const COMP = "00000000-0000-4000-8000-000000000005";
 const OTHER_CYCLE = "00000000-0000-4000-8000-000000000099";
+
+// Admin users need a cycle assignment (admins are scoped by assignment like everyone else)
+const adminAssignment = mockAssignment({
+  cycleId: CYCLE,
+  role: "company_commander",
+  unitType: "company",
+  unitId: COMP,
+});
+
+/** Set up scope mocks for a company_commander admin so getScopeSquadIds returns [SQUAD] */
+function mockAdminScope() {
+  mockPlatoonFindMany.mockResolvedValueOnce([{ id: PLATOON }] as never);
+  mockSquadFindMany.mockResolvedValueOnce([{ id: SQUAD }] as never);
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -54,14 +69,14 @@ describe("POST /api/soldiers/bulk", () => {
   });
 
   it("returns 400 for invalid input (missing soldiers)", async () => {
-    mockAuth.mockResolvedValue({ user: mockSessionUser({ isAdmin: true }) } as never);
+    mockAuth.mockResolvedValue({ user: mockSessionUser({ isAdmin: true, cycleAssignments: [adminAssignment] }) } as never);
     const req = createMockRequest("POST", "/api/soldiers/bulk", { cycleId: CYCLE });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
 
   it("returns 400 for empty soldiers array", async () => {
-    mockAuth.mockResolvedValue({ user: mockSessionUser({ isAdmin: true }) } as never);
+    mockAuth.mockResolvedValue({ user: mockSessionUser({ isAdmin: true, cycleAssignments: [adminAssignment] }) } as never);
     const req = createMockRequest("POST", "/api/soldiers/bulk", {
       cycleId: CYCLE, soldiers: [],
     });
@@ -110,11 +125,12 @@ describe("POST /api/soldiers/bulk", () => {
 
   it("returns 400 when squad does not belong to the cycle", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({ isAdmin: true, cycleAssignments: [adminAssignment] }),
     } as never);
 
-    // Admin: scopeSquadIds is null (not called), goes straight to validation
-    // Validation query: prisma.squad.findMany for the unique squad IDs
+    // getScopeSquadIds for company_commander
+    mockAdminScope();
+    // Validation query: squad belongs to a different cycle
     mockSquadFindMany.mockResolvedValueOnce([
       {
         id: SQUAD, platoonId: PLATOON,
@@ -232,9 +248,10 @@ describe("POST /api/soldiers/bulk", () => {
 
   it("creates soldiers with idNumber in bulk for admin", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({ isAdmin: true, cycleAssignments: [adminAssignment] }),
     } as never);
 
+    mockAdminScope();
     mockSquadFindMany.mockResolvedValueOnce([
       {
         id: SQUAD, platoonId: PLATOON,
@@ -262,9 +279,10 @@ describe("POST /api/soldiers/bulk", () => {
 
   it("creates soldiers in bulk and returns 201 for admin", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({ isAdmin: true, cycleAssignments: [adminAssignment] }),
     } as never);
 
+    mockAdminScope();
     mockSquadFindMany.mockResolvedValueOnce([
       {
         id: SQUAD, platoonId: PLATOON,
@@ -294,9 +312,10 @@ describe("POST /api/soldiers/bulk", () => {
   it("updates existing soldiers matched by idNumber and creates new ones", async () => {
     const EXISTING_SOLDIER_ID = "00000000-0000-4000-8000-000000000020";
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({ isAdmin: true, cycleAssignments: [adminAssignment] }),
     } as never);
 
+    mockAdminScope();
     mockSquadFindMany.mockResolvedValueOnce([
       {
         id: SQUAD, platoonId: PLATOON,
@@ -329,9 +348,10 @@ describe("POST /api/soldiers/bulk", () => {
 
   it("does not match soldiers without idNumber for update", async () => {
     mockAuth.mockResolvedValue({
-      user: mockSessionUser({ isAdmin: true }),
+      user: mockSessionUser({ isAdmin: true, cycleAssignments: [adminAssignment] }),
     } as never);
 
+    mockAdminScope();
     mockSquadFindMany.mockResolvedValueOnce([
       {
         id: SQUAD, platoonId: PLATOON,
