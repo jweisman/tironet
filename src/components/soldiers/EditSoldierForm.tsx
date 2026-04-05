@@ -230,7 +230,7 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="050-1234567"
+            placeholder="לדוגמה: 050-1234567"
             dir="ltr"
           />
         </div>
@@ -241,7 +241,7 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
             type="tel"
             value={emergencyPhone}
             onChange={(e) => setEmergencyPhone(e.target.value)}
-            placeholder="050-9876543"
+            placeholder="לדוגמה: 050-9876543"
             dir="ltr"
           />
         </div>

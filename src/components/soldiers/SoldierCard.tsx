@@ -13,6 +13,7 @@ export interface SoldierSummary {
   rank: string | null;
   status: SoldierStatus;
   profileImage: string | null;
+  phone: string | null;
   gapCount: number;
   openRequestCount: number;
   approvedRequestTypes: RequestType[];

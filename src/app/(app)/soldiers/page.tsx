@@ -67,7 +67,7 @@ const STATUS_FILTERS: StatusFilter[] = [
 
 const SOLDIERS_QUERY = `
   SELECT
-    s.id, s.given_name, s.family_name, s.id_number, s.rank, s.status, s.profile_image,
+    s.id, s.given_name, s.family_name, s.id_number, s.rank, s.status, s.profile_image, s.phone,
     s.squad_id,
     (
       SELECT COUNT(*)
@@ -136,6 +136,7 @@ interface RawSoldier {
   rank: string | null;
   status: string;
   profile_image: string | null;
+  phone: string | null;
   squad_id: string;
   gap_count: number;
   open_request_count: number;
@@ -157,6 +158,7 @@ function mapSoldier(raw: RawSoldier, approvedTypes: RequestType[]): SoldierSumma
     rank: raw.rank ?? null,
     status: raw.status as SoldierStatus,
     profileImage: raw.profile_image ?? null,
+    phone: raw.phone ?? null,
     gapCount: Number(raw.gap_count ?? 0),
     openRequestCount: Number(raw.open_request_count ?? 0),
     approvedRequestTypes: approvedTypes,
@@ -269,7 +271,8 @@ export default function SoldiersPage() {
             const fullName = `${s.familyName} ${s.givenName}`.toLowerCase();
             const matchesName = fullName.includes(q);
             const matchesId = s.idNumber?.includes(q) ?? false;
-            if (!matchesName && !matchesId) return false;
+            const matchesPhone = s.phone?.includes(q) ?? false;
+            if (!matchesName && !matchesId && !matchesPhone) return false;
           }
           return true;
         }),
@@ -361,7 +364,7 @@ export default function SoldiersPage() {
               className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             />
             <Input
-              placeholder="חיפוש חייל..."
+              placeholder="חיפוש לפי שם, מ״א או טלפון..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pe-8"
