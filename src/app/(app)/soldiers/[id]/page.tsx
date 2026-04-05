@@ -290,6 +290,10 @@ export default function SoldierDetailPage() {
   );
   const gapCount = failedReports.length + (missingRows ?? []).length;
 
+  // Completed activities: reports that are not gaps (passed, na, or non-required/non-active)
+  const failedIds = new Set(failedReports.map((r) => r.id));
+  const completedReports = (reportRows ?? []).filter((r) => !failedIds.has(r.id));
+
   const initials = (raw.given_name[0] ?? "") + (raw.family_name[0] ?? "");
   const colorClass = getAvatarColor(raw.given_name + raw.family_name);
   const statusVariant = STATUS_VARIANT[raw.status as SoldierStatus];
@@ -411,6 +415,60 @@ export default function SoldierDetailPage() {
         )}
       </div>
 
+      {/* Requests section */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground">בקשות</h2>
+          {(userRole === "squad_commander" || userRole === "platoon_commander") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRequestTypeMenuOpen(true)}
+            >
+              <Plus size={14} className="ml-1" />
+              בקשה חדשה
+            </Button>
+          )}
+        </div>
+
+        {(!soldierRequests || soldierRequests.length === 0) ? (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            <FileText size={16} />
+            <span>אין בקשות</span>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+            {soldierRequests.map((r) => (
+              <Link
+                key={r.id}
+                href={`/requests/${r.id}`}
+                className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <RequestTypeIcon type={r.type as RequestType} size={16} />
+                </span>
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <p className="text-sm font-medium">{REQUEST_TYPE_LABELS[r.type as RequestType]}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {r.description || "—"}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <Badge variant={REQUEST_STATUS_VARIANT[r.status as RequestStatus]} className="text-xs">
+                    {REQUEST_STATUS_LABELS[r.status as RequestStatus]}
+                  </Badge>
+                  {r.assigned_role && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {ASSIGNED_ROLE_LABELS[r.assigned_role as Role]}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Gap activities section */}
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-muted-foreground">
@@ -470,56 +528,57 @@ export default function SoldierDetailPage() {
         )}
       </div>
 
-      {/* Requests section */}
+      {/* Completed activities section */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground">בקשות</h2>
-          {(userRole === "squad_commander" || userRole === "platoon_commander") && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRequestTypeMenuOpen(true)}
-            >
-              <Plus size={14} className="ml-1" />
-              בקשה חדשה
-            </Button>
-          )}
-        </div>
+        <h2 className="text-sm font-semibold text-muted-foreground">
+          פעילויות שהושלמו
+        </h2>
 
-        {(!soldierRequests || soldierRequests.length === 0) ? (
+        {completedReports.length === 0 ? (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
             <FileText size={16} />
-            <span>אין בקשות</span>
+            <span>אין פעילויות שהושלמו</span>
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
-            {soldierRequests.map((r) => (
-              <Link
-                key={r.id}
-                href={`/requests/${r.id}`}
-                className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                  <RequestTypeIcon type={r.type as RequestType} size={16} />
-                </span>
-                <div className="flex-1 min-w-0 space-y-0.5">
-                  <p className="text-sm font-medium">{REQUEST_TYPE_LABELS[r.type as RequestType]}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {r.description || "—"}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <Badge variant={REQUEST_STATUS_VARIANT[r.status as RequestStatus]} className="text-xs">
-                    {REQUEST_STATUS_LABELS[r.status as RequestStatus]}
-                  </Badge>
-                  {r.assigned_role && (
-                    <span className="text-[10px] text-muted-foreground">
-                      {ASSIGNED_ROLE_LABELS[r.assigned_role as Role]}
-                    </span>
+            {completedReports.map((r) => {
+              const scores = getActiveScores(parseScoreConfig(r.score_config));
+              const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
+              const withValues = scores
+                .map((s) => ({ label: s.label, format: s.format, grade: grades[parseInt(s.key.replace("score", "")) - 1] }))
+                .filter((a) => a.grade != null);
+              const resultLabel = r.result === "passed" ? "עבר" : r.result === "failed" ? "נכשל" : r.result === "na" ? "לא רלוונטי" : null;
+              return (
+                <Link
+                  key={r.id}
+                  href={`/activities/${r.activity_id}`}
+                  className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <p className="text-sm font-medium">{r.activity_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.activity_type_name} · {formatDate(r.activity_date)}
+                    </p>
+                    {withValues.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {withValues.map((a) => `${a.label}: ${formatGradeDisplay(a.grade, a.format)}`).join(" · ")}
+                      </p>
+                    )}
+                    {r.note && (
+                      <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
+                    )}
+                  </div>
+                  {resultLabel && (
+                    <Badge
+                      variant={r.result === "passed" ? "default" : r.result === "na" ? "secondary" : "destructive"}
+                      className={`shrink-0 mt-0.5 text-xs ${r.result === "passed" ? "bg-emerald-600" : ""}`}
+                    >
+                      {resultLabel}
+                    </Badge>
                   )}
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
