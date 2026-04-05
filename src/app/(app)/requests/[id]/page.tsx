@@ -485,6 +485,8 @@ export default function RequestDetailPage() {
                     )}
                   </div>
                   <div className="pb-3 min-w-0 flex-1">
+                    <div className="md:flex md:items-start md:gap-3">
+                    <div className="shrink-0">
                     <p className="text-sm font-medium">
                       {ACTION_LABELS[a.action as RequestActionType] ?? a.action}
                       {" · "}
@@ -493,6 +495,25 @@ export default function RequestDetailPage() {
                     <p className="text-xs text-muted-foreground">
                       {formatDateTime(a.created_at)}
                     </p>
+                    </div>
+                    {!isEditing && a.note && (
+                      <div className="hidden md:flex items-start gap-1 min-w-0 flex-1">
+                        <p className="flex-1 min-w-0 text-sm whitespace-pre-wrap text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
+                          {a.note}
+                        </p>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => { setEditingActionId(a.id); setEditingNoteText(a.note ?? ""); }}
+                            className="shrink-0 mt-1.5 text-muted-foreground hover:text-foreground"
+                            title="ערוך הערה"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    </div>
                     {isEditing ? (
                       <div className="mt-1 space-y-1.5">
                         <textarea
@@ -524,7 +545,7 @@ export default function RequestDetailPage() {
                     ) : (
                       <>
                         {a.note && (
-                          <div className="flex items-start gap-1 mt-1">
+                          <div className="md:hidden flex items-start gap-1 mt-1">
                             <p className="flex-1 text-sm whitespace-pre-wrap text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
                               {a.note}
                             </p>

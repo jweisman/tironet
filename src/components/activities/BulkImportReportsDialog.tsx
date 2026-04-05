@@ -214,17 +214,37 @@ function parseRows(
       }
 
       // Parse grades
+      const getRaw = (idx: number) =>
+        idx >= 0 && idx < row.length ? row[idx] ?? null : null;
       const grades: (number | null)[] = mapping.grades.map((colIdx, scoreIdx) => {
         if (colIdx === UNMAPPED) return null;
-        const raw = get(colIdx);
-        if (!raw) return null;
-        const num = parseGradeInput(String(raw), activeScores[scoreIdx].format);
+        const cellRaw = getRaw(colIdx);
+        if (cellRaw == null || String(cellRaw).trim() === "") return null;
+
+        const format = activeScores[scoreIdx].format;
+
+        // Excel stores time cells (e.g. 3:15) as fractional days (hours:minutes).
+        // When raw: true, we get a float like 0.135416 instead of "3:15".
+        // Excel interprets "3:15" as 3 hours 15 minutes, but for scores we
+        // treat it as 3 minutes 15 seconds. Convert: fractional day → hours
+        // and minutes → reinterpret as minutes and seconds.
+        if (format === "time" && typeof cellRaw === "number" && cellRaw > 0 && cellRaw < 1) {
+          const totalExcelSeconds = Math.round(cellRaw * 86400);
+          const excelHours = Math.floor(totalExcelSeconds / 3600);
+          const excelMinutes = Math.floor((totalExcelSeconds % 3600) / 60);
+          // Reinterpret H:MM as M:SS
+          const scoreSeconds = excelHours * 60 + excelMinutes;
+          return scoreSeconds;
+        }
+
+        const display = String(cellRaw).trim();
+        const num = parseGradeInput(display, format);
         if (num === null) {
-          errors.push(`${activeScores[scoreIdx].label}: ערך לא חוקי "${raw}"`);
+          errors.push(`${activeScores[scoreIdx].label}: ערך לא חוקי "${display}"`);
           return null;
         }
         if (num < 0) {
-          errors.push(`${activeScores[scoreIdx].label}: ערך לא חוקי "${raw}"`);
+          errors.push(`${activeScores[scoreIdx].label}: ערך לא חוקי "${display}"`);
           return null;
         }
         return num;

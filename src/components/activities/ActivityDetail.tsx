@@ -550,7 +550,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 {/* Score column headers (only for multi-score activity types) */}
                 {activeScores.length > 1 && (
                   <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border">
-                    <div className="flex-1" />
+                    <div className="flex-1 min-w-0" />
+                    <div className="hidden md:flex flex-1 min-w-0 text-[10px] text-muted-foreground">הערה</div>
                     <div className="flex shrink-0 mx-2">
                       {activeScores.map((score) => (
                         <span key={score.key} className="w-10 text-center text-[10px] text-muted-foreground truncate">
@@ -578,6 +579,13 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                             </span>
                           )}
                         </div>
+                        {report.note ? (
+                          <p className="hidden md:block flex-1 min-w-0 text-xs text-muted-foreground truncate" title={report.note}>
+                            {report.note}
+                          </p>
+                        ) : activeScores.length > 1 ? (
+                          <div className="hidden md:block flex-1 min-w-0" />
+                        ) : null}
                         {hasGrades && (
                           <div className="flex shrink-0 mx-2">
                             {activeScores.length === 1 && report[activeScores[0].gradeKey] != null && (
@@ -603,7 +611,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                         </div>
                       </div>
                       {report.note && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                        <p className="md:hidden text-xs text-muted-foreground mt-1 truncate">
                           {report.note}
                         </p>
                       )}
