@@ -29,20 +29,28 @@ export async function POST(req: NextRequest) {
 
   const { endpoint, keys } = parsed.data;
 
-  await prisma.pushSubscription.upsert({
-    where: { endpoint },
-    create: {
-      userId: session.user.id,
-      endpoint,
-      p256dh: keys.p256dh,
-      auth: keys.auth,
-    },
-    update: {
-      userId: session.user.id,
-      p256dh: keys.p256dh,
-      auth: keys.auth,
-    },
-  });
+  await prisma.$transaction([
+    prisma.pushSubscription.upsert({
+      where: { endpoint },
+      create: {
+        userId: session.user.id,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      },
+      update: {
+        userId: session.user.id,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      },
+    }),
+    // Ensure the user has a notification preferences row (both enabled by default)
+    prisma.notificationPreference.upsert({
+      where: { userId: session.user.id },
+      create: { userId: session.user.id },
+      update: {},
+    }),
+  ]);
 
   return NextResponse.json({ ok: true });
 }
@@ -62,9 +70,17 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Invalid endpoint" }, { status: 400 });
   }
 
+  const userId = session.user.id;
+
   await prisma.pushSubscription.deleteMany({
-    where: { endpoint: endpoint.data, userId: session.user.id },
+    where: { endpoint: endpoint.data, userId },
   });
+
+  // If this was the user's last subscription, remove their preference row
+  const remaining = await prisma.pushSubscription.count({ where: { userId } });
+  if (remaining === 0) {
+    await prisma.notificationPreference.deleteMany({ where: { userId } });
+  }
 
   return NextResponse.json({ ok: true });
 }

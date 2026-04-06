@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";
+import { sendPushToUsers } from "@/lib/push/send";
 import { z } from "zod";
 import type { SessionUser, Role } from "@/types";
 
@@ -86,6 +88,13 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  // Notify users with the assigned role about the new request
+  after(() =>
+    notifyAssignedRole(data.cycleId, assignedRole).catch((err) =>
+      console.warn("[push] request creation notification failed:", err),
+    ),
+  );
+
   return NextResponse.json({ request: req }, { status: 201 });
 }
 
@@ -119,4 +128,34 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({ requests, role: scope.role });
+}
+
+/**
+ * Find all users assigned to the given role in the cycle and send them
+ * a push notification about a new request requiring their action.
+ */
+async function notifyAssignedRole(cycleId: string, assignedRole: string): Promise<void> {
+  const roles: Role[] = assignedRole === "company_commander"
+    ? ["company_commander", "deputy_company_commander"]
+    : [assignedRole as Role];
+
+  const assignments = await prisma.userCycleAssignment.findMany({
+    where: {
+      cycleId,
+      role: { in: roles },
+    },
+    select: { userId: true },
+  });
+
+  const userIds = [...new Set(assignments.map((a) => a.userId))];
+
+  await sendPushToUsers(
+    userIds,
+    {
+      title: "בקשה חדשה ממתינה לטיפולך",
+      body: "יש בקשה שדורשת את פעולתך",
+      url: "/requests?filter=action",
+    },
+    "requestAssignmentEnabled",
+  );
 }
