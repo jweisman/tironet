@@ -561,7 +561,7 @@ Key components:
 ### Database models
 
 - **`PushSubscription`** — per-device subscription (endpoint, p256dh, auth). One user can have multiple devices. Keyed by `endpoint` (unique).
-- **`NotificationPreference`** — per-user opt-out toggles. One-to-one with User. Missing row = both enabled (opt-out model).
+- **`NotificationPreference`** — per-user opt-out toggles. One-to-one with User. Created automatically when a user subscribes to push; deleted when their last subscription is removed.
 
 Neither model is synced via PowerSync — they are server-only.
 
@@ -578,7 +578,12 @@ Generated once with `npx web-push generate-vapid-keys`. Stored as environment va
 
 1. **Daily Tasks** (scheduled) — Vercel Cron at 20:00 Israel time (17:00 UTC) via `vercel.json`. Counts missing activity reports for today/yesterday per squad commander. Opt-out via `dailyTasksEnabled`.
 
-2. **Request Assignment** (event-driven) — fires inline from `PATCH /api/requests/[id]` when a workflow action sets a new `assignedRole`. Notifies all users with that role in the cycle. Opt-out via `requestAssignmentEnabled`.
+2. **Request Assignment** (event-driven) — fires from three places:
+   - `POST /api/requests` — when a new request is created, notifies users with the initially assigned role
+   - `PATCH /api/requests/[id]` (online path) — when a workflow action (`data.action`) sets a new `assignedRole`
+   - `PATCH /api/requests/[id]` (connector path) — when the PowerSync connector uploads a status/assignedRole change
+
+   Opt-out via `requestAssignmentEnabled`.
 
 ### iOS limitations
 
@@ -588,9 +593,35 @@ iOS Safari only supports push for PWAs **installed to the Home Screen** (since i
 
 The `/api/cron/daily-tasks` endpoint validates `Authorization: Bearer <CRON_SECRET>`. Vercel automatically sends this header for configured cron jobs. Set `CRON_SECRET` in Vercel environment variables.
 
+### PowerSync connector path vs online path — notification gotcha
+
+Because this is an offline-first app, **all user mutations go through PowerSync** (local SQLite → connector → API). The connector uploads workflow actions as two separate operations: a PATCH to `/api/requests/[id]` with `status`/`assignedRole` fields (no `action` field), and a POST to `/api/request-actions` for the audit entry.
+
+This means any server-side logic gated on `data.action` (the online-only workflow path) is **effectively dead code** — it only fires if someone calls the API directly, bypassing PowerSync. When adding side effects (like notifications) to workflow transitions, you must add them to **both** the `if (data.action)` block (online path) **and** the `if (data.status !== undefined || data.assignedRole !== undefined)` block (connector path). Similarly, request creation notifications must be in the `POST /api/requests` handler.
+
+### `after()` is required for fire-and-forget work on Vercel
+
+Vercel serverless functions terminate as soon as the response is sent. A bare `someAsyncWork().catch(...)` promise will be killed before it completes. Use `after()` from `next/server` to keep the function alive until the work finishes:
+
+```typescript
+import { after } from "next/server";
+
+// Inside your route handler, BEFORE returning the response:
+after(() =>
+  sendPushToUsers(userIds, payload, "requestAssignmentEnabled").catch((err) =>
+    console.warn("[push] notification failed:", err),
+  ),
+);
+
+return NextResponse.json({ ... });
+```
+
+This applies to all fire-and-forget work: push notifications, analytics, logging, etc.
+
 ### Adding new notification types
 
 1. Add a new preference field to `NotificationPreference` (Prisma schema + migration).
 2. Add a toggle in the profile page's notifications section.
-3. Call `sendPushToUsers()` with the new preference field name from the trigger point.
-4. The push payload's `url` field determines where the notification click navigates.
+3. Call `sendPushToUsers()` with the new preference field name from the trigger point, wrapped in `after()`.
+4. If the trigger is a workflow action, add the call to **both** the online and connector code paths (see gotcha above).
+5. The push payload's `url` field determines where the notification click navigates.
