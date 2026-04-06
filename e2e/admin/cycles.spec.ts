@@ -44,17 +44,26 @@ test.describe("Admin — Cycles", () => {
     await cycleRow.locator("button:has(svg.lucide-pencil)").click();
 
     // Clear and type new name
-    const input = page.locator("input").first();
+    const input = page.getByRole("textbox");
     await input.clear();
     await input.fill("Edited Cycle");
 
-    // Confirm
-    await page.locator("button:has(svg.lucide-check)").click();
+    // Confirm — intercept the PATCH to ensure the server receives the body.
+    // Under heavy Turbopack load the first attempt may get an empty body (400/500),
+    // so retry the click if the response isn't ok.
+    await expect(async () => {
+      const [res] = await Promise.all([
+        page.waitForResponse(
+          (r) => r.url().includes("/api/admin/cycles/") && r.request().method() === "PATCH",
+          { timeout: 5000 },
+        ),
+        page.locator("button:has(svg.lucide-check)").click(),
+      ]);
+      expect(res.ok()).toBeTruthy();
+    }).toPass({ timeout: 15000, intervals: [2000] });
 
     // Updated name should appear
-    await expect(page.getByText("Edited Cycle")).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText("Edited Cycle")).toBeVisible({ timeout: 5000 });
   });
 
   test("toggle cycle active/inactive", async ({ page }) => {

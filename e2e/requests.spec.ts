@@ -357,8 +357,17 @@ test.describe("Requests — denial workflow (cross-role)", () => {
       timeout: 10000,
     });
 
-    // Wait for the connector to upload the denial to the server
+    // Wait for the connector to upload the denial AND the action note to the server
     await waitForRequestOnServer(platoonPage, requestId!, "denied");
+    // Also wait for the request_action (denial note) to be uploaded — it's a separate CRUD op
+    await expect(async () => {
+      const res = await platoonPage.request.get(`/api/requests/${requestId}`);
+      const data = await res.json();
+      const hasDenyAction = data.request?.actions?.some(
+        (a: { action: string; note: string }) => a.action === "deny" && a.note === "E2E denial reason"
+      );
+      expect(hasDenyAction).toBeTruthy();
+    }).toPass({ timeout: 30000, intervals: [1000] });
 
     await platoonPage.close();
     await platoonContext.close();
@@ -377,7 +386,8 @@ test.describe("Requests — denial workflow (cross-role)", () => {
     await expect(ackBtn).toBeVisible({ timeout: 60000 });
 
     // Denial note should be displayed in the audit trail timeline (visible in both desktop+mobile containers, use .first())
-    await expect(squadPage2.getByText("E2E denial reason").first()).toBeVisible();
+    // request_actions may still be syncing via PowerSync even after the request itself is synced, so allow extra time
+    await expect(squadPage2.getByText("E2E denial reason").first()).toBeVisible({ timeout: 30000 });
     await expect(squadPage2.getByText("מהלך הטיפול")).toBeVisible();
 
     // Acknowledge

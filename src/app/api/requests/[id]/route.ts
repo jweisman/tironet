@@ -50,6 +50,10 @@ export async function GET(
       createdBy: {
         select: { givenName: true, familyName: true },
       },
+      actions: {
+        select: { id: true, action: true, note: true, userId: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
