@@ -170,6 +170,14 @@ export async function PATCH(
         ...(data.specialConditions !== undefined ? { specialConditions: data.specialConditions } : {}),
       },
     });
+
+    // Connector path: notify users assigned to the new role (if role changed)
+    if (data.assignedRole && data.assignedRole !== req.assignedRole) {
+      notifyAssignedRole(req.cycleId, data.assignedRole).catch((err) =>
+        console.warn("[push] request assignment notification failed:", err),
+      );
+    }
+
     return NextResponse.json({ request: updated });
   }
 
