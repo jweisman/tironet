@@ -156,6 +156,8 @@ enum Role {
   platoon_commander
   platoon_sergeant
   squad_commander
+  instructor
+  company_medic
 }
 
 enum UnitType {

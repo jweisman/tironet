@@ -26,7 +26,7 @@ type Props = {
   onCancel: () => void;
 };
 
-const ROLES: Role[] = ["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander"];
+const ROLES: Role[] = ["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander", "instructor", "company_medic"];
 
 export function AssignUserForm({ userId, cycles, structureByCycle, onSuccess, onCancel }: Props) {
   const [cycleId, setCycleId] = useState(cycles[0]?.id ?? "");

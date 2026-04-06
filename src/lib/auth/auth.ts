@@ -165,16 +165,17 @@ async function resolvePowerSyncClaims(assignments: RawAssignment[]): Promise<{
   let squad_id: string | null = null;
 
   for (const a of assignments) {
-    const role = effectiveRole(a.role as import("@/types").Role);
-    if (role === "company_commander") {
+    const role = a.role as import("@/types").Role;
+    const eff = effectiveRole(role);
+    if (eff === "company_commander" || role === "instructor" || role === "company_medic") {
       const platoons = await prisma.platoon.findMany({
         where: { companyId: a.unitId },
         select: { id: true },
       });
       platoons.forEach((p) => platoon_ids.add(p.id));
-    } else if (role === "platoon_commander") {
+    } else if (eff === "platoon_commander") {
       platoon_ids.add(a.unitId);
-    } else if (role === "squad_commander") {
+    } else if (eff === "squad_commander") {
       squad_id = a.unitId;
       const squad = await prisma.squad.findUnique({
         where: { id: a.unitId },

@@ -1,11 +1,36 @@
 import { describe, it, expect } from "vitest";
 import {
+  effectiveRole,
   rolesInvitableBy,
   canInviteRole,
   RANKS,
   ROLE_LABELS,
   UNIT_TYPE_FOR_ROLE,
 } from "../permissions";
+
+describe("effectiveRole", () => {
+  it("maps deputy_company_commander to company_commander", () => {
+    expect(effectiveRole("deputy_company_commander")).toBe("company_commander");
+  });
+
+  it("maps platoon_sergeant to platoon_commander", () => {
+    expect(effectiveRole("platoon_sergeant")).toBe("platoon_commander");
+  });
+
+  it("passes instructor through unchanged", () => {
+    expect(effectiveRole("instructor")).toBe("instructor");
+  });
+
+  it("passes company_medic through unchanged", () => {
+    expect(effectiveRole("company_medic")).toBe("company_medic");
+  });
+
+  it("passes base roles through unchanged", () => {
+    expect(effectiveRole("company_commander")).toBe("company_commander");
+    expect(effectiveRole("platoon_commander")).toBe("platoon_commander");
+    expect(effectiveRole("squad_commander")).toBe("squad_commander");
+  });
+});
 
 describe("rolesInvitableBy", () => {
   it("admin can invite all roles", () => {
@@ -15,7 +40,9 @@ describe("rolesInvitableBy", () => {
     expect(roles).toContain("platoon_commander");
     expect(roles).toContain("platoon_sergeant");
     expect(roles).toContain("squad_commander");
-    expect(roles).toHaveLength(5);
+    expect(roles).toContain("instructor");
+    expect(roles).toContain("company_medic");
+    expect(roles).toHaveLength(7);
   });
 
   it("company_commander can invite lower-ranked roles", () => {
@@ -89,6 +116,24 @@ describe("canInviteRole", () => {
     expect(canInviteRole("squad_commander", "platoon_commander")).toBe(false);
     expect(canInviteRole("squad_commander", "company_commander")).toBe(false);
   });
+
+  it("instructor can invite lower-ranked roles (rank 3)", () => {
+    expect(canInviteRole("instructor", "squad_commander")).toBe(true);
+    expect(canInviteRole("instructor", "platoon_commander")).toBe(true);
+    expect(canInviteRole("instructor", "instructor")).toBe(false);
+    expect(canInviteRole("instructor", "company_commander")).toBe(false);
+  });
+
+  it("company_medic can invite lower-ranked roles (rank 3)", () => {
+    expect(canInviteRole("company_medic", "squad_commander")).toBe(true);
+    expect(canInviteRole("company_medic", "platoon_commander")).toBe(true);
+    expect(canInviteRole("company_medic", "company_medic")).toBe(false);
+  });
+
+  it("company_commander cannot invite instructor or company_medic (same rank)", () => {
+    expect(canInviteRole("company_commander", "instructor")).toBe(false);
+    expect(canInviteRole("company_commander", "company_medic")).toBe(false);
+  });
 });
 
 describe("constants", () => {
@@ -104,6 +149,8 @@ describe("constants", () => {
     expect(ROLE_LABELS.platoon_commander).toBe('מ"מ');
     expect(ROLE_LABELS.platoon_sergeant).toBe('סמ"ח');
     expect(ROLE_LABELS.squad_commander).toBe('מ"כ');
+    expect(ROLE_LABELS.instructor).toBe("מדריך");
+    expect(ROLE_LABELS.company_medic).toBe('חופ"ל');
   });
 
   it("UNIT_TYPE_FOR_ROLE maps roles to unit types", () => {
@@ -112,5 +159,7 @@ describe("constants", () => {
     expect(UNIT_TYPE_FOR_ROLE.platoon_commander).toBe("platoon");
     expect(UNIT_TYPE_FOR_ROLE.platoon_sergeant).toBe("platoon");
     expect(UNIT_TYPE_FOR_ROLE.squad_commander).toBe("squad");
+    expect(UNIT_TYPE_FOR_ROLE.instructor).toBe("company");
+    expect(UNIT_TYPE_FOR_ROLE.company_medic).toBe("company");
   });
 });

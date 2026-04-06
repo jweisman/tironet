@@ -16,6 +16,8 @@ export function effectiveRole(role: Role): Role {
 const ROLE_RANK: Record<Role, number> = {
   company_commander: 3,
   deputy_company_commander: 3,
+  instructor: 3,
+  company_medic: 3,
   platoon_commander: 2,
   platoon_sergeant: 2,
   squad_commander: 1,
@@ -24,6 +26,8 @@ const ROLE_RANK: Record<Role, number> = {
 export const ROLE_LABELS: Record<Role, string> = {
   company_commander: 'מ"פ',
   deputy_company_commander: 'סמ"פ',
+  instructor: "מדריך",
+  company_medic: 'חופ"ל',
   platoon_commander: 'מ"מ',
   platoon_sergeant: 'סמ"ח',
   squad_commander: 'מ"כ',
@@ -32,6 +36,8 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const UNIT_TYPE_FOR_ROLE: Record<Role, "company" | "platoon" | "squad"> = {
   company_commander: "company",
   deputy_company_commander: "company",
+  instructor: "company",
+  company_medic: "company",
   platoon_commander: "platoon",
   platoon_sergeant: "platoon",
   squad_commander: "squad",

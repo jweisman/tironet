@@ -175,8 +175,9 @@ export default function SoldiersPage() {
   const searchParams = useSearchParams();
 
   const syncStatus = useStatus();
-  const rawRole = selectedAssignment?.role ?? "";
+  const rawRole = (selectedAssignment?.role ?? "") as Role | "";
   const role = rawRole ? effectiveRole(rawRole as Role) : "";
+  const noAccess = rawRole === "instructor" || rawRole === "company_medic";
 
   // -------- PowerSync queries --------
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
@@ -340,6 +341,15 @@ export default function SoldiersPage() {
       setMarkingNa(false);
       setLateJoinerInfo(null);
     }
+  }
+
+  if (noAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
+        <p className="text-lg font-medium">אין גישה לעמוד זה</p>
+        <p className="text-muted-foreground text-sm">עמוד החיילים אינו זמין עבור תפקיד זה.</p>
+      </div>
+    );
   }
 
   if (!selectedCycleId) {

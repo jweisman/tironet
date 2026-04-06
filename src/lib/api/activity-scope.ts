@@ -5,11 +5,11 @@ import type { SessionUser, CycleAssignment } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 
 export interface ActivityScope {
-  role: "squad_commander" | "platoon_commander" | "company_commander";
+  role: "squad_commander" | "platoon_commander" | "company_commander" | "instructor";
   platoonIds: string[];
   platoons: { id: string; name: string }[]; // id + name for create form
   squadId?: string; // only for squad_commander
-  canCreate: boolean; // platoon_commander & company_commander
+  canCreate: boolean; // platoon_commander, company_commander & instructor
   canEditMetadataForPlatoon: (platoonId: string) => boolean;
 }
 
@@ -99,6 +99,22 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
       platoons,
       canCreate: true,
       canEditMetadataForPlatoon: (pid: string) => platoons.some((p) => p.id === pid),
+    };
+    return { scope, error: null, user };
+  }
+
+  if (assignment.role === "instructor") {
+    // Company-level: can create activities but not edit metadata
+    const platoons = await prisma.platoon.findMany({
+      where: { companyId: assignment.unitId },
+      select: { id: true, name: true },
+    });
+    const scope: ActivityScope = {
+      role: "instructor",
+      platoonIds: platoons.map((p) => p.id),
+      platoons,
+      canCreate: true,
+      canEditMetadataForPlatoon: () => false,
     };
     return { scope, error: null, user };
   }

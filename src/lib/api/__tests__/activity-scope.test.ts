@@ -180,4 +180,50 @@ describe("getActivityScope", () => {
     expect(result.scope!.canCreate).toBe(true);
     expect(result.scope!.canEditMetadataForPlatoon("p1")).toBe(true);
   });
+
+  it("resolves instructor scope: company-level, canCreate but no metadata edit", async () => {
+    const user = mockSessionUser({
+      cycleAssignments: [
+        mockAssignment({
+          cycleId: "cycle-1",
+          role: "instructor",
+          unitType: "company",
+          unitId: "company-1",
+        }),
+      ],
+    });
+    mockAuth.mockResolvedValue({ user } as never);
+
+    const platoons = [
+      { id: "p1", name: "P1" },
+      { id: "p2", name: "P2" },
+    ];
+    mockPrisma.platoon.findMany.mockResolvedValue(platoons as never);
+
+    const result = await getActivityScope("cycle-1");
+    expect(result.scope!.role).toBe("instructor");
+    expect(result.scope!.platoonIds).toEqual(["p1", "p2"]);
+    expect(result.scope!.platoons).toEqual(platoons);
+    expect(result.scope!.canCreate).toBe(true);
+    expect(result.scope!.canEditMetadataForPlatoon("p1")).toBe(false);
+    expect(result.scope!.canEditMetadataForPlatoon("p2")).toBe(false);
+  });
+
+  it("returns 403 for company_medic (no activity access)", async () => {
+    const user = mockSessionUser({
+      cycleAssignments: [
+        mockAssignment({
+          cycleId: "cycle-1",
+          role: "company_medic",
+          unitType: "company",
+          unitId: "company-1",
+        }),
+      ],
+    });
+    mockAuth.mockResolvedValue({ user } as never);
+
+    const result = await getActivityScope("cycle-1");
+    expect(result.scope).toBeNull();
+    expect(result.error!.status).toBe(403);
+  });
 });

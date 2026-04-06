@@ -297,6 +297,49 @@ The requests list page (`/requests`) has two tabs:
 
 Open requests are sorted with "assigned to me" first.
 
+## Roles and Access Control
+
+### Role hierarchy
+
+| Role | `effectiveRole()` maps to | Rank | Unit Type | Description |
+|---|---|---|---|---|
+| `company_commander` | (self) | 3 | company | Full access to all data in their company |
+| `deputy_company_commander` | `company_commander` | 3 | company | Same permissions as company commander |
+| `instructor` | (self) | 3 | company | Activities and activity reports only — no soldiers page, no requests |
+| `company_medic` | (self) | 3 | company | Requests (medical only on list page) and request reports only — no activities, no soldiers page |
+| `platoon_commander` | (self) | 2 | platoon | Full access within their platoon |
+| `platoon_sergeant` | `platoon_commander` | 2 | platoon | Same permissions as platoon commander |
+| `squad_commander` | (self) | 1 | squad | Access to their own squad only |
+
+### `effectiveRole()` — deputy role mapping
+
+`effectiveRole()` maps `deputy_company_commander` → `company_commander` and `platoon_sergeant` → `platoon_commander`. The new roles (`instructor`, `company_medic`) pass through unchanged because they have distinct access patterns that differ from `company_commander`.
+
+### Instructor (`instructor` / מדריך)
+
+- **Unit type:** company — assigned to a company, sees all platoons in that company
+- **Activities:** can view, create (single + bulk, including "all platoons" option), and edit activity reports for all squads
+- **Cannot access:** soldiers page, requests page, request reports
+- **Navigation:** sees only Home + Activities + Reports (activity reports section only)
+- **PowerSync claims:** gets `platoon_ids` expanded from company, same as company commanders
+- **Scope functions:** `getActivityScope()` returns `role: "instructor"`, `canCreate: true`, `canEditMetadataForPlatoon: () => false`
+
+### Company Medic (`company_medic` / חופ"ל)
+
+- **Unit type:** company — assigned to a company, sees all platoons in that company
+- **Requests:** can view all request types but the list page filters to medical only; can add notes and edit request details but **cannot perform workflow actions** (approve/deny/acknowledge) — `getAvailableActions()` returns `[]` since medic doesn't match any `assignedRole`
+- **Cannot access:** soldiers page, activities page, activity reports
+- **Navigation:** sees only Home + Requests + Reports (request reports section only, forced to medical type)
+- **Scope functions:** `getRequestScope()` returns `role: "company_medic"`, `canCreate: false`
+
+### Page access guards
+
+Navigation (Sidebar/TabBar) filters out inaccessible pages, but pages also guard against direct URL access:
+- `/soldiers` — blocks `instructor` and `company_medic`
+- `/activities` — blocks `company_medic`
+- `/requests` — blocks `instructor`
+- `/reports` — conditionally shows activity reports section (hidden for medic) and request reports section (hidden for instructor)
+
 ## API Conventions
 
 - All protected routes call `auth()` from `@/lib/auth/auth` and check `session.user`

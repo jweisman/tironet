@@ -23,6 +23,8 @@ const ROLE_SHORT: Record<string, string> = {
   platoon_sergeant: 'סמ"ח',
   company_commander: 'מ"פ',
   deputy_company_commander: 'סמ"פ',
+  instructor: "מדריך",
+  company_medic: 'חופ"ל',
 };
 
 // ---------------------------------------------------------------------------
@@ -364,7 +366,7 @@ export default function HomePage() {
   }
   const platoons = Array.from(platoonMap.values());
 
-  const isCompany = role === "company_commander";
+  const isCompany = role === "company_commander" || rawRole === "instructor" || rawRole === "company_medic";
   const isPlatoon = role === "platoon_commander";
 
   return (

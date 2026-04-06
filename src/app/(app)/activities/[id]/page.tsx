@@ -145,6 +145,7 @@ export default function ActivityPage() {
         const canEdit =
           role === "platoon_commander" ||
           role === "company_commander" ||
+          role === "instructor" ||
           (role === "squad_commander" && sq.id === squadId);
 
         const soldiers = (soldiersRows ?? [])
