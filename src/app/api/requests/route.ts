@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";
 import { sendPushToUsers } from "@/lib/push/send";
@@ -88,8 +89,10 @@ export async function POST(request: NextRequest) {
   });
 
   // Notify users with the assigned role about the new request
-  notifyAssignedRole(data.cycleId, assignedRole).catch((err) =>
-    console.warn("[push] request creation notification failed:", err),
+  after(() =>
+    notifyAssignedRole(data.cycleId, assignedRole).catch((err) =>
+      console.warn("[push] request creation notification failed:", err),
+    ),
   );
 
   return NextResponse.json({ request: req }, { status: 201 });

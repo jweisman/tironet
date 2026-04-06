@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";
 import { getNextState } from "@/lib/requests/workflow";
@@ -135,9 +136,10 @@ export async function PATCH(
 
     // Send push notification to users with the newly assigned role
     if (transition.newAssignedRole) {
-      // Fire and forget — don't block the response
-      notifyAssignedRole(req.cycleId, transition.newAssignedRole).catch((err) =>
-        console.warn("[push] request assignment notification failed:", err),
+      after(() =>
+        notifyAssignedRole(req.cycleId, transition.newAssignedRole!).catch((err) =>
+          console.warn("[push] request assignment notification failed:", err),
+        ),
       );
     }
 
@@ -173,8 +175,10 @@ export async function PATCH(
 
     // Connector path: notify users assigned to the new role (if role changed)
     if (data.assignedRole && data.assignedRole !== req.assignedRole) {
-      notifyAssignedRole(req.cycleId, data.assignedRole).catch((err) =>
-        console.warn("[push] request assignment notification failed:", err),
+      after(() =>
+        notifyAssignedRole(req.cycleId, data.assignedRole!).catch((err) =>
+          console.warn("[push] request assignment notification failed:", err),
+        ),
       );
     }
 
