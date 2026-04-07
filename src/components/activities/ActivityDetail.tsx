@@ -170,7 +170,17 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
       setSaveError(null);
 
       try {
-        if (report.id) {
+        if (report.id && report.result === null) {
+          // Result cleared — delete the entire report row so the server
+          // removes it too (issue #75). PowerSync queues a DELETE operation
+          // that the connector uploads via DELETE /api/activity-reports/:id.
+          await db.execute("DELETE FROM activity_reports WHERE id = ?", [report.id]);
+          setReports((prev) => {
+            const next = new Map(prev);
+            next.set(soldierId, { ...EMPTY_REPORT });
+            return next;
+          });
+        } else if (report.id) {
           await db.execute(
             "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
             [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, report.id]

@@ -17,12 +17,13 @@ vi.mock("@/lib/db/prisma", () => ({
       upsert: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
     },
   },
 }));
 
 import { POST } from "../route";
-import { PATCH } from "../[id]/route";
+import { PATCH, DELETE } from "../[id]/route";
 import { getActivityScope } from "@/lib/api/activity-scope";
 import { prisma } from "@/lib/db/prisma";
 import { createMockRequest, mockSessionUser } from "@/__tests__/helpers/api";
@@ -379,5 +380,65 @@ describe("PATCH /api/activity-reports/[id]", () => {
     expect(json.report.result).toBe("failed");
     expect(json.report.grade1).toBe(70);
     expect(json.report.note).toBe("Updated note");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/activity-reports/[id]
+// ---------------------------------------------------------------------------
+
+describe("DELETE /api/activity-reports/[id]", () => {
+  it("returns 404 when report not found", async () => {
+    mockPrisma.activityReport.findUnique.mockResolvedValue(null as never);
+
+    const req = createMockRequest("DELETE", "/api/activity-reports/r-999");
+    const res = await DELETE(req, makeParams("r-999"));
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when user cannot edit the report", async () => {
+    mockPrisma.activityReport.findUnique.mockResolvedValue({
+      id: "r-1",
+      activity: { cycleId: "cycle-1", platoonId: "platoon-1" },
+      soldier: { squadId: "squad-other", squad: { platoonId: "platoon-1" } },
+    } as never);
+
+    const scope = makeSquadCommanderScope({ squadId: "squad-1" });
+    mockGetActivityScope.mockResolvedValue({
+      scope,
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    const req = createMockRequest("DELETE", "/api/activity-reports/r-1");
+    const res = await DELETE(req, makeParams("r-1"));
+    expect(res.status).toBe(403);
+  });
+
+  it("deletes report successfully", async () => {
+    mockPrisma.activityReport.findUnique.mockResolvedValue({
+      id: "r-1",
+      activity: { cycleId: "cycle-1", platoonId: "platoon-1" },
+      soldier: { squadId: "squad-1", squad: { platoonId: "platoon-1" } },
+    } as never);
+
+    const scope = makePlatoonCommanderScope();
+    mockGetActivityScope.mockResolvedValue({
+      scope,
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    mockPrisma.activityReport.delete.mockResolvedValue({ id: "r-1" } as never);
+
+    const req = createMockRequest("DELETE", "/api/activity-reports/r-1");
+    const res = await DELETE(req, makeParams("r-1"));
+    expect(res.status).toBe(200);
+
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(mockPrisma.activityReport.delete).toHaveBeenCalledWith({
+      where: { id: "r-1" },
+    });
   });
 });
