@@ -304,13 +304,23 @@ Request creation and workflow actions (approve/deny/acknowledge) write to the lo
 ### List page filtering
 
 The requests list page (`/requests`) has three tabs:
-- **Open** (`פתוחות`): requests where `status === "open"` (undecided, still being reviewed)
-- **Approved** (`אושרו`): requests where `status === "approved"` (includes both pending-ack and fully completed)
-- **Requires my action** (`דורשות טיפולי`): requests where `assignedRole !== null && canActOnRequest(userRole, assignedRole)` — cross-cuts open and approved tabs
+- **Open** (`פתוחות`): requests where `status === "open"` (undecided, still being reviewed). Sorted with "assigned to me" first.
+- **Active** (`פעילות`): approved requests that are currently relevant, defined per type:
+  - **Leave**: `departureAt >= today` OR `returnAt >= today` (upcoming or currently on leave)
+  - **Medical**: any appointment in `medicalAppointments` JSON array has `date >= today`
+  - **Hardship**: always active (no date criterion)
+  - Sorted by soonest relevant date first (departure date for leave, next appointment for medical). Hardship sorts last (no activity date).
+- **Requires my action** (`דורשות טיפולי`): requests where `assignedRole !== null && canActOnRequest(userRole, assignedRole)` — cross-cuts open and active statuses
 
-Denied requests pending acknowledgement (`status === "denied"`, `assignedRole !== null`) appear **only** in the "requires my action" tab — not in "open" or "approved". Completed denied requests (`assignedRole === null`) do not appear in any tab.
+Denied requests pending acknowledgement (`status === "denied"`, `assignedRole !== null`) appear **only** in the "requires my action" tab — not in "open" or "active". Completed denied requests (`assignedRole === null`) do not appear in any tab.
 
-Open requests are sorted with "assigned to me" first.
+### Soldiers page "active requests" filter
+
+The soldiers page has a "בקשות פעילות" filter pill that shows soldiers with any request activity. A soldier passes the filter if they have `openRequestCount > 0` (pending workflow requests) **or** `approvedRequestTypes.length > 0` (active approved requests from `APPROVED_REQUESTS_QUERY`). The `APPROVED_REQUESTS_QUERY` uses the same active definition as the requests list Active tab — leave with future dates, medical with future appointments, or hardship.
+
+### Soldier detail page — full request history
+
+The soldier detail page (`/soldiers/[id]`) shows **all** requests for the soldier in the current cycle, including completed denials and fully acknowledged approvals. This gives a complete picture of the soldier's request history.
 
 ### Badge count scoping (`useRequestBadge`)
 
