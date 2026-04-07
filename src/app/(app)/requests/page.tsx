@@ -22,12 +22,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { canActOnRequest } from "@/lib/requests/workflow";
+import { parseMedicalAppointments, hasUpcomingAppointment } from "@/lib/requests/medical-appointments";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type ViewTab = "open" | "approved" | "mine";
+type ViewTab = "open" | "active" | "mine";
 
 // ---------------------------------------------------------------------------
 // SQL queries (PowerSync local SQLite)
@@ -36,7 +37,7 @@ type ViewTab = "open" | "approved" | "mine";
 const REQUESTS_QUERY = `
   SELECT
     r.id, r.type, r.status, r.assigned_role, r.description, r.urgent,
-    r.created_at,
+    r.created_at, r.departure_at, r.return_at, r.medical_appointments,
     s.family_name || ' ' || s.given_name AS soldier_name,
     s.squad_id,
     sq.name AS squad_name,
@@ -56,6 +57,9 @@ interface RawRequest {
   description: string | null;
   urgent: number | null;
   created_at: string;
+  departure_at: string | null;
+  return_at: string | null;
+  medical_appointments: string | null;
   soldier_name: string;
   squad_id: string;
   squad_name: string;
@@ -75,16 +79,40 @@ function mapRequest(raw: RawRequest): RequestSummary {
     createdAt: raw.created_at,
     description: raw.description,
     urgent: raw.urgent != null ? Boolean(raw.urgent) : null,
+    departureAt: raw.departure_at,
+    returnAt: raw.return_at,
+    medicalAppointments: raw.medical_appointments,
   };
 }
 
-function formatDayHeader(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("he-IL", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+function isActiveRequest(r: RequestSummary, today: string): boolean {
+  if (r.status !== "approved") return false;
+  if (r.type === "hardship") return true;
+  if (r.type === "leave") {
+    const dep = r.departureAt?.split("T")[0];
+    const ret = r.returnAt?.split("T")[0];
+    return (dep != null && dep >= today) || (ret != null && ret >= today);
+  }
+  if (r.type === "medical") {
+    const appts = parseMedicalAppointments(r.medicalAppointments);
+    return hasUpcomingAppointment(appts);
+  }
+  return false;
+}
+
+/** Sort key for active requests: soonest relevant date first. */
+function activeRequestSortDate(r: RequestSummary): string {
+  if (r.type === "leave") {
+    return r.departureAt?.split("T")[0] ?? r.returnAt?.split("T")[0] ?? "9999";
+  }
+  if (r.type === "medical") {
+    const today = new Date().toISOString().split("T")[0];
+    const appts = parseMedicalAppointments(r.medicalAppointments);
+    const next = appts.find((a) => a.date >= today);
+    return next?.date ?? "9999";
+  }
+  // Hardship: no activity date, sort last
+  return "9999";
 }
 
 // ---------------------------------------------------------------------------
@@ -123,8 +151,8 @@ export default function RequestsPage() {
   const [viewTab, setViewTab] = useState<ViewTab>(
     searchParams.get("filter") === "mine"
       ? "mine"
-      : searchParams.get("tab") === "approved"
-        ? "approved"
+      : searchParams.get("tab") === "active"
+        ? "active"
         : "open"
   );
   const [filterType, setFilterType] = useState<RequestType | "all">("all");
@@ -137,21 +165,15 @@ export default function RequestsPage() {
     [allRequests, filterType],
   );
 
-  const approvedRequests = useMemo(
-    () => allRequests.filter((r) => r.status === "approved" && (filterType === "all" || r.type === filterType)),
-    [allRequests, filterType],
-  );
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  // Group approved by day
-  const approvedByDay = useMemo(() => {
-    const groups = new Map<string, RequestSummary[]>();
-    for (const r of approvedRequests) {
-      const day = r.createdAt.split("T")[0];
-      if (!groups.has(day)) groups.set(day, []);
-      groups.get(day)!.push(r);
-    }
-    return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a));
-  }, [approvedRequests]);
+  const activeRequests = useMemo(
+    () =>
+      allRequests
+        .filter((r) => isActiveRequest(r, today) && (filterType === "all" || r.type === filterType))
+        .sort((a, b) => activeRequestSortDate(a).localeCompare(activeRequestSortDate(b))),
+    [allRequests, filterType, today],
+  );
 
   // Sort open: assigned to me first
   const sortedOpen = useMemo(() => {
@@ -221,16 +243,16 @@ export default function RequestsPage() {
 
           <button
             type="button"
-            onClick={() => setViewTab("approved")}
+            onClick={() => setViewTab("active")}
             className={cn(
               "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-              viewTab === "approved"
+              viewTab === "active"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:text-foreground",
             )}
           >
-            אושרו
-            {approvedRequests.length > 0 && <span className="mr-1">({approvedRequests.length})</span>}
+            פעילות
+            {activeRequests.length > 0 && <span className="mr-1">({activeRequests.length})</span>}
           </button>
 
           {role && !isMedic && (
@@ -344,33 +366,26 @@ export default function RequestsPage() {
           </>
         )}
 
-        {/* Approved requests grouped by day */}
-        {viewTab === "approved" && (
+        {/* Active requests */}
+        {viewTab === "active" && (
           <>
-            {approvedByDay.length === 0 && syncStatus.hasSynced && (
+            {activeRequests.length === 0 && syncStatus.hasSynced && (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
-                <p className="font-medium">אין בקשות שאושרו</p>
+                <p className="font-medium">אין בקשות פעילות</p>
               </div>
             )}
-            {approvedByDay.map(([day, requests]) => (
-              <div key={day}>
-                <div className="sticky top-[52px] z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {formatDayHeader(day)}
-                  </p>
-                </div>
-                <div className="divide-y divide-border">
-                  {requests.map((r) => (
-                    <RequestCard
-                      key={r.id}
-                      request={r}
-                      userRole={rawRole as Role}
-                      onClick={() => router.push(`/requests/${r.id}`)}
-                    />
-                  ))}
-                </div>
+            {activeRequests.length > 0 && (
+              <div className="divide-y divide-border">
+                {activeRequests.map((r) => (
+                  <RequestCard
+                    key={r.id}
+                    request={r}
+                    userRole={rawRole as Role}
+                    onClick={() => router.push(`/requests/${r.id}`)}
+                  />
+                ))}
               </div>
-            ))}
+            )}
           </>
         )}
       </div>

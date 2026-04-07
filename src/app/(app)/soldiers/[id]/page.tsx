@@ -131,12 +131,11 @@ const MISSING_QUERY = `
   ORDER BY a.date DESC
 `;
 
-// Requests for this soldier (outstanding or approved)
+// All requests for this soldier (full history)
 const SOLDIER_REQUESTS_QUERY = `
   SELECT r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.created_at
   FROM requests r
   WHERE r.soldier_id = ?
-    AND (r.assigned_role IS NOT NULL OR r.status = 'approved')
   ORDER BY r.created_at DESC
 `;
 

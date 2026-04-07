@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { canActOnRequest } from "../workflow";
-import type { RequestStatus, Role } from "@/types";
+import { parseMedicalAppointments, hasUpcomingAppointment } from "../medical-appointments";
+import type { RequestStatus, RequestType, Role } from "@/types";
 
 // ---------------------------------------------------------------------------
 // These predicates mirror the filters used on the requests list page.
-// Open tab:     status === "open"
-// Approved tab: status === "approved"
-// Mine tab:     assignedRole !== null && canActOnRequest(userRole, assignedRole)
+// Open tab:   status === "open"
+// Active tab: status === "approved" AND type-specific date criteria
+// Mine tab:   assignedRole !== null && canActOnRequest(userRole, assignedRole)
 // ---------------------------------------------------------------------------
 
 interface RequestState {
@@ -18,8 +19,26 @@ function isInOpenTab(r: RequestState): boolean {
   return r.status === "open";
 }
 
-function isInApprovedTab(r: RequestState): boolean {
-  return r.status === "approved";
+interface ActiveRequestState extends RequestState {
+  type: RequestType;
+  departureAt?: string | null;
+  returnAt?: string | null;
+  medicalAppointments?: string | null;
+}
+
+function isInActiveTab(r: ActiveRequestState, today: string): boolean {
+  if (r.status !== "approved") return false;
+  if (r.type === "hardship") return true;
+  if (r.type === "leave") {
+    const dep = r.departureAt?.split("T")[0];
+    const ret = r.returnAt?.split("T")[0];
+    return (dep != null && dep >= today) || (ret != null && ret >= today);
+  }
+  if (r.type === "medical") {
+    const appts = parseMedicalAppointments(r.medicalAppointments);
+    return hasUpcomingAppointment(appts);
+  }
+  return false;
 }
 
 function isInMineTab(r: RequestState, userRole: Role): boolean {
@@ -62,30 +81,83 @@ describe("request tab classification", () => {
     });
   });
 
-  describe("approved tab includes only status=approved", () => {
-    it.each([
-      ["open → platoon_commander", false],
-      ["open → company_commander", false],
-      ["approved → platoon_commander (ack)", true],
-      ["approved → squad_commander (ack)", true],
-      ["denied → platoon_commander (ack)", false],
-      ["denied → squad_commander (ack)", false],
-      ["approved → done", true],
-      ["denied → done", false],
-    ])("%s → inApprovedTab=%s", (label, expected) => {
-      const { state } = STATES.find((s) => s.label === label)!;
-      expect(isInApprovedTab(state)).toBe(expected);
+  describe("active tab filters by type-specific date criteria", () => {
+    const today = "2026-04-07";
+
+    it("hardship approved requests are always active", () => {
+      expect(isInActiveTab({ status: "approved", assignedRole: null, type: "hardship" }, today)).toBe(true);
+    });
+
+    it("hardship approved pending ack are active", () => {
+      expect(isInActiveTab({ status: "approved", assignedRole: "squad_commander", type: "hardship" }, today)).toBe(true);
+    });
+
+    it("leave with future departureAt is active", () => {
+      expect(isInActiveTab({
+        status: "approved", assignedRole: null, type: "leave",
+        departureAt: "2026-04-08T08:00:00Z", returnAt: "2026-04-10T20:00:00Z",
+      }, today)).toBe(true);
+    });
+
+    it("leave with past departureAt but future returnAt is active (currently on leave)", () => {
+      expect(isInActiveTab({
+        status: "approved", assignedRole: null, type: "leave",
+        departureAt: "2026-04-05T08:00:00Z", returnAt: "2026-04-08T20:00:00Z",
+      }, today)).toBe(true);
+    });
+
+    it("leave with both dates in past is not active", () => {
+      expect(isInActiveTab({
+        status: "approved", assignedRole: null, type: "leave",
+        departureAt: "2026-04-01T08:00:00Z", returnAt: "2026-04-03T20:00:00Z",
+      }, today)).toBe(false);
+    });
+
+    it("leave with null dates is not active", () => {
+      expect(isInActiveTab({
+        status: "approved", assignedRole: null, type: "leave",
+        departureAt: null, returnAt: null,
+      }, today)).toBe(false);
+    });
+
+    it("medical with future appointment is active", () => {
+      expect(isInActiveTab({
+        status: "approved", assignedRole: null, type: "medical",
+        medicalAppointments: JSON.stringify([{ id: "a1", date: "2026-04-10", place: "Hospital", type: "Checkup" }]),
+      }, today)).toBe(true);
+    });
+
+    it("medical with all past appointments is not active", () => {
+      expect(isInActiveTab({
+        status: "approved", assignedRole: null, type: "medical",
+        medicalAppointments: JSON.stringify([{ id: "a1", date: "2026-04-01", place: "Hospital", type: "Checkup" }]),
+      }, today)).toBe(false);
+    });
+
+    it("medical with null appointments is not active", () => {
+      expect(isInActiveTab({
+        status: "approved", assignedRole: null, type: "medical",
+        medicalAppointments: null,
+      }, today)).toBe(false);
+    });
+
+    it("non-approved requests are never active", () => {
+      expect(isInActiveTab({ status: "open", assignedRole: "platoon_commander", type: "hardship" }, today)).toBe(false);
+      expect(isInActiveTab({ status: "denied", assignedRole: null, type: "hardship" }, today)).toBe(false);
     });
   });
 
-  describe("denied-pending-ack never appears in open or approved tabs", () => {
+  describe("denied-pending-ack never appears in open or active tabs", () => {
     const deniedPending = STATES.filter((s) => s.state.status === "denied" && s.state.assignedRole !== null);
+    const today = "2026-04-07";
 
     it.each(deniedPending.map((s) => [s.label, s.state] as const))(
-      "%s → not in open, not in approved",
+      "%s → not in open, not in active",
       (_label, state) => {
         expect(isInOpenTab(state)).toBe(false);
-        expect(isInApprovedTab(state)).toBe(false);
+        // Denied requests are never active regardless of type
+        expect(isInActiveTab({ ...state, type: "leave", departureAt: "2099-01-01T00:00:00Z", returnAt: "2099-01-02T00:00:00Z" }, today)).toBe(false);
+        expect(isInActiveTab({ ...state, type: "hardship" }, today)).toBe(false);
       },
     );
   });
@@ -147,5 +219,85 @@ describe("mine tab classification", () => {
       const { state } = STATES.find((s) => s.label === label)!;
       expect(isInMineTab(state, role)).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Active request sort order
+// ---------------------------------------------------------------------------
+
+interface SortableRequest {
+  type: RequestType;
+  departureAt?: string | null;
+  returnAt?: string | null;
+  medicalAppointments?: string | null;
+  createdAt?: string;
+}
+
+/** Mirrors activeRequestSortDate from the requests page. */
+function activeRequestSortDate(r: SortableRequest): string {
+  if (r.type === "leave") {
+    return r.departureAt?.split("T")[0] ?? r.returnAt?.split("T")[0] ?? "9999";
+  }
+  if (r.type === "medical") {
+    const today = new Date().toISOString().split("T")[0];
+    const appts = parseMedicalAppointments(r.medicalAppointments);
+    const next = appts.find((a) => a.date >= today);
+    return next?.date ?? "9999";
+  }
+  // Hardship: no activity date, sort last
+  return "9999";
+}
+
+describe("active request sort order", () => {
+  it("leave requests sort by departure date, soonest first", () => {
+    const a: SortableRequest = { type: "leave", departureAt: "2026-04-10T08:00:00Z", returnAt: "2026-04-12T20:00:00Z" };
+    const b: SortableRequest = { type: "leave", departureAt: "2026-04-08T08:00:00Z", returnAt: "2026-04-09T20:00:00Z" };
+    const sorted = [a, b].sort((x, y) => activeRequestSortDate(x).localeCompare(activeRequestSortDate(y)));
+    expect(sorted).toEqual([b, a]);
+  });
+
+  it("leave with null departureAt falls back to returnAt", () => {
+    const a: SortableRequest = { type: "leave", departureAt: null, returnAt: "2026-04-12T20:00:00Z" };
+    expect(activeRequestSortDate(a)).toBe("2026-04-12");
+  });
+
+  it("medical requests sort by earliest upcoming appointment", () => {
+    const a: SortableRequest = {
+      type: "medical",
+      medicalAppointments: JSON.stringify([
+        { id: "1", date: "2026-04-15", place: "A", type: "X" },
+        { id: "2", date: "2026-04-20", place: "B", type: "Y" },
+      ]),
+    };
+    const b: SortableRequest = {
+      type: "medical",
+      medicalAppointments: JSON.stringify([
+        { id: "3", date: "2026-04-09", place: "C", type: "Z" },
+      ]),
+    };
+    const sorted = [a, b].sort((x, y) => activeRequestSortDate(x).localeCompare(activeRequestSortDate(y)));
+    expect(sorted).toEqual([b, a]);
+  });
+
+  it("hardship requests always sort last", () => {
+    const a: SortableRequest = { type: "hardship", createdAt: "2026-04-05T10:00:00Z" };
+    const b: SortableRequest = { type: "hardship", createdAt: "2026-04-02T10:00:00Z" };
+    // Both get "9999", so relative order is stable (no reordering)
+    expect(activeRequestSortDate(a)).toBe("9999");
+    expect(activeRequestSortDate(b)).toBe("9999");
+  });
+
+  it("mixed types: leave and medical sort by date, hardship sorts last", () => {
+    const leave: SortableRequest = { type: "leave", departureAt: "2026-04-12T08:00:00Z" };
+    const medical: SortableRequest = {
+      type: "medical",
+      medicalAppointments: JSON.stringify([{ id: "1", date: "2026-04-09", place: "A", type: "X" }]),
+    };
+    const hardship: SortableRequest = { type: "hardship", createdAt: "2026-04-01T10:00:00Z" };
+    const sorted = [hardship, leave, medical].sort((x, y) =>
+      activeRequestSortDate(x).localeCompare(activeRequestSortDate(y)),
+    );
+    expect(sorted).toEqual([medical, leave, hardship]);
   });
 });

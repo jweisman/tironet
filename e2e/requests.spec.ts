@@ -108,12 +108,12 @@ test.describe("Requests — squad commander", () => {
     await expect(page.getByText('ממתין למ"מ')).toBeVisible({ timeout: 10000 });
   });
 
-  test("sees open and approved tabs", async ({ page }) => {
+  test("sees open and active tabs", async ({ page }) => {
     await gotoRequestsPage(page);
 
     // Verify the page loads (open tab is default)
     await expect(page.getByRole("button", { name: /פתוחות/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /אושרו/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /פעילות/ })).toBeVisible();
   });
 });
 
@@ -138,15 +138,15 @@ test.describe("Requests — platoon commander", () => {
     await expect(page.getByText(soldierName).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test("request list shows open and approved tabs", async ({ page }) => {
+  test("request list shows open and active tabs", async ({ page }) => {
     await gotoRequestsPage(page);
 
     // Both tabs should be visible
     await expect(page.getByRole("button", { name: /פתוחות/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /אושרו/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /פעילות/ })).toBeVisible();
 
-    // Switch to approved tab
-    await page.getByRole("button", { name: /אושרו/ }).click();
+    // Switch to active tab
+    await page.getByRole("button", { name: /פעילות/ }).click();
   });
 
   test("'assigned to me' filter works", async ({ page }) => {
