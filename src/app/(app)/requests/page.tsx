@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Bell } from "lucide-react";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
+import { usePowerSync } from "@powersync/react";
 import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
 import { RequestCard, type RequestSummary } from "@/components/requests/RequestCard";
 import { CreateRequestForm } from "@/components/requests/CreateRequestForm";
+import { ContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
-import { canActOnRequest } from "@/lib/requests/workflow";
+import { canActOnRequest, getAvailableActions, getNextState } from "@/lib/requests/workflow";
 import { parseMedicalAppointments, hasUpcomingAppointment } from "@/lib/requests/medical-appointments";
 
 // ---------------------------------------------------------------------------
@@ -136,11 +139,19 @@ function formatGroupDate(dateKey: string): string {
 // Page component
 // ---------------------------------------------------------------------------
 
+const ACTION_LABELS: Record<string, string> = {
+  approve: "אשר",
+  deny: "דחה",
+  acknowledge: "אשר קבלה",
+};
+
 export default function RequestsPage() {
   const { selectedCycleId, selectedAssignment } = useCycle();
   const router = useRouter();
   const searchParams = useSearchParams();
   const syncStatus = useStatus();
+  const db = usePowerSync();
+  const { data: session } = useSession();
   const rawRole = (selectedAssignment?.role ?? "") as Role | "";
   const role = rawRole ? effectiveRole(rawRole) : "";
   const canCreate = role === "squad_commander" || role === "platoon_commander";
@@ -218,6 +229,89 @@ export default function RequestsPage() {
   function handleCreateSuccess(_requestId: string) {
     setCreateType(null);
     toast.success("הבקשה נוצרה בהצלחה");
+  }
+
+  // --- Context menu / quick actions ---
+  const [ctxMenu, setCtxMenu] = useState<{ position: { x: number; y: number }; request: RequestSummary } | null>(null);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteDialogAction, setNoteDialogAction] = useState<"approve" | "deny">("approve");
+  const [actionNote, setActionNote] = useState("");
+  const [actionRequest, setActionRequest] = useState<RequestSummary | null>(null);
+  const [acting, setActing] = useState(false);
+
+  const userName = session?.user
+    ? `${(session.user as { familyName?: string }).familyName ?? ""} ${(session.user as { givenName?: string }).givenName ?? ""}`.trim()
+    : "";
+
+  async function insertAction(requestId: string, action: string, note: string | null) {
+    const actionId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await db.execute(
+      `INSERT INTO request_actions (id, request_id, user_id, action, note, user_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [actionId, requestId, session?.user?.id ?? "", action, note, userName, now],
+    );
+  }
+
+  async function executeAction(request: RequestSummary, action: "approve" | "deny" | "acknowledge", note: string | null) {
+    if (!request.assignedRole) return;
+    const transition = getNextState(request.status, request.assignedRole, action, request.type);
+    if (!transition) return;
+
+    setActing(true);
+    try {
+      await db.execute(
+        `UPDATE requests SET status = ?, assigned_role = ?, updated_at = ? WHERE id = ?`,
+        [transition.newStatus, transition.newAssignedRole, new Date().toISOString(), request.id],
+      );
+      await insertAction(request.id, action, note);
+      const messages: Record<string, string> = {
+        approve: "הבקשה אושרה",
+        deny: "הבקשה נדחתה",
+        acknowledge: "הבקשה התקבלה",
+      };
+      toast.success(messages[action]);
+    } catch {
+      toast.error("שגיאה בביצוע הפעולה");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  const handleLongPress = useCallback((request: RequestSummary, pos: { x: number; y: number }) => {
+    if (!rawRole || rawRole === "company_medic") return;
+    const actions = request.assignedRole
+      ? getAvailableActions(request.status, request.assignedRole, rawRole as Role, request.type)
+      : [];
+    if (actions.length === 0) return;
+    setCtxMenu({ position: pos, request });
+  }, [rawRole]);
+
+  function getContextMenuItems(request: RequestSummary): ContextMenuItem[] {
+    if (!rawRole || rawRole === "company_medic") return [];
+    const actions = request.assignedRole
+      ? getAvailableActions(request.status, request.assignedRole, rawRole as Role, request.type)
+      : [];
+    return actions.map((action) => ({
+      label: ACTION_LABELS[action] ?? action,
+      destructive: action === "deny",
+      onClick: () => {
+        if (action === "acknowledge") {
+          executeAction(request, action, null);
+        } else {
+          setActionRequest(request);
+          setActionNote("");
+          setNoteDialogAction(action);
+          setNoteDialogOpen(true);
+        }
+      },
+    }));
+  }
+
+  function confirmActionWithNote() {
+    if (!actionRequest) return;
+    executeAction(actionRequest, noteDialogAction, actionNote.trim() || null);
+    setNoteDialogOpen(false);
+    setActionRequest(null);
   }
 
   if (rawRole === "instructor") {
@@ -353,6 +447,7 @@ export default function RequestsPage() {
                     request={r}
                     userRole={rawRole as Role}
                     onClick={() => router.push(`/requests/${r.id}`)}
+                    onLongPress={(pos) => handleLongPress(r, pos)}
                   />
                 ))}
               </div>
@@ -376,6 +471,7 @@ export default function RequestsPage() {
                     request={r}
                     userRole={rawRole as Role}
                     onClick={() => router.push(`/requests/${r.id}`)}
+                    onLongPress={(pos) => handleLongPress(r, pos)}
                   />
                 ))}
               </div>
@@ -405,6 +501,7 @@ export default function RequestsPage() {
                           request={r}
                           userRole={rawRole as Role}
                           onClick={() => router.push(`/requests/${r.id}`)}
+                          onLongPress={(pos) => handleLongPress(r, pos)}
                         />
                       ))}
                     </div>
@@ -473,6 +570,60 @@ export default function RequestsPage() {
               onCancel={() => setCreateType(null)}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Context menu for quick actions */}
+      {ctxMenu && (
+        <ContextMenu
+          items={getContextMenuItems(ctxMenu.request)}
+          position={ctxMenu.position}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+
+      {/* Note dialog for approve/deny */}
+      <Dialog open={noteDialogOpen} onOpenChange={(open) => { if (!open) { setNoteDialogOpen(false); setActionRequest(null); } }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>{noteDialogAction === "approve" ? "אישור בקשה" : "דחיית בקשה"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {actionRequest && (
+              <p className="text-sm text-muted-foreground">
+                {actionRequest.soldierName} · {REQUEST_TYPE_LABELS[actionRequest.type]}
+              </p>
+            )}
+            <textarea
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              rows={3}
+              placeholder="הערה (אופציונלי)"
+              value={actionNote}
+              onChange={(e) => setActionNote(e.target.value)}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => { setNoteDialogOpen(false); setActionRequest(null); }}
+                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                onClick={confirmActionWithNote}
+                disabled={acting}
+                className={cn(
+                  "rounded-md px-4 py-2 text-sm font-medium text-white transition-colors",
+                  noteDialogAction === "deny"
+                    ? "bg-destructive hover:bg-destructive/90"
+                    : "bg-primary hover:bg-primary/90",
+                )}
+              >
+                {noteDialogAction === "approve" ? "אשר" : "דחה"}
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

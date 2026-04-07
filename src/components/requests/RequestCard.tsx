@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useCallback } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,6 +35,7 @@ interface Props {
   request: RequestSummary;
   userRole: Role | "admin";
   onClick: () => void;
+  onLongPress?: (e: { x: number; y: number }) => void;
 }
 
 function formatDate(dateStr: string) {
@@ -46,14 +48,53 @@ function formatDate(dateStr: string) {
   });
 }
 
-export function RequestCard({ request, userRole, onClick }: Props) {
+export function RequestCard({ request, userRole, onClick, onLongPress }: Props) {
   const isAssignedToMe =
     request.assignedRole !== null && userRole !== "admin" && canActOnRequest(userRole, request.assignedRole);
+
+  // Long-press detection for mobile
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!onLongPress) return;
+    suppressClickRef.current = false;
+    const touch = e.touches[0];
+    const x = touch.clientX;
+    const y = touch.clientY;
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      suppressClickRef.current = true;
+      onLongPress({ x, y });
+    }, 500);
+  }, [onLongPress]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (!onLongPress) return;
+    e.preventDefault();
+    suppressClickRef.current = true;
+    onLongPress({ x: e.clientX, y: e.clientY });
+  }, [onLongPress]);
 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        if (suppressClickRef.current) { suppressClickRef.current = false; return; }
+        onClick();
+      }}
+      onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
       className="flex w-full items-start gap-3 px-4 py-3 text-start hover:bg-muted/50 transition-colors"
     >
       {/* Icon */}
