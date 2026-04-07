@@ -277,7 +277,7 @@ export default function SoldiersPage() {
         soldiers: squad.soldiers.filter((s) => {
           if (statusFilter !== "all" && s.status !== statusFilter) return false;
           if (showGapsOnly && s.gapCount === 0) return false;
-          if (showRequestsOnly && s.openRequestCount === 0) return false;
+          if (showRequestsOnly && s.openRequestCount === 0 && s.approvedRequestTypes.length === 0) return false;
           if (search.trim()) {
             const q = search.trim().toLowerCase();
             const fullName = `${s.familyName} ${s.givenName}`.toLowerCase();
