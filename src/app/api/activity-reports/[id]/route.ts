@@ -79,6 +79,37 @@ export async function PATCH(
   });
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const report = await prisma.activityReport.findUnique({
+    where: { id },
+    include: {
+      activity: { select: { cycleId: true, platoonId: true } },
+      soldier: { select: { squadId: true, squad: { select: { platoonId: true } } } },
+    },
+  });
+
+  if (!report) {
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
+  }
+
+  const { scope, error, user } = await getActivityScope(report.activity.cycleId);
+  if (error || !scope || !user) return error!;
+
+  const canEdit = canEditReport(scope, report.soldier.squad.platoonId, report.soldier.squadId);
+  if (!canEdit) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  await prisma.activityReport.delete({ where: { id } });
+
+  return NextResponse.json({ success: true });
+}
+
 function canEditReport(
   scope: Awaited<ReturnType<typeof getActivityScope>>["scope"],
   platoonId: string,
