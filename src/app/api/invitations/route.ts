@@ -53,7 +53,7 @@ const schema = z
     email: z.string().email().optional(),
     phone: z.string().optional(),
     cycleId: z.string().uuid(),
-    role: z.enum(["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander"]),
+    role: z.enum(["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander", "instructor", "company_medic"]),
     unitType: z.enum(["company", "platoon", "squad"]),
     unitId: z.string().uuid(),
     givenName: z.string().min(1).optional(),

@@ -216,11 +216,11 @@ export default function ActivitiesPage() {
     return list;
   }, [allActivities, filter, sortMode, weekAgoStr, todayStr]);
 
-  const showPlatoon = role === "company_commander";
+  const showPlatoon = role === "company_commander" || rawRole === "instructor";
 
-  // Group activities by platoon for company commanders
+  // Group activities by platoon for company-level roles
   const activitiesByPlatoon = useMemo(() => {
-    if (role !== "company_commander") return null;
+    if (!showPlatoon) return null;
     const platoonOrder = (companyPlatoons ?? []).map((p) => p.id);
     const map = new Map<string, { platoonName: string; activities: ActivitySummary[] }>();
     for (const activity of filtered) {
@@ -243,9 +243,9 @@ export default function ActivitiesPage() {
   const platoonOptions = useMemo(() => {
     if (!selectedAssignment) return [];
     if (role === "platoon_commander") return [{ id: selectedAssignment.unitId, name: "המחלקה שלי" }];
-    if (role === "company_commander") return companyPlatoons ?? [];
+    if (role === "company_commander" || rawRole === "instructor") return companyPlatoons ?? [];
     return [];
-  }, [selectedAssignment, role, companyPlatoons]);
+  }, [selectedAssignment, role, rawRole, companyPlatoons]);
 
   function handleCreateSuccess(activityId: string, platoonCount: number) {
     setCreateOpen(false);
@@ -273,6 +273,15 @@ export default function ActivitiesPage() {
 
   const pendingActivity = pendingActivityId ? allActivities.find((a) => a.id === pendingActivityId) : null;
   const showNotifyDialog = !!pendingActivity && pendingActivity.status === "active";
+
+  if (rawRole === "company_medic") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
+        <p className="text-lg font-medium">אין גישה לעמוד זה</p>
+        <p className="text-muted-foreground text-sm">עמוד הפעילויות אינו זמין עבור תפקיד זה.</p>
+      </div>
+    );
+  }
 
   if (!selectedCycleId) {
     return (

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    pushSubscription: { upsert: vi.fn(), deleteMany: vi.fn() },
+    pushSubscription: { upsert: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
+    notificationPreference: { upsert: vi.fn(), deleteMany: vi.fn() },
+    $transaction: vi.fn((ops: unknown) => Array.isArray(ops) ? Promise.all(ops) : ops),
   },
 }));
 
@@ -18,9 +20,15 @@ import { createMockRequest } from "@/__tests__/helpers/api";
 const mockAuth = vi.mocked(auth);
 const mockUpsert = vi.mocked(prisma.pushSubscription.upsert);
 const mockDeleteMany = vi.mocked(prisma.pushSubscription.deleteMany);
+const mockCount = vi.mocked(prisma.pushSubscription.count);
+const mockPrefUpsert = vi.mocked(prisma.notificationPreference.upsert);
+const mockPrefDeleteMany = vi.mocked(prisma.notificationPreference.deleteMany);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPrefUpsert.mockResolvedValue({} as never);
+  mockCount.mockResolvedValue(1 as never);
+  mockPrefDeleteMany.mockResolvedValue({ count: 0 } as never);
 });
 
 const validSubscription = {

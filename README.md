@@ -5,7 +5,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 ## Features
 
 - **Training hierarchy** — Cycles → Companies → Platoons → Squads → Soldiers
-- **Role-based access** — Admins, cycle commanders, company commanders, platoon commanders, and squad commanders each see only their slice of the hierarchy
+- **Role-based access** — Admins, company commanders (and deputies), platoon commanders (and sergeants), squad commanders, instructors (activity-focused), and company medics (medical request-focused) each see only their slice of the hierarchy
 - **Activity management** — Create training activities, assign them to platoons, and record per-soldier results (pass / fail / N/A) with up to 6 labeled scores per activity type and notes; bulk import activities from Excel/CSV
 - **Bulk reporting** — Update an entire squad's activity results in one action; import reports from Excel/CSV with user-defined column mapping (saved per activity type)
 - **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), commander notes on approve/deny, and full offline support
@@ -182,7 +182,7 @@ npm run make-admin -- --email you@example.com
 npm test
 ```
 
-Runs 433 unit tests with ~98% line coverage. Tests cover API routes, auth logic, PowerSync connector, React components, and utility functions. Configuration is in `vitest.config.ts`.
+Runs 499 unit tests with ~98% line coverage. Tests cover API routes, auth logic, PowerSync connector, React components, and utility functions. Configuration is in `vitest.config.ts`.
 
 ### E2E Tests (Playwright)
 

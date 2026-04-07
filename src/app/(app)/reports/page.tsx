@@ -37,6 +37,10 @@ export default function ReportsPage() {
   // Date range filter — "" means all, "week" = last 7 days, "month" = last 30 days
   const [activityDateRange, setActivityDateRange] = useState<string>("");
 
+  // Request type filter state — "" means all types
+  const [selectedRequestType, setSelectedRequestType] = useState<string>("");
+  const [requestDateRange, setRequestDateRange] = useState<string>("");
+
   // Fetch activity types
   useEffect(() => {
     fetch("/api/activity-types")
@@ -55,11 +59,17 @@ export default function ReportsPage() {
 
   // Check role — squad commanders should not reach here (nav hides it),
   // but guard against direct URL access
-  const role = session?.user?.cycleAssignments
-    ?.map((a) => effectiveRole(a.role as Role))
+  const assignments = session?.user?.cycleAssignments ?? [];
+  const role = assignments
+    .map((a) => effectiveRole(a.role as Role))
     .find((r) => r === "company_commander" || r === "platoon_commander");
+  const rawRoles = assignments.map((a) => a.role as Role);
+  const isInstructor = rawRoles.includes("instructor");
+  const isMedic = rawRoles.includes("company_medic");
   const isAdmin = session?.user?.isAdmin;
-  const hasAccess = isAdmin || !!role;
+  const hasAccess = isAdmin || !!role || isInstructor || isMedic;
+  const showActivityReports = !isMedic;
+  const showRequestReports = !isInstructor;
 
   if (cycleLoading) return null;
 
@@ -80,10 +90,6 @@ export default function ReportsPage() {
       </div>
     );
   }
-
-  // Request type filter state — "" means all types
-  const [selectedRequestType, setSelectedRequestType] = useState<string>("");
-  const [requestDateRange, setRequestDateRange] = useState<string>("");
 
   // "" = all types, otherwise a single type ID
   const typesParam = selectedTypeId;
@@ -139,7 +145,8 @@ export default function ReportsPage() {
       return;
     }
     const params = new URLSearchParams();
-    if (selectedRequestType) params.set("types", selectedRequestType);
+    const reqType = isMedic ? "medical" : selectedRequestType;
+    if (reqType) params.set("types", reqType);
     if (requestDateRange) params.set("dateRange", requestDateRange);
     const qs = params.toString();
     router.push(`/reports/request-summary${qs ? `?${qs}` : ""}`);
@@ -154,6 +161,7 @@ export default function ReportsPage() {
 
       <div className="p-4 space-y-6">
         {/* Activity reports section */}
+        {showActivityReports && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">דוחות פעילויות</h2>
 
@@ -254,13 +262,16 @@ export default function ReportsPage() {
             )}
           </div>
         </section>
+        )}
 
         {/* Request reports section */}
+        {showRequestReports && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">דוחות בקשות</h2>
 
           {/* Request filters */}
           <div className="flex flex-wrap gap-2">
+            {!isMedic && (
             <select
               value={selectedRequestType}
               onChange={(e) => setSelectedRequestType(e.target.value)}
@@ -271,6 +282,7 @@ export default function ReportsPage() {
               <option value="medical">רפואה</option>
               <option value="hardship">בקשת ת&quot;ש</option>
             </select>
+            )}
             <select
               value={requestDateRange}
               onChange={(e) => setRequestDateRange(e.target.value)}
@@ -304,6 +316,7 @@ export default function ReportsPage() {
             </div>
           </button>
         </section>
+        )}
       </div>
     </div>
   );

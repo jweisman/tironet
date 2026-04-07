@@ -103,8 +103,11 @@ export default function RequestsPage() {
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
   const { data: rawRequests } = useQuery<RawRequest>(REQUESTS_QUERY, queryParams);
 
+  const isMedic = rawRole === "company_medic";
+
   const allRequests = useMemo(() => {
-    const mapped = (rawRequests ?? []).map(mapRequest);
+    let mapped = (rawRequests ?? []).map(mapRequest);
+    if (isMedic) mapped = mapped.filter((r) => r.type === "medical");
     const unitId = selectedAssignment?.unitId;
     if (!unitId || !role) return mapped;
     if (role === "squad_commander") {
@@ -114,7 +117,7 @@ export default function RequestsPage() {
       return mapped.filter((r) => r.platoonId === unitId);
     }
     return mapped;
-  }, [rawRequests, role, selectedAssignment?.unitId]);
+  }, [rawRequests, role, selectedAssignment?.unitId, isMedic]);
 
   // UI state — initialise from URL params
   const [viewTab, setViewTab] = useState<ViewTab>(
@@ -178,6 +181,15 @@ export default function RequestsPage() {
     toast.success("הבקשה נוצרה בהצלחה");
   }
 
+  if (rawRole === "instructor") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
+        <p className="text-lg font-medium">אין גישה לעמוד זה</p>
+        <p className="text-muted-foreground text-sm">עמוד הבקשות אינו זמין עבור תפקיד זה.</p>
+      </div>
+    );
+  }
+
   if (!selectedCycleId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
@@ -221,7 +233,7 @@ export default function RequestsPage() {
             {approvedRequests.length > 0 && <span className="mr-1">({approvedRequests.length})</span>}
           </button>
 
-          {role && (
+          {role && !isMedic && (
             <button
               type="button"
               onClick={() => setViewTab("mine")}
@@ -248,7 +260,7 @@ export default function RequestsPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+        {!isMedic && <div className="flex items-center gap-1.5">
           {(["all", "leave", "medical", "hardship"] as const).map((t) => (
             <button
               key={t}
@@ -264,7 +276,7 @@ export default function RequestsPage() {
               {t === "all" ? "הכל" : REQUEST_TYPE_LABELS[t]}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
       {/* Content */}

@@ -11,6 +11,15 @@ vi.mock("@/lib/api/request-scope", () => ({
   getRequestScope: vi.fn(),
 }));
 
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: vi.fn((fn: () => void) => fn()) };
+});
+
+vi.mock("@/lib/push/send", () => ({
+  sendPushToUsers: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { GET, POST } from "../route";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";

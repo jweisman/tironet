@@ -8,10 +8,11 @@ import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { useCycle } from "@/contexts/CycleContext";
 import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
 import type { Role } from "@/types";
 
-const staticTabs = [
+const allTabs = [
   { href: "/home", icon: Home, labelKey: "home" as const },
   { href: "/soldiers", icon: Users, labelKey: "soldiers" as const },
   { href: "/activities", icon: Activity, labelKey: "activities" as const },
@@ -22,21 +23,31 @@ export function TabBar() {
   const pathname = usePathname();
   const t = useTranslations("nav");
   const { data: session } = useSession();
+  const { selectedAssignment } = useCycle();
   const requestBadge = useRequestBadge();
   const isAdmin = session?.user?.isAdmin;
+  const selectedRole = selectedAssignment?.role as Role | undefined;
   const isCommander = session?.user?.cycleAssignments?.some(
     (a) => { const r = effectiveRole(a.role as Role); return r === "company_commander" || r === "platoon_commander"; }
   );
+  const canSeeReports = isAdmin || isCommander || selectedRole === "instructor" || selectedRole === "company_medic";
+  const canSeeCommanders = !isAdmin && isCommander && selectedRole !== "instructor" && selectedRole !== "company_medic";
+
+  // Filter tabs by role
+  const staticTabs = allTabs.filter(({ href }) => {
+    if (selectedRole === "instructor") return href === "/home" || href === "/activities";
+    if (selectedRole === "company_medic") return href === "/home" || href === "/requests";
+    return true;
+  });
+
   // Build overflow menu items
   const overflowItems: OverflowItem[] = [];
 
-  // Reports — visible to everyone except squad commanders
-  if (isAdmin || isCommander) {
+  if (canSeeReports) {
     overflowItems.push({ href: "/reports", icon: BarChart3, label: "דוחות" });
   }
 
-  // Commanders page — for non-admin commanders
-  if (!isAdmin && isCommander) {
+  if (canSeeCommanders) {
     overflowItems.push({ href: "/users", icon: UserCog, label: "מפקדים" });
   }
 

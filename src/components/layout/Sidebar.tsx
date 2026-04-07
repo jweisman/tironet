@@ -15,7 +15,7 @@ import { effectiveRole } from "@/lib/auth/permissions";
 import { SoldierLogo } from "@/components/SoldierLogo";
 import type { Role } from "@/types";
 
-const navItems = [
+const allNavItems = [
   { href: "/home", icon: Home, labelKey: "home" },
   { href: "/soldiers", icon: Users, labelKey: "soldiers" },
   { href: "/activities", icon: Activity, labelKey: "activities" },
@@ -26,12 +26,22 @@ export function Sidebar() {
   const pathname = usePathname();
   const t = useTranslations("nav");
   const { data: session } = useSession();
-  const { activeCycles } = useCycle();
+  const { activeCycles, selectedAssignment } = useCycle();
   const requestBadge = useRequestBadge();
   const isAdmin = session?.user?.isAdmin;
+  const selectedRole = selectedAssignment?.role as Role | undefined;
   const isCommander = session?.user?.cycleAssignments?.some(
     (a) => { const r = effectiveRole(a.role as Role); return r === "company_commander" || r === "platoon_commander"; }
   );
+  const canSeeReports = isAdmin || isCommander || selectedRole === "instructor" || selectedRole === "company_medic";
+  const canSeeCommanders = !isAdmin && isCommander && selectedRole !== "instructor" && selectedRole !== "company_medic";
+
+  // Filter nav items based on role
+  const navItems = allNavItems.filter(({ href }) => {
+    if (selectedRole === "instructor") return href === "/home" || href === "/activities";
+    if (selectedRole === "company_medic") return href === "/home" || href === "/requests";
+    return true;
+  });
 
   // Deduplicate cycles by id
   const uniqueCycles = activeCycles.filter(
@@ -79,7 +89,7 @@ export function Sidebar() {
           );
         })}
 
-        {(isAdmin || isCommander) && (
+        {canSeeReports && (
           <Link
             href="/reports"
             className={cn(
@@ -94,7 +104,7 @@ export function Sidebar() {
           </Link>
         )}
 
-        {!isAdmin && isCommander && (
+        {canSeeCommanders && (
           <Link
             href="/users"
             className={cn(
