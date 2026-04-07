@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
-import { cn } from "@/lib/utils";
 import {
   REQUEST_TYPE_LABELS,
   TRANSPORTATION_LABELS,
 } from "@/lib/requests/constants";
+import { formatAppointment } from "@/lib/requests/medical-appointments";
+import { extractRequestFields } from "@/lib/reports/detail-columns";
+import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import type { RequestSummaryData, RequestSummaryItem } from "@/app/api/reports/request-summary/route";
 import type { RequestType, Transportation } from "@/types";
 
@@ -19,8 +21,7 @@ import type { RequestType, Transportation } from "@/types";
 
 function formatDateTime(dateStr: string | null) {
   if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("he-IL", {
+  return new Date(dateStr).toLocaleDateString("he-IL", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -31,60 +32,31 @@ function formatDateTime(dateStr: string | null) {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("he-IL", {
+  return new Date(dateStr).toLocaleDateString("he-IL", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
 }
 
+const clientFormatters = {
+  text: (s: string) => s,
+  dateTime: formatDateTime,
+  date: formatDate,
+  appointment: formatAppointment,
+  transportationLabels: TRANSPORTATION_LABELS as Record<string, string>,
+};
+
 function RequestDetails({ req }: { req: RequestSummaryItem }) {
-  const details: { label: string; value: string }[] = [];
+  const { fields, appointments } = extractRequestFields(req, clientFormatters);
 
-  if (req.description) details.push({ label: "תיאור", value: req.description });
-
-  if (req.type === "leave") {
-    if (req.place) details.push({ label: "מקום", value: req.place });
-    if (req.departureAt) details.push({ label: "יציאה", value: formatDateTime(req.departureAt) });
-    if (req.returnAt) details.push({ label: "חזרה", value: formatDateTime(req.returnAt) });
-    if (req.transportation) {
-      details.push({ label: "הגעה", value: TRANSPORTATION_LABELS[req.transportation as Transportation] ?? req.transportation });
-    }
-  }
-
-  if (req.type === "medical") {
-    if (req.paramedicDate) details.push({ label: 'בדיקת חופ"ל', value: formatDate(req.paramedicDate) });
-    if (req.medicalAppointments && req.medicalAppointments.length > 0) {
-      for (const appt of req.medicalAppointments) {
-        const date = new Date(appt.date + "T00:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
-        const parts = [appt.type, date, appt.place].filter(Boolean);
-        details.push({ label: "תור", value: parts.join(" / ") });
-      }
-    }
-    if (req.sickLeaveDays != null) details.push({ label: "ימי גימלים", value: String(req.sickLeaveDays) });
-  }
-
-  if (req.type === "hardship" && req.specialConditions != null) {
-    details.push({ label: "אוכלוסיות מיוחדות", value: req.specialConditions ? "כן" : "לא" });
-  }
-
+  const notes: { label: string; value: string }[] = [];
   for (const n of req.notes ?? []) {
-    const actionLabel = n.action === "approve" ? "אישור" : n.action === "deny" ? "דחיה" : n.action;
-    details.push({ label: `${n.userName} (${actionLabel})`, value: n.note });
+    const actionLabel = n.action === "approve" ? "אישור" : n.action === "deny" ? "דחיה" : n.action === "note" ? "הערה" : n.action;
+    notes.push({ label: `${n.userName} (${actionLabel})`, value: n.note });
   }
 
-  if (details.length === 0) return null;
-
-  return (
-    <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-      {details.map((d, i) => (
-        <span key={i}>
-          <span className="font-medium text-foreground/70">{d.label}:</span> {d.value}
-        </span>
-      ))}
-    </div>
-  );
+  return <RequestDetailColumns data={{ fields, appointments, notes }} />;
 }
 
 // ---------------------------------------------------------------------------

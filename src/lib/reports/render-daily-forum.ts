@@ -13,6 +13,11 @@ import {
   TYPE_LABELS,
   TRANSPORTATION_LABELS,
 } from "@/lib/reports/html-helpers";
+import {
+  extractRequestFields,
+  renderDetailColumnsHtml,
+  DETAIL_COLUMNS_CSS,
+} from "@/lib/reports/detail-columns";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -482,41 +487,23 @@ export async function fetchDailyForum(
 // HTML rendering helpers
 // ---------------------------------------------------------------------------
 
+const htmlFormatters = {
+  text: escapeHtml,
+  dateTime: formatDateTime,
+  date: formatDate,
+  appointment: formatAppointment,
+  transportationLabels: TRANSPORTATION_LABELS,
+};
+
 function renderRequestDetailsHtml(req: OpenRequestItem): string {
-  const rows: string[] = [];
+  const { fields, appointments } = extractRequestFields(req, htmlFormatters);
 
-  if (req.description) {
-    rows.push(`<span class="detail-label">תיאור:</span> ${escapeHtml(req.description)}`);
-  }
-
-  if (req.type === "leave") {
-    if (req.place) rows.push(`<span class="detail-label">מקום:</span> ${escapeHtml(req.place)}`);
-    if (req.departureAt) rows.push(`<span class="detail-label">יציאה:</span> ${formatDateTime(req.departureAt)}`);
-    if (req.returnAt) rows.push(`<span class="detail-label">חזרה:</span> ${formatDateTime(req.returnAt)}`);
-    if (req.transportation) rows.push(`<span class="detail-label">הגעה:</span> ${TRANSPORTATION_LABELS[req.transportation] ?? req.transportation}`);
-  }
-
-  if (req.type === "medical") {
-    if (req.paramedicDate) rows.push(`<span class="detail-label">בדיקת חופ"ל:</span> ${formatDate(req.paramedicDate)}`);
-    if (req.medicalAppointments && req.medicalAppointments.length > 0) {
-      for (const appt of req.medicalAppointments) {
-        rows.push(`<span class="detail-label">תור:</span> ${escapeHtml(formatAppointment(appt))}`);
-      }
-    }
-    if (req.sickLeaveDays != null) rows.push(`<span class="detail-label">ימי גימלים:</span> ${req.sickLeaveDays}`);
-  }
-
-  if (req.type === "hardship") {
-    if (req.specialConditions != null) {
-      rows.push(`<span class="detail-label">אוכלוסיות מיוחדות:</span> ${req.specialConditions ? "כן" : "לא"}`);
-    }
-  }
-
+  const notes: { label: string; value: string }[] = [];
   if (req.latestNote) {
-    rows.push(`<span class="detail-label">הערה:</span> ${escapeHtml(req.latestNote)}`);
+    notes.push({ label: "הערה", value: escapeHtml(req.latestNote) });
   }
 
-  return rows.join('<span class="sep">·</span>');
+  return renderDetailColumnsHtml({ fields, appointments, notes });
 }
 
 function renderRequestTypeSection(title: string, requests: OpenRequestItem[]): string {
@@ -777,8 +764,7 @@ export function renderDailyForumHtml(data: DailyForumData): string {
       margin-top: 2px;
       padding-right: 4px;
     }
-    .detail-label { font-weight: 600; }
-    .sep { margin: 0 6px; color: #bbb; }
+${DETAIL_COLUMNS_CSS}
     /* Activities */
     .activity-section {
       page-break-inside: avoid;

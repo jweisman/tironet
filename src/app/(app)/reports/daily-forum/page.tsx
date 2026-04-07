@@ -8,6 +8,9 @@ import { useCycle } from "@/contexts/CycleContext";
 import { PieChart, PieChartLegend } from "@/components/reports/PieChart";
 import { cn } from "@/lib/utils";
 import { formatGradeDisplay } from "@/lib/score-format";
+import { formatAppointment } from "@/lib/requests/medical-appointments";
+import { extractRequestFields } from "@/lib/reports/detail-columns";
+import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import type {
   DailyForumData,
   PlatoonForumSection,
@@ -27,34 +30,31 @@ const TRANSPORTATION_LABELS: Record<string, string> = {
   other: "אחר",
 };
 
+function formatDateTime(dateStr: string | null) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("he-IL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
+}
+
+const clientFormatters = {
+  text: (s: string) => s,
+  dateTime: formatDateTime,
+  date: formatDate,
+  appointment: formatAppointment,
+  transportationLabels: TRANSPORTATION_LABELS,
+};
+
 function RequestCard({ req }: { req: OpenRequestItem }) {
-  const details: string[] = [];
-  if (req.description) details.push(`תיאור: ${req.description}`);
+  const { fields, appointments } = extractRequestFields(req, clientFormatters);
 
-  if (req.type === "leave") {
-    if (req.place) details.push(`מקום: ${req.place}`);
-    if (req.departureAt) details.push(`יציאה: ${new Date(req.departureAt).toLocaleDateString("he-IL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`);
-    if (req.returnAt) details.push(`חזרה: ${new Date(req.returnAt).toLocaleDateString("he-IL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`);
-    if (req.transportation) details.push(`הגעה: ${TRANSPORTATION_LABELS[req.transportation] ?? req.transportation}`);
+  const notes: { label: string; value: string }[] = [];
+  if (req.latestNote) {
+    notes.push({ label: "הערה", value: req.latestNote });
   }
-
-  if (req.type === "medical") {
-    if (req.paramedicDate) details.push(`בדיקת חופ"ל: ${new Date(req.paramedicDate).toLocaleDateString("he-IL")}`);
-    if (req.medicalAppointments && req.medicalAppointments.length > 0) {
-      for (const appt of req.medicalAppointments) {
-        const date = new Date(appt.date + "T00:00:00").toLocaleDateString("he-IL");
-        const parts = [appt.type, date, appt.place].filter(Boolean);
-        details.push(`תור: ${parts.join(" / ")}`);
-      }
-    }
-    if (req.sickLeaveDays != null) details.push(`ימי גימלים: ${req.sickLeaveDays}`);
-  }
-
-  if (req.type === "hardship" && req.specialConditions != null) {
-    details.push(`אוכלוסיות מיוחדות: ${req.specialConditions ? "כן" : "לא"}`);
-  }
-
-  if (req.latestNote) details.push(`הערה: ${req.latestNote}`);
 
   return (
     <div className="border-b border-border py-2 px-1">
@@ -65,11 +65,7 @@ function RequestCard({ req }: { req: OpenRequestItem }) {
           {new Date(req.createdAt).toLocaleDateString("he-IL", { day: "numeric", month: "short" })}
         </span>
       </div>
-      {details.length > 0 && (
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {details.join(" · ")}
-        </p>
-      )}
+      <RequestDetailColumns data={{ fields, appointments, notes }} />
     </div>
   );
 }
