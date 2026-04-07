@@ -124,7 +124,7 @@ export async function fetchRequestSummary(
     returnAt: r.returnAt?.toISOString() ?? null,
     transportation: r.transportation,
     paramedicDate: r.paramedicDate?.toISOString().split("T")[0] ?? null,
-    medicalAppointments: parseMedicalAppointments(r.medicalAppointments as unknown),
+    medicalAppointments: parseMedicalAppointments(r.medicalAppointments as string | null),
     sickLeaveDays: r.sickLeaveDays,
     specialConditions: r.specialConditions,
     notes: (r.actions ?? [])

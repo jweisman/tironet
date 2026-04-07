@@ -241,7 +241,7 @@ export async function fetchDailyForum(
       returnAt: r.returnAt?.toISOString() ?? null,
       transportation: r.transportation,
       paramedicDate: r.paramedicDate?.toISOString().split("T")[0] ?? null,
-      medicalAppointments: parseMedicalAppointments(r.medicalAppointments as unknown),
+      medicalAppointments: parseMedicalAppointments(r.medicalAppointments as string | null),
       sickLeaveDays: r.sickLeaveDays,
       specialConditions: r.specialConditions,
       latestNote: r.actions[0]?.note ?? null,
