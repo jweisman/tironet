@@ -14,7 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Trash2, Plus } from "lucide-react";
 import { TRANSPORTATION_LABELS } from "@/lib/requests/constants";
+import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import type { RequestType, Transportation, Role } from "@/types";
 
 /** Format a Date as a `datetime-local` input value (YYYY-MM-DDTHH:MM). */
@@ -106,10 +108,25 @@ export function CreateRequestForm({
   // Medical fields
   const [urgent, setUrgent] = useState(false);
   const [paramedicDate, setParamedicDate] = useState("");
-  const [appointmentDate, setAppointmentDate] = useState("");
-  const [appointmentPlace, setAppointmentPlace] = useState("");
-  const [appointmentType, setAppointmentType] = useState("");
+  const [appointments, setAppointments] = useState<MedicalAppointment[]>([]);
   const [sickLeaveDays, setSickLeaveDays] = useState<number | "">("");
+
+  function addAppointment() {
+    setAppointments((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), date: "", place: "", type: "" },
+    ]);
+  }
+
+  function updateAppointment(id: string, field: keyof Omit<MedicalAppointment, "id">, value: string) {
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, [field]: value } : a)),
+    );
+  }
+
+  function removeAppointment(id: string) {
+    setAppointments((prev) => prev.filter((a) => a.id !== id));
+  }
 
   // Hardship fields
   const [specialConditions, setSpecialConditions] = useState(false);
@@ -164,15 +181,13 @@ export function CreateRequestForm({
 
       if (requestType === "medical") {
         columns.push(
-          "urgent", "paramedic_date", "appointment_date",
-          "appointment_place", "appointment_type", "sick_leave_days",
+          "urgent", "paramedic_date", "medical_appointments", "sick_leave_days",
         );
+        const validAppointments = appointments.filter((a) => a.date);
         values.push(
           urgent ? 1 : 0,
           paramedicDate || null,
-          appointmentDate || null,
-          appointmentPlace || null,
-          appointmentType || null,
+          validAppointments.length > 0 ? JSON.stringify(validAppointments) : null,
           sickLeaveDays === "" ? null : sickLeaveDays,
         );
       }
@@ -321,37 +336,67 @@ export function CreateRequestForm({
               style={paramedicDate ? undefined : { color: "transparent" }}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="req-appt-date">תאריך תור</Label>
-              <Input
-                id="req-appt-date"
-                type="date"
-                value={appointmentDate}
-                onChange={(e) => setAppointmentDate(e.target.value)}
-                dir="ltr"
-                lang="he"
-                style={appointmentDate ? undefined : { color: "transparent" }}
-              />
+
+          {/* Appointments list */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>תורים</Label>
+              <button
+                type="button"
+                onClick={addAppointment}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+              >
+                <Plus size={14} />
+                הוסף תור
+              </button>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="req-appt-place">מקום התור</Label>
-              <Input
-                id="req-appt-place"
-                value={appointmentPlace}
-                onChange={(e) => setAppointmentPlace(e.target.value)}
-              />
-            </div>
+            {appointments.length === 0 && (
+              <p className="text-xs text-muted-foreground">אין תורים. לחץ &quot;הוסף תור&quot; כדי להוסיף.</p>
+            )}
+            {appointments.map((appt) => (
+              <div key={appt.id} className="rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">תור</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAppointment(appt.id)}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">תאריך</Label>
+                    <Input
+                      type="date"
+                      value={appt.date}
+                      onChange={(e) => updateAppointment(appt.id, "date", e.target.value)}
+                      dir="ltr"
+                      lang="he"
+                      style={appt.date ? undefined : { color: "transparent" }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">מקום</Label>
+                    <Input
+                      value={appt.place}
+                      onChange={(e) => updateAppointment(appt.id, "place", e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">סוג</Label>
+                  <Input
+                    value={appt.type}
+                    onChange={(e) => updateAppointment(appt.id, "type", e.target.value)}
+                    placeholder="לדוגמה: פיזיותרפיה"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="req-appt-type">סוג התור</Label>
-            <Input
-              id="req-appt-type"
-              value={appointmentType}
-              onChange={(e) => setAppointmentType(e.target.value)}
-              placeholder="לדוגמה: פיזיותרפיה"
-            />
-          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="req-sick-days">ימי גימלים</Label>
             <Input

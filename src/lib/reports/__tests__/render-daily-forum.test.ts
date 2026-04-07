@@ -111,9 +111,7 @@ describe("fetchDailyForum", () => {
         returnAt: null,
         transportation: null,
         paramedicDate: null,
-        appointmentDate: null,
-        appointmentPlace: null,
-        appointmentType: null,
+        medicalAppointments: null,
         sickLeaveDays: null,
         specialConditions: null,
         soldier: {
@@ -135,9 +133,7 @@ describe("fetchDailyForum", () => {
         returnAt: new Date("2026-04-12T20:00:00Z"),
         transportation: "shuttle",
         paramedicDate: null,
-        appointmentDate: null,
-        appointmentPlace: null,
-        appointmentType: null,
+        medicalAppointments: null,
         sickLeaveDays: null,
         specialConditions: null,
         soldier: {

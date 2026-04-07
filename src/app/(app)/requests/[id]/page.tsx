@@ -2,7 +2,9 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward, MessageSquare, Pencil } from "lucide-react";
+import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { usePowerSync, useQuery } from "@powersync/react";
@@ -24,6 +26,8 @@ import {
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/requests/workflow";
+import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import type { RequestType, RequestStatus, Role, Transportation, RequestActionType } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -66,9 +70,7 @@ interface RawRequest {
   transportation: string | null;
   urgent: number | null;
   paramedic_date: string | null;
-  appointment_date: string | null;
-  appointment_place: string | null;
-  appointment_type: string | null;
+  medical_appointments: string | null;
   sick_leave_days: number | null;
   special_conditions: number | null;
   created_at: string;
@@ -197,6 +199,10 @@ export default function RequestDetailPage() {
   // Inline note editing
   const [editingActionId, setEditingActionId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
+
+  // Appointment editing
+  const [editingAppointments, setEditingAppointments] = useState(false);
+  const [editAppointmentsList, setEditAppointmentsList] = useState<MedicalAppointment[]>([]);
 
   if (!raw && timedOut) {
     return (
@@ -443,9 +449,143 @@ export default function RequestDetailPage() {
               label='תאריך בדיקת חופ"ל'
               value={formatDate(raw.paramedic_date)}
             />
-            <DetailRow label="תאריך תור" value={formatDate(raw.appointment_date)} />
-            <DetailRow label="מקום התור" value={raw.appointment_place} />
-            <DetailRow label="סוג התור" value={raw.appointment_type} />
+            {/* Appointments section */}
+            {(() => {
+              const appts = parseMedicalAppointments(raw.medical_appointments);
+              return (
+                <div className="py-2 border-b border-border">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-muted-foreground">תורים</span>
+                    {isAssignedToMe && !editingAppointments && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditAppointmentsList(appts.length > 0 ? appts : []);
+                          setEditingAppointments(true);
+                        }}
+                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                      >
+                        <Pencil size={12} />
+                        ערוך
+                      </button>
+                    )}
+                  </div>
+                  {!editingAppointments ? (
+                    appts.length > 0 ? (
+                      <ul className="space-y-1">
+                        {appts.map((a) => (
+                          <li key={a.id} className="text-sm font-medium">
+                            {formatAppointment(a)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">אין תורים</p>
+                    )
+                  ) : (
+                    <div className="space-y-2 mt-2">
+                      {editAppointmentsList.map((appt) => (
+                        <div key={appt.id} className="rounded-lg border border-border p-2 space-y-1.5">
+                          <div className="flex items-center justify-end">
+                            <button
+                              type="button"
+                              onClick={() => setEditAppointmentsList((prev) => prev.filter((a) => a.id !== appt.id))}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-0.5">
+                              <Label className="text-xs">תאריך</Label>
+                              <Input
+                                type="date"
+                                value={appt.date}
+                                onChange={(e) =>
+                                  setEditAppointmentsList((prev) =>
+                                    prev.map((a) => (a.id === appt.id ? { ...a, date: e.target.value } : a)),
+                                  )
+                                }
+                                dir="ltr"
+                                lang="he"
+                                style={appt.date ? undefined : { color: "transparent" }}
+                              />
+                            </div>
+                            <div className="space-y-0.5">
+                              <Label className="text-xs">מקום</Label>
+                              <Input
+                                value={appt.place}
+                                onChange={(e) =>
+                                  setEditAppointmentsList((prev) =>
+                                    prev.map((a) => (a.id === appt.id ? { ...a, place: e.target.value } : a)),
+                                  )
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-xs">סוג</Label>
+                            <Input
+                              value={appt.type}
+                              onChange={(e) =>
+                                setEditAppointmentsList((prev) =>
+                                  prev.map((a) => (a.id === appt.id ? { ...a, type: e.target.value } : a)),
+                                )
+                              }
+                              placeholder="לדוגמה: פיזיותרפיה"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditAppointmentsList((prev) => [
+                            ...prev,
+                            { id: crypto.randomUUID(), date: "", place: "", type: "" },
+                          ])
+                        }
+                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                      >
+                        <Plus size={14} />
+                        הוסף תור
+                      </button>
+                      <div className="flex gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const valid = editAppointmentsList.filter((a) => a.date);
+                            try {
+                              await db.execute(
+                                `UPDATE requests SET medical_appointments = ?, updated_at = ? WHERE id = ?`,
+                                [valid.length > 0 ? JSON.stringify(valid) : null, new Date().toISOString(), raw.id],
+                              );
+                              toast.success("תורים עודכנו");
+                              setEditingAppointments(false);
+                            } catch {
+                              toast.error("שגיאה בעדכון תורים");
+                            }
+                          }}
+                          disabled={acting}
+                          className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          <Check size={12} />
+                          שמור
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAppointments(false)}
+                          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
+                        >
+                          <X size={12} />
+                          ביטול
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <DetailRow
               label="ימי גימלים"
               value={raw.sick_leave_days != null ? String(raw.sick_leave_days) : null}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { getRequestScope } from "@/lib/api/request-scope";
 import { sendPushToUsers } from "@/lib/push/send";
 import { z } from "zod";
@@ -20,9 +21,12 @@ const createSchema = z.object({
   // Medical fields
   urgent: z.boolean().nullable().optional(),
   paramedicDate: z.string().nullable().optional(),
-  appointmentDate: z.string().nullable().optional(),
-  appointmentPlace: z.string().nullable().optional(),
-  appointmentType: z.string().nullable().optional(),
+  medicalAppointments: z.array(z.object({
+    id: z.string(),
+    date: z.string(),
+    place: z.string(),
+    type: z.string(),
+  })).nullable().optional(),
   sickLeaveDays: z.number().int().min(0).nullable().optional(),
   // Hardship fields
   specialConditions: z.boolean().nullable().optional(),
@@ -80,9 +84,7 @@ export async function POST(request: NextRequest) {
       transportation: data.transportation ?? null,
       urgent: data.urgent ?? null,
       paramedicDate: data.paramedicDate ? new Date(data.paramedicDate) : null,
-      appointmentDate: data.appointmentDate ? new Date(data.appointmentDate) : null,
-      appointmentPlace: data.appointmentPlace ?? null,
-      appointmentType: data.appointmentType ?? null,
+      medicalAppointments: data.medicalAppointments ?? Prisma.DbNull,
       sickLeaveDays: data.sickLeaveDays ?? null,
       specialConditions: data.specialConditions ?? null,
     },

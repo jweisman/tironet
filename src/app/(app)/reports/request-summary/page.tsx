@@ -55,9 +55,13 @@ function RequestDetails({ req }: { req: RequestSummaryItem }) {
 
   if (req.type === "medical") {
     if (req.paramedicDate) details.push({ label: 'בדיקת חופ"ל', value: formatDate(req.paramedicDate) });
-    if (req.appointmentDate) details.push({ label: "תור", value: formatDate(req.appointmentDate) });
-    if (req.appointmentPlace) details.push({ label: "מקום", value: req.appointmentPlace });
-    if (req.appointmentType) details.push({ label: "סוג", value: req.appointmentType });
+    if (req.medicalAppointments && req.medicalAppointments.length > 0) {
+      for (const appt of req.medicalAppointments) {
+        const date = new Date(appt.date + "T00:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
+        const parts = [appt.type, date, appt.place].filter(Boolean);
+        details.push({ label: "תור", value: parts.join(" / ") });
+      }
+    }
     if (req.sickLeaveDays != null) details.push({ label: "ימי גימלים", value: String(req.sickLeaveDays) });
   }
 

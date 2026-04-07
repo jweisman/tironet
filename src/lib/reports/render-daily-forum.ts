@@ -3,6 +3,8 @@ import type { ScoreConfig } from "@/types/score-config";
 import { getActiveScores } from "@/types/score-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 import type { ActivitySummaryRow } from "@/lib/reports/render-activity-summary";
+import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import {
   escapeHtml,
   renderPieSvg,
@@ -33,9 +35,7 @@ export interface OpenRequestItem {
   transportation: string | null;
   // Medical fields
   paramedicDate: string | null;
-  appointmentDate: string | null;
-  appointmentPlace: string | null;
-  appointmentType: string | null;
+  medicalAppointments: MedicalAppointment[] | null;
   sickLeaveDays: number | null;
   // Hardship fields
   specialConditions: boolean | null;
@@ -236,9 +236,7 @@ export async function fetchDailyForum(
       returnAt: r.returnAt?.toISOString() ?? null,
       transportation: r.transportation,
       paramedicDate: r.paramedicDate?.toISOString().split("T")[0] ?? null,
-      appointmentDate: r.appointmentDate?.toISOString().split("T")[0] ?? null,
-      appointmentPlace: r.appointmentPlace,
-      appointmentType: r.appointmentType,
+      medicalAppointments: parseMedicalAppointments(r.medicalAppointments as unknown),
       sickLeaveDays: r.sickLeaveDays,
       specialConditions: r.specialConditions,
       latestNote: r.actions[0]?.note ?? null,
@@ -500,9 +498,11 @@ function renderRequestDetailsHtml(req: OpenRequestItem): string {
 
   if (req.type === "medical") {
     if (req.paramedicDate) rows.push(`<span class="detail-label">בדיקת חופ"ל:</span> ${formatDate(req.paramedicDate)}`);
-    if (req.appointmentDate) rows.push(`<span class="detail-label">תור:</span> ${formatDate(req.appointmentDate)}`);
-    if (req.appointmentPlace) rows.push(`<span class="detail-label">מקום:</span> ${escapeHtml(req.appointmentPlace)}`);
-    if (req.appointmentType) rows.push(`<span class="detail-label">סוג:</span> ${escapeHtml(req.appointmentType)}`);
+    if (req.medicalAppointments && req.medicalAppointments.length > 0) {
+      for (const appt of req.medicalAppointments) {
+        rows.push(`<span class="detail-label">תור:</span> ${escapeHtml(formatAppointment(appt))}`);
+      }
+    }
     if (req.sickLeaveDays != null) rows.push(`<span class="detail-label">ימי גימלים:</span> ${req.sickLeaveDays}`);
   }
 

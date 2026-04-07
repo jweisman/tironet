@@ -249,6 +249,18 @@ Similarly, `Soldier.squadId` is write-once. The "transferred" status (`SoldierSt
 
 Three types: `leave` (יציאה), `medical` (רפואה), `hardship` (ת"ש). Each has type-specific fields defined in the Prisma schema and PowerSync local schema.
 
+### Medical appointments — JSON column
+
+Medical requests store appointments as a JSON array in `medical_appointments` (Prisma `Json?`, PowerSync `column.text`, SQLite text). Each appointment has `{ id, date, place, type }`. The `id` is a client-generated UUID for stable React keys.
+
+**Key patterns:**
+- **Prisma null handling:** Use `Prisma.DbNull` (not `null`) when setting the column to SQL NULL via Prisma.
+- **PowerSync connector:** The connector JSON-parses `medical_appointments` from the SQLite text column before sending to the API (`JSON.parse()`).
+- **Soldiers page "active" query:** Uses SQLite `json_each()` + `json_extract()` to check if any appointment date is in the future.
+- **Shared utilities:** `src/lib/requests/medical-appointments.ts` exports `parseMedicalAppointments()`, `hasUpcomingAppointment()`, and `formatAppointment()`. Use these everywhere instead of inline parsing.
+- **Detail page editing:** Appointments can be added/edited/removed on the request detail page by users with the assigned role. Edits are written directly to local SQLite via `db.execute()`.
+- **"Open" logic:** A medical request is considered active (soldiers page badge) if **any** appointment is in the future.
+
 ### Workflow state machine
 
 Requests use a `status` + `assignedRole` pair to track progress. `assignedRole` is nullable — `null` means the workflow is complete (terminal state).

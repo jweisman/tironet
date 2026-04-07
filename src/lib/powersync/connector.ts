@@ -139,9 +139,7 @@ export class TironetConnector implements PowerSyncBackendConnector {
               transportation: d.transportation,
               urgent: d.urgent != null ? Boolean(d.urgent) : undefined,
               paramedicDate: d.paramedic_date,
-              appointmentDate: d.appointment_date,
-              appointmentPlace: d.appointment_place,
-              appointmentType: d.appointment_type,
+              medicalAppointments: d.medical_appointments ? JSON.parse(d.medical_appointments as string) : undefined,
               sickLeaveDays: d.sick_leave_days,
               specialConditions: d.special_conditions != null ? Boolean(d.special_conditions) : undefined,
             });
@@ -153,8 +151,7 @@ export class TironetConnector implements PowerSyncBackendConnector {
               cycle_id: "cycleId", soldier_id: "soldierId",
               assigned_role: "assignedRole", created_by_user_id: "createdByUserId",
               departure_at: "departureAt", return_at: "returnAt",
-              paramedic_date: "paramedicDate", appointment_date: "appointmentDate",
-              appointment_place: "appointmentPlace", appointment_type: "appointmentType",
+              paramedic_date: "paramedicDate", medical_appointments: "medicalAppointments",
               sick_leave_days: "sickLeaveDays", special_conditions: "specialConditions",
             };
             for (const [key, value] of Object.entries(d)) {
@@ -163,6 +160,10 @@ export class TironetConnector implements PowerSyncBackendConnector {
             // Convert integer booleans back
             if ("urgent" in body) body.urgent = body.urgent != null ? Boolean(body.urgent) : undefined;
             if ("specialConditions" in body) body.specialConditions = body.specialConditions != null ? Boolean(body.specialConditions) : undefined;
+            // Parse JSON string fields
+            if ("medicalAppointments" in body && typeof body.medicalAppointments === "string") {
+              try { body.medicalAppointments = JSON.parse(body.medicalAppointments as string); } catch { /* keep as-is */ }
+            }
             await apiRequest(`/api/requests/${id}`, "PATCH", body);
           } else if (opType === UpdateType.DELETE) {
             await apiRequest(`/api/requests/${id}`, "DELETE");

@@ -40,9 +40,13 @@ function RequestCard({ req }: { req: OpenRequestItem }) {
 
   if (req.type === "medical") {
     if (req.paramedicDate) details.push(`בדיקת חופ"ל: ${new Date(req.paramedicDate).toLocaleDateString("he-IL")}`);
-    if (req.appointmentDate) details.push(`תור: ${new Date(req.appointmentDate).toLocaleDateString("he-IL")}`);
-    if (req.appointmentPlace) details.push(`מקום: ${req.appointmentPlace}`);
-    if (req.appointmentType) details.push(`סוג: ${req.appointmentType}`);
+    if (req.medicalAppointments && req.medicalAppointments.length > 0) {
+      for (const appt of req.medicalAppointments) {
+        const date = new Date(appt.date + "T00:00:00").toLocaleDateString("he-IL");
+        const parts = [appt.type, date, appt.place].filter(Boolean);
+        details.push(`תור: ${parts.join(" / ")}`);
+      }
+    }
     if (req.sickLeaveDays != null) details.push(`ימי גימלים: ${req.sickLeaveDays}`);
   }
 
