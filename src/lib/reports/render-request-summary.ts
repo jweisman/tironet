@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/db/prisma";
 import type { RequestType } from "@/types";
+import {
+  escapeHtml,
+  formatDateTime,
+  formatDate,
+  TYPE_LABELS,
+  TRANSPORTATION_LABELS,
+} from "@/lib/reports/html-helpers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,18 +51,6 @@ export interface RequestSummaryData {
   totalCount: number;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  leave: "בקשת יציאה",
-  medical: "רפואה",
-  hardship: 'בקשת ת"ש',
-};
-
-const TRANSPORTATION_LABELS: Record<string, string> = {
-  public_transit: 'תחב"צ',
-  shuttle: "שאטל",
-  military_transport: "נסיעה צבאית",
-  other: "אחר",
-};
 
 // ---------------------------------------------------------------------------
 // Data fetching
@@ -180,28 +175,6 @@ export async function fetchRequestSummary(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatDateTime(dateStr: string | null): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("he-IL", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("he-IL", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
 function renderRequestDetails(req: RequestSummaryItem): string {
   const rows: string[] = [];
 
@@ -236,14 +209,6 @@ function renderRequestDetails(req: RequestSummaryItem): string {
   }
 
   return rows.join('<span class="sep">·</span>');
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 // ---------------------------------------------------------------------------

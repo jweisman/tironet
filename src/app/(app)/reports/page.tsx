@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Table2, Loader2, ClipboardList } from "lucide-react";
+import { FileText, Table2, Loader2, ClipboardList, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSession } from "next-auth/react";
@@ -70,6 +70,7 @@ export default function ReportsPage() {
   const hasAccess = isAdmin || !!role || isInstructor || isMedic;
   const showActivityReports = !isMedic;
   const showRequestReports = !isInstructor;
+  const showDailyForum = !!role; // platoon or company commander only
 
   if (cycleLoading) return null;
 
@@ -139,6 +140,14 @@ export default function ReportsPage() {
     router.push(`/reports/activity-summary${qs ? `?${qs}` : ""}`);
   }
 
+  function handleDailyForum() {
+    if (!navigator.onLine) {
+      toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
+      return;
+    }
+    router.push("/reports/daily-forum");
+  }
+
   function handleRequestSummary() {
     if (!navigator.onLine) {
       toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
@@ -160,6 +169,33 @@ export default function ReportsPage() {
       </div>
 
       <div className="p-4 space-y-6">
+        {/* Daily forum report */}
+        {showDailyForum && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground">דוח יומי</h2>
+          <button
+            type="button"
+            onClick={handleDailyForum}
+            className="flex w-full items-start gap-4 rounded-xl border border-border bg-background p-4 text-start hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Calendar size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold">דוח פורום יומי</p>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  PDF
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                סיכום יומי של בקשות פתוחות, פעילויות היום והמחר, ופערים
+              </p>
+            </div>
+          </button>
+        </section>
+        )}
+
         {/* Activity reports section */}
         {showActivityReports && (
         <section className="space-y-3">
