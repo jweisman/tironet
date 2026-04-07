@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useCallback } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ interface Props {
   activity: ActivitySummary;
   showPlatoon?: boolean;
   onClick: () => void;
+  onLongPress?: (e: { x: number; y: number }) => void;
 }
 
 function formatDate(isoString: string): string {
@@ -37,20 +39,60 @@ function formatDate(isoString: string): string {
   });
 }
 
-export function ActivityCard({ activity, showPlatoon = false, onClick }: Props) {
+export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPress }: Props) {
   const isPast = activity.date.split("T")[0] < new Date().toISOString().split("T")[0];
   const hasIssues = activity.isRequired && isPast && (activity.missingCount > 0 || activity.failedCount > 0);
+
+  // Long-press detection for mobile
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!onLongPress) return;
+    suppressClickRef.current = false;
+    const touch = e.touches[0];
+    const x = touch.clientX;
+    const y = touch.clientY;
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      suppressClickRef.current = true;
+      onLongPress({ x, y });
+    }, 500);
+  }, [onLongPress]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (!onLongPress) return;
+    e.preventDefault();
+    suppressClickRef.current = true;
+    onLongPress({ x: e.clientX, y: e.clientY });
+  }, [onLongPress]);
 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        if (suppressClickRef.current) { suppressClickRef.current = false; return; }
+        onClick();
+      }}
+      onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
       className={cn(
         "flex w-full flex-col gap-1.5 py-3 px-4 text-start transition-colors hover:bg-muted/50 active:bg-muted border-b border-b-border border-s-2",
         hasIssues
           ? "border-s-amber-400 bg-amber-50/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 dark:border-s-amber-600"
           : "border-s-transparent"
       )}
+      style={onLongPress ? { WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties : undefined}
     >
       {/* Main row */}
       <div className="flex items-center gap-3 w-full">

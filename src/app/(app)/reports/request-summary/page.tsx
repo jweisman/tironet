@@ -10,7 +10,7 @@ import {
   TRANSPORTATION_LABELS,
 } from "@/lib/requests/constants";
 import { formatAppointment } from "@/lib/requests/medical-appointments";
-import { extractRequestFields } from "@/lib/reports/detail-columns";
+import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns";
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import type { RequestSummaryData, RequestSummaryItem } from "@/app/api/reports/request-summary/route";
 import type { RequestType, Transportation } from "@/types";
@@ -50,11 +50,7 @@ const clientFormatters = {
 function RequestDetails({ req }: { req: RequestSummaryItem }) {
   const { fields, appointments } = extractRequestFields(req, clientFormatters);
 
-  const notes: { label: string; value: string }[] = [];
-  for (const n of req.notes ?? []) {
-    const actionLabel = n.action === "approve" ? "אישור" : n.action === "deny" ? "דחיה" : n.action === "note" ? "הערה" : n.action;
-    notes.push({ label: `${n.userName} (${actionLabel})`, value: n.note });
-  }
+  const notes = formatNotes(req.notes ?? []);
 
   return <RequestDetailColumns data={{ fields, appointments, notes }} />;
 }

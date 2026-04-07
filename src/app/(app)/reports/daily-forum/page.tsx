@@ -9,7 +9,7 @@ import { PieChart, PieChartLegend } from "@/components/reports/PieChart";
 import { cn } from "@/lib/utils";
 import { formatGradeDisplay } from "@/lib/score-format";
 import { formatAppointment } from "@/lib/requests/medical-appointments";
-import { extractRequestFields } from "@/lib/reports/detail-columns";
+import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns";
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import type {
   DailyForumData,
@@ -51,10 +51,7 @@ const clientFormatters = {
 function RequestCard({ req }: { req: OpenRequestItem }) {
   const { fields, appointments } = extractRequestFields(req, clientFormatters);
 
-  const notes: { label: string; value: string }[] = [];
-  if (req.latestNote) {
-    notes.push({ label: "הערה", value: req.latestNote });
-  }
+  const notes = formatNotes(req.notes);
 
   return (
     <div className="border-b border-border py-2 px-1">

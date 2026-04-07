@@ -15,6 +15,7 @@ import {
 } from "@/lib/reports/html-helpers";
 import {
   extractRequestFields,
+  formatNotes,
   renderDetailColumnsHtml,
   DETAIL_COLUMNS_CSS,
 } from "@/lib/reports/detail-columns";
@@ -44,8 +45,8 @@ export interface OpenRequestItem {
   sickLeaveDays: number | null;
   // Hardship fields
   specialConditions: boolean | null;
-  // Latest note
-  latestNote: string | null;
+  // Audit trail notes
+  notes: { action: string; userName: string; note: string }[];
 }
 
 export interface TodayActivityItem {
@@ -211,9 +212,8 @@ export async function fetchDailyForum(
       },
       actions: {
         where: { note: { not: null } },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { note: true },
+        orderBy: { createdAt: "asc" },
+        select: { action: true, userName: true, note: true },
       },
     },
     orderBy: { createdAt: "desc" },
@@ -244,7 +244,9 @@ export async function fetchDailyForum(
       medicalAppointments: parseMedicalAppointments(r.medicalAppointments as string | null),
       sickLeaveDays: r.sickLeaveDays,
       specialConditions: r.specialConditions,
-      latestNote: r.actions[0]?.note ?? null,
+      notes: (r.actions ?? [])
+        .filter((a): a is typeof a & { note: string } => a.note != null)
+        .map((a) => ({ action: a.action, userName: a.userName, note: a.note })),
     };
     const group = requestsByPlatoon.get(platoonId)!;
     if (r.type === "medical") group.medical.push(item);
@@ -498,10 +500,7 @@ const htmlFormatters = {
 function renderRequestDetailsHtml(req: OpenRequestItem): string {
   const { fields, appointments } = extractRequestFields(req, htmlFormatters);
 
-  const notes: { label: string; value: string }[] = [];
-  if (req.latestNote) {
-    notes.push({ label: "הערה", value: escapeHtml(req.latestNote) });
-  }
+  const notes = formatNotes(req.notes, escapeHtml);
 
   return renderDetailColumnsHtml({ fields, appointments, notes });
 }

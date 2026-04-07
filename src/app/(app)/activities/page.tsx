@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronDown, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
-import { useQuery } from "@powersync/react";
+import { useQuery, usePowerSync } from "@powersync/react";
 import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
 import { effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
+import { ContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
 import { CreateActivityForm } from "@/components/activities/CreateActivityForm";
 import { BulkImportActivitiesDialog } from "@/components/activities/BulkImportActivitiesDialog";
 import {
@@ -147,6 +148,8 @@ export default function ActivitiesPage() {
   const rawRole = selectedAssignment?.role ?? "";
   const role = rawRole ? effectiveRole(rawRole as Role) : "";
   const canCreate = role !== "squad_commander" && !!role;
+  const canEdit = canCreate; // same roles that can create can also edit metadata
+  const db = usePowerSync();
 
   // -------- PowerSync queries --------
   // Squad commanders see only their squad's counts; everyone else gets platoon-wide counts (squadId = '').
@@ -263,6 +266,28 @@ export default function ActivitiesPage() {
     if (skipped > 0) parts.push(`(${skipped} דולגו — כבר קיימות)`);
     toast.success(parts.join(" "));
   }
+
+  // -------- Context menu --------
+  const [contextMenu, setContextMenu] = useState<{ activity: ActivitySummary; position: { x: number; y: number } } | null>(null);
+
+  const openContextMenu = useCallback((activity: ActivitySummary, position: { x: number; y: number }) => {
+    setContextMenu({ activity, position });
+  }, []);
+
+  const contextMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!contextMenu) return [];
+    const a = contextMenu.activity;
+    return [
+      {
+        label: a.isRequired ? "סמן כרשות" : "סמן כחובה",
+        onClick: () => { db.execute("UPDATE activities SET is_required = ? WHERE id = ?", [a.isRequired ? 0 : 1, a.id]); },
+      },
+      {
+        label: a.status === "draft" ? "סמן כפעיל" : "סמן כטיוטה",
+        onClick: () => { db.execute("UPDATE activities SET status = ? WHERE id = ?", [a.status === "draft" ? "active" : "draft", a.id]); },
+      },
+    ];
+  }, [contextMenu, db]);
 
   async function handleNotify() {
     if (!pendingActivityId) return;
@@ -394,6 +419,7 @@ export default function ActivitiesPage() {
                     activity={activity}
                     showPlatoon={false}
                     onClick={() => router.push(`/activities/${activity.id}`)}
+                    onLongPress={canEdit ? (pos) => openContextMenu(activity, pos) : undefined}
                   />
                 ))}
               </div>
@@ -408,6 +434,7 @@ export default function ActivitiesPage() {
                 activity={activity}
                 showPlatoon={showPlatoon}
                 onClick={() => router.push(`/activities/${activity.id}`)}
+                onLongPress={canEdit ? (pos) => openContextMenu(activity, pos) : undefined}
               />
             ))}
           </div>
@@ -477,6 +504,15 @@ export default function ActivitiesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          items={contextMenuItems}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
