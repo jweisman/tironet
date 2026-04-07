@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NODE_OPTIONS='--max-old-space-size=8192' next dev",
     "build": "npx prisma migrate deploy && npx prisma generate && next build",
     "postinstall": "prisma generate && powersync-web copy-assets -o public && cp public/@powersync/worker/*.umd.js public/@powersync/ && node scripts/generate-splash.mjs",
     "start": "next start",
