@@ -54,11 +54,8 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
 };
 
 const STATUS_FILTERS: StatusFilter[] = [
-  "all",
   "active",
-  "transferred",
-  "dropped",
-  "injured",
+  "all",
 ];
 
 // ---------------------------------------------------------------------------
@@ -255,7 +252,7 @@ export default function SoldiersPage() {
 
   // -------- UI state --------
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [showGapsOnly, setShowGapsOnly] = useState(
     searchParams.get("filter") === "gaps"
   );
@@ -462,7 +459,7 @@ export default function SoldiersPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {totalSoldiers === 0 && !syncStatus.hasSynced && !search && statusFilter === "all" && !showGapsOnly && !showRequestsOnly && (
+        {totalSoldiers === 0 && !syncStatus.hasSynced && !search && (statusFilter === "all" || statusFilter === "active") && !showGapsOnly && !showRequestsOnly && (
           <div className="divide-y divide-border">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -475,10 +472,10 @@ export default function SoldiersPage() {
             ))}
           </div>
         )}
-        {totalSoldiers === 0 && (syncStatus.hasSynced || search || statusFilter !== "all" || showGapsOnly || showRequestsOnly) && (
+        {totalSoldiers === 0 && (syncStatus.hasSynced || search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
-            {(search || statusFilter !== "all" || showGapsOnly || showRequestsOnly) && (
+            {(search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && (
               <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>
             )}
           </div>
