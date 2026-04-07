@@ -88,9 +88,7 @@ const requests = new Table({
   // Medical fields
   urgent: column.integer,
   paramedic_date: column.text,
-  appointment_date: column.text,
-  appointment_place: column.text,
-  appointment_type: column.text,
+  medical_appointments: column.text,
   sick_leave_days: column.integer,
   // Hardship fields
   special_conditions: column.integer,

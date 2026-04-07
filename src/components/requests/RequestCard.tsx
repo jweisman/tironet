@@ -24,6 +24,10 @@ export interface RequestSummary {
   createdAt: string;
   description: string | null;
   urgent: boolean | null;
+  // Optional date fields for active-request filtering
+  departureAt?: string | null;
+  returnAt?: string | null;
+  medicalAppointments?: string | null;
 }
 
 interface Props {

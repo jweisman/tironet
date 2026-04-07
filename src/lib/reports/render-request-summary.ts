@@ -7,6 +7,13 @@ import {
   TYPE_LABELS,
   TRANSPORTATION_LABELS,
 } from "@/lib/reports/html-helpers";
+import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
+import {
+  extractRequestFields,
+  renderDetailColumnsHtml,
+  DETAIL_COLUMNS_CSS,
+} from "@/lib/reports/detail-columns";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,9 +36,7 @@ export interface RequestSummaryItem {
   transportation: string | null;
   // Medical fields
   paramedicDate: string | null;
-  appointmentDate: string | null;
-  appointmentPlace: string | null;
-  appointmentType: string | null;
+  medicalAppointments: MedicalAppointment[] | null;
   sickLeaveDays: number | null;
   // Hardship fields
   specialConditions: boolean | null;
@@ -119,9 +124,7 @@ export async function fetchRequestSummary(
     returnAt: r.returnAt?.toISOString() ?? null,
     transportation: r.transportation,
     paramedicDate: r.paramedicDate?.toISOString().split("T")[0] ?? null,
-    appointmentDate: r.appointmentDate?.toISOString().split("T")[0] ?? null,
-    appointmentPlace: r.appointmentPlace,
-    appointmentType: r.appointmentType,
+    medicalAppointments: parseMedicalAppointments(r.medicalAppointments as string | null),
     sickLeaveDays: r.sickLeaveDays,
     specialConditions: r.specialConditions,
     notes: (r.actions ?? [])
@@ -175,40 +178,24 @@ export async function fetchRequestSummary(
 // Helpers
 // ---------------------------------------------------------------------------
 
+const htmlFormatters = {
+  text: escapeHtml,
+  dateTime: formatDateTime,
+  date: formatDate,
+  appointment: formatAppointment,
+  transportationLabels: TRANSPORTATION_LABELS,
+};
+
 function renderRequestDetails(req: RequestSummaryItem): string {
-  const rows: string[] = [];
+  const { fields, appointments } = extractRequestFields(req, htmlFormatters);
 
-  if (req.description) {
-    rows.push(`<span class="detail-label">תיאור:</span> ${escapeHtml(req.description)}`);
-  }
-
-  if (req.type === "leave") {
-    if (req.place) rows.push(`<span class="detail-label">מקום:</span> ${escapeHtml(req.place)}`);
-    if (req.departureAt) rows.push(`<span class="detail-label">יציאה:</span> ${formatDateTime(req.departureAt)}`);
-    if (req.returnAt) rows.push(`<span class="detail-label">חזרה:</span> ${formatDateTime(req.returnAt)}`);
-    if (req.transportation) rows.push(`<span class="detail-label">הגעה:</span> ${TRANSPORTATION_LABELS[req.transportation] ?? req.transportation}`);
-  }
-
-  if (req.type === "medical") {
-    if (req.paramedicDate) rows.push(`<span class="detail-label">בדיקת חופ"ל:</span> ${formatDate(req.paramedicDate)}`);
-    if (req.appointmentDate) rows.push(`<span class="detail-label">תור:</span> ${formatDate(req.appointmentDate)}`);
-    if (req.appointmentPlace) rows.push(`<span class="detail-label">מקום:</span> ${escapeHtml(req.appointmentPlace)}`);
-    if (req.appointmentType) rows.push(`<span class="detail-label">סוג:</span> ${escapeHtml(req.appointmentType)}`);
-    if (req.sickLeaveDays != null) rows.push(`<span class="detail-label">ימי גימלים:</span> ${req.sickLeaveDays}`);
-  }
-
-  if (req.type === "hardship") {
-    if (req.specialConditions != null) {
-      rows.push(`<span class="detail-label">אוכלוסיות מיוחדות:</span> ${req.specialConditions ? "כן" : "לא"}`);
-    }
-  }
-
+  const notes: { label: string; value: string }[] = [];
   for (const n of req.notes) {
-    const actionLabel = n.action === "approve" ? "אישור" : n.action === "deny" ? "דחיה" : n.action;
-    rows.push(`<span class="detail-label">${escapeHtml(n.userName)} (${actionLabel}):</span> ${escapeHtml(n.note)}`);
+    const actionLabel = n.action === "approve" ? "אישור" : n.action === "deny" ? "דחיה" : n.action === "note" ? "הערה" : n.action;
+    notes.push({ label: `${escapeHtml(n.userName)} (${actionLabel})`, value: escapeHtml(n.note) });
   }
 
-  return rows.join('<span class="sep">·</span>');
+  return renderDetailColumnsHtml({ fields, appointments, notes });
 }
 
 // ---------------------------------------------------------------------------
@@ -320,11 +307,10 @@ export function renderRequestSummaryHtml(data: RequestSummaryData): string {
     .request-details {
       font-size: 10px;
       color: #444;
-      margin-top: 3px;
+      margin-top: 4px;
       padding-right: 4px;
     }
-    .detail-label { font-weight: 600; }
-    .sep { margin: 0 6px; color: #bbb; }
+${DETAIL_COLUMNS_CSS}
     .no-data { font-size: 11px; color: #999; text-align: center; margin-top: 24px; }
   </style>
 </head>

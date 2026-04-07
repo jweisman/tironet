@@ -56,6 +56,9 @@ const baseRequest = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Restore default: canActOnRequest returns true unless overridden
+  mockCanActOnRequest.mockReset();
+  mockCanActOnRequest.mockReturnValue(true);
   // Mock $transaction to resolve array transactions and return first element
   mockTransaction.mockImplementation(async (ops: unknown) => {
     if (Array.isArray(ops)) {
@@ -369,6 +372,57 @@ describe("PATCH /api/requests/[id] — field edits", () => {
     const updateCall = mockRequestUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
     expect(updateCall.data.status).toBe("approved");
     expect(updateCall.data.assignedRole).toBeNull();
+  });
+
+  it("allows company_medic to edit medical request fields", async () => {
+    const medicalRequest = { ...baseRequest, type: "medical", assignedRole: "platoon_commander" };
+    mockCanActOnRequest.mockReturnValueOnce(false); // medic doesn't match assignedRole
+    mockRequestFindUnique.mockResolvedValue(medicalRequest as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "company_medic",
+        soldierIds: ["sol-1"],
+        squadIds: [],
+        platoonIds: ["pl-1"],
+        canCreate: false,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+    mockRequestUpdate.mockResolvedValue({
+      ...medicalRequest,
+      medicalAppointments: [{ id: "a1", date: "2026-04-10", place: "Hospital", type: "Checkup" }],
+    } as never);
+
+    const req = createMockRequest("PATCH", "/api/requests/req-1", {
+      medicalAppointments: [{ id: "a1", date: "2026-04-10", place: "Hospital", type: "Checkup" }],
+    });
+    const res = await PATCH(req, makeParams("req-1"));
+    expect(res.status).toBe(200);
+  });
+
+  it("blocks company_medic from editing non-medical request fields", async () => {
+    mockCanActOnRequest.mockReturnValueOnce(false);
+    mockRequestFindUnique.mockResolvedValue({
+      ...baseRequest,
+      type: "leave",
+      assignedRole: "platoon_commander",
+    } as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "company_medic",
+        soldierIds: ["sol-1"],
+        squadIds: [],
+        platoonIds: ["pl-1"],
+        canCreate: false,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    const req = createMockRequest("PATCH", "/api/requests/req-1", { description: "Updated" });
+    const res = await PATCH(req, makeParams("req-1"));
+    expect(res.status).toBe(403);
   });
 
   it("returns existing request when no fields to update", async () => {

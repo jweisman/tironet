@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { getRequestScope } from "@/lib/api/request-scope";
 import { getNextState } from "@/lib/requests/workflow";
 import { canActOnRequest } from "@/lib/requests/workflow";
@@ -21,9 +22,12 @@ const patchSchema = z.object({
   transportation: z.enum(["public_transit", "shuttle", "military_transport", "other"]).nullable().optional(),
   urgent: z.boolean().nullable().optional(),
   paramedicDate: z.string().nullable().optional(),
-  appointmentDate: z.string().nullable().optional(),
-  appointmentPlace: z.string().nullable().optional(),
-  appointmentType: z.string().nullable().optional(),
+  medicalAppointments: z.array(z.object({
+    id: z.string(),
+    date: z.string(),
+    place: z.string(),
+    type: z.string(),
+  })).nullable().optional(),
   sickLeaveDays: z.number().int().min(0).nullable().optional(),
   specialConditions: z.boolean().nullable().optional(),
   // Status/assignment override from connector (offline sync)
@@ -146,8 +150,9 @@ export async function PATCH(
     return NextResponse.json({ request: updated });
   }
 
-  // Handle field edits — only the assigned role can edit
-  if (!canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
+  // Handle field edits — assigned role or company medic (medical requests only) can edit
+  const isMedicOnMedical = scope.role === "company_medic" && req.type === "medical";
+  if (!isMedicOnMedical && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
     return NextResponse.json({ error: "Only the assigned role can edit" }, { status: 403 });
   }
 
@@ -165,9 +170,7 @@ export async function PATCH(
         ...(data.transportation !== undefined ? { transportation: data.transportation } : {}),
         ...(data.urgent !== undefined ? { urgent: data.urgent } : {}),
         ...(data.paramedicDate !== undefined ? { paramedicDate: data.paramedicDate ? new Date(data.paramedicDate) : null } : {}),
-        ...(data.appointmentDate !== undefined ? { appointmentDate: data.appointmentDate ? new Date(data.appointmentDate) : null } : {}),
-        ...(data.appointmentPlace !== undefined ? { appointmentPlace: data.appointmentPlace } : {}),
-        ...(data.appointmentType !== undefined ? { appointmentType: data.appointmentType } : {}),
+        ...(data.medicalAppointments !== undefined ? { medicalAppointments: data.medicalAppointments ?? Prisma.DbNull } : {}),
         ...(data.sickLeaveDays !== undefined ? { sickLeaveDays: data.sickLeaveDays } : {}),
         ...(data.specialConditions !== undefined ? { specialConditions: data.specialConditions } : {}),
       },
@@ -194,9 +197,7 @@ export async function PATCH(
   if (data.transportation !== undefined) updateData.transportation = data.transportation;
   if (data.urgent !== undefined) updateData.urgent = data.urgent;
   if (data.paramedicDate !== undefined) updateData.paramedicDate = data.paramedicDate ? new Date(data.paramedicDate) : null;
-  if (data.appointmentDate !== undefined) updateData.appointmentDate = data.appointmentDate ? new Date(data.appointmentDate) : null;
-  if (data.appointmentPlace !== undefined) updateData.appointmentPlace = data.appointmentPlace;
-  if (data.appointmentType !== undefined) updateData.appointmentType = data.appointmentType;
+  if (data.medicalAppointments !== undefined) updateData.medicalAppointments = data.medicalAppointments ?? Prisma.DbNull;
   if (data.sickLeaveDays !== undefined) updateData.sickLeaveDays = data.sickLeaveDays;
   if (data.specialConditions !== undefined) updateData.specialConditions = data.specialConditions;
 

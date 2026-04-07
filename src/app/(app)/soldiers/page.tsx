@@ -107,8 +107,11 @@ const APPROVED_REQUESTS_QUERY = `
   WHERE r.cycle_id = ?
     AND r.status = 'approved'
     AND (
-      (r.type = 'leave' AND r.departure_at >= DATE('now'))
-      OR (r.type = 'medical' AND r.appointment_date >= DATE('now'))
+      (r.type = 'leave' AND (r.departure_at >= DATE('now') OR r.return_at >= DATE('now')))
+      OR (r.type = 'medical' AND r.medical_appointments IS NOT NULL AND EXISTS (
+        SELECT 1 FROM json_each(r.medical_appointments) AS a
+        WHERE json_extract(a.value, '$.date') >= DATE('now')
+      ))
       OR r.type = 'hardship'
     )
 `;
@@ -439,7 +442,7 @@ export default function SoldiersPage() {
             )}
           >
             <FileText size={12} />
-            <span>בקשות</span>
+            <span>בקשות פעילות</span>
           </button>
           <button
             type="button"
