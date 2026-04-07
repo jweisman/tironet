@@ -115,6 +115,23 @@ function activeRequestSortDate(r: RequestSummary): string {
   return "9999";
 }
 
+function groupByDate(requests: RequestSummary[]): [string, RequestSummary[]][] {
+  const groups = new Map<string, RequestSummary[]>();
+  for (const r of requests) {
+    const key = activeRequestSortDate(r);
+    const list = groups.get(key);
+    if (list) list.push(r);
+    else groups.set(key, [r]);
+  }
+  return Array.from(groups.entries());
+}
+
+function formatGroupDate(dateKey: string): string {
+  if (dateKey === "9999") return "ת\"ש";
+  const d = new Date(dateKey + "T00:00:00");
+  return d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
+}
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
@@ -375,14 +392,23 @@ export default function RequestsPage() {
               </div>
             )}
             {activeRequests.length > 0 && (
-              <div className="divide-y divide-border">
-                {activeRequests.map((r) => (
-                  <RequestCard
-                    key={r.id}
-                    request={r}
-                    userRole={rawRole as Role}
-                    onClick={() => router.push(`/requests/${r.id}`)}
-                  />
+              <div>
+                {groupByDate(activeRequests).map(([dateKey, requests]) => (
+                  <div key={dateKey}>
+                    <div className="sticky top-[5.5rem] z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                      {formatGroupDate(dateKey)}
+                    </div>
+                    <div className="divide-y divide-border">
+                      {requests.map((r) => (
+                        <RequestCard
+                          key={r.id}
+                          request={r}
+                          userRole={rawRole as Role}
+                          onClick={() => router.push(`/requests/${r.id}`)}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
