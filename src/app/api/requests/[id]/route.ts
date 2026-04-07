@@ -150,8 +150,9 @@ export async function PATCH(
     return NextResponse.json({ request: updated });
   }
 
-  // Handle field edits — only the assigned role can edit
-  if (!canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
+  // Handle field edits — assigned role or company medic (medical requests only) can edit
+  const isMedicOnMedical = scope.role === "company_medic" && req.type === "medical";
+  if (!isMedicOnMedical && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
     return NextResponse.json({ error: "Only the assigned role can edit" }, { status: 403 });
   }
 

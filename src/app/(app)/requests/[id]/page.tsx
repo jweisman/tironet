@@ -233,6 +233,10 @@ export default function RequestDetailPage() {
 
   const isAssignedToMe = assignedRole !== null && rawUserRole !== "" && canActOnRequest(rawUserRole as Role, assignedRole);
 
+  // Company medics can edit medical request fields (appointments, etc.) but cannot perform workflow actions
+  const isMedicOnMedical = rawUserRole === "company_medic" && requestType === "medical";
+  const canEditFields = isAssignedToMe || isMedicOnMedical;
+
   const userName = session?.user
     ? `${(session.user as { familyName?: string }).familyName ?? ""} ${(session.user as { givenName?: string }).givenName ?? ""}`.trim()
     : "";
@@ -456,7 +460,7 @@ export default function RequestDetailPage() {
                 <div className="py-2 border-b border-border">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm text-muted-foreground">תורים</span>
-                    {isAssignedToMe && !editingAppointments && (
+                    {canEditFields && !editingAppointments && (
                       <button
                         type="button"
                         onClick={() => {

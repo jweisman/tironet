@@ -54,6 +54,20 @@ describe("parseMedicalAppointments", () => {
     const result = parseMedicalAppointments(json);
     expect(result).toHaveLength(2);
   });
+
+  it("sorts appointments by date ascending", () => {
+    const json = JSON.stringify([
+      { id: "1", date: "2026-04-12", place: "C", type: "X" },
+      { id: "2", date: "2026-04-06", place: "A", type: "Y" },
+      { id: "3", date: "2026-04-10", place: "B", type: "Z" },
+    ]);
+    const result = parseMedicalAppointments(json);
+    expect(result.map((a) => a.date)).toEqual([
+      "2026-04-06",
+      "2026-04-10",
+      "2026-04-12",
+    ]);
+  });
 });
 
 describe("hasUpcomingAppointment", () => {

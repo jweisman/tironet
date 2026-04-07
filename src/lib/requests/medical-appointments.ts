@@ -16,13 +16,15 @@ export function parseMedicalAppointments(
   try {
     const arr = typeof json === "string" ? JSON.parse(json) : json;
     if (!Array.isArray(arr)) return [];
-    return arr.filter(
-      (item): item is MedicalAppointment =>
-        item != null &&
-        typeof item === "object" &&
-        typeof item.id === "string" &&
-        typeof item.date === "string",
-    );
+    return arr
+      .filter(
+        (item): item is MedicalAppointment =>
+          item != null &&
+          typeof item === "object" &&
+          typeof item.id === "string" &&
+          typeof item.date === "string",
+      )
+      .sort((a, b) => a.date.localeCompare(b.date));
   } catch {
     return [];
   }
