@@ -291,11 +291,18 @@ Request creation and workflow actions (approve/deny/acknowledge) write to the lo
 
 ### List page filtering
 
-The requests list page (`/requests`) has two tabs:
-- **Open** (`פתוחות`): requests where `assignedRole !== null` (still in the workflow)
-- **Approved** (`אושרו`): requests where `status === "approved" && assignedRole === null` (workflow complete)
+The requests list page (`/requests`) has three tabs:
+- **Open** (`פתוחות`): requests where `status === "open"` (undecided, still being reviewed)
+- **Approved** (`אושרו`): requests where `status === "approved"` (includes both pending-ack and fully completed)
+- **Requires my action** (`דורשות טיפולי`): requests where `assignedRole !== null && canActOnRequest(userRole, assignedRole)` — cross-cuts open and approved tabs
+
+Denied requests pending acknowledgement (`status === "denied"`, `assignedRole !== null`) appear **only** in the "requires my action" tab — not in "open" or "approved". Completed denied requests (`assignedRole === null`) do not appear in any tab.
 
 Open requests are sorted with "assigned to me" first.
+
+### Badge count scoping (`useRequestBadge`)
+
+The request badge (home page callout, sidebar/tab bar dot) counts requests assigned to the user's **effective role** (e.g. `platoon_sergeant` → `platoon_commander`). For squad commanders, the count is further scoped to their own squad via `s.squad_id = ?` — without this, the badge would include requests from all squads in the platoon (since the sync stream delivers the full platoon).
 
 ## Roles and Access Control
 

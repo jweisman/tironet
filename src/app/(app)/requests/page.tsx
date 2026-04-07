@@ -133,7 +133,7 @@ export default function RequestsPage() {
 
   // Filtered lists
   const openRequests = useMemo(
-    () => allRequests.filter((r) => r.assignedRole !== null && r.status !== "approved" && (filterType === "all" || r.type === filterType)),
+    () => allRequests.filter((r) => r.status === "open" && (filterType === "all" || r.type === filterType)),
     [allRequests, filterType],
   );
 

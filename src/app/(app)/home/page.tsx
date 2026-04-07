@@ -211,7 +211,7 @@ const REQUESTS_QUERY = `
   SELECT
     s.squad_id,
     SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) AS approved_requests,
-    SUM(CASE WHEN r.assigned_role IS NOT NULL AND r.status != 'approved' THEN 1 ELSE 0 END) AS in_progress_requests
+    SUM(CASE WHEN r.status = 'open' THEN 1 ELSE 0 END) AS in_progress_requests
   FROM requests r
   JOIN soldiers s ON s.id = r.soldier_id
   WHERE r.cycle_id = (SELECT id FROM cycle)
