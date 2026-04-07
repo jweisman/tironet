@@ -96,6 +96,7 @@ export function RequestCard({ request, userRole, onClick, onLongPress }: Props) 
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
       className="flex w-full items-start gap-3 px-4 py-3 text-start hover:bg-muted/50 transition-colors"
+      style={onLongPress ? { WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties : undefined}
     >
       {/* Icon */}
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">

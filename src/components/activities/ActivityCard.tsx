@@ -92,6 +92,7 @@ export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPre
           ? "border-s-amber-400 bg-amber-50/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 dark:border-s-amber-600"
           : "border-s-transparent"
       )}
+      style={onLongPress ? { WebkitUserSelect: "none", WebkitTouchCallout: "none" } as React.CSSProperties : undefined}
     >
       {/* Main row */}
       <div className="flex items-center gap-3 w-full">
