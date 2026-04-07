@@ -11,6 +11,7 @@ import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medi
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import {
   extractRequestFields,
+  formatNotes,
   renderDetailColumnsHtml,
   DETAIL_COLUMNS_CSS,
 } from "@/lib/reports/detail-columns";
@@ -189,11 +190,7 @@ const htmlFormatters = {
 function renderRequestDetails(req: RequestSummaryItem): string {
   const { fields, appointments } = extractRequestFields(req, htmlFormatters);
 
-  const notes: { label: string; value: string }[] = [];
-  for (const n of req.notes) {
-    const actionLabel = n.action === "approve" ? "אישור" : n.action === "deny" ? "דחיה" : n.action === "note" ? "הערה" : n.action;
-    notes.push({ label: `${escapeHtml(n.userName)} (${actionLabel})`, value: escapeHtml(n.note) });
-  }
+  const notes = formatNotes(req.notes, escapeHtml);
 
   return renderDetailColumnsHtml({ fields, appointments, notes });
 }

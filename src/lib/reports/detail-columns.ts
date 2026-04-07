@@ -86,6 +86,32 @@ export function extractRequestFields(
 }
 
 // ---------------------------------------------------------------------------
+// Note formatting (shared between server + client)
+// ---------------------------------------------------------------------------
+
+export interface RequestNote {
+  action: string;
+  userName: string;
+  note: string;
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  approve: "אישור",
+  deny: "דחיה",
+  note: "הערה",
+};
+
+export function formatNotes(
+  notes: RequestNote[],
+  escapeText: (s: string) => string = (s) => s,
+): { label: string; value: string }[] {
+  return notes.map((n) => {
+    const actionLabel = ACTION_LABELS[n.action] ?? n.action;
+    return { label: `${escapeText(n.userName)} (${actionLabel})`, value: escapeText(n.note) };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Server-side HTML rendering
 // ---------------------------------------------------------------------------
 
@@ -122,16 +148,19 @@ export function renderDetailColumnsHtml(data: DetailColumnsData): string {
 
 export const DETAIL_COLUMNS_CSS = `    .detail-columns {
       display: flex;
-      gap: 24px;
+      flex-wrap: wrap;
+      gap: 8px 24px;
       align-items: flex-start;
     }
     .detail-grid {
       border-collapse: collapse;
-      flex-shrink: 0;
+      width: auto;
+      max-width: 60%;
     }
     .detail-grid td {
       padding: 1px 0;
       vertical-align: top;
+      word-break: break-word;
     }
     .detail-grid td:first-child {
       padding-left: 8px;
@@ -139,10 +168,16 @@ export const DETAIL_COLUMNS_CSS = `    .detail-columns {
       color: #666;
     }
     .detail-label { font-weight: 600; }
+    .detail-appointments {
+      flex-shrink: 0;
+    }
     .detail-appointments ul {
       margin: 1px 8px 0 0;
       padding: 0;
       list-style: none;
+    }
+    .detail-appointments li {
+      white-space: nowrap;
     }
     .detail-appointments li::before {
       content: "–";
@@ -152,6 +187,8 @@ export const DETAIL_COLUMNS_CSS = `    .detail-columns {
     .detail-notes {
       border-right: 1px solid #ddd;
       padding-right: 12px;
+      flex: 1;
+      min-width: 120px;
     }
     .detail-note {
       color: #888;
