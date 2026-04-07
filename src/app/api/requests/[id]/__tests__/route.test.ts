@@ -20,7 +20,13 @@ vi.mock("@/lib/requests/workflow", () => ({
 
 vi.mock("@/lib/push/send", () => ({
   sendPushToUsers: vi.fn().mockResolvedValue(undefined),
+  notifyAssignedRole: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: vi.fn((fn: () => void) => fn()) };
+});
 
 import { GET, PATCH, DELETE } from "../route";
 import { prisma } from "@/lib/db/prisma";
