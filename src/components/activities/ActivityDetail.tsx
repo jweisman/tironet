@@ -437,7 +437,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
         <div className="flex items-center gap-2">
           {data.isRequired && (
-            <Badge variant="secondary">דרוש</Badge>
+            <Badge variant="secondary">חובה</Badge>
           )}
           <Badge variant={data.status === "draft" ? "outline" : "default"}>
             {data.status === "draft" ? "טיוטה" : "פעיל"}
@@ -745,7 +745,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
             {/* Required */}
             <div className="flex items-center justify-between">
-              <Label htmlFor="meta-required">פעילות דרושה</Label>
+              <Label htmlFor="meta-required">פעילות חובה</Label>
               <Switch
                 id="meta-required"
                 checked={metaIsRequired}

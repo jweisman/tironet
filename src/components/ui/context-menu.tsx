@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export interface ContextMenuItem {
@@ -17,6 +17,29 @@ interface Props {
 
 export function ContextMenu({ items, position, onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [adjusted, setAdjusted] = useState<{ top: number; left: number } | null>(null);
+
+  // Clamp to viewport after measuring the menu
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    let top = position.y;
+    let left = position.x;
+    // Clamp bottom
+    if (top + rect.height > window.innerHeight - pad) {
+      top = window.innerHeight - rect.height - pad;
+    }
+    // Clamp right
+    if (left + rect.width > window.innerWidth - pad) {
+      left = window.innerWidth - rect.width - pad;
+    }
+    // Clamp left/top
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    setAdjusted({ top, left });
+  }, [position]);
 
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
@@ -28,12 +51,12 @@ export function ContextMenu({ items, position, onClose }: Props) {
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [onClose]);
 
-  // Adjust position to stay within viewport
   const style: React.CSSProperties = {
     position: "fixed",
-    top: position.y,
-    left: position.x,
+    top: adjusted?.top ?? position.y,
+    left: adjusted?.left ?? position.x,
     zIndex: 100,
+    visibility: adjusted ? "visible" : "hidden",
   };
 
   return (
