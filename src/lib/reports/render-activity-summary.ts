@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 import type { ScoreConfig } from "@/types/score-config";
 import { getActiveScores } from "@/types/score-config";
+import type { DisplayConfiguration } from "@/types/display-config";
+import { getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 import { renderPieSvg } from "@/lib/reports/html-helpers";
 
@@ -28,6 +30,7 @@ export interface ActivitySummaryItem {
   naCount: number;
   totalSoldiers: number;
   rows: ActivitySummaryRow[];
+  displayConfiguration?: DisplayConfiguration | null;
 }
 
 export interface ActivitySummaryData {
@@ -60,7 +63,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       ...(afterDate ? { date: { gte: afterDate } } : {}),
     },
     include: {
-      activityType: { select: { name: true, scoreConfig: true } },
+      activityType: { select: { name: true, scoreConfig: true, displayConfiguration: true } },
       reports: {
         include: {
           soldier: {
@@ -168,6 +171,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       passedCount, failedCount, naCount,
       totalSoldiers: activeReports.length,
       rows: mergedRows,
+      displayConfiguration: at.displayConfiguration as DisplayConfiguration | null,
     };
   });
 
@@ -210,9 +214,9 @@ export function renderActivitySummaryHtml(
           ${pieSvg}
           <div>
             <div class="legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> עבר (${activity.passedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> נכשל (${activity.failedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> לא רלוונטי (${activity.naCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ${getResultLabels(activity.displayConfiguration).passed.label} (${activity.passedCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).failed.label} (${activity.failedCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>
             </div>
             <p class="total-line">סה״כ ${activity.totalSoldiers} חיילים</p>
           </div>

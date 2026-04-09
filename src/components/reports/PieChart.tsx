@@ -84,15 +84,17 @@ export function PieChartLegend({
   passed,
   failed,
   na,
+  resultLabels,
 }: {
   passed: number;
   failed: number;
   na: number;
+  resultLabels?: { passed: { label: string }; failed: { label: string }; na: { label: string } };
 }) {
   const items = [
-    { label: "עבר", count: passed, color: COLORS.passed },
-    { label: "נכשל", count: failed, color: COLORS.failed },
-    { label: "לא רלוונטי", count: na, color: COLORS.na },
+    { label: resultLabels?.passed.label ?? "עבר", count: passed, color: COLORS.passed },
+    { label: resultLabels?.failed.label ?? "נכשל", count: failed, color: COLORS.failed },
+    { label: resultLabels?.na.label ?? "לא רלוונטי", count: na, color: COLORS.na },
   ];
 
   return (

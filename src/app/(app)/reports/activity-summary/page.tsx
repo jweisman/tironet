@@ -12,6 +12,7 @@ import type {
 } from "@/app/api/reports/activity-summary/route";
 import { cn } from "@/lib/utils";
 import { formatGradeDisplay } from "@/lib/score-format";
+import { getResultLabels } from "@/types/display-config";
 
 export default function ActivitySummaryPage() {
   const router = useRouter();
@@ -156,6 +157,7 @@ export default function ActivitySummaryPage() {
                     passed={activity.passedCount}
                     failed={activity.failedCount}
                     na={activity.naCount}
+                    resultLabels={getResultLabels(activity.displayConfiguration)}
                   />
                   <p className="text-xs text-muted-foreground">
                     סה&quot;כ {activity.totalSoldiers} חיילים

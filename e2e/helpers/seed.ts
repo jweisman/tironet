@@ -30,6 +30,7 @@ const IDS = {
   squadC: "e2e00000-0000-4000-8000-000000000042",
   activityTypeShooting: "e2e00000-0000-4000-8000-000000000050",
   activityTypeNav: "e2e00000-0000-4000-8000-000000000051",
+  activityTypeLessons: "e2e00000-0000-4000-8000-000000000052",
   activity1: "e2e00000-0000-4000-8000-000000000060",
   activity2: "e2e00000-0000-4000-8000-000000000061",
   activityDraft: "e2e00000-0000-4000-8000-000000000062",
@@ -131,6 +132,12 @@ async function seed() {
     data: [
       { id: IDS.activityTypeShooting, name: "Shooting", icon: "Target", sortOrder: 0 },
       { id: IDS.activityTypeNav, name: "Navigation", icon: "Compass", sortOrder: 1 },
+      {
+        id: IDS.activityTypeLessons, name: "Lessons", icon: "BookOpen", sortOrder: 2,
+        displayConfiguration: {
+          results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
+        },
+      },
     ],
   });
 

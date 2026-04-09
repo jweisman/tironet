@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/api/admin-guard";
 
@@ -17,10 +18,25 @@ const scoreConfigSchema = z.object({
   score6: scoreSlotSchema,
 }).optional();
 
+const resultLabelSchema = z.object({ label: z.string().min(1) });
+
+const displayConfigSchema = z.object({
+  results: z.object({
+    passed: resultLabelSchema,
+    failed: resultLabelSchema,
+    na: resultLabelSchema,
+  }).optional(),
+  note: z.object({
+    type: z.literal("list"),
+    options: z.array(z.string().min(1)).min(1),
+  }).optional(),
+}).nullable().optional();
+
 const createSchema = z.object({
   name: z.string().min(1),
   icon: z.string().min(1),
   scoreConfig: scoreConfigSchema,
+  displayConfiguration: displayConfigSchema,
 });
 
 export async function GET() {
@@ -46,8 +62,15 @@ export async function POST(req: NextRequest) {
   const maxSort = await prisma.activityType.aggregate({ _max: { sortOrder: true } });
   const sortOrder = (maxSort._max.sortOrder ?? 0) + 1;
 
+  const { displayConfiguration, ...rest } = parsed.data;
   const type = await prisma.activityType.create({
-    data: { ...parsed.data, sortOrder },
+    data: {
+      ...rest,
+      sortOrder,
+      ...(displayConfiguration !== undefined && {
+        displayConfiguration: displayConfiguration ?? Prisma.DbNull,
+      }),
+    },
   });
   return NextResponse.json(type, { status: 201 });
 }

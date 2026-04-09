@@ -30,6 +30,8 @@ import { ReportRow } from "./ReportRow";
 import { ActivityTypeIcon } from "./ActivityTypeIcon";
 import type { ActivityResult } from "@/types";
 import type { ActiveScore } from "@/types/score-config";
+import type { DisplayConfiguration } from "@/types/display-config";
+import { getResultLabels, getNoteOptions } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 import { useEffect, useRef } from "react";
 
@@ -79,7 +81,7 @@ export interface ActivityDetailData {
   date: string;
   status: "draft" | "active";
   isRequired: boolean;
-  activityType: { id: string; name: string; icon: string; activeScores: ActiveScore[] };
+  activityType: { id: string; name: string; icon: string; activeScores: ActiveScore[]; displayConfiguration?: DisplayConfiguration | null };
   platoon: { id: string; name: string; companyName: string };
   role: string;
   canEditMetadata: boolean;
@@ -125,6 +127,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [importReportsOpen, setImportReportsOpen] = useState(false);
 
   const activeScores = data.activityType.activeScores;
+  const resultLabels = getResultLabels(data.activityType.displayConfiguration);
+  const noteOptions = getNoteOptions(data.activityType.displayConfiguration);
 
   // Local reports state: Map<soldierId, SoldierReport>
   const [reports, setReports] = useState<Map<string, SoldierReport>>(() => {
@@ -517,7 +521,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
       {/* Bulk update bar */}
       {editingReports && (
         <div className="sticky top-0 z-10">
-          <BulkUpdateBar onBulkUpdate={handleBulkUpdate} loading={bulkLoading} />
+          <BulkUpdateBar onBulkUpdate={handleBulkUpdate} loading={bulkLoading} resultLabels={resultLabels} />
         </div>
       )}
 
@@ -550,6 +554,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                     soldier={soldier}
                     report={reports.get(soldier.id) ?? { ...EMPTY_REPORT }}
                     activeScores={activeScores}
+                    resultLabels={resultLabels}
+                    noteOptions={noteOptions}
                     disabled={saving.has(soldier.id)}
                     onChange={handleReportChange}
                   />
@@ -655,6 +661,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
               }))
             )}
           existingReports={reports}
+          resultLabels={resultLabels}
+          noteOptions={noteOptions}
           onImport={handleImportReports}
         />
       )}

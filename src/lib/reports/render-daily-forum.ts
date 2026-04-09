@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 import type { ScoreConfig } from "@/types/score-config";
 import { getActiveScores } from "@/types/score-config";
+import type { DisplayConfiguration } from "@/types/display-config";
+import { getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 import type { ActivitySummaryRow } from "@/lib/reports/render-activity-summary";
 import { parseMedicalAppointments, hasUpcomingAppointment, formatAppointment } from "@/lib/requests/medical-appointments";
@@ -61,6 +63,7 @@ export interface TodayActivityItem {
   naCount: number;
   totalSoldiers: number;
   rows: ActivitySummaryRow[];
+  displayConfiguration?: DisplayConfiguration | null;
 }
 
 export interface TomorrowActivityItem {
@@ -82,6 +85,7 @@ export interface GapActivityItem {
   activityTypeName: string;
   date: string;
   soldiers: GapSoldier[];
+  displayConfiguration?: DisplayConfiguration | null;
 }
 
 export interface PlatoonForumSection {
@@ -344,7 +348,7 @@ export async function fetchDailyForum(
       status: "active",
     },
     include: {
-      activityType: { select: { name: true, scoreConfig: true } },
+      activityType: { select: { name: true, scoreConfig: true, displayConfiguration: true } },
       reports: {
         include: {
           soldier: {
@@ -460,6 +464,7 @@ export async function fetchDailyForum(
       naCount,
       totalSoldiers: activeReports.length,
       rows: mergedRows,
+      displayConfiguration: activity.activityType.displayConfiguration as DisplayConfiguration | null,
     });
   }
 
@@ -502,7 +507,7 @@ export async function fetchDailyForum(
       date: { lt: todayStart },
     },
     include: {
-      activityType: { select: { name: true } },
+      activityType: { select: { name: true, displayConfiguration: true } },
       reports: {
         select: { soldierId: true, result: true },
       },
@@ -539,6 +544,7 @@ export async function fetchDailyForum(
         activityTypeName: activity.activityType.name,
         date: activity.date.toISOString().split("T")[0],
         soldiers: gapSoldiers.sort((a, b) => a.name.localeCompare(b.name)),
+        displayConfiguration: activity.activityType.displayConfiguration as DisplayConfiguration | null,
       });
     }
   }
@@ -645,9 +651,9 @@ function renderTodayActivitiesHtml(activities: TodayActivityItem[]): string {
           ${pieSvg}
           <div>
             <div class="legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> עבר (${activity.passedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> נכשל (${activity.failedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> לא רלוונטי (${activity.naCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ${getResultLabels(activity.displayConfiguration).passed.label} (${activity.passedCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).failed.label} (${activity.failedCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>
             </div>
             <p class="total-line">סה״כ ${activity.totalSoldiers} חיילים</p>
           </div>
@@ -689,9 +695,10 @@ function renderGapsHtml(gaps: GapActivityItem[]): string {
 
   return gaps.map((gap) => {
     const dateStr = new Date(gap.date).toLocaleDateString("he-IL");
+    const failedLabel = getResultLabels(gap.displayConfiguration).failed.label;
     const soldierRows = gap.soldiers.map((s) => {
       const badge = s.result === "failed"
-        ? '<span class="badge badge-failed">נכשל</span>'
+        ? `<span class="badge badge-failed">${failedLabel}</span>`
         : '<span class="badge badge-missing">חסר</span>';
       return `<tr><td>${escapeHtml(s.name)}</td><td>${badge}</td></tr>`;
     }).join("\n");

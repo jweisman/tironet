@@ -30,6 +30,7 @@ import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
 import { parseScoreConfig, getActiveScores } from "@/types/score-config";
+import { parseDisplayConfig, getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 
 // ---------------------------------------------------------------------------
@@ -102,7 +103,8 @@ const REPORTS_QUERY = `
     a.status AS activity_status,
     a.is_required,
     at.name AS activity_type_name,
-    at.score_config
+    at.score_config,
+    at.display_configuration
   FROM activity_reports ar
   JOIN activities a    ON a.id  = ar.activity_id
   JOIN activity_types at ON at.id = a.activity_type_id
@@ -175,6 +177,7 @@ interface RawReport {
   activity_status: string; is_required: number;
   activity_type_name: string;
   score_config: string | null;
+  display_configuration: string | null;
 }
 interface RawMissing {
   id: string; name: string; date: string; activity_type_name: string;
@@ -555,7 +558,8 @@ export default function SoldierDetailPage() {
               const withValues = scores
                 .map((s) => ({ label: s.label, format: s.format, grade: grades[parseInt(s.key.replace("score", "")) - 1] }))
                 .filter((a) => a.grade != null);
-              const resultLabel = r.result === "passed" ? "עבר" : r.result === "failed" ? "נכשל" : r.result === "na" ? "לא רלוונטי" : null;
+              const rl = getResultLabels(parseDisplayConfig(r.display_configuration));
+              const resultLabel = r.result === "passed" ? rl.passed.label : r.result === "failed" ? rl.failed.label : r.result === "na" ? rl.na.label : null;
               return (
                 <Link
                   key={r.id}

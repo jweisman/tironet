@@ -10,7 +10,7 @@ streams:
   activity_types:
     auto_subscribe: true
     query: >
-      SELECT id, name, icon, is_active, sort_order, score_config
+      SELECT id, name, icon, is_active, sort_order, score_config, display_configuration
       FROM activity_types
 
   cycles:

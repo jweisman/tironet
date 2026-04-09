@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { Upload } from "lucide-react";
 import type { SoldierReport, GradeKey } from "./ActivityDetail";
 import type { ActivityResult } from "@/types";
+import type { ResultLabels } from "@/types/display-config";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +45,8 @@ interface Props {
   activeScores: ActiveScore[];
   soldiers: SoldierInfo[];
   existingReports: Map<string, SoldierReport>;
+  resultLabels: ResultLabels;
+  noteOptions?: string[] | null;
   onImport: (reports: Map<string, SoldierReport>) => Promise<void>;
 }
 
@@ -172,7 +175,9 @@ function parseRows(
   headerRowIndex: number,
   mapping: ColumnMapping,
   soldiersByIdNumber: Map<string, SoldierInfo>,
-  activeScores: ActiveScore[]
+  activeScores: ActiveScore[],
+  customResultMap: Record<string, ActivityResult>,
+  noteOptionsList?: string[] | null,
 ): ParsedReportRow[] {
   const seenIdNumbers = new Set<string>();
 
@@ -207,7 +212,7 @@ function parseRows(
       let result: ActivityResult | null = null;
       if (resultRaw) {
         const normalized = resultRaw.toLowerCase().trim();
-        result = RESULT_MAP[normalized] ?? null;
+        result = customResultMap[normalized] ?? null;
         if (!result) {
           errors.push(`תוצאה לא חוקית: "${resultRaw}"`);
         }
@@ -250,6 +255,11 @@ function parseRows(
         return num;
       });
 
+      // Validate note against allowed options
+      if (noteOptionsList && noteOptionsList.length > 0 && noteRaw && !noteOptionsList.includes(noteRaw)) {
+        errors.push(`הערה לא חוקית: "${noteRaw}"`);
+      }
+
       return {
         rowIndex: i + headerRowIndex + 2,
         idNumberRaw,
@@ -278,6 +288,8 @@ export function BulkImportReportsDialog({
   activeScores,
   soldiers,
   existingReports,
+  resultLabels,
+  noteOptions,
   onImport,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -293,6 +305,16 @@ export function BulkImportReportsDialog({
   });
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  // Build dynamic result map including custom labels
+  const resultMap = useMemo(() => {
+    const map = { ...RESULT_MAP };
+    // Add custom labels as valid import values (case-insensitive handled during lookup)
+    map[resultLabels.passed.label] = "passed";
+    map[resultLabels.failed.label] = "failed";
+    map[resultLabels.na.label] = "na";
+    return map;
+  }, [resultLabels]);
 
   // Build soldier lookup by idNumber
   const soldiersByIdNumber = useMemo(() => {
@@ -312,8 +334,8 @@ export function BulkImportReportsDialog({
   // Parse rows whenever mapping or data changes
   const parsedRows = useMemo(() => {
     if (dataRows.length === 0) return [];
-    return parseRows(dataRows, headerRowIndex, mapping, soldiersByIdNumber, activeScores);
-  }, [dataRows, headerRowIndex, mapping, soldiersByIdNumber, activeScores]);
+    return parseRows(dataRows, headerRowIndex, mapping, soldiersByIdNumber, activeScores, resultMap, noteOptions);
+  }, [dataRows, headerRowIndex, mapping, soldiersByIdNumber, activeScores, resultMap, noteOptions]);
 
   const validRows = parsedRows.filter((r) => r.errors.length === 0);
   const errorRows = parsedRows.filter((r) => r.errors.length > 0);
@@ -487,7 +509,7 @@ export function BulkImportReportsDialog({
 
               {/* Result */}
               <MappingSelect
-                label="תוצאה (עבר/נכשל/לא רלוונטי)"
+                label={`תוצאה (${resultLabels.passed.label}/${resultLabels.failed.label}/${resultLabels.na.label})`}
                 value={mapping.result}
                 options={columnOptions}
                 onChange={(v) => updateMapping("result", v)}
@@ -574,11 +596,11 @@ export function BulkImportReportsDialog({
                         </td>
                         <td className="px-2 py-1.5 text-muted-foreground">
                           {row.result === "passed"
-                            ? "עבר"
+                            ? resultLabels.passed.label
                             : row.result === "failed"
-                              ? "נכשל"
+                              ? resultLabels.failed.label
                               : row.result === "na"
-                                ? "לא רלוונטי"
+                                ? resultLabels.na.label
                                 : "—"}
                         </td>
                         {activeScores.map((score, i) => (
