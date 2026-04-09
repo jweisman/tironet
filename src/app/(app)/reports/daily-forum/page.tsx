@@ -13,6 +13,7 @@ import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns"
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import { REQUEST_STATUS_LABELS, ASSIGNED_ROLE_LABELS } from "@/lib/requests/constants";
 import type { RequestStatus, Role } from "@/types";
+import { getResultLabels } from "@/types/display-config";
 import type {
   DailyForumData,
   PlatoonForumSection,
@@ -125,6 +126,7 @@ function TodayActivitySection({ activity }: { activity: TodayActivityItem }) {
             passed={activity.passedCount}
             failed={activity.failedCount}
             na={activity.naCount}
+            resultLabels={getResultLabels(activity.displayConfiguration)}
           />
           <p className="text-xs text-muted-foreground">
             סה&quot;כ {activity.totalSoldiers} חיילים
@@ -205,7 +207,7 @@ function GapSection({ gap }: { gap: GapActivityItem }) {
                 <td className="px-2 py-1">{s.name}</td>
                 <td className="px-2 py-1">
                   {s.result === "failed" ? (
-                    <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">נכשל</span>
+                    <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">{getResultLabels(gap.displayConfiguration).failed.label}</span>
                   ) : (
                     <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">חסר</span>
                   )}

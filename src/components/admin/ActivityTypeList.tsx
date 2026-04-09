@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { ScoreConfig, ScoreSlot } from "@/types/score-config";
 import { SCORE_KEYS, getActiveScores } from "@/types/score-config";
+import type { DisplayConfiguration } from "@/types/display-config";
+import { DEFAULT_RESULT_LABELS, getResultLabels, getNoteOptions } from "@/types/display-config";
 
 type ActivityType = {
   id: string;
@@ -36,6 +38,7 @@ type ActivityType = {
   isActive: boolean;
   sortOrder: number;
   scoreConfig: ScoreConfig | null;
+  displayConfiguration: DisplayConfiguration | null;
 };
 
 type Props = {
@@ -79,6 +82,8 @@ export default function ActivityTypeList({ initialTypes }: Props) {
     Array.from({ length: 6 }, () => ({ label: "", format: "number" as const }))
   );
   const [scoresExpandedId, setScoresExpandedId] = useState<string | null>(null);
+  const [editResultLabels, setEditResultLabels] = useState({ passed: "", failed: "", na: "" });
+  const [editNoteOptions, setEditNoteOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   function startEdit(type: ActivityType) {
@@ -92,6 +97,14 @@ export default function ActivityTypeList({ initialTypes }: Props) {
         return slot ? { label: slot.label, format: slot.format ?? "number" } : { label: "", format: "number" as const };
       })
     );
+    const labels = getResultLabels(type.displayConfiguration);
+    setEditResultLabels({
+      passed: labels.passed.label,
+      failed: labels.failed.label,
+      na: labels.na.label,
+    });
+    const noteOpts = getNoteOptions(type.displayConfiguration);
+    setEditNoteOptions(noteOpts ?? []);
     setScoresExpandedId(type.id);
   }
 
@@ -101,6 +114,30 @@ export default function ActivityTypeList({ initialTypes }: Props) {
       const slot = scores[i];
       config[k] = slot.label.trim() ? { label: slot.label.trim(), format: slot.format } : null;
     });
+    return config;
+  }
+
+  function buildDisplayConfig(): DisplayConfiguration | null {
+    const passed = editResultLabels.passed.trim();
+    const failed = editResultLabels.failed.trim();
+    const na = editResultLabels.na.trim();
+    const isDefault =
+      passed === DEFAULT_RESULT_LABELS.passed.label &&
+      failed === DEFAULT_RESULT_LABELS.failed.label &&
+      na === DEFAULT_RESULT_LABELS.na.label;
+    const filteredOptions = editNoteOptions.map((o) => o.trim()).filter(Boolean);
+    if (isDefault && filteredOptions.length === 0) return null;
+    const config: DisplayConfiguration = {};
+    if (!isDefault) {
+      config.results = {
+        passed: { label: passed || DEFAULT_RESULT_LABELS.passed.label },
+        failed: { label: failed || DEFAULT_RESULT_LABELS.failed.label },
+        na: { label: na || DEFAULT_RESULT_LABELS.na.label },
+      };
+    }
+    if (filteredOptions.length > 0) {
+      config.note = { type: "list", options: filteredOptions };
+    }
     return config;
   }
 
@@ -144,6 +181,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
         name: editName.trim(),
         icon: editIcon.trim(),
         scoreConfig: buildScoreConfig(editScores),
+        displayConfiguration: buildDisplayConfig(),
       }),
     });
     if (res.ok) {
@@ -369,6 +407,101 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                       </span>
                     );
                   })}
+                </div>
+
+                {/* Display configuration section */}
+                <div className="border-t pt-3 space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground">תצוגת תוצאות</p>
+                  {editingId === type.id ? (
+                    <div className="space-y-2">
+                      {(["passed", "failed", "na"] as const).map((key) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-16 shrink-0 text-end">
+                            {key === "passed" ? "עבר:" : key === "failed" ? "נכשל:" : "לא רלוונטי:"}
+                          </span>
+                          <Input
+                            placeholder={DEFAULT_RESULT_LABELS[key].label}
+                            value={editResultLabels[key]}
+                            onChange={(e) => setEditResultLabels((prev) => ({ ...prev, [key]: e.target.value }))}
+                            className="text-xs flex-1"
+                          />
+                        </div>
+                      ))}
+
+                      <p className="text-xs font-semibold text-muted-foreground mt-3">אפשרויות הערה (רשימה נפתחת)</p>
+                      <div className="space-y-1">
+                        {editNoteOptions.map((opt, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <Input
+                              value={opt}
+                              onChange={(e) => setEditNoteOptions((prev) => {
+                                const next = [...prev];
+                                next[i] = e.target.value;
+                                return next;
+                              })}
+                              className="text-xs flex-1"
+                              placeholder={`אפשרות ${i + 1}`}
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => setEditNoteOptions((prev) => prev.filter((_, j) => j !== i))}
+                              aria-label="הסר אפשרות"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setEditNoteOptions((prev) => [...prev, ""])}
+                        >
+                          <PlusCircle className="w-3 h-3 me-1" />
+                          הוסף אפשרות
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        השאר ריק לשדה הערה חופשי. הוסף אפשרויות כדי להציג רשימה נפתחת.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {(() => {
+                        const labels = getResultLabels(type.displayConfiguration);
+                        const noteOpts = getNoteOptions(type.displayConfiguration);
+                        const isDefault =
+                          labels.passed.label === DEFAULT_RESULT_LABELS.passed.label &&
+                          labels.failed.label === DEFAULT_RESULT_LABELS.failed.label &&
+                          labels.na.label === DEFAULT_RESULT_LABELS.na.label;
+                        return (
+                          <>
+                            {isDefault ? (
+                              <p className="text-xs text-muted-foreground/50">ברירת מחדל (עבר / נכשל / לא רלוונטי)</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {(["passed", "failed", "na"] as const).map((key) => (
+                                  <span key={key} className="text-xs bg-background border rounded px-2 py-1">
+                                    {labels[key].label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {noteOpts && noteOpts.length > 0 && (
+                              <div className="mt-1">
+                                <span className="text-[10px] text-muted-foreground">הערה (רשימה): </span>
+                                <span className="text-xs">{noteOpts.join(", ")}</span>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

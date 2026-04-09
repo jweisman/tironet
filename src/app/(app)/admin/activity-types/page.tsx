@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import ActivityTypeList from "@/components/admin/ActivityTypeList";
 import type { ScoreConfig } from "@/types/score-config";
+import type { DisplayConfiguration } from "@/types/display-config";
 
 export default async function ActivityTypesPage() {
   const types = await prisma.activityType.findMany({
@@ -15,6 +16,7 @@ export default async function ActivityTypesPage() {
         isActive: t.isActive,
         sortOrder: t.sortOrder,
         scoreConfig: (t.scoreConfig as ScoreConfig) ?? null,
+        displayConfiguration: (t.displayConfiguration as DisplayConfiguration) ?? null,
       }))}
     />
   );

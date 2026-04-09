@@ -25,7 +25,11 @@ const ACTIVITY_TYPES = [
       score1: { label: "ציון", format: "number" }
     }
   },
-  { name: "שיעורים", icon: "book-open", sortOrder: 4 },
+  { name: "שיעורים", icon: "book-open", sortOrder: 4,
+    displayConfiguration: {
+      results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
+    },
+  },
   { name: "בוחנים", icon: "clipboard-check", sortOrder: 5,
     scoreConfig: {
       score1: { label: "ציון", format: "number" }
@@ -36,11 +40,18 @@ const ACTIVITY_TYPES = [
       score1: { label: "ציון", format: "number" }
     }
   },
-  { name: "שיחות מפקד", icon: "message-circle", sortOrder: 7 },
+  { name: "שיחות מפקד", icon: "message-circle", sortOrder: 7,
+    displayConfiguration: {
+      results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
+    },
+  },
   { name: "בחמ״ס", icon: "timer", sortOrder: 8,
     scoreConfig: {
       score1: { label: "זמן", format: "time" }
-    }
+    },
+    displayConfiguration: {
+      note: { type: "list", options: ["קיר", "חבל", "זמן", "אחר"] },
+    },
   },
 ];
 
@@ -54,13 +65,16 @@ async function main() {
       await prisma.activityType.create({ data: at });
       console.log(`Created activity type: ${at.name}`);
     } else {
-      // Update scoreConfig if defined (e.g. כש״ג migration)
-      if ("scoreConfig" in at) {
+      // Update scoreConfig / displayConfiguration if defined
+      const updates: Record<string, unknown> = {};
+      if ("scoreConfig" in at) updates.scoreConfig = at.scoreConfig;
+      if ("displayConfiguration" in at) updates.displayConfiguration = at.displayConfiguration;
+      if (Object.keys(updates).length > 0) {
         await prisma.activityType.update({
           where: { id: existing.id },
-          data: { scoreConfig: at.scoreConfig },
+          data: updates,
         });
-        console.log(`Updated scoreConfig for: ${at.name}`);
+        console.log(`Updated config for: ${at.name}`);
       } else {
         console.log(`Skipped existing activity type: ${at.name}`);
       }

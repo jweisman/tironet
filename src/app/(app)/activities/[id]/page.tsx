@@ -14,6 +14,7 @@ import {
 import type { ActivityResult, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { parseScoreConfig, getActiveScores } from "@/types/score-config";
+import { parseDisplayConfig } from "@/types/display-config";
 
 // ---------------------------------------------------------------------------
 // SQL queries (PowerSync local SQLite)
@@ -24,7 +25,7 @@ const ACTIVITY_QUERY = `
     a.id, a.name, a.date, a.status, a.is_required,
     a.platoon_id, a.cycle_id,
     at.id AS activity_type_id, at.name AS activity_type_name, at.icon AS activity_type_icon,
-    at.score_config,
+    at.score_config, at.display_configuration,
     p.name AS platoon_name,
     c.name AS company_name
   FROM activities a
@@ -59,6 +60,7 @@ interface RawActivity {
   platoon_id: string; cycle_id: string;
   activity_type_id: string; activity_type_name: string; activity_type_icon: string;
   score_config: string | null;
+  display_configuration: string | null;
   platoon_name: string; company_name: string;
 }
 interface RawSquad { id: string; name: string; sort_order: number; }
@@ -186,6 +188,7 @@ export default function ActivityPage() {
 
     const scoreConfig = parseScoreConfig(activity.score_config);
     const activeScores = getActiveScores(scoreConfig);
+    const displayConfig = parseDisplayConfig(activity.display_configuration);
 
     return {
       id: activity.id,
@@ -198,6 +201,7 @@ export default function ActivityPage() {
         name: activity.activity_type_name,
         icon: activity.activity_type_icon,
         activeScores,
+        displayConfiguration: displayConfig,
       },
       platoon: {
         id: activity.platoon_id,

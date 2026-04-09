@@ -191,6 +191,83 @@ describe("POST /api/admin/activity-types", () => {
     });
   });
 
+  it("creates activity type with displayConfiguration", async () => {
+    adminSuccess();
+    mockAggregate.mockResolvedValue({ _max: { sortOrder: 0 } } as never);
+    const displayConfiguration = {
+      results: {
+        passed: { label: "נוכח" },
+        failed: { label: "לא נוכח" },
+        na: { label: "פטור" },
+      },
+      note: { type: "list", options: ["קיר", "חבל", "זמן"] },
+    };
+    mockCreate.mockResolvedValue({ id: "t5", name: "שיחה", icon: "MessageCircle", displayConfiguration } as never);
+
+    const req = createMockRequest("POST", "/api/admin/activity-types", {
+      name: "שיחה",
+      icon: "MessageCircle",
+      displayConfiguration,
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    expect(mockCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        displayConfiguration,
+      }),
+    });
+  });
+
+  it("accepts null displayConfiguration to clear config", async () => {
+    adminSuccess();
+    mockAggregate.mockResolvedValue({ _max: { sortOrder: 0 } } as never);
+    mockCreate.mockResolvedValue({ id: "t6" } as never);
+
+    const req = createMockRequest("POST", "/api/admin/activity-types", {
+      name: "Test",
+      icon: "Activity",
+      displayConfiguration: null,
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+  });
+
+  it("returns 400 for invalid displayConfiguration (empty label)", async () => {
+    adminSuccess();
+
+    const req = createMockRequest("POST", "/api/admin/activity-types", {
+      name: "Test",
+      icon: "Activity",
+      displayConfiguration: {
+        results: {
+          passed: { label: "" },
+          failed: { label: "לא נוכח" },
+          na: { label: "פטור" },
+        },
+      },
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for invalid displayConfiguration (empty options array)", async () => {
+    adminSuccess();
+
+    const req = createMockRequest("POST", "/api/admin/activity-types", {
+      name: "Test",
+      icon: "Activity",
+      displayConfiguration: {
+        note: { type: "list", options: [] },
+      },
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
   it("returns 403 for non-admin", async () => {
     adminFailure();
 

@@ -6,6 +6,7 @@ import { parseGradeInput, formatGradeDisplay } from "@/lib/score-format";
 import type { ActivityResult } from "@/types";
 import type { GradeKey } from "./ActivityDetail";
 import type { ActiveScore } from "@/types/score-config";
+import type { ResultLabels } from "@/types/display-config";
 
 interface ReportRowProps {
   soldier: {
@@ -27,6 +28,8 @@ interface ReportRowProps {
     note: string | null;
   };
   activeScores: ActiveScore[];
+  resultLabels: ResultLabels;
+  noteOptions?: string[] | null;
   disabled?: boolean;
   onChange: (
     soldierId: string,
@@ -54,7 +57,7 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash];
 }
 
-export function ReportRow({ soldier, report, activeScores, disabled = false, onChange }: ReportRowProps) {
+export function ReportRow({ soldier, report, activeScores, resultLabels, noteOptions, disabled = false, onChange }: ReportRowProps) {
   const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const initials = (soldier.givenName[0] ?? "") + (soldier.familyName[0] ?? "");
@@ -89,6 +92,10 @@ export function ReportRow({ soldier, report, activeScores, disabled = false, onC
     debounceRefs.current.set("note", setTimeout(() => {
       onChange(soldier.id, "note", val || null);
     }, 500));
+  }
+
+  function handleNoteSelect(e: React.ChangeEvent<HTMLSelectElement>) {
+    onChange(soldier.id, "note", e.target.value || null);
   }
 
   return (
@@ -132,7 +139,7 @@ export function ReportRow({ soldier, report, activeScores, disabled = false, onC
                 : "bg-transparent text-muted-foreground border-border hover:bg-green-50 hover:text-green-700 hover:border-green-200"
             )}
           >
-            עבר
+            {resultLabels.passed.label}
           </button>
           <button
             type="button"
@@ -144,7 +151,7 @@ export function ReportRow({ soldier, report, activeScores, disabled = false, onC
                 : "bg-transparent text-muted-foreground border-border hover:bg-red-50 hover:text-red-700 hover:border-red-200"
             )}
           >
-            נכשל
+            {resultLabels.failed.label}
           </button>
           <button
             type="button"
@@ -156,7 +163,7 @@ export function ReportRow({ soldier, report, activeScores, disabled = false, onC
                 : "bg-transparent text-muted-foreground border-border hover:bg-gray-100"
             )}
           >
-            לא רלוונטי
+            {resultLabels.na.label}
           </button>
         </div>
       </div>
@@ -177,14 +184,28 @@ export function ReportRow({ soldier, report, activeScores, disabled = false, onC
               dir="ltr"
             />
           ))}
-          <input
-            type="text"
-            defaultValue={report.note ?? ""}
-            onChange={handleNoteChange}
-            placeholder="הערה"
-            aria-label="הערה"
-            className="flex-1 min-w-[100px] rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+          {noteOptions && noteOptions.length > 0 ? (
+            <select
+              value={noteOptions.includes(report.note ?? "") ? report.note ?? "" : ""}
+              onChange={handleNoteSelect}
+              aria-label="הערה"
+              className="flex-1 min-w-[100px] rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">בחר...</option>
+              {noteOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              defaultValue={report.note ?? ""}
+              onChange={handleNoteChange}
+              placeholder="הערה"
+              aria-label="הערה"
+              className="flex-1 min-w-[100px] rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          )}
         </div>
       )}
     </div>

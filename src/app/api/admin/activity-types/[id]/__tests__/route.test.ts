@@ -176,6 +176,41 @@ describe("PATCH /api/admin/activity-types/[id]", () => {
     expect(res.status).toBe(400);
   });
 
+  it("updates displayConfiguration", async () => {
+    adminSuccess();
+    const displayConfiguration = {
+      results: {
+        passed: { label: "נוכח" },
+        failed: { label: "לא נוכח" },
+        na: { label: "פטור" },
+      },
+    };
+    mockUpdate.mockResolvedValue({ id: "type-1", displayConfiguration } as never);
+
+    const req = createMockRequest("PATCH", "/api/admin/activity-types/type-1", {
+      displayConfiguration,
+    });
+
+    const res = await PATCH(req, idParams);
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: "type-1" },
+      data: { displayConfiguration },
+    });
+  });
+
+  it("clears displayConfiguration with null", async () => {
+    adminSuccess();
+    mockUpdate.mockResolvedValue({ id: "type-1", displayConfiguration: null } as never);
+
+    const req = createMockRequest("PATCH", "/api/admin/activity-types/type-1", {
+      displayConfiguration: null,
+    });
+
+    const res = await PATCH(req, idParams);
+    expect(res.status).toBe(200);
+  });
+
   it("returns 403 for non-admin", async () => {
     adminFailure();
 

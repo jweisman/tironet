@@ -1,13 +1,15 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import type { ResultLabels } from "@/types/display-config";
 
 interface Props {
   onBulkUpdate: (result: "passed" | "failed" | "na") => void;
   loading?: boolean;
+  resultLabels: ResultLabels;
 }
 
-export function BulkUpdateBar({ onBulkUpdate, loading = false }: Props) {
+export function BulkUpdateBar({ onBulkUpdate, loading = false, resultLabels }: Props) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-muted/80 border-b border-border">
       <span className="text-xs text-muted-foreground shrink-0">סמן הכל כ:</span>
@@ -22,7 +24,7 @@ export function BulkUpdateBar({ onBulkUpdate, loading = false }: Props) {
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
-          עבר ✓
+          {resultLabels.passed.label} ✓
         </button>
         <button
           type="button"
@@ -34,7 +36,7 @@ export function BulkUpdateBar({ onBulkUpdate, loading = false }: Props) {
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
-          נכשל ✗
+          {resultLabels.failed.label} ✗
         </button>
         <button
           type="button"
@@ -46,7 +48,7 @@ export function BulkUpdateBar({ onBulkUpdate, loading = false }: Props) {
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
-          לא רלוונטי —
+          {resultLabels.na.label} —
         </button>
       </div>
     </div>
