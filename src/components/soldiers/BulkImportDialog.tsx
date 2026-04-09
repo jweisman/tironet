@@ -50,6 +50,7 @@ interface ParsedRow {
   status: string;
   phone: string;
   emergencyPhone: string;
+  platoonName: string;
   squadName: string;
   resolvedSquadId: string | null;
   isUpdate: boolean;
@@ -67,7 +68,7 @@ const VALID_STATUSES: Record<string, SoldierStatus> = {
   injured: "injured",
 };
 
-const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום"];
+const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "מחלקה", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום"];
 
 const FROM_FILE = "__from_file__";
 
@@ -75,10 +76,10 @@ function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    ["כהן", "דוד", "1234567", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543"],
-    ["לוי", "רחל", "", "", "", "", "", ""],
+    ["כהן", "דוד", "1234567", "מחלקה א", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543"],
+    ["לוי", "רחל", "", "", "", "", "", "", ""],
   ]);
-  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
+  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, ws, "חיילים");
   XLSX.writeFile(wb, "תבנית-חיילים.xlsx");
 }
@@ -86,6 +87,7 @@ function downloadTemplate() {
 function parseSheet(
   workbook: XLSX.WorkBook,
   squads: SquadOption[],
+  platoonMode: "select" | "file",
   squadMode: "select" | "file",
   existingIdNumbers?: Set<string>
 ): ParsedRow[] {
@@ -107,16 +109,26 @@ function parseSheet(
   const familyIdx = headers.findIndex((h) => h === "שם משפחה");
   const givenIdx = headers.findIndex((h) => h === "שם פרטי");
   const idNumberIdx = headers.findIndex((h) => h === "מספר אישי");
+  const platoonIdx = headers.findIndex((h) => h === "מחלקה");
   const squadIdx = headers.findIndex((h) => h === "כיתה");
   const rankIdx = headers.findIndex((h) => h === "דרגה");
   const statusIdx = headers.findIndex((h) => h === "סטטוס");
   const phoneIdx = headers.findIndex((h) => h === "טלפון");
   const emergencyPhoneIdx = headers.findIndex((h) => h === "טלפון חירום");
 
-  // Build squad name → id lookup (case-insensitive, trimmed)
-  const squadLookup = new Map<string, string>();
+  // Build platoon name → id lookup (case-insensitive, trimmed)
+  const platoonLookup = new Map<string, string>();
   for (const s of squads) {
-    squadLookup.set(s.name.trim().toLowerCase(), s.id);
+    platoonLookup.set(s.platoonName.trim().toLowerCase(), s.platoonId);
+  }
+
+  // Build "platoonId:squadName" → id lookup (case-insensitive, trimmed)
+  // When platoon is from file, squad must be resolved within the correct platoon
+  const squadLookupByPlatoon = new Map<string, string>();
+  const squadLookupGlobal = new Map<string, string>();
+  for (const s of squads) {
+    squadLookupByPlatoon.set(`${s.platoonId}:${s.name.trim().toLowerCase()}`, s.id);
+    squadLookupGlobal.set(s.name.trim().toLowerCase(), s.id);
   }
 
   const dataRows = rows.slice(headerIdx + 1);
@@ -127,13 +139,14 @@ function parseSheet(
     const familyName = get(familyIdx);
     const givenName = get(givenIdx);
     const idNumber = get(idNumberIdx);
+    const platoonName = get(platoonIdx);
     const squadName = get(squadIdx);
     const rank = get(rankIdx);
     const status = get(statusIdx);
     const phone = get(phoneIdx);
     const emergencyPhone = get(emergencyPhoneIdx);
 
-    if (!familyName && !givenName && !rank && !status && !idNumber && !squadName && !phone && !emergencyPhone) return;
+    if (!familyName && !givenName && !rank && !status && !idNumber && !squadName && !platoonName && !phone && !emergencyPhone) return;
 
     const errors: string[] = [];
     if (!familyName) errors.push("שם משפחה חסר");
@@ -148,12 +161,32 @@ function parseSheet(
       errors.push(`טלפון חירום לא תקין: "${emergencyPhone}"`);
     }
 
+    // Resolve platoon from file when in platoon-from-file mode
+    let resolvedPlatoonId: string | null = null;
+    if (platoonMode === "file") {
+      if (!platoonName) {
+        errors.push("מחלקה חסרה");
+      } else {
+        resolvedPlatoonId = platoonLookup.get(platoonName.toLowerCase()) ?? null;
+        if (!resolvedPlatoonId) {
+          errors.push(`מחלקה לא נמצאה: "${platoonName}"`);
+        }
+      }
+    }
+
     let resolvedSquadId: string | null = null;
     if (squadMode === "file") {
       if (!squadName) {
         errors.push("כיתה חסרה");
-      } else {
-        resolvedSquadId = squadLookup.get(squadName.toLowerCase()) ?? null;
+      } else if (platoonMode === "file" && resolvedPlatoonId) {
+        // Squad must exist within the resolved platoon
+        resolvedSquadId = squadLookupByPlatoon.get(`${resolvedPlatoonId}:${squadName.toLowerCase()}`) ?? null;
+        if (!resolvedSquadId) {
+          errors.push(`כיתה "${squadName}" לא נמצאה במחלקה "${platoonName}"`);
+        }
+      } else if (platoonMode === "select") {
+        // Squad resolved within the filtered squads list (already filtered by platoon)
+        resolvedSquadId = squadLookupGlobal.get(squadName.toLowerCase()) ?? null;
         if (!resolvedSquadId) {
           errors.push(`כיתה לא נמצאה: "${squadName}"`);
         }
@@ -171,6 +204,7 @@ function parseSheet(
       status,
       phone,
       emergencyPhone,
+      platoonName,
       squadName,
       resolvedSquadId,
       isUpdate,
@@ -199,8 +233,9 @@ export function BulkImportDialog({
   const showPlatoonSelector = !defaultSquadId && platoons.length > 1;
 
   const [platoonId, setPlatoonId] = useState("");
+  const platoonMode = platoonId === FROM_FILE ? "file" : "select";
   const filteredSquads = useMemo(
-    () => platoonId ? squads.filter((s) => s.platoonId === platoonId) : squads,
+    () => platoonId && platoonId !== FROM_FILE ? squads.filter((s) => s.platoonId === platoonId) : squads,
     [squads, platoonId]
   );
 
@@ -212,9 +247,16 @@ export function BulkImportDialog({
     }
   }, [squads, defaultSquadId, squadId]);
 
+  // When platoon is "from file", force squad to "from file" too
+  useEffect(() => {
+    if (platoonId === FROM_FILE && squadId !== FROM_FILE) {
+      setSquadId(FROM_FILE);
+    }
+  }, [platoonId, squadId]);
+
   // Reset squad when platoon filter changes and current selection is no longer valid
   useEffect(() => {
-    if (platoonId && squadId && squadId !== FROM_FILE && filteredSquads.length > 0 && !filteredSquads.some((s) => s.id === squadId)) {
+    if (platoonId && platoonId !== FROM_FILE && squadId && squadId !== FROM_FILE && filteredSquads.length > 0 && !filteredSquads.some((s) => s.id === squadId)) {
       setSquadId("");
     }
   }, [platoonId, filteredSquads, squadId]);
@@ -228,13 +270,13 @@ export function BulkImportDialog({
 
   const squadMode = squadId === FROM_FILE ? "file" : "select";
 
-  // Re-parse when squad mode or platoon filter changes
+  // Re-parse when squad/platoon mode or platoon filter changes
   useEffect(() => {
     if (workbook) {
-      const parsed = parseSheet(workbook, filteredSquads, squadMode, existingIdNumbers);
+      const parsed = parseSheet(workbook, platoonMode === "file" ? squads : filteredSquads, platoonMode, squadMode, existingIdNumbers);
       setRows(parsed);
     }
-  }, [squadMode, workbook, filteredSquads]);
+  }, [squadMode, platoonMode, workbook, filteredSquads, squads]);
 
   function reset() {
     setRows(null);
@@ -260,7 +302,7 @@ export function BulkImportDialog({
         const data = ev.target?.result;
         const wb = XLSX.read(data, { type: "array" });
         setWorkbook(wb);
-        const parsed = parseSheet(wb, filteredSquads, squadMode, existingIdNumbers);
+        const parsed = parseSheet(wb, platoonMode === "file" ? squads : filteredSquads, platoonMode, squadMode, existingIdNumbers);
         setRows(parsed);
       } catch {
         setImportError("לא ניתן לקרוא את הקובץ");
@@ -332,16 +374,19 @@ export function BulkImportDialog({
             <div className="space-y-1.5">
               <Label>מחלקה</Label>
               <Select
-                value={platoonId}
+                value={platoonId || "__all__"}
                 onValueChange={(v) => setPlatoonId(!v || v === "__all__" ? "" : v)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="כל המחלקות">
-                    {platoons.find((p) => p.id === platoonId)?.name ?? "כל המחלקות"}
+                    {platoonId === FROM_FILE
+                      ? "מהקובץ"
+                      : platoons.find((p) => p.id === platoonId)?.name ?? "כל המחלקות"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">כל המחלקות</SelectItem>
+                  <SelectItem value={FROM_FILE}>מהקובץ</SelectItem>
                   {platoons.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
@@ -349,14 +394,23 @@ export function BulkImportDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {platoonId === FROM_FILE && (
+                <p className="text-xs text-muted-foreground">
+                  המחלקה והכיתה ייקראו מהקובץ. השמות חייבים להתאים בדיוק לשמות במערכת.
+                </p>
+              )}
             </div>
           )}
 
-          {/* Squad selector */}
+          {/* Squad selector — disabled when platoon is "from file" */}
           {!defaultSquadId && squads.length >= 1 && (
             <div className="space-y-1.5">
               <Label>כיתה</Label>
-              <Select value={squadId} onValueChange={(v) => v && setSquadId(v)}>
+              <Select
+                value={squadId}
+                onValueChange={(v) => v && setSquadId(v)}
+                disabled={platoonMode === "file"}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="בחר כיתה">
                     {squadId === FROM_FILE
@@ -373,7 +427,7 @@ export function BulkImportDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {squadId === FROM_FILE && (
+              {squadId === FROM_FILE && platoonMode !== "file" && (
                 <p className="text-xs text-muted-foreground">
                   הכיתה תיקרא מעמודת &quot;כיתה&quot; בקובץ. השם חייב להתאים בדיוק לשם הכיתה במערכת.
                 </p>
@@ -453,6 +507,9 @@ export function BulkImportDialog({
                         <th className="text-end px-2 py-1.5 font-medium">שם משפחה</th>
                         <th className="text-end px-2 py-1.5 font-medium">שם פרטי</th>
                         <th className="text-end px-2 py-1.5 font-medium">מ.א.</th>
+                        {platoonMode === "file" && (
+                          <th className="text-end px-2 py-1.5 font-medium">מחלקה</th>
+                        )}
                         {squadMode === "file" && (
                           <th className="text-end px-2 py-1.5 font-medium">כיתה</th>
                         )}
@@ -492,6 +549,16 @@ export function BulkImportDialog({
                           <td className="px-2 py-1.5 text-muted-foreground">
                             {row.idNumber || "—"}
                           </td>
+                          {platoonMode === "file" && (
+                            <td
+                              className={cn(
+                                "px-2 py-1.5",
+                                !row.platoonName && "text-destructive font-medium"
+                              )}
+                            >
+                              {row.platoonName || "—"}
+                            </td>
+                          )}
                           {squadMode === "file" && (
                             <td
                               className={cn(
