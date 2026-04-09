@@ -16,22 +16,24 @@ test.describe("Dashboard — platoon commander", () => {
   test("platoon commander sees squad cards", async ({ page }) => {
     await page.goto("/home");
 
+    const main = page.getByRole("main");
     // Wait for PowerSync data to sync
     // Squad A and Squad B are in Platoon 1 (the commander's platoon)
-    await expect(page.getByText("Squad A")).toBeVisible({ timeout: 60000 });
-    await expect(page.getByText("Squad B")).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Squad A" })).toBeVisible({ timeout: 60000 });
+    await expect(main.getByRole("heading", { name: "Squad B" })).toBeVisible();
   });
 
   test("squad cards show soldier counts", async ({ page }) => {
     await page.goto("/home");
 
+    const main = page.getByRole("main");
     // Wait for data to load
-    await expect(page.getByText("Squad A")).toBeVisible({ timeout: 60000 });
+    await expect(main.getByRole("heading", { name: "Squad A" })).toBeVisible({ timeout: 60000 });
 
     // Squad A has 3 soldiers (2 active + 1 transferred)
     // The exact UI depends on whether transferred are counted
     // Just verify the card has some numeric content
-    const squadACard = page.getByText("Squad A").locator("../..");
+    const squadACard = main.getByRole("heading", { name: "Squad A" }).locator("../..");
     await expect(squadACard).toBeVisible();
   });
 });
@@ -43,13 +45,14 @@ test.describe("Dashboard — squad commander", () => {
   test("squad commander sees only their squad", async ({ page }) => {
     await page.goto("/home");
 
-    // Should see Squad A (their squad)
-    await expect(page.getByText("Squad A")).toBeVisible({ timeout: 60000 });
-
-    // Should NOT see Squad B or Squad C in main content
-    // Use getByRole("main") to avoid matching "Squad Commander" in sidebar
+    // Should see Squad A card heading (their squad)
     const main = page.getByRole("main");
-    await expect(main.getByText("Squad B")).not.toBeVisible();
-    await expect(main.getByText("Squad C")).not.toBeVisible();
+    await expect(
+      main.getByRole("heading", { name: "Squad A" })
+    ).toBeVisible({ timeout: 60000 });
+
+    // Should NOT see Squad B or Squad C squad cards
+    await expect(main.getByRole("heading", { name: "Squad B" })).not.toBeVisible();
+    await expect(main.getByRole("heading", { name: "Squad C" })).not.toBeVisible();
   });
 });
