@@ -14,7 +14,7 @@ export function RequestDetailColumns({ data }: { data: DetailColumnsData }) {
           {data.fields.map((d, i) => (
             <Fragment key={i}>
               <span className="font-medium text-muted-foreground whitespace-nowrap">{d.label}</span>
-              <span className="text-foreground/80">{d.value}</span>
+              <span className={d.highlight ? "font-bold text-foreground" : "text-foreground/80"}>{d.value}</span>
             </Fragment>
           ))}
         </div>
@@ -26,7 +26,7 @@ export function RequestDetailColumns({ data }: { data: DetailColumnsData }) {
           <span className="font-medium text-muted-foreground">תורים</span>
           <ul className="mt-0.5 mr-3 space-y-0">
             {data.appointments.map((a, i) => (
-              <li key={i} className="text-foreground/80 before:content-['–'] before:ml-1.5 before:text-muted-foreground/50">{a}</li>
+              <li key={i} className={`before:content-['–'] before:ml-1.5 before:text-muted-foreground/50 ${a.highlight ? "font-bold text-foreground" : "text-foreground/80"}`}>{a.text}</li>
             ))}
           </ul>
         </div>

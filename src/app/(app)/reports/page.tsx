@@ -189,7 +189,7 @@ export default function ReportsPage() {
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                סיכום יומי של בקשות פתוחות, פעילויות היום והמחר, ופערים
+                סיכום יומי של בקשות פתוחות ופעילות, פעילויות היום והמחר, ופערים
               </p>
             </div>
           </button>

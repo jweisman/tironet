@@ -3,7 +3,7 @@ import type { ScoreConfig } from "@/types/score-config";
 import { getActiveScores } from "@/types/score-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 import type { ActivitySummaryRow } from "@/lib/reports/render-activity-summary";
-import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import { parseMedicalAppointments, hasUpcomingAppointment, formatAppointment } from "@/lib/requests/medical-appointments";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import {
   escapeHtml,
@@ -91,6 +91,10 @@ export interface PlatoonForumSection {
   openRequests: {
     medical: OpenRequestItem[];
     hardship: OpenRequestItem[];
+    leave: OpenRequestItem[];
+  };
+  activeRequests: {
+    medical: OpenRequestItem[];
     leave: OpenRequestItem[];
   };
   todayActivities: TodayActivityItem[];
@@ -197,7 +201,7 @@ export async function fetchDailyForum(
   const openRequests = await prisma.request.findMany({
     where: {
       cycleId,
-      assignedRole: { not: null },
+      status: "open",
       soldier: {
         squad: { platoon: { id: { in: platoonIds } } },
       },
@@ -251,6 +255,81 @@ export async function fetchDailyForum(
     const group = requestsByPlatoon.get(platoonId)!;
     if (r.type === "medical") group.medical.push(item);
     else if (r.type === "hardship") group.hardship.push(item);
+    else group.leave.push(item);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Active requests (approved leave with future dates, medical with future appointments — no hardship)
+  // ---------------------------------------------------------------------------
+  const activeRequests = await prisma.request.findMany({
+    where: {
+      cycleId,
+      status: "approved",
+      type: { in: ["leave", "medical"] },
+      soldier: {
+        squad: { platoon: { id: { in: platoonIds } } },
+      },
+    },
+    include: {
+      soldier: {
+        include: {
+          squad: {
+            include: { platoon: { select: { id: true } } },
+          },
+        },
+      },
+      actions: {
+        where: { note: { not: null } },
+        orderBy: { createdAt: "asc" },
+        select: { action: true, userName: true, note: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Filter to actually active and group by platoon
+  const activeByPlatoon = new Map<string, { medical: OpenRequestItem[]; leave: OpenRequestItem[] }>();
+  for (const r of activeRequests) {
+    const platoonId = r.soldier.squad.platoon.id;
+    const item: OpenRequestItem = {
+      id: r.id,
+      type: r.type,
+      typeLabel: TYPE_LABELS[r.type] ?? r.type,
+      status: r.status,
+      assignedRole: r.assignedRole,
+      soldierName: `${r.soldier.familyName} ${r.soldier.givenName}`,
+      squad: r.soldier.squad.name,
+      description: r.description,
+      createdAt: r.createdAt.toISOString(),
+      place: r.place,
+      departureAt: r.departureAt?.toISOString() ?? null,
+      returnAt: r.returnAt?.toISOString() ?? null,
+      transportation: r.transportation,
+      paramedicDate: r.paramedicDate?.toISOString().split("T")[0] ?? null,
+      medicalAppointments: parseMedicalAppointments(r.medicalAppointments as string | null),
+      sickLeaveDays: r.sickLeaveDays,
+      specialConditions: r.specialConditions,
+      notes: (r.actions ?? [])
+        .filter((a): a is typeof a & { note: string } => a.note != null)
+        .map((a) => ({ action: a.action, userName: a.userName, note: a.note })),
+    };
+
+    // Check if actually active (future dates)
+    let isActive = false;
+    if (r.type === "leave") {
+      const dep = r.departureAt?.toISOString().split("T")[0];
+      const ret = r.returnAt?.toISOString().split("T")[0];
+      isActive = (dep != null && dep >= today) || (ret != null && ret >= today);
+    } else if (r.type === "medical") {
+      isActive = hasUpcomingAppointment(item.medicalAppointments ?? []);
+    }
+    if (!isActive) continue;
+
+    if (!activeByPlatoon.has(platoonId)) {
+      activeByPlatoon.set(platoonId, { medical: [], leave: [] });
+    }
+    const group = activeByPlatoon.get(platoonId)!;
+    if (r.type === "medical") group.medical.push(item);
     else group.leave.push(item);
   }
 
@@ -472,6 +551,7 @@ export async function fetchDailyForum(
     platoonName: platoon.name,
     companyName: platoon.company.name,
     openRequests: requestsByPlatoon.get(platoon.id) ?? { medical: [], hardship: [], leave: [] },
+    activeRequests: activeByPlatoon.get(platoon.id) ?? { medical: [], leave: [] },
     todayActivities: todayByPlatoon.get(platoon.id) ?? [],
     tomorrowActivities: tomorrowByPlatoon.get(platoon.id) ?? [],
     gaps: gapsByPlatoon.get(platoon.id) ?? [],
@@ -497,24 +577,35 @@ const htmlFormatters = {
   transportationLabels: TRANSPORTATION_LABELS,
 };
 
-function renderRequestDetailsHtml(req: OpenRequestItem): string {
-  const { fields, appointments } = extractRequestFields(req, htmlFormatters);
+function renderRequestDetailsHtml(req: OpenRequestItem, options?: { highlightDates?: boolean }): string {
+  const { fields, appointments } = extractRequestFields(req, htmlFormatters, options);
 
   const notes = formatNotes(req.notes, escapeHtml);
 
   return renderDetailColumnsHtml({ fields, appointments, notes });
 }
 
-function renderRequestTypeSection(title: string, requests: OpenRequestItem[]): string {
+const STATUS_LABELS: Record<string, string> = { open: "פתוח", approved: "אושר", denied: "נדחה" };
+const ROLE_LABELS: Record<string, string> = {
+  squad_commander: 'מ"כ', platoon_commander: 'מ"מ', platoon_sergeant: 'סמ"ח',
+  company_commander: 'מ"פ', deputy_company_commander: 'סמ"פ', instructor: "מדריך", company_medic: 'חופ"ל',
+};
+
+function renderRequestTypeSection(title: string, requests: OpenRequestItem[], options?: { highlightDates?: boolean }): string {
   if (requests.length === 0) return "";
   const cards = requests.map((req) => {
-    const details = renderRequestDetailsHtml(req);
+    const details = renderRequestDetailsHtml(req, options);
+    const statusBadge = `<span class="badge badge-status">${escapeHtml(STATUS_LABELS[req.status] ?? req.status)}</span>`;
+    const roleBadge = req.assignedRole
+      ? `<span class="badge badge-role">ממתין ל${escapeHtml(ROLE_LABELS[req.assignedRole] ?? req.assignedRole)}</span>`
+      : "";
     return `
       <div class="request-card">
         <div class="request-header">
           <span class="soldier-name">${escapeHtml(req.soldierName)}</span>
           <span class="request-squad">${escapeHtml(req.squad)}</span>
           <span class="request-date">${formatDateTime(req.createdAt)}</span>
+          <span class="request-badges">${statusBadge}${roleBadge}</span>
         </div>
         ${details ? `<div class="request-details">${details}</div>` : ""}
       </div>
@@ -642,9 +733,9 @@ export function renderDailyForumHtml(data: DailyForumData): string {
 
   const platoonsHtml = data.platoons.map((platoon, i) => {
     const pageBreak = multiPlatoon && i > 0 ? ' style="page-break-before: always;"' : "";
-    const totalRequests = platoon.openRequests.medical.length + platoon.openRequests.hardship.length + platoon.openRequests.leave.length;
+    const totalOpen = platoon.openRequests.medical.length + platoon.openRequests.hardship.length + platoon.openRequests.leave.length;
 
-    const requestsHtml = totalRequests > 0
+    const openHtml = totalOpen > 0
       ? [
           renderRequestTypeSection("רפואה", platoon.openRequests.medical),
           renderRequestTypeSection('ת"ש', platoon.openRequests.hardship),
@@ -652,13 +743,27 @@ export function renderDailyForumHtml(data: DailyForumData): string {
         ].join("\n")
       : '<p class="no-data">אין בקשות פתוחות</p>';
 
+    const totalActive = platoon.activeRequests.medical.length + platoon.activeRequests.leave.length;
+
+    const activeHtml = totalActive > 0
+      ? [
+          renderRequestTypeSection("רפואה", platoon.activeRequests.medical, { highlightDates: true }),
+          renderRequestTypeSection("יציאה", platoon.activeRequests.leave, { highlightDates: true }),
+        ].join("\n")
+      : '<p class="no-data">אין בקשות פעילות</p>';
+
     return `
       <div class="platoon-section"${pageBreak}>
         ${multiPlatoon ? `<div class="platoon-header">${escapeHtml(platoon.companyName)} — ${escapeHtml(platoon.platoonName)}</div>` : ""}
 
         <div class="section-block">
-          <h2 class="section-title">בקשות פתוחות (${totalRequests})</h2>
-          ${requestsHtml}
+          <h2 class="section-title">בקשות פתוחות (${totalOpen})</h2>
+          ${openHtml}
+        </div>
+
+        <div class="section-block">
+          <h2 class="section-title">בקשות פעילות (${totalActive})</h2>
+          ${activeHtml}
         </div>
 
         <div class="group-block">
@@ -752,11 +857,14 @@ export function renderDailyForumHtml(data: DailyForumData): string {
     .request-header {
       display: flex;
       gap: 10px;
-      align-items: baseline;
+      align-items: center;
     }
     .soldier-name { font-weight: 600; font-size: 11px; }
     .request-squad { font-size: 10px; color: #666; }
     .request-date { font-size: 10px; color: #666; }
+    .request-badges { margin-right: auto; display: flex; gap: 4px; }
+    .badge-status { background: #f3f4f6; color: #374151; }
+    .badge-role { background: #fef3c7; color: #92400e; }
     .request-details {
       font-size: 10px;
       color: #444;
