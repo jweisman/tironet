@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronDown, FileUp } from "lucide-react";
 import { toast } from "sonner";
@@ -150,6 +150,17 @@ export default function ActivitiesPage() {
   const canCreate = role !== "squad_commander" && !!role;
   const canEdit = canCreate; // same roles that can create can also edit metadata
   const db = usePowerSync();
+
+  // -------- Sticky header offset --------
+  const actHeaderRef = useRef<HTMLDivElement>(null);
+  const [actHeaderH, setActHeaderH] = useState(0);
+  useEffect(() => {
+    const el = actHeaderRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setActHeaderH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // -------- PowerSync queries --------
   // Squad commanders see only their squad's counts; everyone else gets platoon-wide counts (squadId = '').
@@ -320,7 +331,7 @@ export default function ActivitiesPage() {
   return (
     <div className="-mx-4 -my-6">
       {/* Sticky header */}
-      <div className="sticky top-0 z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2">
+      <div ref={actHeaderRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: "var(--app-header-height, 0px)" }}>
         <div className="flex items-center gap-2">
           <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
             {FILTER_PILLS.map((f) => (
@@ -405,7 +416,7 @@ export default function ActivitiesPage() {
           <div>
             {activitiesByPlatoon.map((platoonGroup) => (
               <div key={platoonGroup.platoonName}>
-                <div className="sticky top-[52px] z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between border-b border-border">
+                <div className="sticky z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between border-b border-border" style={{ top: `calc(var(--app-header-height, 0px) + ${actHeaderH}px)` }}>
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     {platoonGroup.platoonName}
                   </span>
