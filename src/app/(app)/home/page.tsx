@@ -87,6 +87,7 @@ const SQUADS_QUERY = `
     sq.name AS squad_name,
     p.id    AS platoon_id,
     p.name  AS platoon_name,
+    c.name  AS company_name,
 
     (SELECT COUNT(*)
      FROM soldiers s
@@ -146,6 +147,7 @@ const SQUADS_QUERY = `
 
   FROM squads sq
   JOIN platoons p ON p.id = sq.platoon_id
+  JOIN companies c ON c.id = p.company_id
   WHERE sq.id IN (SELECT squad_id FROM scope)
   ORDER BY p.sort_order ASC, p.name ASC, sq.sort_order ASC, sq.name ASC
 `;
@@ -222,6 +224,7 @@ const REQUESTS_QUERY = `
 interface RawSquad {
   squad_id: string; squad_name: string;
   platoon_id: string; platoon_name: string;
+  company_name: string;
   soldier_count: number; soldiers_with_gaps: number;
   reported_activities: number; missing_report_activities: number;
 }
@@ -322,6 +325,21 @@ export default function HomePage() {
     [rawSquads, topGapsMap, requestsMap]
   );
 
+  // Build unit path: company > platoon > squad (depending on role)
+  const unitPath = useMemo(() => {
+    const first = rawSquads?.[0];
+    if (!first) return "";
+    const parts: string[] = [];
+    if (first.company_name) parts.push(first.company_name);
+    if (role === "platoon_commander" || role === "squad_commander") {
+      if (first.platoon_name) parts.push(first.platoon_name);
+    }
+    if (role === "squad_commander") {
+      if (first.squad_name) parts.push(first.squad_name);
+    }
+    return parts.join(" > ");
+  }, [role, rawSquads]);
+
   // While session / cycle context is still resolving, show nothing
   // (avoids flashing "no access" or "choose a cycle" before data arrives).
   if (cycleLoading) {
@@ -383,11 +401,11 @@ export default function HomePage() {
               {ROLE_SHORT[rawRole] ?? rawRole}
             </span>
           )}
-          {role && cycleName && (
+          {rawRole && (unitPath || cycleName) && (
             <span className="text-muted-foreground text-sm">·</span>
           )}
-          {cycleName && (
-            <span className="text-sm text-muted-foreground">{cycleName}</span>
+          {(unitPath || cycleName) && (
+            <span className="text-sm text-muted-foreground">{unitPath || cycleName}</span>
           )}
         </div>
       </div>
