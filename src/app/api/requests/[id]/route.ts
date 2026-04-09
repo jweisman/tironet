@@ -7,6 +7,7 @@ import { getNextState } from "@/lib/requests/workflow";
 import { canActOnRequest } from "@/lib/requests/workflow";
 import { sendPushToUsers } from "@/lib/push/send";
 import { z } from "zod";
+import { effectiveRole } from "@/lib/auth/permissions";
 import type { RequestStatus, RequestType, Role, SessionUser } from "@/types";
 
 const patchSchema = z.object({
@@ -150,9 +151,10 @@ export async function PATCH(
     return NextResponse.json({ request: updated });
   }
 
-  // Handle field edits — assigned role or company medic (medical requests only) can edit
+  // Handle field edits — assigned role, company medic, or platoon commander (medical requests only) can edit
   const isMedicOnMedical = scope.role === "company_medic" && req.type === "medical";
-  if (!isMedicOnMedical && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
+  const isPlatoonCmdrOnMedical = effectiveRole(scope.role as Role) === "platoon_commander" && req.type === "medical";
+  if (!isMedicOnMedical && !isPlatoonCmdrOnMedical && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
     return NextResponse.json({ error: "Only the assigned role can edit" }, { status: 403 });
   }
 
