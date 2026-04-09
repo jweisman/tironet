@@ -193,7 +193,7 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
 
       {/* Required */}
       <div className="flex items-center justify-between">
-        <Label htmlFor="activity-required">פעילות דרושה</Label>
+        <Label htmlFor="activity-required">פעילות חובה</Label>
         <Switch
           id="activity-required"
           checked={isRequired}

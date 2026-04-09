@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -155,6 +155,22 @@ export default function RequestsPage() {
   const rawRole = (selectedAssignment?.role ?? "") as Role | "";
   const role = rawRole ? effectiveRole(rawRole) : "";
   const canCreate = role === "squad_commander" || role === "platoon_commander";
+
+  // -------- Sticky header offsets --------
+  // AppShell publishes --app-header-height as a CSS variable.
+  // The page header uses that variable directly via inline style.
+  // Date-group sub-headers use CSS calc() combining the reactive variable
+  // with the JS-measured page header height — avoids timing issues where
+  // the child effect fires before the parent sets the CSS variable.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [pageHeaderH, setPageHeaderH] = useState(0);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setPageHeaderH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
   const { data: rawRequests } = useQuery<RawRequest>(REQUESTS_QUERY, queryParams);
@@ -335,7 +351,7 @@ export default function RequestsPage() {
   return (
     <div className="-mx-4 -my-6">
       {/* Sticky header */}
-      <div className="sticky top-0 z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2">
+      <div ref={headerRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: "var(--app-header-height, 0px)" }}>
         <div className="flex items-center gap-1.5">
           {/* View tabs */}
           <button
@@ -491,7 +507,7 @@ export default function RequestsPage() {
               <div>
                 {groupByDate(activeRequests).map(([dateKey, requests]) => (
                   <div key={dateKey}>
-                    <div className="sticky top-[5.5rem] z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                    <div className="sticky z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground" style={{ top: `calc(var(--app-header-height, 0px) + ${pageHeaderH}px)` }}>
                       {formatGroupDate(dateKey)}
                     </div>
                     <div className="divide-y divide-border">

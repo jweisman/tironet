@@ -26,6 +26,7 @@ import {
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/requests/workflow";
+import { effectiveRole } from "@/lib/auth/permissions";
 import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import type { RequestType, RequestStatus, Role, Transportation, RequestActionType } from "@/types";
@@ -233,9 +234,11 @@ export default function RequestDetailPage() {
 
   const isAssignedToMe = assignedRole !== null && rawUserRole !== "" && canActOnRequest(rawUserRole as Role, assignedRole);
 
-  // Company medics can edit medical request fields (appointments, etc.) but cannot perform workflow actions
+  // Company medics and platoon commanders can edit medical request fields (appointments, etc.)
+  const effRole = rawUserRole ? effectiveRole(rawUserRole as Role) : "";
   const isMedicOnMedical = rawUserRole === "company_medic" && requestType === "medical";
-  const canEditFields = isAssignedToMe || isMedicOnMedical;
+  const isPlatoonCmdrOnMedical = effRole === "platoon_commander" && requestType === "medical";
+  const canEditFields = isAssignedToMe || isMedicOnMedical || isPlatoonCmdrOnMedical;
 
   const userName = session?.user
     ? `${(session.user as { familyName?: string }).familyName ?? ""} ${(session.user as { givenName?: string }).givenName ?? ""}`.trim()

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, AlertCircle, FileUp, FileText } from "lucide-react";
 import { toast } from "sonner";
@@ -225,30 +225,27 @@ export default function SoldiersPage() {
   }, [rawSoldiers]);
 
   // -------- Sticky header offset --------
+  // AppShell publishes --app-header-height as a CSS variable.
+  // We measure our own sticky bar + platoon header heights with ResizeObserver,
+  // then combine with the CSS variable via calc() to avoid timing issues.
   const stickyBarRef = useRef<HTMLDivElement>(null);
   const platoonHeaderRef = useRef<HTMLDivElement>(null);
-  const [searchBarTop, setSearchBarTop] = useState(0);
-  const [stickyTop, setStickyTop] = useState(104); // fallback
-  const [squadStickyTop, setSquadStickyTop] = useState(140); // fallback
-  const measure = useCallback(() => {
-    // Mobile header (md:hidden) — query the AppShell header element
-    const mobileHeader = document.querySelector("header.sticky") as HTMLElement | null;
-    const headerH = mobileHeader?.offsetHeight ?? 0;
-    setSearchBarTop(headerH);
-    if (stickyBarRef.current) {
-      const barH = stickyBarRef.current.offsetHeight + headerH;
-      setStickyTop(barH);
-      const platoonH = platoonHeaderRef.current?.offsetHeight ?? 36;
-      setSquadStickyTop(barH + platoonH);
-    }
+  const [barH, setBarH] = useState(0);
+  const [platoonH, setPlatoonH] = useState(36);
+  useEffect(() => {
+    const el = stickyBarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBarH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
   useEffect(() => {
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [measure]);
-  // Re-measure when role/data changes (platoonHeaderRef may not exist on first render)
-  useEffect(() => { measure(); }, [role, allSquads, measure]);
+    const el = platoonHeaderRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setPlatoonH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // -------- UI state --------
   const [search, setSearch] = useState("");
@@ -377,7 +374,7 @@ export default function SoldiersPage() {
   return (
     <div className="-mx-4 -my-6">
       {/* Sticky top search + gaps filter */}
-      <div ref={stickyBarRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: searchBarTop }}>
+      <div ref={stickyBarRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: "var(--app-header-height, 0px)" }}>
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search
@@ -499,7 +496,7 @@ export default function SoldiersPage() {
           <div>
             {filteredSquads.map((squad) => (
               <div key={squad.id}>
-                <div className="sticky z-10 bg-muted px-4 py-2 flex items-center justify-between border-b border-border" style={{ top: stickyTop }}>
+                <div className="sticky z-10 bg-muted px-4 py-2 flex items-center justify-between border-b border-border" style={{ top: `calc(var(--app-header-height, 0px) + ${barH}px)` }}>
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     {squad.name}
                   </span>
@@ -525,7 +522,7 @@ export default function SoldiersPage() {
           <div>
             {squadsByPlatoon.map((platoonGroup) => (
               <div key={platoonGroup.platoonName}>
-                <div ref={platoonHeaderRef} className="sticky z-[11] bg-background border-b border-border px-4 py-2 flex items-center justify-between" style={{ top: stickyTop }}>
+                <div ref={platoonHeaderRef} className="sticky z-[11] bg-background border-b border-border px-4 py-2 flex items-center justify-between" style={{ top: `calc(var(--app-header-height, 0px) + ${barH}px)` }}>
                   <span className="text-sm font-semibold">
                     {platoonGroup.platoonName}
                   </span>
@@ -535,7 +532,7 @@ export default function SoldiersPage() {
                 </div>
                 {platoonGroup.squads.map((squad) => (
                   <div key={squad.id}>
-                    <div className="sticky z-10 bg-muted px-4 py-1.5 flex items-center justify-between border-b border-border" style={{ top: squadStickyTop }}>
+                    <div className="sticky z-10 bg-muted px-4 py-1.5 flex items-center justify-between border-b border-border" style={{ top: `calc(var(--app-header-height, 0px) + ${barH + platoonH}px)` }}>
                       <span className="text-xs font-medium text-muted-foreground">
                         {squad.name}
                       </span>

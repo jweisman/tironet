@@ -11,6 +11,8 @@ import { formatGradeDisplay } from "@/lib/score-format";
 import { formatAppointment } from "@/lib/requests/medical-appointments";
 import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns";
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
+import { REQUEST_STATUS_LABELS, ASSIGNED_ROLE_LABELS } from "@/lib/requests/constants";
+import type { RequestStatus, Role } from "@/types";
 import type {
   DailyForumData,
   PlatoonForumSection,
@@ -48,18 +50,28 @@ const clientFormatters = {
   transportationLabels: TRANSPORTATION_LABELS,
 };
 
-function RequestCard({ req }: { req: OpenRequestItem }) {
-  const { fields, appointments } = extractRequestFields(req, clientFormatters);
+function RequestCard({ req, highlightDates }: { req: OpenRequestItem; highlightDates?: boolean }) {
+  const { fields, appointments } = extractRequestFields(req, clientFormatters, { highlightDates });
 
   const notes = formatNotes(req.notes);
 
   return (
     <div className="border-b border-border py-2 px-1">
-      <div className="flex items-baseline gap-2">
+      <div className="flex items-center gap-2">
         <span className="font-semibold text-sm">{req.soldierName}</span>
         <span className="text-xs text-muted-foreground">{req.squad}</span>
         <span className="text-xs text-muted-foreground">
           {new Date(req.createdAt).toLocaleDateString("he-IL", { day: "numeric", month: "short" })}
+        </span>
+        <span className="ms-auto flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+            {REQUEST_STATUS_LABELS[req.status as RequestStatus] ?? req.status}
+          </span>
+          {req.assignedRole && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800/60 dark:text-amber-100">
+              ממתין ל{ASSIGNED_ROLE_LABELS[req.assignedRole as Role] ?? req.assignedRole}
+            </span>
+          )}
         </span>
       </div>
       <RequestDetailColumns data={{ fields, appointments, notes }} />
@@ -71,7 +83,7 @@ function RequestCard({ req }: { req: OpenRequestItem }) {
 // Request type section
 // ---------------------------------------------------------------------------
 
-function RequestTypeSection({ title, requests }: { title: string; requests: OpenRequestItem[] }) {
+function RequestTypeSection({ title, requests, highlightDates }: { title: string; requests: OpenRequestItem[]; highlightDates?: boolean }) {
   if (requests.length === 0) return null;
   return (
     <div className="mb-3">
@@ -79,7 +91,7 @@ function RequestTypeSection({ title, requests }: { title: string; requests: Open
         {title} ({requests.length})
       </div>
       {requests.map((req) => (
-        <RequestCard key={req.id} req={req} />
+        <RequestCard key={req.id} req={req} highlightDates={highlightDates} />
       ))}
     </div>
   );
@@ -212,7 +224,8 @@ function GapSection({ gap }: { gap: GapActivityItem }) {
 // ---------------------------------------------------------------------------
 
 function PlatoonSection({ platoon, multiPlatoon }: { platoon: PlatoonForumSection; multiPlatoon: boolean }) {
-  const totalRequests = platoon.openRequests.medical.length + platoon.openRequests.hardship.length + platoon.openRequests.leave.length;
+  const totalOpen = platoon.openRequests.medical.length + platoon.openRequests.hardship.length + platoon.openRequests.leave.length;
+  const totalActive = platoon.activeRequests.medical.length + platoon.activeRequests.leave.length;
 
   return (
     <div className="mb-8">
@@ -225,15 +238,30 @@ function PlatoonSection({ platoon, multiPlatoon }: { platoon: PlatoonForumSectio
       {/* Open requests */}
       <div className="mb-6">
         <h2 className="text-sm font-bold border-b border-border pb-1 mb-3">
-          בקשות פתוחות ({totalRequests})
+          בקשות פתוחות ({totalOpen})
         </h2>
-        {totalRequests === 0 ? (
+        {totalOpen === 0 ? (
           <p className="text-xs text-muted-foreground">אין בקשות פתוחות</p>
         ) : (
           <>
             <RequestTypeSection title="רפואה" requests={platoon.openRequests.medical} />
             <RequestTypeSection title='ת"ש' requests={platoon.openRequests.hardship} />
             <RequestTypeSection title="יציאה" requests={platoon.openRequests.leave} />
+          </>
+        )}
+      </div>
+
+      {/* Active requests */}
+      <div className="mb-6">
+        <h2 className="text-sm font-bold border-b border-border pb-1 mb-3">
+          בקשות פעילות ({totalActive})
+        </h2>
+        {totalActive === 0 ? (
+          <p className="text-xs text-muted-foreground">אין בקשות פעילות</p>
+        ) : (
+          <>
+            <RequestTypeSection title="רפואה" requests={platoon.activeRequests.medical} highlightDates />
+            <RequestTypeSection title="יציאה" requests={platoon.activeRequests.leave} highlightDates />
           </>
         )}
       </div>

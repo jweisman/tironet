@@ -156,7 +156,7 @@ export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPre
         {/* Badges */}
         {activity.isRequired && (
           <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
-            דרוש
+            חובה
           </Badge>
         )}
         <Badge

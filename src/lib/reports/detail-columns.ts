@@ -11,8 +11,8 @@ import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 
 /** Pre-computed data for the 3-column detail layout. */
 export interface DetailColumnsData {
-  fields: { label: string; value: string }[];
-  appointments: string[];
+  fields: { label: string; value: string; highlight?: boolean }[];
+  appointments: { text: string; highlight?: boolean }[];
   notes: { label: string; value: string }[];
 }
 
@@ -46,9 +46,11 @@ export interface DetailFormatters {
 export function extractRequestFields(
   req: RequestDetailInput,
   fmt: DetailFormatters,
-): { fields: { label: string; value: string }[]; appointments: string[] } {
-  const fields: { label: string; value: string }[] = [];
-  const appointments: string[] = [];
+  options?: { highlightDates?: boolean },
+): { fields: { label: string; value: string; highlight?: boolean }[]; appointments: { text: string; highlight?: boolean }[] } {
+  const fields: { label: string; value: string; highlight?: boolean }[] = [];
+  const appointments: { text: string; highlight?: boolean }[] = [];
+  const hl = options?.highlightDates ?? false;
 
   if (req.description) {
     fields.push({ label: "תיאור", value: fmt.text(req.description) });
@@ -56,8 +58,8 @@ export function extractRequestFields(
 
   if (req.type === "leave") {
     if (req.place) fields.push({ label: "מקום", value: fmt.text(req.place) });
-    if (req.departureAt) fields.push({ label: "יציאה", value: fmt.dateTime(req.departureAt) });
-    if (req.returnAt) fields.push({ label: "חזרה", value: fmt.dateTime(req.returnAt) });
+    if (req.departureAt) fields.push({ label: "יציאה", value: fmt.dateTime(req.departureAt), highlight: hl });
+    if (req.returnAt) fields.push({ label: "חזרה", value: fmt.dateTime(req.returnAt), highlight: hl });
     if (req.transportation) {
       fields.push({
         label: "הגעה",
@@ -69,8 +71,12 @@ export function extractRequestFields(
   if (req.type === "medical") {
     if (req.paramedicDate) fields.push({ label: 'בדיקת חופ"ל', value: fmt.date(req.paramedicDate) });
     if (req.medicalAppointments && req.medicalAppointments.length > 0) {
+      const today = new Date().toISOString().split("T")[0];
+      let nextHighlighted = false;
       for (const appt of req.medicalAppointments) {
-        appointments.push(fmt.text(fmt.appointment(appt)));
+        const isNext = hl && !nextHighlighted && appt.date >= today;
+        if (isNext) nextHighlighted = true;
+        appointments.push({ text: fmt.text(fmt.appointment(appt)), highlight: isNext || undefined });
       }
     }
     if (req.sickLeaveDays != null) fields.push({ label: "ימי גימלים", value: String(req.sickLeaveDays) });
@@ -122,13 +128,18 @@ export function renderDetailColumnsHtml(data: DetailColumnsData): string {
 
   if (data.fields.length > 0) {
     const fieldRows = data.fields
-      .map((f) => `<tr><td class="detail-label">${f.label}</td><td>${f.value}</td></tr>`)
+      .map((f) => {
+        const val = f.highlight ? `<strong class="detail-highlight">${f.value}</strong>` : f.value;
+        return `<tr><td class="detail-label">${f.label}</td><td>${val}</td></tr>`;
+      })
       .join("");
     columns.push(`<table class="detail-grid">${fieldRows}</table>`);
   }
 
   if (data.appointments.length > 0) {
-    const items = data.appointments.map((a) => `<li>${a}</li>`).join("");
+    const items = data.appointments.map((a) =>
+      a.highlight ? `<li><strong class="detail-highlight">${a.text}</strong></li>` : `<li>${a.text}</li>`
+    ).join("");
     columns.push(`<div class="detail-appointments"><span class="detail-label">תורים</span><ul>${items}</ul></div>`);
   }
 
@@ -168,6 +179,7 @@ export const DETAIL_COLUMNS_CSS = `    .detail-columns {
       color: #666;
     }
     .detail-label { font-weight: 600; }
+    .detail-highlight { font-weight: 700; color: #1a1a1a; }
     .detail-appointments {
       flex-shrink: 0;
     }

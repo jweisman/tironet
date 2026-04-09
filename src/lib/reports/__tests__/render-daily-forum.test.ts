@@ -90,6 +90,8 @@ describe("fetchDailyForum", () => {
     expect(result!.platoons[0].openRequests.medical).toHaveLength(0);
     expect(result!.platoons[0].openRequests.hardship).toHaveLength(0);
     expect(result!.platoons[0].openRequests.leave).toHaveLength(0);
+    expect(result!.platoons[0].activeRequests.medical).toHaveLength(0);
+    expect(result!.platoons[0].activeRequests.leave).toHaveLength(0);
     expect(result!.platoons[0].todayActivities).toHaveLength(0);
     expect(result!.platoons[0].tomorrowActivities).toHaveLength(0);
     expect(result!.platoons[0].gaps).toHaveLength(0);
@@ -98,7 +100,8 @@ describe("fetchDailyForum", () => {
   it("groups open requests by type", async () => {
     mockCycleFindUnique.mockResolvedValue({ id: "cycle-1", name: "Test Cycle" } as never);
     mockPlatoonFindMany.mockResolvedValue([basePlatoon] as never);
-    mockRequestFindMany.mockResolvedValue([
+    // First call = open requests, second call = active requests
+    mockRequestFindMany.mockResolvedValueOnce([
       {
         id: "r1",
         type: "medical",
@@ -144,6 +147,7 @@ describe("fetchDailyForum", () => {
         actions: [],
       },
     ] as never);
+    mockRequestFindMany.mockResolvedValueOnce([]); // active requests
     mockActivityFindMany.mockResolvedValue([]);
 
     const result = await fetchDailyForum("cycle-1", ["p1"], "2026-04-07");
@@ -152,6 +156,89 @@ describe("fetchDailyForum", () => {
     expect(result!.platoons[0].openRequests.hardship).toHaveLength(0);
     expect(result!.platoons[0].openRequests.medical[0].soldierName).toBe("Cohen Avi");
     expect(result!.platoons[0].openRequests.leave[0].place).toBe("Tel Aviv");
+  });
+
+  it("includes active approved requests (leave + medical) but not hardship", async () => {
+    mockCycleFindUnique.mockResolvedValue({ id: "cycle-1", name: "Test Cycle" } as never);
+    mockPlatoonFindMany.mockResolvedValue([basePlatoon] as never);
+    mockRequestFindMany.mockResolvedValueOnce([]); // open requests
+    mockRequestFindMany.mockResolvedValueOnce([
+      {
+        id: "r-leave",
+        type: "leave",
+        status: "approved",
+        assignedRole: null,
+        description: "Weekend leave",
+        createdAt: new Date("2026-04-07T10:00:00Z"),
+        place: "Home",
+        departureAt: new Date("2026-04-10T08:00:00Z"),
+        returnAt: new Date("2026-04-12T20:00:00Z"),
+        transportation: "private",
+        paramedicDate: null,
+        medicalAppointments: null,
+        sickLeaveDays: null,
+        specialConditions: null,
+        soldier: {
+          givenName: "Avi",
+          familyName: "Cohen",
+          squad: { name: "Squad 1", platoon: { id: "p1" } },
+        },
+        actions: [],
+      },
+      {
+        id: "r-medical",
+        type: "medical",
+        status: "approved",
+        assignedRole: null,
+        description: "Checkup",
+        createdAt: new Date("2026-04-07T09:00:00Z"),
+        place: null,
+        departureAt: null,
+        returnAt: null,
+        transportation: null,
+        paramedicDate: null,
+        medicalAppointments: JSON.stringify([{ id: "a1", date: "2026-12-01", place: "Hospital", type: "Checkup" }]),
+        sickLeaveDays: null,
+        specialConditions: null,
+        soldier: {
+          givenName: "Dan",
+          familyName: "Levy",
+          squad: { name: "Squad 1", platoon: { id: "p1" } },
+        },
+        actions: [],
+      },
+      {
+        id: "r-leave-past",
+        type: "leave",
+        status: "approved",
+        assignedRole: null,
+        description: "Past leave",
+        createdAt: new Date("2026-03-01T10:00:00Z"),
+        place: "Home",
+        departureAt: new Date("2026-03-05T08:00:00Z"),
+        returnAt: new Date("2026-03-07T20:00:00Z"),
+        transportation: "private",
+        paramedicDate: null,
+        medicalAppointments: null,
+        sickLeaveDays: null,
+        specialConditions: null,
+        soldier: {
+          givenName: "Avi",
+          familyName: "Cohen",
+          squad: { name: "Squad 1", platoon: { id: "p1" } },
+        },
+        actions: [],
+      },
+    ] as never);
+    mockActivityFindMany.mockResolvedValue([]);
+
+    const result = await fetchDailyForum("cycle-1", ["p1"], "2026-04-07");
+    // Active leave with future dates
+    expect(result!.platoons[0].activeRequests.leave).toHaveLength(1);
+    expect(result!.platoons[0].activeRequests.leave[0].soldierName).toBe("Cohen Avi");
+    // Active medical with future appointment
+    expect(result!.platoons[0].activeRequests.medical).toHaveLength(1);
+    expect(result!.platoons[0].activeRequests.medical[0].soldierName).toBe("Levy Dan");
   });
 
   it("computes pass/fail/na counts for today activities", async () => {
@@ -305,6 +392,7 @@ describe("renderDailyForumHtml", () => {
         platoonName: "Platoon 1",
         companyName: "Company A",
         openRequests: { medical: [], hardship: [], leave: [] },
+        activeRequests: { medical: [], leave: [] },
         todayActivities: [],
         tomorrowActivities: [],
         gaps: [],
@@ -316,6 +404,7 @@ describe("renderDailyForumHtml", () => {
     const html = renderDailyForumHtml(emptyData);
     expect(html).toContain("דוח פורום יומי");
     expect(html).toContain("בקשות פתוחות");
+    expect(html).toContain("בקשות פעילות");
     expect(html).toContain("הספקים");
     expect(html).toContain("פעילויות היום");
     expect(html).toContain("פעילויות מחר");
@@ -411,6 +500,7 @@ describe("renderDailyForumHtml", () => {
   it("shows empty state messages", () => {
     const html = renderDailyForumHtml(emptyData);
     expect(html).toContain("אין בקשות פתוחות");
+    expect(html).toContain("אין בקשות פעילות");
     expect(html).toContain("אין פעילויות להיום");
     expect(html).toContain("אין פעילויות למחר");
     expect(html).toContain("אין פערים");
