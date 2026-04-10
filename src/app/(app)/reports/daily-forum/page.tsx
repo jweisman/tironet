@@ -302,7 +302,6 @@ function PlatoonSection({ platoon, multiPlatoon }: { platoon: PlatoonForumSectio
                   <tr className="border-b-2 border-border">
                     <th className="text-start px-2 py-1.5 font-semibold">סוג</th>
                     <th className="text-start px-2 py-1.5 font-semibold">שם</th>
-                    <th className="text-start px-2 py-1.5 font-semibold">סטטוס</th>
                     <th className="text-start px-2 py-1.5 font-semibold">חובה</th>
                   </tr>
                 </thead>
@@ -311,13 +310,6 @@ function PlatoonSection({ platoon, multiPlatoon }: { platoon: PlatoonForumSectio
                     <tr key={a.id} className="border-b border-border">
                       <td className="px-2 py-1.5">{a.activityTypeName}</td>
                       <td className="px-2 py-1.5">{a.name}</td>
-                      <td className="px-2 py-1.5">
-                        {a.status === "active" ? (
-                          <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-800">פעיל</span>
-                        ) : (
-                          <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">טיוטה</span>
-                        )}
-                      </td>
                       <td className="px-2 py-1.5">
                         {a.isRequired ? (
                           <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">חובה</span>

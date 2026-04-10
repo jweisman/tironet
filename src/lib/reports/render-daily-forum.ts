@@ -70,7 +70,6 @@ export interface TomorrowActivityItem {
   id: string;
   name: string;
   activityTypeName: string;
-  status: string;
   isRequired: boolean;
 }
 
@@ -345,7 +344,6 @@ export async function fetchDailyForum(
       cycleId,
       platoonId: { in: platoonIds },
       date: { gte: todayStart, lte: todayEnd },
-      status: "active",
     },
     include: {
       activityType: { select: { name: true, scoreConfig: true, displayConfiguration: true } },
@@ -490,7 +488,6 @@ export async function fetchDailyForum(
       id: activity.id,
       name: activity.name,
       activityTypeName: activity.activityType.name,
-      status: activity.status,
       isRequired: activity.isRequired,
     });
   }
@@ -502,7 +499,6 @@ export async function fetchDailyForum(
     where: {
       cycleId,
       platoonId: { in: platoonIds },
-      status: "active",
       isRequired: true,
       date: { lt: todayStart },
     },
@@ -673,18 +669,15 @@ function renderTomorrowActivitiesHtml(activities: TomorrowActivityItem[]): strin
   if (activities.length === 0) return '<p class="no-data">אין פעילויות למחר</p>';
 
   const rows = activities.map((a) => {
-    const statusBadge = a.status === "active"
-      ? '<span class="badge badge-active">פעיל</span>'
-      : '<span class="badge badge-draft">טיוטה</span>';
     const requiredBadge = a.isRequired
       ? '<span class="badge badge-required">חובה</span>'
       : '<span class="badge badge-optional">רשות</span>';
-    return `<tr><td>${escapeHtml(a.activityTypeName)}</td><td>${escapeHtml(a.name)}</td><td>${statusBadge}</td><td>${requiredBadge}</td></tr>`;
+    return `<tr><td>${escapeHtml(a.activityTypeName)}</td><td>${escapeHtml(a.name)}</td><td>${requiredBadge}</td></tr>`;
   }).join("\n");
 
   return `
     <table class="tomorrow-table">
-      <thead><tr><th>סוג</th><th>שם</th><th>סטטוס</th><th>חובה</th></tr></thead>
+      <thead><tr><th>סוג</th><th>שם</th><th>חובה</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;

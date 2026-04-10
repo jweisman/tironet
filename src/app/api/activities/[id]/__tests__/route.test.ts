@@ -135,22 +135,6 @@ describe("GET /api/activities/[id]", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 403 when squad_commander tries to view draft activity", async () => {
-    const draftActivity = { ...fullActivity, status: "draft" };
-    mockPrisma.activity.findUnique.mockResolvedValue(draftActivity as never);
-
-    const scope = makeSquadCommanderScope();
-    mockGetActivityScope.mockResolvedValue({
-      scope,
-      error: null,
-      user: mockSessionUser(),
-    });
-
-    const req = createMockRequest("GET", "/api/activities/act-1");
-    const res = await GET(req, makeParams("act-1"));
-    expect(res.status).toBe(403);
-  });
-
   it("squad_commander sees only their squad", async () => {
     mockPrisma.activity.findUnique.mockResolvedValue(fullActivity as never);
 

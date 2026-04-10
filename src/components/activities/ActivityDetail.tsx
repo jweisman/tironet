@@ -79,7 +79,6 @@ export interface ActivityDetailData {
   id: string;
   name: string;
   date: string;
-  status: "draft" | "active";
   isRequired: boolean;
   activityType: { id: string; name: string; icon: string; activeScores: ActiveScore[]; displayConfiguration?: DisplayConfiguration | null };
   platoon: { id: string; name: string; companyName: string };
@@ -146,7 +145,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [metaDate, setMetaDate] = useState(data.date.split("T")[0]);
   const [metaActivityTypeId, setMetaActivityTypeId] = useState(data.activityType.id);
   const [metaIsRequired, setMetaIsRequired] = useState(data.isRequired);
-  const [metaStatus, setMetaStatus] = useState<"draft" | "active">(data.status);
   const [metaSubmitting, setMetaSubmitting] = useState(false);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
@@ -344,7 +342,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           date: metaDate,
           activityTypeId: metaActivityTypeId,
           isRequired: metaIsRequired,
-          status: metaStatus,
         }),
       });
 
@@ -443,10 +440,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           {data.isRequired && (
             <Badge variant="secondary">חובה</Badge>
           )}
-          <Badge variant={data.status === "draft" ? "outline" : "default"}>
-            {data.status === "draft" ? "טיוטה" : "פעיל"}
-          </Badge>
-
           <div className="flex-1" />
 
           <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -460,7 +453,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                     setMetaDate(data.date.split("T")[0]);
                     setMetaActivityTypeId(data.activityType.id);
                     setMetaIsRequired(data.isRequired);
-                    setMetaStatus(data.status);
                     setEditingMetadata(true);
                   }}
                 >
@@ -759,35 +751,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 checked={metaIsRequired}
                 onCheckedChange={setMetaIsRequired}
               />
-            </div>
-
-            {/* Status */}
-            <div className="space-y-1.5">
-              <Label>סטטוס</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMetaStatus("draft")}
-                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                    metaStatus === "draft"
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  טיוטה
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMetaStatus("active")}
-                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                    metaStatus === "active"
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  פעיל
-                </button>
-              </div>
             </div>
 
             {metaError && (

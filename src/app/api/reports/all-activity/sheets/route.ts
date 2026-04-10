@@ -104,7 +104,6 @@ export async function POST(request: NextRequest) {
             where: {
               activity: {
                 cycleId,
-                status: "active",
                 platoonId: { in: scope!.platoonIds },
                 ...(activityTypeIds?.length ? { activityTypeId: { in: activityTypeIds } } : {}),
                 ...(afterDate ? { date: { gte: afterDate } } : {}),
@@ -127,7 +126,6 @@ export async function POST(request: NextRequest) {
     where: {
       cycleId,
       platoonId: { in: scope!.platoonIds },
-      status: "active",
       ...(activityTypeIds?.length ? { activityTypeId: { in: activityTypeIds } } : {}),
       ...(afterDate ? { date: { gte: afterDate } } : {}),
     },

@@ -158,7 +158,7 @@ async function seed() {
     data: [
       { id: IDS.activity1, platoonId: IDS.platoon1, cycleId: IDS.cycle, activityTypeId: IDS.activityTypeShooting, name: "Shooting Drill 1", date: today, isRequired: true, status: "active", createdByUserId: IDS.platoonCmdUser },
       { id: IDS.activity2, platoonId: IDS.platoon1, cycleId: IDS.cycle, activityTypeId: IDS.activityTypeNav, name: "Navigation Exercise", date: new Date(today.getTime() - 86400000), isRequired: true, status: "active", createdByUserId: IDS.platoonCmdUser },
-      { id: IDS.activityDraft, platoonId: IDS.platoon1, cycleId: IDS.cycle, activityTypeId: IDS.activityTypeShooting, name: "Draft Activity", date: new Date(today.getTime() + 86400000), isRequired: false, status: "draft", createdByUserId: IDS.platoonCmdUser },
+      { id: IDS.activityDraft, platoonId: IDS.platoon1, cycleId: IDS.cycle, activityTypeId: IDS.activityTypeShooting, name: "Future Activity", date: new Date(today.getTime() + 86400000), isRequired: false, status: "active", createdByUserId: IDS.platoonCmdUser },
       { id: IDS.activityP2, platoonId: IDS.platoon2, cycleId: IDS.cycle, activityTypeId: IDS.activityTypeShooting, name: "Platoon 2 Shooting", date: today, isRequired: true, status: "active", createdByUserId: IDS.adminUser },
     ],
   });

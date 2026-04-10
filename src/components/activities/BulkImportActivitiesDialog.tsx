@@ -47,7 +47,6 @@ interface ParsedRow {
   name: string;
   date: string;
   isRequired: boolean;
-  status: "draft" | "active";
   errors: string[];
 }
 
@@ -60,14 +59,7 @@ const VALID_REQUIRED: Record<string, boolean> = {
   false: false,
 };
 
-const VALID_STATUSES: Record<string, "draft" | "active"> = {
-  טיוטה: "draft",
-  פעיל: "active",
-  draft: "draft",
-  active: "active",
-};
-
-const TEMPLATE_HEADERS = ["סוג פעילות", "שם", "תאריך", "חובה", "סטטוס"];
+const TEMPLATE_HEADERS = ["סוג פעילות", "שם", "תאריך", "חובה"];
 
 function downloadTemplate(activityTypes: ActivityType[]) {
   const type1 = activityTypes[0]?.name ?? "ירי";
@@ -110,8 +102,6 @@ function parseSheet(
   const nameIdx = headers.findIndex((h) => h === "שם");
   const dateIdx = headers.findIndex((h) => h === "תאריך");
   const requiredIdx = headers.findIndex((h) => h === "חובה");
-  const statusIdx = headers.findIndex((h) => h === "סטטוס");
-
   // Build type name → id lookup (case-insensitive, trimmed)
   const typeLookup = new Map<string, string>();
   for (const t of activityTypes) {
@@ -130,10 +120,8 @@ function parseSheet(
     const dateRawValue = getRaw(dateIdx);
     const dateRaw = dateRawValue != null ? String(dateRawValue).trim() : "";
     const requiredRaw = get(requiredIdx);
-    const statusRaw = get(statusIdx);
-
     // Skip completely empty rows
-    if (!activityTypeName && !name && !dateRaw && !requiredRaw && !statusRaw) return;
+    if (!activityTypeName && !name && !dateRaw && !requiredRaw) return;
 
     const errors: string[] = [];
 
@@ -182,17 +170,6 @@ function parseSheet(
       }
     }
 
-    // Validate status (optional, default draft)
-    let status: "draft" | "active" = "draft";
-    if (statusRaw) {
-      const normalized = statusRaw.toLowerCase();
-      if (normalized in VALID_STATUSES) {
-        status = VALID_STATUSES[normalized];
-      } else {
-        errors.push(`סטטוס לא חוקי: "${statusRaw}"`);
-      }
-    }
-
     parsed.push({
       rowIndex: i + headerIdx + 2,
       activityTypeName,
@@ -200,7 +177,6 @@ function parseSheet(
       name,
       date,
       isRequired,
-      status,
       errors,
     });
   });
@@ -307,7 +283,6 @@ export function BulkImportActivitiesDialog({
               name: r.name,
               date: r.date,
               isRequired: r.isRequired,
-              status: r.status,
             })),
           }),
         });
@@ -438,7 +413,6 @@ export function BulkImportActivitiesDialog({
                         <th className="text-end px-2 py-1.5 font-medium">שם</th>
                         <th className="text-end px-2 py-1.5 font-medium">תאריך</th>
                         <th className="text-end px-2 py-1.5 font-medium">חובה</th>
-                        <th className="text-end px-2 py-1.5 font-medium">סטטוס</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -473,9 +447,6 @@ export function BulkImportActivitiesDialog({
                           </td>
                           <td className="px-2 py-1.5 text-muted-foreground">
                             {row.isRequired ? "כן" : "לא"}
-                          </td>
-                          <td className="px-2 py-1.5 text-muted-foreground">
-                            {row.status === "draft" ? "טיוטה" : "פעיל"}
                           </td>
                         </tr>
                       ))}

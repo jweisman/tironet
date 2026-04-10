@@ -194,7 +194,6 @@ export default function ActivityPage() {
       id: activity.id,
       name: activity.name,
       date: activity.date,
-      status: activity.status as "draft" | "active",
       isRequired: Number(activity.is_required) === 1,
       activityType: {
         id: activity.activity_type_id,

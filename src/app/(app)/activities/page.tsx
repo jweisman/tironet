@@ -19,16 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -36,17 +26,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Types
 // ---------------------------------------------------------------------------
 
-type FilterPill = "open" | "completed" | "gaps" | "week" | "draft";
+type FilterPill = "open" | "completed" | "gaps" | "future";
 type SortMode = "date-desc" | "date-asc" | "name-asc" | "name-desc";
 
 const FILTER_LABELS: Record<FilterPill, string> = {
   open: "פתוחות",
   completed: "הושלמו",
   gaps: "עם פערים",
-  week: "השבוע",
-  draft: "טיוטה",
+  future: "עתידיות",
 };
-const FILTER_PILLS: FilterPill[] = ["open", "completed", "gaps", "week", "draft"];
+const FILTER_PILLS: FilterPill[] = ["open", "completed", "gaps", "future"];
 
 const SORT_LABELS: Record<SortMode, string> = {
   "date-desc": "תאריך (חדש לישן)",
@@ -108,7 +97,7 @@ const COMPANY_PLATOONS_QUERY = `
 // ---------------------------------------------------------------------------
 
 interface RawActivity {
-  id: string; name: string; date: string; status: string;
+  id: string; name: string; date: string;
   is_required: number;
   activity_type_name: string; activity_type_icon: string;
   platoon_id: string; platoon_name: string; company_name: string;
@@ -123,7 +112,6 @@ function mapActivity(raw: RawActivity): ActivitySummary {
     id: raw.id,
     name: raw.name,
     date: raw.date,
-    status: raw.status as "draft" | "active",
     isRequired: Number(raw.is_required) === 1,
     activityType: { name: raw.activity_type_name, icon: raw.activity_type_icon },
     platoon: { id: raw.platoon_id, name: raw.platoon_name, companyName: raw.company_name },
@@ -185,18 +173,12 @@ export default function ActivitiesPage() {
   const [filter, setFilter] = useState<FilterPill>(
     (FILTER_PILLS as readonly string[]).includes(initialFilter) ? initialFilter as FilterPill : "open"
   );
-  const [sortMode, setSortMode] = useState<SortMode>("date-desc");
+  const [sortMode, setSortMode] = useState<SortMode>("date-asc");
   const [sortOpen, setSortOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
-  const [notifying, setNotifying] = useState(false);
 
   const todayStr = new Date().toISOString().split("T")[0];
-  const weekAgoStr = useMemo(() => {
-    const d = new Date(); d.setDate(d.getDate() - 7);
-    return d.toISOString().split("T")[0];
-  }, []);
 
   // An activity is "completed" when its date is in the past and it has no gaps.
   // Non-required activities can't have gaps, so past date alone is sufficient.
@@ -210,15 +192,14 @@ export default function ActivitiesPage() {
   const filtered = useMemo(() => {
     let list = [...allActivities];
     if (filter === "open") {
-      list = list.filter((a) => !isCompleted(a));
+      // Open = date < tomorrow with gaps (non-completed past/today activities)
+      list = list.filter((a) => a.date.split("T")[0] <= todayStr && !isCompleted(a));
     } else if (filter === "completed") {
       list = list.filter(isCompleted);
-    } else if (filter === "week") {
-      list = list.filter((a) => { const d = a.date.split("T")[0]; return d >= weekAgoStr && d <= todayStr; });
     } else if (filter === "gaps") {
       list = list.filter((a) => a.isRequired && a.date.split("T")[0] < todayStr && (a.missingCount > 0 || a.failedCount > 0));
-    } else if (filter === "draft") {
-      list = list.filter((a) => a.status === "draft");
+    } else if (filter === "future") {
+      list = list.filter((a) => a.date.split("T")[0] > todayStr);
     }
     list.sort((a, b) => {
       if (sortMode === "date-desc") return b.date.localeCompare(a.date);
@@ -228,7 +209,7 @@ export default function ActivitiesPage() {
       return 0;
     });
     return list;
-  }, [allActivities, filter, sortMode, weekAgoStr, todayStr]);
+  }, [allActivities, filter, sortMode, todayStr]);
 
   const showPlatoon = role === "company_commander" || rawRole === "instructor";
 
@@ -261,13 +242,12 @@ export default function ActivitiesPage() {
     return [];
   }, [selectedAssignment, role, rawRole, companyPlatoons]);
 
-  function handleCreateSuccess(activityId: string, platoonCount: number) {
+  function handleCreateSuccess(_activityId: string, platoonCount: number) {
     setCreateOpen(false);
     if (platoonCount > 1) {
       toast.success(`הפעילות נוצרה בהצלחה ב-${platoonCount} מחלקות`);
     } else {
       toast.success("הפעילות נוצרה בהצלחה");
-      setPendingActivityId(activityId);
     }
   }
 
@@ -293,22 +273,8 @@ export default function ActivitiesPage() {
         label: a.isRequired ? "סמן כרשות" : "סמן כחובה",
         onClick: () => { db.execute("UPDATE activities SET is_required = ? WHERE id = ?", [a.isRequired ? 0 : 1, a.id]); },
       },
-      {
-        label: a.status === "draft" ? "סמן כפעיל" : "סמן כטיוטה",
-        onClick: () => { db.execute("UPDATE activities SET status = ? WHERE id = ?", [a.status === "draft" ? "active" : "draft", a.id]); },
-      },
     ];
   }, [contextMenu, db]);
-
-  async function handleNotify() {
-    if (!pendingActivityId) return;
-    setNotifying(true);
-    try { await fetch(`/api/activities/${pendingActivityId}/notify`, { method: "POST" }); }
-    catch { /* ignore */ } finally { setNotifying(false); setPendingActivityId(null); }
-  }
-
-  const pendingActivity = pendingActivityId ? allActivities.find((a) => a.id === pendingActivityId) : null;
-  const showNotifyDialog = !!pendingActivity && pendingActivity.status === "active";
 
   if (rawRole === "company_medic") {
     return (
@@ -498,23 +464,6 @@ export default function ActivitiesPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={showNotifyDialog} onOpenChange={(open) => { if (!open) setPendingActivityId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>הודע למ&quot;כים?</AlertDialogTitle>
-            <AlertDialogDescription>
-              האם לשלוח הודעה בדוא&quot;ל למפקדי הכיתות על הפעילות החדשה?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingActivityId(null)}>לא</AlertDialogCancel>
-            <AlertDialogAction onClick={handleNotify} disabled={notifying}>
-              {notifying ? "שולח..." : "כן, שלח הודעה"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Context menu */}
       {contextMenu && (

@@ -14,22 +14,6 @@ test.describe("Activities — platoon commander", () => {
     await expect(page.getByText("Navigation Exercise")).toBeVisible();
   });
 
-  test("filter by draft shows only draft activities", async ({ page }) => {
-    await page.goto("/activities");
-    await expect(page.getByText("Shooting Drill 1")).toBeVisible({
-      timeout: 60000,
-    });
-
-    // Click draft filter pill (use exact to avoid matching activity card buttons)
-    await page.getByRole("button", { name: "טיוטה", exact: true }).click();
-
-    // Only draft activity should be visible
-    await expect(page.getByText("Draft Activity")).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.getByText("Shooting Drill 1")).not.toBeVisible();
-  });
-
   test("activity detail page shows squads with soldiers", async ({ page }) => {
     await page.goto("/activities");
     await expect(page.getByText("Shooting Drill 1")).toBeVisible({

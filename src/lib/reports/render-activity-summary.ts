@@ -58,7 +58,6 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
     where: {
       cycleId,
       platoonId: { in: platoonIds },
-      status: "active",
       ...(activityTypeIds && activityTypeIds.length > 0 ? { activityTypeId: { in: activityTypeIds } } : {}),
       ...(afterDate ? { date: { gte: afterDate } } : {}),
     },

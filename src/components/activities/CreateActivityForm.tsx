@@ -40,7 +40,6 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
   const [nameOverridden, setNameOverridden] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [isRequired, setIsRequired] = useState(true);
-  const [status, setStatus] = useState<"draft" | "active">("draft");
   const [platoonId, setPlatoonId] = useState(
     platoonOptions.length === 1 ? platoonOptions[0].id : ""
   );
@@ -97,7 +96,6 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
             name: name.trim(),
             date,
             isRequired,
-            status,
           }),
         });
 
@@ -199,39 +197,6 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
           checked={isRequired}
           onCheckedChange={setIsRequired}
         />
-      </div>
-
-      {/* Status */}
-      <div className="space-y-1.5">
-        <Label>סטטוס</Label>
-        <div className="flex rounded-lg bg-muted p-1 gap-1" role="radiogroup" aria-label="סטטוס">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={status === "draft"}
-            onClick={() => setStatus("draft")}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition-all ${
-              status === "draft"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            טיוטה
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={status === "active"}
-            onClick={() => setStatus("active")}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition-all ${
-              status === "active"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            פעיל
-          </button>
-        </div>
       </div>
 
       {error && (

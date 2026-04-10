@@ -143,7 +143,7 @@ describe("GET /api/activities", () => {
     expect(json.activities[0].totalSoldiers).toBe(10);
   });
 
-  it("squad_commander only sees active activities and scoped soldier counts", async () => {
+  it("squad_commander sees scoped soldier counts", async () => {
     const user = mockSessionUser();
     const scope = makeSquadCommanderScope();
     mockGetActivityScope.mockResolvedValue({ scope, error: null, user });
@@ -190,12 +190,6 @@ describe("GET /api/activities", () => {
     expect(json.activities[0].passedCount).toBe(1);
     expect(json.activities[0].totalSoldiers).toBe(2);
 
-    // Verify the findMany was called with status:"active"
-    expect(mockPrisma.activity.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ status: "active" }),
-      })
-    );
   });
 });
 

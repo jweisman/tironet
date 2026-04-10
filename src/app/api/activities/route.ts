@@ -10,7 +10,7 @@ const createSchema = z.object({
   name: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   isRequired: z.boolean().optional().default(true),
-  status: z.enum(["draft", "active"]).optional().default("draft"),
+  status: z.enum(["draft", "active"]).optional().default("active"),
 });
 
 export async function GET(request: NextRequest) {
@@ -24,17 +24,10 @@ export async function GET(request: NextRequest) {
   const { scope, error, user } = await getActivityScope(cycleId);
   if (error || !scope || !user) return error!;
 
-  // Build filter
-  const statusFilter =
-    scope.role === "squad_commander"
-      ? { status: "active" as const }
-      : {};
-
   const activities = await prisma.activity.findMany({
     where: {
       cycleId,
       platoonId: { in: scope.platoonIds },
-      ...statusFilter,
     },
     include: {
       activityType: { select: { id: true, name: true, icon: true } },

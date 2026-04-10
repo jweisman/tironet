@@ -10,7 +10,6 @@ export interface ActivitySummary {
   id: string;
   name: string;
   date: string; // ISO string
-  status: "draft" | "active";
   isRequired: boolean;
   activityType: { name: string; icon: string };
   platoon: { id: string; name: string; companyName: string };
@@ -159,12 +158,6 @@ export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPre
             חובה
           </Badge>
         )}
-        <Badge
-          variant={activity.status === "draft" ? "outline" : "default"}
-          className="text-xs px-1.5 py-0 h-4"
-        >
-          {activity.status === "draft" ? "טיוטה" : "פעיל"}
-        </Badge>
       </div>
     </button>
   );

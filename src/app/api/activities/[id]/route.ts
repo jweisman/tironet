@@ -78,11 +78,6 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Squad commander can only see active activities
-  if (scope.role === "squad_commander" && activity.status === "draft") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const canEditMetadata = scope.canEditMetadataForPlatoon(activity.platoonId);
   const canEditReports =
     scope.role === "platoon_commander" ||
