@@ -88,7 +88,10 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const req = await prisma.request.findUnique({ where: { id } });
+  const req = await prisma.request.findUnique({
+    where: { id },
+    include: { soldier: { select: { familyName: true, givenName: true } } },
+  });
   if (!req) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -142,7 +145,7 @@ export async function PATCH(
     // Send push notification to users with the newly assigned role
     if (transition.newAssignedRole) {
       after(() =>
-        notifyAssignedRole(req.cycleId, transition.newAssignedRole!).catch((err) =>
+        notifyAssignedRole(req.cycleId, transition.newAssignedRole!, req.type, `${req.soldier.familyName} ${req.soldier.givenName}`).catch((err) =>
           console.warn("[push] request assignment notification failed:", err),
         ),
       );
@@ -181,7 +184,7 @@ export async function PATCH(
     // Connector path: notify users assigned to the new role (if role changed)
     if (data.assignedRole && data.assignedRole !== req.assignedRole) {
       after(() =>
-        notifyAssignedRole(req.cycleId, data.assignedRole!).catch((err) =>
+        notifyAssignedRole(req.cycleId, data.assignedRole!, req.type, `${req.soldier.familyName} ${req.soldier.givenName}`).catch((err) =>
           console.warn("[push] request assignment notification failed:", err),
         ),
       );
@@ -242,7 +245,9 @@ export async function DELETE(
  * Find all users assigned to the given role in the cycle and send them
  * a push notification about a new request requiring their action.
  */
-async function notifyAssignedRole(cycleId: string, assignedRole: string): Promise<void> {
+const TYPE_LABELS: Record<string, string> = { leave: "יציאה", medical: "רפואה", hardship: 'ת"ש' };
+
+async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, soldierName: string): Promise<void> {
   // For company_commander assignments, also include deputy_company_commander
   const roles: Role[] = assignedRole === "company_commander"
     ? ["company_commander", "deputy_company_commander"]
@@ -257,12 +262,13 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string): Promis
   });
 
   const userIds = [...new Set(assignments.map((a) => a.userId))];
+  const typeLabel = TYPE_LABELS[requestType] ?? requestType;
 
   await sendPushToUsers(
     userIds,
     {
       title: "בקשה חדשה",
-      body: "יש בקשה שדורשת את פעולתך",
+      body: `בקשה ${typeLabel} חדשה עבור ${soldierName} דורשת את פעולתך`,
       url: "/requests?filter=action",
     },
     "requestAssignmentEnabled",

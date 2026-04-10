@@ -36,6 +36,8 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 // POST /api/requests
 // ---------------------------------------------------------------------------
+const fakeSoldier = { familyName: "Cohen", givenName: "Avi" };
+
 describe("POST /api/requests", () => {
   const validBody = {
     cycleId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
@@ -116,7 +118,7 @@ describe("POST /api/requests", () => {
       user: mockSessionUser(),
     });
 
-    const fakeRequest = { id: "req-1", ...validBody, status: "open", assignedRole: "platoon_commander" };
+    const fakeRequest = { id: "req-1", ...validBody, status: "open", assignedRole: "platoon_commander", soldier: fakeSoldier };
     mockRequestCreate.mockResolvedValue(fakeRequest as never);
 
     const req = createMockRequest("POST", "/api/requests", validBody);
@@ -142,7 +144,7 @@ describe("POST /api/requests", () => {
       user: mockSessionUser(),
     });
 
-    mockRequestCreate.mockResolvedValue({ id: "req-2" } as never);
+    mockRequestCreate.mockResolvedValue({ id: "req-2", soldier: fakeSoldier } as never);
 
     const req = createMockRequest("POST", "/api/requests", validBody);
     const res = await POST(req);
@@ -166,7 +168,7 @@ describe("POST /api/requests", () => {
       user: mockSessionUser(),
     });
 
-    mockRequestCreate.mockResolvedValue({ id: clientId } as never);
+    mockRequestCreate.mockResolvedValue({ id: clientId, soldier: fakeSoldier } as never);
 
     const req = createMockRequest("POST", "/api/requests", { ...validBody, id: clientId });
     const res = await POST(req);
@@ -189,7 +191,7 @@ describe("POST /api/requests", () => {
       user: mockSessionUser(),
     });
 
-    mockRequestCreate.mockResolvedValue({ id: "req-4" } as never);
+    mockRequestCreate.mockResolvedValue({ id: "req-4", soldier: fakeSoldier } as never);
 
     const bodyWithDates = {
       ...validBody,
@@ -220,6 +222,7 @@ describe("POST /api/requests", () => {
     mockRequestCreate.mockResolvedValue({
       id: "req-medic",
       assignedRole: "platoon_commander",
+      soldier: fakeSoldier,
     } as never);
 
     const req = createMockRequest("POST", "/api/requests", {

@@ -60,6 +60,7 @@ const baseRequest = {
   status: "open",
   assignedRole: "platoon_commander",
   createdByUserId: "user-1",
+  soldier: { familyName: "Cohen", givenName: "Avi" },
 };
 
 beforeEach(() => {

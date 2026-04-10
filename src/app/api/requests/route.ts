@@ -96,11 +96,13 @@ export async function POST(request: NextRequest) {
       sickLeaveDays: data.sickLeaveDays ?? null,
       specialConditions: data.specialConditions ?? null,
     },
+    include: { soldier: { select: { familyName: true, givenName: true } } },
   });
 
   // Notify users with the assigned role about the new request
+  const soldierName = `${req.soldier.familyName} ${req.soldier.givenName}`;
   after(() =>
-    notifyAssignedRole(data.cycleId, assignedRole).catch((err) =>
+    notifyAssignedRole(data.cycleId, assignedRole, data.type, soldierName).catch((err) =>
       console.warn("[push] request creation notification failed:", err),
     ),
   );
@@ -144,7 +146,9 @@ export async function GET(request: NextRequest) {
  * Find all users assigned to the given role in the cycle and send them
  * a push notification about a new request requiring their action.
  */
-async function notifyAssignedRole(cycleId: string, assignedRole: string): Promise<void> {
+const TYPE_LABELS: Record<string, string> = { leave: "יציאה", medical: "רפואה", hardship: 'ת"ש' };
+
+async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, soldierName: string): Promise<void> {
   const roles: Role[] = assignedRole === "company_commander"
     ? ["company_commander", "deputy_company_commander"]
     : [assignedRole as Role];
@@ -158,12 +162,13 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string): Promis
   });
 
   const userIds = [...new Set(assignments.map((a) => a.userId))];
+  const typeLabel = TYPE_LABELS[requestType] ?? requestType;
 
   await sendPushToUsers(
     userIds,
     {
       title: "בקשה חדשה",
-      body: "יש בקשה שדורשת את פעולתך",
+      body: `בקשה ${typeLabel} חדשה עבור ${soldierName} דורשת את פעולתך`,
       url: "/requests?filter=action",
     },
     "requestAssignmentEnabled",
