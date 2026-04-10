@@ -40,6 +40,7 @@ export default function ReportsPage() {
   // Request type filter state — "" means all types
   const [selectedRequestType, setSelectedRequestType] = useState<string>("");
   const [requestDateRange, setRequestDateRange] = useState<string>("");
+  const [requestStatusFilter, setRequestStatusFilter] = useState<string>("open_active");
 
   // Fetch activity types
   useEffect(() => {
@@ -157,6 +158,7 @@ export default function ReportsPage() {
     const reqType = isMedic ? "medical" : selectedRequestType;
     if (reqType) params.set("types", reqType);
     if (requestDateRange) params.set("dateRange", requestDateRange);
+    if (requestStatusFilter) params.set("statusFilter", requestStatusFilter);
     const qs = params.toString();
     router.push(`/reports/request-summary${qs ? `?${qs}` : ""}`);
   }
@@ -307,6 +309,17 @@ export default function ReportsPage() {
 
           {/* Request filters */}
           <div className="flex flex-wrap gap-2">
+            <select
+              value={requestStatusFilter}
+              onChange={(e) => setRequestStatusFilter(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="open_active">פתוחות ופעילות</option>
+              <option value="open">פתוחות</option>
+              <option value="active">פעילות</option>
+              <option value="approved">מאושרות</option>
+              <option value="all">הכל</option>
+            </select>
             {!isMedic && (
             <select
               value={selectedRequestType}
@@ -347,7 +360,7 @@ export default function ReportsPage() {
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                בקשות מאושרות לפי חייל — מקובצות לפי כיתות ומחלקות
+                בקשות לפי סטטוס וחייל — מקובצות לפי כיתות ומחלקות
               </p>
             </div>
           </button>

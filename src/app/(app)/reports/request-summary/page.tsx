@@ -12,7 +12,15 @@ import {
 import { formatAppointment } from "@/lib/requests/medical-appointments";
 import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns";
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
-import type { RequestSummaryData, RequestSummaryItem } from "@/app/api/reports/request-summary/route";
+import type { RequestSummaryData, RequestSummaryItem, RequestStatusFilter } from "@/app/api/reports/request-summary/route";
+
+const STATUS_FILTER_LABELS: Record<RequestStatusFilter, string> = {
+  open_active: "פתוחות ופעילות",
+  open: "פתוחות",
+  active: "פעילות",
+  approved: "מאושרות",
+  all: "הכל",
+};
 import type { RequestType, Transportation } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -69,6 +77,7 @@ export default function RequestSummaryPage() {
 
   const typesParam = searchParams.get("types") ?? "";
   const dateRange = searchParams.get("dateRange") ?? "";
+  const statusFilter = (searchParams.get("statusFilter") ?? "open_active") as RequestStatusFilter;
 
   useEffect(() => {
     if (!selectedCycleId) return;
@@ -76,6 +85,7 @@ export default function RequestSummaryPage() {
     const params = new URLSearchParams({ cycleId: selectedCycleId });
     if (typesParam) params.set("requestTypes", typesParam);
     if (dateRange) params.set("dateRange", dateRange);
+    if (statusFilter) params.set("statusFilter", statusFilter);
     fetch(`/api/reports/request-summary?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
@@ -84,7 +94,7 @@ export default function RequestSummaryPage() {
       .then((d: RequestSummaryData) => setData(d))
       .catch(() => toast.error("שגיאה בטעינת הדוח"))
       .finally(() => setLoading(false));
-  }, [selectedCycleId, typesParam, dateRange]);
+  }, [selectedCycleId, typesParam, dateRange, statusFilter]);
 
   async function handleExportPdf() {
     if (!selectedCycleId) return;
@@ -93,6 +103,7 @@ export default function RequestSummaryPage() {
       const params = new URLSearchParams({ cycleId: selectedCycleId });
       if (typesParam) params.set("requestTypes", typesParam);
       if (dateRange) params.set("dateRange", dateRange);
+      if (statusFilter) params.set("statusFilter", statusFilter);
       const res = await fetch(`/api/reports/request-summary/pdf?${params}`);
       if (!res.ok) throw new Error("PDF generation failed");
       const blob = await res.blob();
@@ -149,7 +160,7 @@ export default function RequestSummaryPage() {
         </div>
         {data && (
           <p className="text-xs text-muted-foreground mt-1">
-            מחזור {data.cycleName} — {data.totalCount} בקשות מאושרות
+            מחזור {data.cycleName} — {STATUS_FILTER_LABELS[statusFilter]} · {data.totalCount} בקשות
             {dateRange === "week" && " · שבוע אחרון"}
             {dateRange === "month" && " · חודש אחרון"}
           </p>
@@ -166,27 +177,34 @@ export default function RequestSummaryPage() {
 
         {!loading && data && data.totalCount === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
-            <p className="font-medium">אין בקשות מאושרות במחזור זה</p>
+            <p className="font-medium">אין בקשות במחזור זה</p>
           </div>
         )}
 
         {!loading &&
           data?.groups.map((group, gi) => {
             if (group.level === "platoon") {
+              // Count requests in all squad groups under this platoon header
+              let platoonCount = 0;
+              for (let j = gi + 1; j < data.groups.length && data.groups[j].level === "squad"; j++) {
+                platoonCount += data.groups[j].requests.length;
+              }
               return (
                 <div
                   key={`p-${gi}`}
-                  className="text-sm font-bold bg-muted rounded-lg px-3 py-2 mt-4"
+                  className="flex items-center justify-between text-sm font-bold bg-muted rounded-lg px-3 py-2 mt-4"
                 >
-                  {group.label}
+                  <span>{group.label}</span>
+                  <span className="text-xs font-medium text-muted-foreground">{platoonCount}</span>
                 </div>
               );
             }
 
             return (
               <div key={`s-${gi}`} className="space-y-1">
-                <div className="text-xs font-semibold text-muted-foreground px-1">
-                  {group.label}
+                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground px-1">
+                  <span>{group.label}</span>
+                  <span>{group.requests.length}</span>
                 </div>
                 <div className="rounded-xl border border-border bg-card divide-y divide-border">
                   {group.requests.map((req) => (

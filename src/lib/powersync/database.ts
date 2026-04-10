@@ -32,8 +32,3 @@ function createDatabase(): PowerSyncDatabase | null {
 }
 
 export const db = createDatabase();
-
-// Expose for debugging — remove before shipping
-if (typeof window !== "undefined" && db) {
-  (window as unknown as Record<string, unknown>).__db = db;
-}

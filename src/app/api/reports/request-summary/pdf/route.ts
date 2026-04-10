@@ -4,6 +4,7 @@ import {
   fetchRequestSummary,
   renderRequestSummaryHtml,
 } from "@/lib/reports/render-request-summary";
+import type { RequestStatusFilter } from "@/lib/reports/render-request-summary";
 import { dateRangeToAfterDate } from "@/lib/reports/date-range";
 
 export const runtime = "nodejs";
@@ -57,8 +58,9 @@ export async function GET(request: NextRequest) {
   const typesParam = request.nextUrl.searchParams.get("requestTypes");
   const requestTypes = typesParam ? typesParam.split(",").filter(Boolean) : undefined;
   const afterDate = dateRangeToAfterDate(request.nextUrl.searchParams.get("dateRange"));
+  const statusFilter = (request.nextUrl.searchParams.get("statusFilter") ?? "open_active") as RequestStatusFilter;
 
-  const data = await fetchRequestSummary(cycleId, scope!.platoonIds, requestTypes, afterDate);
+  const data = await fetchRequestSummary(cycleId, scope!.platoonIds, requestTypes, afterDate, statusFilter);
   if (!data) {
     return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
   }

@@ -102,8 +102,10 @@ export interface RequestNote {
 }
 
 const ACTION_LABELS: Record<string, string> = {
+  create: "יצירה",
   approve: "אישור",
   deny: "דחיה",
+  acknowledge: "אישור קבלה",
   note: "הערה",
 };
 

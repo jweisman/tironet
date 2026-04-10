@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
-import type { RequestType } from "@/types";
+import type { RequestType, RequestStatus } from "@/types";
 import {
   escapeHtml,
   formatDateTime,
@@ -7,7 +7,7 @@ import {
   TYPE_LABELS,
   TRANSPORTATION_LABELS,
 } from "@/lib/reports/html-helpers";
-import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import { parseMedicalAppointments, hasUpcomingAppointment, formatAppointment } from "@/lib/requests/medical-appointments";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import {
   extractRequestFields,
@@ -55,18 +55,49 @@ export interface RequestSummaryData {
   cycleName: string;
   groups: RequestSummaryGroup[];
   totalCount: number;
+  statusFilter: RequestStatusFilter;
 }
+
+export type RequestStatusFilter = "open_active" | "open" | "active" | "approved" | "all";
+
+export const STATUS_FILTER_LABELS: Record<RequestStatusFilter, string> = {
+  open_active: "פתוחות ופעילות",
+  open: "פתוחות",
+  active: "פעילות",
+  approved: "מאושרות",
+  all: "הכל",
+};
 
 
 // ---------------------------------------------------------------------------
 // Data fetching
 // ---------------------------------------------------------------------------
 
+/**
+ * Check if an approved request is "active" — currently relevant based on type-specific dates.
+ * Matches the Active tab definition from the requests list page.
+ */
+function isActiveRequest(r: { type: string; departureAt: Date | null; returnAt: Date | null; medicalAppointments: unknown }): boolean {
+  const today = new Date().toISOString().split("T")[0];
+  if (r.type === "leave") {
+    const dep = r.departureAt?.toISOString().split("T")[0];
+    const ret = r.returnAt?.toISOString().split("T")[0];
+    return (dep != null && dep >= today) || (ret != null && ret >= today);
+  }
+  if (r.type === "medical") {
+    const appts = parseMedicalAppointments(r.medicalAppointments as string | null);
+    return hasUpcomingAppointment(appts);
+  }
+  // Hardship is always active
+  return true;
+}
+
 export async function fetchRequestSummary(
   cycleId: string,
   platoonIds: string[],
   requestTypes?: string[],
   afterDate?: Date,
+  statusFilter: RequestStatusFilter = "open_active",
 ): Promise<RequestSummaryData | null> {
   const cycle = await prisma.cycle.findUnique({
     where: { id: cycleId },
@@ -74,10 +105,17 @@ export async function fetchRequestSummary(
   });
   if (!cycle) return null;
 
+  // Build status filter for the Prisma query
+  const statusCondition: Record<string, unknown> =
+    statusFilter === "open" ? { status: "open" }
+    : statusFilter === "active" || statusFilter === "approved" ? { status: "approved" }
+    : statusFilter === "open_active" ? { status: { in: ["open", "approved"] } }
+    : {}; // "all" — no status filter
+
   const requests = await prisma.request.findMany({
     where: {
       cycleId,
-      status: "approved",
+      ...statusCondition,
       soldier: {
         squad: {
           platoon: { id: { in: platoonIds } },
@@ -109,8 +147,15 @@ export async function fetchRequestSummary(
     orderBy: { createdAt: "desc" },
   });
 
+  // Post-query filter: "active" and "open_active" need date-based filtering
+  // for approved requests (open requests pass through as-is)
+  const needsActiveFilter = statusFilter === "active" || statusFilter === "open_active";
+  const filtered = needsActiveFilter
+    ? requests.filter((r) => r.status === "open" || isActiveRequest(r))
+    : requests;
+
   // Map to summary items
-  const items: RequestSummaryItem[] = requests.map((r) => ({
+  const items: RequestSummaryItem[] = filtered.map((r) => ({
     id: r.id,
     type: r.type,
     typeLabel: TYPE_LABELS[r.type] ?? r.type,
@@ -172,6 +217,7 @@ export async function fetchRequestSummary(
     cycleName: cycle.name,
     groups,
     totalCount: items.length,
+    statusFilter,
   };
 }
 
@@ -207,9 +253,13 @@ export function renderRequestSummaryHtml(data: RequestSummaryData): string {
   });
 
   const groupsHtml = data.groups
-    .map((group) => {
+    .map((group, gi) => {
       if (group.level === "platoon") {
-        return `<div class="platoon-header">${escapeHtml(group.label)}</div>`;
+        let platoonCount = 0;
+        for (let j = gi + 1; j < data.groups.length && data.groups[j].level === "squad"; j++) {
+          platoonCount += data.groups[j].requests.length;
+        }
+        return `<div class="platoon-header">${escapeHtml(group.label)} <span class="group-count">(${platoonCount})</span></div>`;
       }
 
       const requestRows = group.requests
@@ -231,7 +281,7 @@ export function renderRequestSummaryHtml(data: RequestSummaryData): string {
 
       return `
         <div class="squad-section">
-          <div class="squad-header">${escapeHtml(group.label)}</div>
+          <div class="squad-header">${escapeHtml(group.label)} <span class="group-count">(${group.requests.length})</span></div>
           ${requestRows}
         </div>
       `;
@@ -282,6 +332,10 @@ export function renderRequestSummaryHtml(data: RequestSummaryData): string {
       padding: 4px 10px;
       margin-bottom: 4px;
     }
+    .group-count {
+      font-weight: 400;
+      color: #999;
+    }
     .request-card {
       border-bottom: 1px solid #ddd;
       padding: 6px 10px;
@@ -313,10 +367,10 @@ ${DETAIL_COLUMNS_CSS}
 </head>
 <body>
   <div class="page-header">
-    <h1>דוח בקשות מאושרות — ${escapeHtml(data.cycleName)}</h1>
-    <p>סה״כ ${data.totalCount} בקשות · תאריך הפקה: ${printDate}</p>
+    <h1>דוח בקשות — ${escapeHtml(data.cycleName)}</h1>
+    <p>${STATUS_FILTER_LABELS[data.statusFilter]} · סה״כ ${data.totalCount} בקשות · תאריך הפקה: ${printDate}</p>
   </div>
-  ${data.totalCount === 0 ? '<p class="no-data">אין בקשות מאושרות</p>' : groupsHtml}
+  ${data.totalCount === 0 ? '<p class="no-data">אין בקשות</p>' : groupsHtml}
 </body>
 </html>`;
 }
