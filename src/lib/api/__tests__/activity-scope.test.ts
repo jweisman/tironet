@@ -181,7 +181,7 @@ describe("getActivityScope", () => {
     expect(result.scope!.canEditMetadataForPlatoon("p1")).toBe(true);
   });
 
-  it("resolves instructor scope: company-level, canCreate but no metadata edit", async () => {
+  it("resolves instructor scope: company-level, canCreate and canEditMetadata", async () => {
     const user = mockSessionUser({
       cycleAssignments: [
         mockAssignment({
@@ -205,8 +205,9 @@ describe("getActivityScope", () => {
     expect(result.scope!.platoonIds).toEqual(["p1", "p2"]);
     expect(result.scope!.platoons).toEqual(platoons);
     expect(result.scope!.canCreate).toBe(true);
-    expect(result.scope!.canEditMetadataForPlatoon("p1")).toBe(false);
-    expect(result.scope!.canEditMetadataForPlatoon("p2")).toBe(false);
+    expect(result.scope!.canEditMetadataForPlatoon("p1")).toBe(true);
+    expect(result.scope!.canEditMetadataForPlatoon("p2")).toBe(true);
+    expect(result.scope!.canEditMetadataForPlatoon("other")).toBe(false);
   });
 
   it("returns 403 for company_medic (no activity access)", async () => {

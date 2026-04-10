@@ -104,7 +104,7 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
   }
 
   if (assignment.role === "instructor") {
-    // Company-level: can create activities but not edit metadata
+    // Company-level: can create and edit activities for any platoon in company
     const platoons = await prisma.platoon.findMany({
       where: { companyId: assignment.unitId },
       select: { id: true, name: true },
@@ -114,7 +114,7 @@ export async function getActivityScope(cycleId: string): Promise<ScopeResult> {
       platoonIds: platoons.map((p) => p.id),
       platoons,
       canCreate: true,
-      canEditMetadataForPlatoon: () => false,
+      canEditMetadataForPlatoon: (pid: string) => platoons.some((p) => p.id === pid),
     };
     return { scope, error: null, user };
   }

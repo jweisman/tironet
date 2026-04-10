@@ -2,6 +2,10 @@
 
 This file captures architectural decisions, constraints, and gotchas for Claude when working on this codebase.
 
+## Definitions
+
+[`docs/DEFINITIONS.md`](docs/DEFINITIONS.md) contains the authoritative definitions for terms used throughout the application (activity statuses, request statuses, role access). Always consult this file when implementing features that involve these concepts, and update it when definitions change.
+
 ## Definition of Done
 
 Before considering any issue or task complete, always:
@@ -347,11 +351,11 @@ The request badge (home page callout, sidebar/tab bar dot) counts requests assig
 ### Instructor (`instructor` / מדריך)
 
 - **Unit type:** company — assigned to a company, sees all platoons in that company
-- **Activities:** can view, create (single + bulk, including "all platoons" option), and edit activity reports for all squads
+- **Activities:** can view, create (single + bulk, including "all platoons" option), edit activity metadata, and edit activity reports for all squads
 - **Cannot access:** soldiers page, requests page, request reports
 - **Navigation:** sees only Home + Activities + Reports (activity reports section only)
 - **PowerSync claims:** gets `platoon_ids` expanded from company, same as company commanders
-- **Scope functions:** `getActivityScope()` returns `role: "instructor"`, `canCreate: true`, `canEditMetadataForPlatoon: () => false`
+- **Scope functions:** `getActivityScope()` returns `role: "instructor"`, `canCreate: true`, `canEditMetadataForPlatoon` checks platoon membership
 
 ### Company Medic (`company_medic` / חופ"ל)
 

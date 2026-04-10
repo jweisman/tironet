@@ -82,7 +82,8 @@ export async function GET(
   const canEditReports =
     scope.role === "platoon_commander" ||
     scope.role === "company_commander" ||
-    scope.role === "squad_commander";
+    scope.role === "squad_commander" ||
+    scope.role === "instructor";
 
   // Build reports map
   const reportsMap = new Map(activity.reports.map((r) => [r.soldierId, r]));

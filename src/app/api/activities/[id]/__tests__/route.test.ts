@@ -177,6 +177,32 @@ describe("GET /api/activities/[id]", () => {
     expect(json.squads[0].soldiers[0].report.result).toBe("passed");
     expect(json.squads[1].soldiers[0].report.result).toBeNull();
   });
+
+  it("instructor sees all squads with canEditMetadata and canEditReports", async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue(fullActivity as never);
+
+    const scope: ActivityScope = {
+      role: "instructor",
+      platoonIds: ["platoon-1"],
+      platoons: [{ id: "platoon-1", name: "Platoon A" }],
+      canCreate: true,
+      canEditMetadataForPlatoon: (pid: string) => pid === "platoon-1",
+    };
+    mockGetActivityScope.mockResolvedValue({
+      scope,
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    const req = createMockRequest("GET", "/api/activities/act-1");
+    const res = await GET(req, makeParams("act-1"));
+    expect(res.status).toBe(200);
+
+    const json = await res.json();
+    expect(json.squads).toHaveLength(2);
+    expect(json.canEditMetadata).toBe(true);
+    expect(json.canEditReports).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
