@@ -470,10 +470,10 @@ export default function RequestDetailPage() {
                           setEditAppointmentsList(appts.length > 0 ? appts : []);
                           setEditingAppointments(true);
                         }}
-                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                        className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
                       >
-                        <Pencil size={12} />
-                        ערוך
+                        <Pencil size={14} />
+                        ערוך תורים
                       </button>
                     )}
                   </div>
@@ -502,7 +502,7 @@ export default function RequestDetailPage() {
                               <Trash2 size={14} />
                             </button>
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div className="space-y-0.5">
                               <Label className="text-xs">תאריך</Label>
                               <Input
@@ -552,7 +552,7 @@ export default function RequestDetailPage() {
                             { id: crypto.randomUUID(), date: "", place: "", type: "" },
                           ])
                         }
-                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                        className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center"
                       >
                         <Plus size={14} />
                         הוסף תור
