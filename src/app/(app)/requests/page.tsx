@@ -154,7 +154,7 @@ export default function RequestsPage() {
   const { data: session } = useSession();
   const rawRole = (selectedAssignment?.role ?? "") as Role | "";
   const role = rawRole ? effectiveRole(rawRole) : "";
-  const canCreate = role === "squad_commander" || role === "platoon_commander";
+  const canCreate = role === "squad_commander" || role === "platoon_commander" || rawRole === "company_medic";
 
   // -------- Sticky header offsets --------
   // AppShell publishes --app-header-height as a CSS variable.
@@ -402,10 +402,10 @@ export default function RequestsPage() {
           {canCreate && (
             <button
               type="button"
-              onClick={() => setTypeMenuOpen(true)}
+              onClick={() => isMedic ? setCreateType("medical") : setTypeMenuOpen(true)}
               className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0 ms-auto"
             >
-              <Plus size={15} /> בקשה חדשה
+              <Plus size={15} /> {isMedic ? "בקשה רפואית חדשה" : "בקשה חדשה"}
             </button>
           )}
         </div>
@@ -533,7 +533,7 @@ export default function RequestsPage() {
       {canCreate && (
         <button
           type="button"
-          onClick={() => setTypeMenuOpen(true)}
+          onClick={() => isMedic ? setCreateType("medical") : setTypeMenuOpen(true)}
           className="md:hidden fixed bottom-20 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
           aria-label="בקשה חדשה"
         >
@@ -548,7 +548,7 @@ export default function RequestsPage() {
             <DialogTitle>בחר סוג בקשה</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            {(["leave", "medical", "hardship"] as RequestType[]).map((type) => (
+            {(isMedic ? ["medical"] as RequestType[] : ["leave", "medical", "hardship"] as RequestType[]).map((type) => (
               <button
                 key={type}
                 type="button"

@@ -261,7 +261,7 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string): Promis
   await sendPushToUsers(
     userIds,
     {
-      title: "בקשה חדשה ממתינה לטיפולך",
+      title: "בקשה חדשה",
       body: "יש בקשה שדורשת את פעולתך",
       url: "/requests?filter=action",
     },

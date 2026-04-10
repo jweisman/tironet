@@ -150,7 +150,7 @@ export async function getRequestScope(cycleId: string): Promise<ScopeResult> {
         soldierIds: soldiers.map((s) => s.id),
         squadIds,
         platoonIds,
-        canCreate: false,
+        canCreate: true,
       },
       error: null,
       user,

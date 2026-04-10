@@ -61,6 +61,27 @@ const SOLDIERS_BY_PLATOON_QUERY = `
   ORDER BY s.family_name, s.given_name
 `;
 
+// Company-level roles (medic): squads in the company (for squad selector)
+const SQUADS_BY_COMPANY_QUERY = `
+  SELECT sq.id, sq.name AS squad_name, p.name AS platoon_name
+  FROM squads sq
+  JOIN platoons p ON p.id = sq.platoon_id
+  WHERE p.company_id = ?
+  ORDER BY p.sort_order, p.name, sq.sort_order, sq.name
+`;
+
+// Soldiers in a specific squad (used after medic selects a squad)
+const SOLDIERS_BY_SQUAD_ID_QUERY = `
+  SELECT s.id, s.given_name, s.family_name,
+         sq.name AS squad_name
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  WHERE s.cycle_id = ?
+    AND s.squad_id = ?
+    AND s.status = 'active'
+  ORDER BY s.family_name, s.given_name
+`;
+
 export function CreateRequestForm({
   cycleId,
   requestType,
@@ -74,10 +95,28 @@ export function CreateRequestForm({
   const { data: session } = useSession();
 
   const isSquadRole = userRole === "squad_commander";
-  const soldierQuery = isSquadRole
-    ? SOLDIERS_BY_SQUAD_QUERY
-    : SOLDIERS_BY_PLATOON_QUERY;
-  const soldierParams = useMemo(() => [cycleId, unitId], [cycleId, unitId]);
+  const isCompanyRole = userRole === "company_medic";
+
+  // For company-level roles (medic): load squads for the squad selector
+  const squadsParams = useMemo(() => [unitId], [unitId]);
+  const { data: companySquads } = useQuery<{
+    id: string;
+    squad_name: string;
+    platoon_name: string;
+  }>(isCompanyRole ? SQUADS_BY_COMPANY_QUERY : "SELECT 1 WHERE 0", isCompanyRole ? squadsParams : []);
+
+  const [selectedSquadId, setSelectedSquadId] = useState("");
+
+  // Soldier query: medics query by selected squad, others by their unit
+  const soldierQuery = isCompanyRole
+    ? SOLDIERS_BY_SQUAD_ID_QUERY
+    : isSquadRole
+      ? SOLDIERS_BY_SQUAD_QUERY
+      : SOLDIERS_BY_PLATOON_QUERY;
+  const soldierParams = useMemo(
+    () => isCompanyRole ? [cycleId, selectedSquadId] : [cycleId, unitId],
+    [cycleId, unitId, selectedSquadId, isCompanyRole],
+  );
   const { data: soldiers } = useQuery<{
     id: string;
     given_name: string;
@@ -223,8 +262,31 @@ export function CreateRequestForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Squad selector (medic only) */}
+      {isCompanyRole && !preselectedSoldierId && (
+        <div className="space-y-1.5">
+          <Label>כיתה</Label>
+          <Select value={selectedSquadId} onValueChange={(v) => { if (v !== null) { setSelectedSquadId(v); setSoldierId(""); } }}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="בחר כיתה">
+                {companySquads?.find((sq) => sq.id === selectedSquadId)
+                  ? `${companySquads.find((sq) => sq.id === selectedSquadId)!.platoon_name} - ${companySquads.find((sq) => sq.id === selectedSquadId)!.squad_name}`
+                  : "בחר כיתה"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {(companySquads ?? []).map((sq) => (
+                <SelectItem key={sq.id} value={sq.id}>
+                  {sq.platoon_name} - {sq.squad_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Soldier selector */}
-      {!preselectedSoldierId && (
+      {!preselectedSoldierId && (!isCompanyRole || selectedSquadId) && (
         <div className="space-y-1.5">
           <Label>חייל</Label>
           <Select value={soldierId} onValueChange={(v) => { if (v !== null) setSoldierId(v); }}>
@@ -238,7 +300,7 @@ export function CreateRequestForm({
             <SelectContent>
               {(soldiers ?? []).map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.family_name} {s.given_name} ({s.squad_name})
+                  {s.family_name} {s.given_name}
                 </SelectItem>
               ))}
             </SelectContent>

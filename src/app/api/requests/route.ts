@@ -52,12 +52,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Soldier not in scope" }, { status: 403 });
   }
 
+  // Medics can only create medical requests
+  if (scope.role === "company_medic" && data.type !== "medical") {
+    return NextResponse.json({ error: "Medics can only create medical requests" }, { status: 403 });
+  }
+
   // Determine initial assignment based on creator's role
   let assignedRole: Role;
   if (scope.role === "squad_commander") {
     assignedRole = "platoon_commander";
   } else if (scope.role === "platoon_sergeant") {
     // Platoon sergeant creates → goes to platoon commander (not company)
+    assignedRole = "platoon_commander";
+  } else if (scope.role === "company_medic") {
+    // Medic creates medical request → goes through regular approval chain
     assignedRole = "platoon_commander";
   } else if (scope.role === "platoon_commander") {
     // Platoon commander creates → goes directly to company commander
@@ -154,7 +162,7 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string): Promis
   await sendPushToUsers(
     userIds,
     {
-      title: "בקשה חדשה ממתינה לטיפולך",
+      title: "בקשה חדשה",
       body: "יש בקשה שדורשת את פעולתך",
       url: "/requests?filter=action",
     },

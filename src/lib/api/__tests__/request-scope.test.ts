@@ -193,7 +193,7 @@ describe("getRequestScope", () => {
     expect(result.scope!.canCreate).toBe(false);
   });
 
-  it("resolves company_medic scope: company-level, canCreate = false", async () => {
+  it("resolves company_medic scope: company-level, canCreate = true", async () => {
     const user = mockSessionUser({
       cycleAssignments: [
         mockAssignment({
@@ -224,7 +224,7 @@ describe("getRequestScope", () => {
     expect(result.scope!.platoonIds).toEqual(["pl-1", "pl-2"]);
     expect(result.scope!.squadIds).toEqual(["sq-1", "sq-2", "sq-3"]);
     expect(result.scope!.soldierIds).toEqual(["sol-1", "sol-2"]);
-    expect(result.scope!.canCreate).toBe(false);
+    expect(result.scope!.canCreate).toBe(true);
   });
 
   it("returns 403 for instructor (no request access)", async () => {
