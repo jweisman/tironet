@@ -34,6 +34,8 @@ export interface RequestSummary {
 interface Props {
   request: RequestSummary;
   userRole: Role | "admin";
+  /** Short text explaining why this request appears on a given date (active tab) */
+  activeDetail?: string | null;
   onClick: () => void;
   onLongPress?: (e: { x: number; y: number }) => void;
 }
@@ -48,7 +50,7 @@ function formatDate(dateStr: string) {
   });
 }
 
-export function RequestCard({ request, userRole, onClick, onLongPress }: Props) {
+export function RequestCard({ request, userRole, activeDetail, onClick, onLongPress }: Props) {
   const isAssignedToMe =
     request.assignedRole !== null && userRole !== "admin" && canActOnRequest(userRole, request.assignedRole);
 
@@ -119,6 +121,9 @@ export function RequestCard({ request, userRole, onClick, onLongPress }: Props) 
           {REQUEST_TYPE_LABELS[request.type]}
           {request.description ? ` · ${request.description}` : ""}
         </p>
+        {activeDetail && (
+          <p className="text-xs text-primary font-semibold">{activeDetail}</p>
+        )}
         <p className="text-xs text-muted-foreground">
           {request.squadName} · {formatDate(request.createdAt)}
         </p>

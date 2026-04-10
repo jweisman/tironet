@@ -25,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { canActOnRequest, getAvailableActions, getNextState } from "@/lib/requests/workflow";
-import { parseMedicalAppointments, hasUpcomingAppointment } from "@/lib/requests/medical-appointments";
+import { parseMedicalAppointments, hasUpcomingAppointment, formatAppointment } from "@/lib/requests/medical-appointments";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -116,6 +116,30 @@ function activeRequestSortDate(r: RequestSummary): string {
   }
   // Hardship: no activity date, sort last
   return "9999";
+}
+
+function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+}
+
+/** Brief explanation of why a request appears on a given date in the active tab. */
+function activeRequestDetail(r: RequestSummary): string | null {
+  if (r.type === "leave") {
+    const dep = r.departureAt?.split("T")[0];
+    const ret = r.returnAt?.split("T")[0];
+    if (dep && ret) return `יציאה ${formatShortDate(dep)} · חזרה ${formatShortDate(ret)}`;
+    if (dep) return `יציאה ${formatShortDate(dep)}`;
+    if (ret) return `חזרה ${formatShortDate(ret)}`;
+    return null;
+  }
+  if (r.type === "medical") {
+    const today = new Date().toISOString().split("T")[0];
+    const appts = parseMedicalAppointments(r.medicalAppointments);
+    const next = appts.find((a) => a.date >= today);
+    if (next) return `תור: ${formatAppointment(next)}`;
+    return null;
+  }
+  return null;
 }
 
 function groupByDate(requests: RequestSummary[]): [string, RequestSummary[]][] {
@@ -516,6 +540,7 @@ export default function RequestsPage() {
                           key={r.id}
                           request={r}
                           userRole={rawRole as Role}
+                          activeDetail={activeRequestDetail(r)}
                           onClick={() => router.push(`/requests/${r.id}`)}
                           onLongPress={(pos) => handleLongPress(r, pos)}
                         />
