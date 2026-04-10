@@ -37,7 +37,7 @@ describe("GET /api/push/preferences", () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ dailyTasksEnabled: true, requestAssignmentEnabled: true });
+    expect(body).toEqual({ dailyTasksEnabled: true, requestAssignmentEnabled: true, activeRequestsEnabled: true });
   });
 
   it("returns stored preferences", async () => {
@@ -47,11 +47,12 @@ describe("GET /api/push/preferences", () => {
       userId: "user-1",
       dailyTasksEnabled: false,
       requestAssignmentEnabled: true,
+      activeRequestsEnabled: false,
     } as never);
 
     const res = await GET();
     const body = await res.json();
-    expect(body).toEqual({ dailyTasksEnabled: false, requestAssignmentEnabled: true });
+    expect(body).toEqual({ dailyTasksEnabled: false, requestAssignmentEnabled: true, activeRequestsEnabled: false });
   });
 });
 

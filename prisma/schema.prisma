@@ -432,6 +432,7 @@ model NotificationPreference {
   userId                   String  @unique @map("user_id") @db.Uuid
   dailyTasksEnabled        Boolean @default(true) @map("daily_tasks_enabled")
   requestAssignmentEnabled Boolean @default(true) @map("request_assignment_enabled")
+  activeRequestsEnabled    Boolean @default(true) @map("active_requests_enabled")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -40,6 +40,7 @@ export default function ProfilePage() {
   const push = usePushSubscription();
   const [dailyTasksEnabled, setDailyTasksEnabled] = useState(true);
   const [requestAssignmentEnabled, setRequestAssignmentEnabled] = useState(true);
+  const [activeRequestsEnabled, setActiveRequestsEnabled] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   // Load notification preferences from server
@@ -50,6 +51,7 @@ export default function ProfilePage() {
         if (data) {
           setDailyTasksEnabled(data.dailyTasksEnabled);
           setRequestAssignmentEnabled(data.requestAssignmentEnabled);
+          setActiveRequestsEnabled(data.activeRequestsEnabled);
         }
         setPrefsLoaded(true);
       })
@@ -57,7 +59,7 @@ export default function ProfilePage() {
   }, []);
 
   const updatePreference = useCallback(
-    async (field: "dailyTasksEnabled" | "requestAssignmentEnabled", value: boolean) => {
+    async (field: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled", value: boolean) => {
       const res = await fetch("/api/push/preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -67,7 +69,8 @@ export default function ProfilePage() {
         toast.error("שגיאה בשמירת העדפות התראות");
         // Revert
         if (field === "dailyTasksEnabled") setDailyTasksEnabled(!value);
-        else setRequestAssignmentEnabled(!value);
+        else if (field === "requestAssignmentEnabled") setRequestAssignmentEnabled(!value);
+        else setActiveRequestsEnabled(!value);
       }
     },
     [],
@@ -281,6 +284,20 @@ export default function ProfilePage() {
                 onCheckedChange={(v) => {
                   setRequestAssignmentEnabled(v);
                   updatePreference("requestAssignmentEnabled", v);
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">בקשות פעילות</p>
+                <p className="text-xs text-muted-foreground">תזכורת על בקשות פעילות להיום ולמחר</p>
+              </div>
+              <Switch
+                checked={activeRequestsEnabled}
+                disabled={!prefsLoaded}
+                onCheckedChange={(v) => {
+                  setActiveRequestsEnabled(v);
+                  updatePreference("activeRequestsEnabled", v);
                 }}
               />
             </div>

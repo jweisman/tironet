@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth/auth";
 const patchSchema = z.object({
   dailyTasksEnabled: z.boolean().optional(),
   requestAssignmentEnabled: z.boolean().optional(),
+  activeRequestsEnabled: z.boolean().optional(),
 });
 
 /**
@@ -25,6 +26,7 @@ export async function GET() {
   return NextResponse.json({
     dailyTasksEnabled: pref?.dailyTasksEnabled ?? true,
     requestAssignmentEnabled: pref?.requestAssignmentEnabled ?? true,
+    activeRequestsEnabled: pref?.activeRequestsEnabled ?? true,
   });
 }
 
@@ -55,5 +57,6 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({
     dailyTasksEnabled: pref.dailyTasksEnabled,
     requestAssignmentEnabled: pref.requestAssignmentEnabled,
+    activeRequestsEnabled: pref.activeRequestsEnabled,
   });
 }
