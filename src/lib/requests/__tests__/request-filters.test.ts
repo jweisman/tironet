@@ -234,6 +234,12 @@ interface SortableRequest {
   createdAt?: string;
 }
 
+function futureDate(daysFromNow: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  return d.toISOString().split("T")[0];
+}
+
 /** Mirrors activeRequestSortDate from the requests page. */
 function activeRequestSortDate(r: SortableRequest): string {
   if (r.type === "leave") {
@@ -251,29 +257,30 @@ function activeRequestSortDate(r: SortableRequest): string {
 
 describe("active request sort order", () => {
   it("leave requests sort by departure date, soonest first", () => {
-    const a: SortableRequest = { type: "leave", departureAt: "2026-04-10T08:00:00Z", returnAt: "2026-04-12T20:00:00Z" };
-    const b: SortableRequest = { type: "leave", departureAt: "2026-04-08T08:00:00Z", returnAt: "2026-04-09T20:00:00Z" };
+    const a: SortableRequest = { type: "leave", departureAt: `${futureDate(3)}T08:00:00Z`, returnAt: `${futureDate(5)}T20:00:00Z` };
+    const b: SortableRequest = { type: "leave", departureAt: `${futureDate(1)}T08:00:00Z`, returnAt: `${futureDate(2)}T20:00:00Z` };
     const sorted = [a, b].sort((x, y) => activeRequestSortDate(x).localeCompare(activeRequestSortDate(y)));
     expect(sorted).toEqual([b, a]);
   });
 
   it("leave with null departureAt falls back to returnAt", () => {
-    const a: SortableRequest = { type: "leave", departureAt: null, returnAt: "2026-04-12T20:00:00Z" };
-    expect(activeRequestSortDate(a)).toBe("2026-04-12");
+    const ret = futureDate(5);
+    const a: SortableRequest = { type: "leave", departureAt: null, returnAt: `${ret}T20:00:00Z` };
+    expect(activeRequestSortDate(a)).toBe(ret);
   });
 
   it("medical requests sort by earliest upcoming appointment", () => {
     const a: SortableRequest = {
       type: "medical",
       medicalAppointments: JSON.stringify([
-        { id: "1", date: "2026-04-15", place: "A", type: "X" },
-        { id: "2", date: "2026-04-20", place: "B", type: "Y" },
+        { id: "1", date: futureDate(5), place: "A", type: "X" },
+        { id: "2", date: futureDate(10), place: "B", type: "Y" },
       ]),
     };
     const b: SortableRequest = {
       type: "medical",
       medicalAppointments: JSON.stringify([
-        { id: "3", date: "2026-04-09", place: "C", type: "Z" },
+        { id: "3", date: futureDate(1), place: "C", type: "Z" },
       ]),
     };
     const sorted = [a, b].sort((x, y) => activeRequestSortDate(x).localeCompare(activeRequestSortDate(y)));
@@ -289,10 +296,10 @@ describe("active request sort order", () => {
   });
 
   it("mixed types: leave and medical sort by date, hardship sorts last", () => {
-    const leave: SortableRequest = { type: "leave", departureAt: "2026-04-12T08:00:00Z" };
+    const leave: SortableRequest = { type: "leave", departureAt: `${futureDate(5)}T08:00:00Z` };
     const medical: SortableRequest = {
       type: "medical",
-      medicalAppointments: JSON.stringify([{ id: "1", date: "2026-04-09", place: "A", type: "X" }]),
+      medicalAppointments: JSON.stringify([{ id: "1", date: futureDate(2), place: "A", type: "X" }]),
     };
     const hardship: SortableRequest = { type: "hardship", createdAt: "2026-04-01T10:00:00Z" };
     const sorted = [hardship, leave, medical].sort((x, y) =>
