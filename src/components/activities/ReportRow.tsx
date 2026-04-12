@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { memo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { parseGradeInput, formatGradeDisplay } from "@/lib/score-format";
 import type { ActivityResult } from "@/types";
@@ -57,7 +57,7 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash];
 }
 
-export function ReportRow({ soldier, report, activeScores, resultLabels, noteOptions, disabled = false, onChange }: ReportRowProps) {
+export const ReportRow = memo(function ReportRow({ soldier, report, activeScores, resultLabels, noteOptions, disabled = false, onChange }: ReportRowProps) {
   const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const initials = (soldier.givenName[0] ?? "") + (soldier.familyName[0] ?? "");
@@ -210,4 +210,4 @@ export function ReportRow({ soldier, report, activeScores, resultLabels, noteOpt
       )}
     </div>
   );
-}
+});
