@@ -39,24 +39,35 @@ function getStepSelectors(steps: DriveStep[]): string[] {
     .filter((el): el is string => typeof el === "string");
 }
 
-/** Returns true when at least one of the selectors matches an element in the DOM. */
+/** Returns true when at least one of the selectors matches a visible element. */
 function hasAnyElement(selectors: string[]): boolean {
-  return selectors.some((sel) => document.querySelector(sel) !== null);
+  return selectors.some((sel) => {
+    const all = document.querySelectorAll(sel);
+    return Array.from(all).some(
+      (el) => (el as HTMLElement).offsetParent !== null || (el as HTMLElement).offsetWidth > 0,
+    );
+  });
 }
 
 export function useTour({ page, steps, config }: UseTourOptions) {
   const driverRef = useRef<ReturnType<typeof driver> | null>(null);
 
   const buildDriver = useCallback(() => {
-    // Filter to only steps whose target element exists in the DOM
-    const availableSteps = steps.filter((step) => {
-      if (!step.element) return true; // highlight-less steps always show
-      const el =
-        typeof step.element === "string"
-          ? document.querySelector(step.element)
-          : step.element;
-      return !!el;
-    });
+    // Filter to only steps whose target element is visible in the DOM.
+    // When both a desktop and mobile variant share the same data-tour
+    // attribute, pick the one that is actually rendered (visible).
+    const availableSteps = steps
+      .map((step) => {
+        if (!step.element) return step; // highlight-less steps always show
+        if (typeof step.element !== "string") return step;
+        const all = document.querySelectorAll(step.element);
+        const visible = Array.from(all).find(
+          (el) => (el as HTMLElement).offsetParent !== null || (el as HTMLElement).offsetWidth > 0,
+        );
+        if (!visible) return null;
+        return { ...step, element: visible };
+      })
+      .filter((s): s is DriveStep => s !== null);
 
     if (availableSteps.length === 0) return null;
 
@@ -64,14 +75,14 @@ export function useTour({ page, steps, config }: UseTourOptions) {
       showProgress: true,
       animate: true,
       allowClose: true,
-      overlayColor: "rgba(0, 0, 0, 0.55)",
-      stagePadding: 8,
+      overlayColor: "rgba(0, 0, 0, 0.6)",
+      stagePadding: 12,
       stageRadius: 12,
       popoverClass: "tironet-tour-popover",
       nextBtnText: "הבא",
       prevBtnText: "הקודם",
       doneBtnText: "סיום",
-      progressText: "{{current}} מתוך {{total}}",
+      progressText: "\u200F{{current}} מתוך {{total}}",
       ...config,
       steps: availableSteps,
       onDestroyStarted: () => {

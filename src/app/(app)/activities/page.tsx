@@ -444,6 +444,7 @@ export default function ActivitiesPage() {
       {canCreate && (
         <>
           <button
+            data-tour="activities-import-btn"
             type="button" onClick={() => setBulkOpen(true)}
             className="md:hidden fixed bottom-20 end-20 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-lg transition-transform active:scale-95"
             aria-label="ייבוא פעילויות"
@@ -451,6 +452,7 @@ export default function ActivitiesPage() {
             <FileUp size={20} />
           </button>
           <button
+            data-tour="activities-add-btn"
             type="button" onClick={() => setCreateOpen(true)}
             className="md:hidden fixed bottom-20 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
             aria-label="הוסף פעילות"

@@ -6,7 +6,7 @@ import type { DriveStep } from "driver.js";
 export const homeTourSteps: DriveStep[] = [
   {
     popover: {
-      title: "!ברוכים הבאים לטירונט",
+      title: "ברוכים הבאים לטירונט!",
       description:
         "מערכת נוחה לניהול בקשות ופעילויות טירונים. בואו נכיר את דף הבית.",
     },

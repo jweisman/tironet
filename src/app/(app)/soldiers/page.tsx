@@ -587,6 +587,7 @@ export default function SoldiersPage() {
 
       {/* FABs — mobile only */}
       <button
+        data-tour="soldiers-import-btn"
         type="button"
         onClick={() => setImportOpen(true)}
         className="md:hidden fixed bottom-20 end-20 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-lg transition-transform active:scale-95"
@@ -595,6 +596,7 @@ export default function SoldiersPage() {
         <FileUp size={20} />
       </button>
       <button
+        data-tour="soldiers-add-btn"
         type="button"
         onClick={() => setAddOpen(true)}
         className="md:hidden fixed bottom-20 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"

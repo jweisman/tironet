@@ -570,6 +570,7 @@ export default function RequestsPage() {
       {/* Mobile FAB */}
       {canCreate && (
         <button
+          data-tour="requests-add-btn"
           type="button"
           onClick={() => isMedic ? setCreateType("medical") : setTypeMenuOpen(true)}
           className="md:hidden fixed bottom-20 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
