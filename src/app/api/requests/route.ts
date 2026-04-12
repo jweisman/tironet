@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
   // Notify users with the assigned role about the new request
   const soldierName = `${req.soldier.familyName} ${req.soldier.givenName}`;
   after(() =>
-    notifyAssignedRole(data.cycleId, assignedRole, data.type, soldierName, req.id).catch((err) =>
+    notifyAssignedRole(data.cycleId, assignedRole, data.type, "open", soldierName, req.id).catch((err) =>
       console.warn("[push] request creation notification failed:", err),
     ),
   );
@@ -144,11 +144,14 @@ export async function GET(request: NextRequest) {
 
 /**
  * Find all users assigned to the given role in the cycle and send them
- * a push notification about a new request requiring their action.
+ * a push notification about a request requiring their action.
+ * The message varies by request status: opened, approved, or denied.
  */
 const TYPE_LABELS: Record<string, string> = { leave: "יציאה", medical: "רפואה", hardship: 'ת"ש' };
+const STATUS_TITLES: Record<string, string> = { open: "בקשה חדשה", approved: "בקשה אושרה", denied: "בקשה נדחתה" };
+const STATUS_LABELS: Record<string, string> = { open: "חדשה", approved: "שאושרה", denied: "שנדחתה" };
 
-async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, soldierName: string, requestId: string): Promise<void> {
+async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, requestStatus: string, soldierName: string, requestId: string): Promise<void> {
   const roles: Role[] = assignedRole === "company_commander"
     ? ["company_commander", "deputy_company_commander"]
     : [assignedRole as Role];
@@ -163,12 +166,14 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string, request
 
   const userIds = [...new Set(assignments.map((a) => a.userId))];
   const typeLabel = TYPE_LABELS[requestType] ?? requestType;
+  const title = STATUS_TITLES[requestStatus] ?? "בקשה חדשה";
+  const statusLabel = STATUS_LABELS[requestStatus] ?? "חדשה";
 
   await sendPushToUsers(
     userIds,
     {
-      title: "בקשה חדשה",
-      body: `בקשה ${typeLabel} חדשה עבור ${soldierName} דורשת את פעולתך`,
+      title,
+      body: `בקשה ${typeLabel} ${statusLabel} עבור ${soldierName} דורשת את פעולתך`,
       url: `/requests/${requestId}`,
     },
     "requestAssignmentEnabled",

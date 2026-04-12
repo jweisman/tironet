@@ -146,7 +146,7 @@ export async function PATCH(
     // Send push notification to users with the newly assigned role
     if (transition.newAssignedRole) {
       after(() =>
-        notifyAssignedRole(req.cycleId, transition.newAssignedRole!, req.type, `${req.soldier.familyName} ${req.soldier.givenName}`, id).catch((err) =>
+        notifyAssignedRole(req.cycleId, transition.newAssignedRole!, req.type, transition.newStatus, `${req.soldier.familyName} ${req.soldier.givenName}`, id).catch((err) =>
           console.warn("[push] request assignment notification failed:", err),
         ),
       );
@@ -184,8 +184,9 @@ export async function PATCH(
 
     // Connector path: notify users assigned to the new role (if role changed)
     if (data.assignedRole && data.assignedRole !== req.assignedRole) {
+      const status = data.status ?? req.status;
       after(() =>
-        notifyAssignedRole(req.cycleId, data.assignedRole!, req.type, `${req.soldier.familyName} ${req.soldier.givenName}`, id).catch((err) =>
+        notifyAssignedRole(req.cycleId, data.assignedRole!, req.type, status, `${req.soldier.familyName} ${req.soldier.givenName}`, id).catch((err) =>
           console.warn("[push] request assignment notification failed:", err),
         ),
       );
@@ -268,11 +269,14 @@ export async function DELETE(
 
 /**
  * Find all users assigned to the given role in the cycle and send them
- * a push notification about a new request requiring their action.
+ * a push notification about a request requiring their action.
+ * The message varies by request status: opened, approved, or denied.
  */
 const TYPE_LABELS: Record<string, string> = { leave: "יציאה", medical: "רפואה", hardship: 'ת"ש' };
+const STATUS_TITLES: Record<string, string> = { open: "בקשה חדשה", approved: "בקשה אושרה", denied: "בקשה נדחתה" };
+const STATUS_LABELS: Record<string, string> = { open: "חדשה", approved: "שאושרה", denied: "שנדחתה" };
 
-async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, soldierName: string, requestId: string): Promise<void> {
+async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, requestStatus: string, soldierName: string, requestId: string): Promise<void> {
   // For company_commander assignments, also include deputy_company_commander
   const roles: Role[] = assignedRole === "company_commander"
     ? ["company_commander", "deputy_company_commander"]
@@ -288,12 +292,14 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string, request
 
   const userIds = [...new Set(assignments.map((a) => a.userId))];
   const typeLabel = TYPE_LABELS[requestType] ?? requestType;
+  const title = STATUS_TITLES[requestStatus] ?? "בקשה חדשה";
+  const statusLabel = STATUS_LABELS[requestStatus] ?? "חדשה";
 
   await sendPushToUsers(
     userIds,
     {
-      title: "בקשה חדשה",
-      body: `בקשה ${typeLabel} חדשה עבור ${soldierName} דורשת את פעולתך`,
+      title,
+      body: `בקשה ${typeLabel} ${statusLabel} עבור ${soldierName} דורשת את פעולתך`,
       url: `/requests/${requestId}`,
     },
     "requestAssignmentEnabled",
