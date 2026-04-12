@@ -142,7 +142,7 @@ describe("POST /api/admin/structure", () => {
     adminSuccess();
 
     const req = createMockRequest("POST", "/api/admin/structure", {
-      type: "battalion",
+      type: "division",
       name: "X",
     });
 
@@ -302,7 +302,7 @@ describe("PATCH /api/admin/structure/[id]", () => {
     adminSuccess();
 
     const req = createMockRequest("PATCH", "/api/admin/structure/unit-1", {
-      type: "battalion",
+      type: "division",
       name: "X",
     });
 
@@ -382,7 +382,7 @@ describe("DELETE /api/admin/structure/[id]", () => {
     adminSuccess();
 
     const req = createMockRequest("DELETE", "/api/admin/structure/unit-1", {
-      type: "battalion",
+      type: "division",
     });
 
     const res = await DELETE_ID(req, idParams);
@@ -496,7 +496,7 @@ describe("PATCH /api/admin/structure/reorder", () => {
     adminSuccess();
 
     const req = createMockRequest("PATCH", "/api/admin/structure/reorder", {
-      type: "battalion",
+      type: "division",
       ids: [UUID1],
     });
 

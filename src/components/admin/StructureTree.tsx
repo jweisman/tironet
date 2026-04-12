@@ -58,11 +58,13 @@ import { cn } from "@/lib/utils";
 
 type Squad = { id: string; name: string };
 type Platoon = { id: string; name: string; squads: Squad[] };
-type Company = { id: string; name: string; platoons: Platoon[] };
+type Company = { id: string; name: string; battalionId: string | null; platoons: Platoon[] };
+type Battalion = { id: string; name: string; sortOrder: number };
 type Cycle = { id: string; name: string; isActive: boolean };
 
 type Props = {
   cycles: Cycle[];
+  battalions: Battalion[];
   initialStructure: Record<string, Company[]>;
 };
 
@@ -225,14 +227,19 @@ function SortableSquadRow({
   );
 }
 
-export default function StructureTree({ cycles, initialStructure }: Props) {
+export default function StructureTree({ cycles, battalions: initialBattalions, initialStructure }: Props) {
   const [selectedCycleId, setSelectedCycleId] = useState(
     () => (cycles.find((c) => c.isActive) ?? cycles[0])?.id ?? ""
   );
   const [structure, setStructure] = useState<Record<string, Company[]>>(initialStructure);
+  const [battalions, setBattalions] = useState<Battalion[]>(initialBattalions);
+  const [expandedBattalions, setExpandedBattalions] = useState<Set<string>>(() => new Set(initialBattalions.map((b) => b.id)));
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [expandedPlatoons, setExpandedPlatoons] = useState<Set<string>>(new Set());
 
+  const [addingBattalion, setAddingBattalion] = useState(false);
+  const [editingBattalionId, setEditingBattalionId] = useState<string | null>(null);
+  const [addingCompanyBattalionId, setAddingCompanyBattalionId] = useState<string | null>(null);
   const [addingCompany, setAddingCompany] = useState(false);
   const [addingPlatoonId, setAddingPlatoonId] = useState<string | null>(null);
   const [addingSquadId, setAddingSquadId] = useState<string | null>(null);
@@ -330,15 +337,49 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
   }
 
   // --- Company operations ---
-  async function addCompany(name: string) {
+  async function addCompany(name: string, battalionId?: string) {
     const company = await mutate("/api/admin/structure", "POST", {
       type: "company",
       cycleId: selectedCycleId,
       name,
+      ...(battalionId ? { battalionId } : {}),
     });
     updateStructure(selectedCycleId, (prev) => [...prev, { ...company, platoons: [] }]);
     setAddingCompany(false);
+    setAddingCompanyBattalionId(null);
     setExpandedCompanies((prev) => new Set([...prev, company.id]));
+  }
+
+  // --- Battalion operations ---
+  async function addBattalion(name: string) {
+    const battalion = await mutate("/api/admin/structure", "POST", { type: "battalion", name });
+    setBattalions((prev) => [...prev, battalion]);
+    setExpandedBattalions((prev) => new Set([...prev, battalion.id]));
+    setAddingBattalion(false);
+  }
+
+  async function renameBattalion(battalionId: string, name: string) {
+    await mutate(`/api/admin/structure/${battalionId}`, "PATCH", { type: "battalion", name });
+    setBattalions((prev) => prev.map((b) => (b.id === battalionId ? { ...b, name } : b)));
+    setEditingBattalionId(null);
+  }
+
+  async function deleteBattalion(battalionId: string) {
+    await mutate(`/api/admin/structure/${battalionId}`, "DELETE", { type: "battalion" });
+    setBattalions((prev) => prev.filter((b) => b.id !== battalionId));
+    // Unassign companies from this battalion
+    updateStructure(selectedCycleId, (prev) =>
+      prev.map((c) => (c.battalionId === battalionId ? { ...c, battalionId: null } : c))
+    );
+    toast.success("הגדוד נמחק");
+  }
+
+  function toggleBattalion(id: string) {
+    setExpandedBattalions((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }
 
   async function renameCompany(companyId: string, name: string) {
@@ -531,14 +572,73 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
       )}
 
       {selectedCycleId && (
-        <div className="space-y-1">
+        <div className="space-y-4">
+          {battalions.map((battalion) => {
+            const battalionCompanies = companies.filter((c) => c.battalionId === battalion.id);
+            const battalionExpanded = expandedBattalions.has(battalion.id);
+            return (
+              <div key={battalion.id} className="border-2 border-primary/20 rounded-xl overflow-hidden">
+                {/* Battalion header */}
+                <div className="flex items-center gap-2 p-3 bg-primary/5">
+                  <button onClick={() => toggleBattalion(battalion.id)} className="text-muted-foreground hover:text-foreground">
+                    {battalionExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </button>
+                  <Shield className="w-4 h-4 text-primary shrink-0" />
+                  {editingBattalionId === battalion.id ? (
+                    <EditInline
+                      initialName={battalion.name}
+                      onSave={(name) => renameBattalion(battalion.id, name)}
+                      onCancel={() => setEditingBattalionId(null)}
+                    />
+                  ) : (
+                    <>
+                      <span className="flex-1 font-semibold text-sm">{battalion.name}</span>
+                      <span className="text-xs text-muted-foreground">{battalionCompanies.length} פלוגות</span>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setAddingCompanyBattalionId(battalion.id); setExpandedBattalions((prev) => new Set([...prev, battalion.id])); }}>
+                        <PlusCircle className="w-3 h-3 ms-1" />
+                        פלוגה
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingBattalionId(battalion.id)} aria-label="ערוך גדוד">
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger render={<Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" aria-label="מחק גדוד" />}>
+                          <Trash2 className="w-3 h-3" />
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>מחיקת גדוד</AlertDialogTitle>
+                            <AlertDialogDescription>האם למחוק את &quot;{battalion.name}&quot;? הפלוגות שמתחתיו לא יימחקו.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>ביטול</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteBattalion(battalion.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">מחק</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+                </div>
+
+                {/* Battalion content: companies */}
+                {battalionExpanded && (
+                  <div className="p-2 space-y-1">
+                    {addingCompanyBattalionId === battalion.id && (
+                      <div className="border rounded-lg p-3">
+                        <InlineForm
+                          placeholder="שם פלוגה"
+                          onSave={(name) => addCompany(name, battalion.id)}
+                          onCancel={() => setAddingCompanyBattalionId(null)}
+                        />
+                      </div>
+                    )}
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleCompanyDragEnd}
           >
-            <SortableContext items={companies.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-              {companies.map((company) => {
+            <SortableContext items={battalionCompanies.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+              {battalionCompanies.map((company) => {
                 const companyExpanded = expandedCompanies.has(company.id);
                 return (
                   <SortableCompanyRow key={company.id} id={company.id}>
@@ -905,13 +1005,88 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
             </SortableContext>
           </DndContext>
 
-          {/* Add company form */}
-          {addingCompany && (
-            <div className="border rounded-lg p-3">
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Unassigned companies (no battalion) */}
+          {(() => {
+            const unassigned = companies.filter((c) => !c.battalionId);
+            if (unassigned.length === 0) return null;
+            return (
+              <div className="border border-dashed rounded-xl p-2 space-y-1">
+                <p className="text-xs text-muted-foreground px-2 py-1">פלוגות ללא גדוד</p>
+                {unassigned.map((company) => (
+                  <div key={company.id} className="border rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-2 p-2.5 bg-muted/30">
+                      <Building2 className="w-4 h-4 text-primary shrink-0" />
+                      {editingCompanyId === company.id ? (
+                        <EditInline
+                          initialName={company.name}
+                          onSave={(name) => renameCompany(company.id, name)}
+                          onCancel={() => setEditingCompanyId(null)}
+                        />
+                      ) : (
+                        <>
+                          <span className="flex-1 font-medium text-sm">{company.name}</span>
+                          {battalions.length > 0 && (
+                            <Select
+                              value=""
+                              onValueChange={async (battalionId) => {
+                                if (!battalionId) return;
+                                await mutate(`/api/admin/structure/${company.id}`, "PATCH", { type: "company", name: company.name, battalionId });
+                                updateStructure(selectedCycleId, (prev) =>
+                                  prev.map((c) => (c.id === company.id ? { ...c, battalionId } : c))
+                                );
+                                toast.success("הפלוגה שויכה לגדוד");
+                              }}
+                            >
+                              <SelectTrigger className="h-7 w-36 text-xs">
+                                <SelectValue placeholder="שייך לגדוד" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {battalions.map((b) => (
+                                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCompanyId(company.id)} aria-label="ערוך פלוגה">
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger render={<Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" aria-label="מחק פלוגה" />}>
+                              <Trash2 className="w-3 h-3" />
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>מחיקת פלוגה</AlertDialogTitle>
+                                <AlertDialogDescription>האם למחוק את &quot;{company.name}&quot;?</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>ביטול</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteCompany(company.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">מחק</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Add battalion */}
+          {addingBattalion && (
+            <div className="border-2 border-dashed border-primary/30 rounded-xl p-3">
               <InlineForm
-                placeholder="שם פלוגה"
-                onSave={addCompany}
-                onCancel={() => setAddingCompany(false)}
+                placeholder="שם גדוד"
+                onSave={addBattalion}
+                onCancel={() => setAddingBattalion(false)}
               />
             </div>
           )}
@@ -919,12 +1094,12 @@ export default function StructureTree({ cycles, initialStructure }: Props) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setAddingCompany(true)}
-            disabled={addingCompany}
+            onClick={() => setAddingBattalion(true)}
+            disabled={addingBattalion}
             className="mt-2"
           >
             <PlusCircle className="w-4 h-4 ms-2" />
-            הוסף פלוגה
+            הוסף גדוד
           </Button>
         </div>
       )}

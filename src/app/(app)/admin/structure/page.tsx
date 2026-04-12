@@ -7,6 +7,11 @@ export default async function StructurePage() {
     select: { id: true, name: true, isActive: true },
   });
 
+  const battalions = await prisma.battalion.findMany({
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, sortOrder: true },
+  });
+
   const companies = await prisma.company.findMany({
     include: {
       platoons: {
@@ -24,5 +29,5 @@ export default async function StructurePage() {
     structure[company.cycleId].push(company);
   }
 
-  return <StructureTree cycles={cycles} initialStructure={structure} />;
+  return <StructureTree cycles={cycles} battalions={battalions} initialStructure={structure} />;
 }

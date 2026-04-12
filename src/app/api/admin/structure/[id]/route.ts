@@ -4,12 +4,13 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/api/admin-guard";
 
 const patchSchema = z.object({
-  type: z.enum(["company", "platoon", "squad"]),
+  type: z.enum(["battalion", "company", "platoon", "squad"]),
   name: z.string().min(1),
+  battalionId: z.string().uuid().nullable().optional(),
 });
 
 const deleteSchema = z.object({
-  type: z.enum(["company", "platoon", "squad"]),
+  type: z.enum(["battalion", "company", "platoon", "squad"]),
 });
 
 export async function PATCH(
@@ -26,10 +27,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { type, name } = parsed.data;
+  const { type, name, battalionId } = parsed.data;
 
+  if (type === "battalion") {
+    const battalion = await prisma.battalion.update({ where: { id }, data: { name } });
+    return NextResponse.json(battalion);
+  }
   if (type === "company") {
-    const company = await prisma.company.update({ where: { id }, data: { name } });
+    const data: Record<string, unknown> = { name };
+    if (battalionId !== undefined) data.battalionId = battalionId;
+    const company = await prisma.company.update({ where: { id }, data });
     return NextResponse.json(company);
   }
   if (type === "platoon") {
@@ -56,7 +63,9 @@ export async function DELETE(
 
   const { type } = parsed.data;
 
-  if (type === "company") {
+  if (type === "battalion") {
+    await prisma.battalion.delete({ where: { id } });
+  } else if (type === "company") {
     await prisma.company.delete({ where: { id } });
   } else if (type === "platoon") {
     await prisma.platoon.delete({ where: { id } });
