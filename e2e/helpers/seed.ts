@@ -22,6 +22,7 @@ const IDS = {
   platoonCmdUser: "e2e00000-0000-4000-8000-000000000002",
   squadCmdUser: "e2e00000-0000-4000-8000-000000000003",
   cycle: "e2e00000-0000-4000-8000-000000000010",
+  battalion: "e2e00000-0000-4000-8000-000000000015",
   company: "e2e00000-0000-4000-8000-000000000020",
   platoon1: "e2e00000-0000-4000-8000-000000000030",
   platoon2: "e2e00000-0000-4000-8000-000000000031",
@@ -65,6 +66,7 @@ async function teardown() {
   await prisma.squad.deleteMany();
   await prisma.platoon.deleteMany();
   await prisma.company.deleteMany();
+  await prisma.battalion.deleteMany();
   await prisma.cycle.deleteMany();
   await prisma.session.deleteMany();
   await prisma.account.deleteMany();
@@ -102,8 +104,12 @@ async function seed() {
     data: { id: IDS.cycle, name: "Test Cycle 2026", isActive: true, sortOrder: 0 },
   });
 
+  await prisma.battalion.create({
+    data: { id: IDS.battalion, name: "Test Battalion", sortOrder: 0 },
+  });
+
   await prisma.company.create({
-    data: { id: IDS.company, cycleId: IDS.cycle, name: "Company Alpha", sortOrder: 0 },
+    data: { id: IDS.company, cycleId: IDS.cycle, battalionId: IDS.battalion, name: "Company Alpha", sortOrder: 0 },
   });
 
   await prisma.platoon.createMany({

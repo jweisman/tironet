@@ -222,7 +222,7 @@ export default function ActivityPage() {
       <div className="mb-4">
         <Link
           href="/activities"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground transition-colors"
         >
           <ChevronRight size={16} />
           חזרה לפעילויות

@@ -82,8 +82,8 @@ test.describe("Admin — Structure", () => {
       timeout: 10000,
     });
 
-    // Click "הוסף פלוגה"
-    await page.getByRole("button", { name: /הוסף פלוגה/ }).click();
+    // Click "פלוגה" button inside the battalion section to add a company
+    await page.getByRole("button", { name: "פלוגה" }).first().click();
 
     // Fill name
     await page.fill('input[placeholder="שם פלוגה"]', "Company Bravo");

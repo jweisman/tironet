@@ -309,7 +309,7 @@ export default function SoldierDetailPage() {
       <button
         type="button"
         onClick={() => router.push("/soldiers")}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 text-sm text-foreground/70 hover:text-foreground transition-colors"
       >
         <ArrowRight size={16} />
         <span>חזרה</span>

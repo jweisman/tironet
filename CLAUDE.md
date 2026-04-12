@@ -144,9 +144,15 @@ The merge `useEffect` in `ActivityDetail` adds new soldiers to each squad and in
 
 If you ever add another `useState(initialData)` component fed by chained `useQuery` params, apply the same merge-via-effect pattern instead of relying on key changes.
 
-### `ActivityDetail` debounce cleanup
+### `ActivityDetail` performance patterns
 
-`ActivityDetail` stores `setTimeout` handles in a `debounceRefs` Map for score/note auto-save. A `useEffect` cleanup clears all pending timeouts on unmount to prevent stale callbacks firing against unmounted state. If you add more debounced refs, follow the same cleanup pattern.
+**Batch writes with `writeTransaction`:** Bulk operations (`handleBulkUpdate`, `handleImportReports`) wrap all `db.execute()` calls in a single `db.writeTransaction()`. This sends one round-trip to the SQLite web worker instead of N sequential awaits. Without this, "update all to passed" with 30 soldiers takes seconds; with it, near-instant.
+
+**No disabled/saving state on report rows:** Report edits are optimistic — `handleReportChange` updates local state synchronously, then `saveReport` writes to SQLite in the background. The row is never greyed out or disabled during the write. Since writes are local SQLite (not network), they can't fail in a meaningful way that the user needs to wait for.
+
+**`ReportRow` is memoized with `React.memo`:** Every call to `setReports` re-renders `ActivityDetail`, but `memo` prevents unchanged `ReportRow` components from re-rendering. For this to work, the `report` prop must be referentially stable — use the constant `EMPTY_REPORT` (not `{ ...EMPTY_REPORT }` which creates a new object each render).
+
+**Debounce cleanup:** `ActivityDetail` stores `setTimeout` handles in a `debounceRefs` Map for score/note auto-save. A `useEffect` cleanup clears all pending timeouts on unmount to prevent stale callbacks firing against unmounted state. If you add more debounced refs, follow the same cleanup pattern.
 
 ### Activity detail page uses activity-cycle assignment, not global context
 
@@ -544,23 +550,35 @@ The auto-select `useEffect` depends on a stable key of all active cycle IDs (`ac
 
 The `PowerSyncProvider` renders children **without** a context wrapper during SSR (`db` is `null` on the server). Calling `useStatus()` during SSR throws `Cannot read properties of null (reading 'currentStatus')`. Pages that are the first to load (e.g. `/home`) hit this because they're server-rendered. Pages reached via client navigation (e.g. `/activities`) don't because the context is already mounted.
 
-**Workaround:** don't use `useStatus()` on pages that may be SSR'd. Use a timeout-based grace period instead, or create a wrapper hook that checks `useContext(PowerSyncContext)` before accessing status.
-
-### `hasSynced` is persisted in SQLite — beware the hydration gap
-
-`useStatus().hasSynced` is restored from SQLite after `init()`. For returning users it can be `true` before `useQuery()` has executed its first query. This creates a single-frame gap where `hasSynced=true` but query results are still `[]`. The `useSyncReady` hook handles this with a `requestAnimationFrame` settle guard — do not check `hasSynced` directly to decide empty states without a similar guard.
+**Workaround:** don't use `useStatus()` on pages that may be SSR'd. Use the `useSafeStatus()` wrapper from `src/hooks/useSafeStatus.ts` which returns safe defaults during SSR.
 
 ### `useSyncReady` hook — unified loading vs "no data" logic
 
-All pages use `useSyncReady(hasData)` from `src/hooks/useSyncReady.ts` to determine whether to show a loading indicator, "no data" message, or connection error. The hook returns `{ showLoading, showEmpty, showConnectionError }`.
+All pages use `useSyncReady(hasData, isLoading)` from `src/hooks/useSyncReady.ts` to determine whether to show a loading indicator, "no data" message, or connection error. Both arguments come directly from `useQuery()`:
 
-**Decision tree:**
-- If `useQuery` returned data → render it immediately (regardless of sync status)
-- If empty AND `hasSynced` is false → show loading spinner/skeleton
-- If empty AND `hasSynced` is true → show "no data" / "not found"
-- If empty AND 15 seconds elapsed without sync → show connection error (WifiOff icon)
+```tsx
+const { data: rawSoldiers, isLoading: soldiersLoading } = useQuery<RawSoldier>(QUERY, params);
+const { showLoading, showEmpty, showConnectionError } = useSyncReady(
+  (rawSoldiers ?? []).length > 0,
+  soldiersLoading
+);
+```
 
-**Do NOT** use hardcoded `setTimeout` grace periods for empty-state decisions. The old 3-second `timedOut` pattern caused premature "no data" messages on slow networks. Always use `useSyncReady` instead.
+**Decision tree (no timers, no flags — driven entirely by PowerSync signals):**
+- `isLoading` is true → show spinner/skeleton (query hasn't returned first results yet)
+- `hasData` is true → render data
+- `hasSynced` is true → show "no data" / "not found" (sync completed, DB is genuinely empty)
+- 15 seconds elapsed without sync → show connection error (only edge case with a timer: first-time user, fully offline, no cached data — without it they'd see a spinner forever)
+
+### Stability principles — no timers for state decisions
+
+**Do NOT** use `setTimeout` to decide between loading and empty states. Timers are guesses — they fire too early on slow networks (showing "no data" while still loading) and too late on fast ones (unnecessary delay). Always use signals from PowerSync (`isLoading`, `hasSynced`) or the browser (`navigator.onLine`).
+
+Similarly, **do not** add custom boolean flags to track loading/connected/bootstrapping state when a library signal already exists. Prior bugs came from maintaining `timedOut`, `grace`, `hasConnectedRef`, `wasOffline`, `reconnectGrace` etc. — all removed in favor of direct signals.
+
+### Filtered views show empty states independently of `useSyncReady`
+
+`useSyncReady` gates the **raw query** empty state (no data at all). Filtered views (e.g. requests "open" tab showing 0 of 14 requests, soldiers with "gaps" filter active) should show their empty message whenever the filtered list is empty and `showLoading` is false — they should **not** require `showEmpty` to be true, because the raw query returned data.
 
 ## Testing
 

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/api/admin-guard";
 
 const schema = z.object({
-  type: z.enum(["company", "platoon", "squad"]),
+  type: z.enum(["battalion", "company", "platoon", "squad"]),
   ids: z.array(z.string().uuid()).min(1),
 });
 
@@ -22,11 +22,13 @@ export async function PATCH(req: NextRequest) {
 
   // Assign sortOrder by position in the ids array
   const updates = ids.map((id, index) =>
-    type === "company"
-      ? prisma.company.update({ where: { id }, data: { sortOrder: index } })
-      : type === "platoon"
-        ? prisma.platoon.update({ where: { id }, data: { sortOrder: index } })
-        : prisma.squad.update({ where: { id }, data: { sortOrder: index } })
+    type === "battalion"
+      ? prisma.battalion.update({ where: { id }, data: { sortOrder: index } })
+      : type === "company"
+        ? prisma.company.update({ where: { id }, data: { sortOrder: index } })
+        : type === "platoon"
+          ? prisma.platoon.update({ where: { id }, data: { sortOrder: index } })
+          : prisma.squad.update({ where: { id }, data: { sortOrder: index } })
   );
 
   await prisma.$transaction(updates);

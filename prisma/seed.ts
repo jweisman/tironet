@@ -94,12 +94,23 @@ async function main() {
     });
     console.log(`Cycle: ${cycle.name}`);
 
+    const battalion = await prisma.battalion.upsert({
+      where: { id: "00000000-0000-0000-0000-000000000010" },
+      update: {},
+      create: {
+        id: "00000000-0000-0000-0000-000000000010",
+        name: "גדוד ראשי",
+      },
+    });
+    console.log(`Battalion: ${battalion.name}`);
+
     const company = await prisma.company.upsert({
       where: { id: "00000000-0000-0000-0000-000000000002" },
       update: {},
       create: {
         id: "00000000-0000-0000-0000-000000000002",
         cycleId: cycle.id,
+        battalionId: battalion.id,
         name: "פלוגה בולדוג",
       },
     });
