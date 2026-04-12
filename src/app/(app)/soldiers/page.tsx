@@ -185,7 +185,7 @@ export default function SoldiersPage() {
   const { data: rawSoldiers, isLoading: soldiersLoading } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
   const { data: rawApprovedRequests } = useQuery<RawApprovedRequest>(APPROVED_REQUESTS_QUERY, queryParams);
-  const { showLoading, showEmpty, showConnectionError } = useSyncReady(
+  const { showLoading, showConnectionError } = useSyncReady(
     (rawSoldiers ?? []).length > 0,
     soldiersLoading
   );
@@ -482,7 +482,7 @@ export default function SoldiersPage() {
             <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
           </div>
         )}
-        {totalSoldiers === 0 && (showEmpty || search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && !showLoading && !showConnectionError && (
+        {totalSoldiers === 0 && !showLoading && !showConnectionError && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
             {(search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && (
