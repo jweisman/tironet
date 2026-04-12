@@ -3,10 +3,11 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle } from "lucide-react";
+import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
+import { useSyncReady } from "@/hooks/useSyncReady";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -233,19 +234,10 @@ export default function SoldierDetailPage() {
     }
   }
 
-  // Grace period: give PowerSync time to hydrate local SQLite after an
-  // offline shell load before showing "not found". The timeout is a hard
-  // upper bound — if data arrives before it, we skip straight to rendering.
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setTimedOut(true), 3000);
-    return () => clearTimeout(t);
-  }, []);
-
   const soldierParams = useMemo(() => [soldierId], [soldierId]);
   const missingParams = useMemo(() => [soldierId, soldierId], [soldierId]);
 
-  const { data: soldierRows } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
+  const { data: soldierRows, isLoading: soldierLoading } = useQuery<RawSoldier>(SOLDIER_QUERY, soldierParams);
   const { data: reportRows } = useQuery<RawReport>(REPORTS_QUERY, soldierParams);
   const { data: missingRows } = useQuery<RawMissing>(MISSING_QUERY, missingParams);
   const { data: soldierRequests } = useQuery<RawSoldierRequest>(SOLDIER_REQUESTS_QUERY, soldierParams);
@@ -253,8 +245,19 @@ export default function SoldierDetailPage() {
   const hasSpecialConditions = Number(specialConditionsRows?.[0]?.count ?? 0) > 0;
 
   const raw = soldierRows?.[0] ?? null;
+  const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!raw, soldierLoading);
 
-  if (!raw && timedOut) {
+  if (!raw && showConnectionError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+        <WifiOff size={28} className="text-muted-foreground mx-auto mb-1" />
+        <p className="font-medium">לא ניתן לטעון נתונים</p>
+        <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
+      </div>
+    );
+  }
+
+  if (!raw && showEmpty) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
         <p className="font-medium">חייל לא נמצא</p>

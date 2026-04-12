@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, ChevronDown, FileUp } from "lucide-react";
+import { Plus, ChevronDown, FileUp, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery, usePowerSync } from "@powersync/react";
-import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
+import { useSyncReady } from "@/hooks/useSyncReady";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
@@ -135,7 +135,6 @@ export default function ActivitiesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const syncStatus = useStatus();
   const rawRole = selectedAssignment?.role ?? "";
   const role = rawRole ? effectiveRole(rawRole as Role) : "";
   const canCreate = role !== "squad_commander" && !!role;
@@ -157,7 +156,11 @@ export default function ActivitiesPage() {
   // Squad commanders see only their squad's counts; everyone else gets platoon-wide counts (squadId = '').
   const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
   const queryParams = useMemo(() => [squadId, selectedCycleId ?? ""], [squadId, selectedCycleId]);
-  const { data: rawActivities } = useQuery<RawActivity>(ACTIVITIES_QUERY, queryParams);
+  const { data: rawActivities, isLoading: activitiesLoading } = useQuery<RawActivity>(ACTIVITIES_QUERY, queryParams);
+  const { showLoading, showEmpty, showConnectionError } = useSyncReady(
+    (rawActivities ?? []).length > 0,
+    activitiesLoading
+  );
 
   const companyId = selectedAssignment?.unitType === "company" ? selectedAssignment.unitId : "";
   const platoonParams = useMemo(() => [companyId], [companyId]);
@@ -367,7 +370,7 @@ export default function ActivitiesPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {filtered.length === 0 && !syncStatus.hasSynced && filter === "open" && (
+        {filtered.length === 0 && showLoading && filter === "open" && (
           <div className="divide-y divide-border">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -381,7 +384,14 @@ export default function ActivitiesPage() {
             ))}
           </div>
         )}
-        {filtered.length === 0 && (syncStatus.hasSynced || filter !== "open") && (
+        {filtered.length === 0 && showConnectionError && filter === "open" && (
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
+            <WifiOff size={28} className="text-muted-foreground mx-auto mb-1" />
+            <p className="font-medium">לא ניתן לטעון נתונים</p>
+            <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
+          </div>
+        )}
+        {filtered.length === 0 && (showEmpty || filter !== "open") && !showLoading && !showConnectionError && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין פעילויות</p>
             {filter !== "open" && <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>}

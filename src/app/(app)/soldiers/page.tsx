@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, AlertCircle, FileUp, FileText } from "lucide-react";
+import { Plus, Search, AlertCircle, FileUp, FileText, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
-import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
+import { useSyncReady } from "@/hooks/useSyncReady";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
@@ -177,16 +177,19 @@ export default function SoldiersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const syncStatus = useStatus();
   const rawRole = (selectedAssignment?.role ?? "") as Role | "";
   const role = rawRole ? effectiveRole(rawRole as Role) : "";
   const noAccess = rawRole === "instructor" || rawRole === "company_medic";
 
   // -------- PowerSync queries --------
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
-  const { data: rawSoldiers } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
+  const { data: rawSoldiers, isLoading: soldiersLoading } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
   const { data: rawApprovedRequests } = useQuery<RawApprovedRequest>(APPROVED_REQUESTS_QUERY, queryParams);
+  const { showLoading, showEmpty, showConnectionError } = useSyncReady(
+    (rawSoldiers ?? []).length > 0,
+    soldiersLoading
+  );
 
   const allSquads: SquadData[] = useMemo(() => {
     // Build soldier → approved request types map
@@ -468,7 +471,7 @@ export default function SoldiersPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {totalSoldiers === 0 && !syncStatus.hasSynced && !search && (statusFilter === "all" || statusFilter === "active") && !showGapsOnly && !showRequestsOnly && (
+        {totalSoldiers === 0 && showLoading && !search && (statusFilter === "all" || statusFilter === "active") && !showGapsOnly && !showRequestsOnly && (
           <div className="divide-y divide-border">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -481,7 +484,14 @@ export default function SoldiersPage() {
             ))}
           </div>
         )}
-        {totalSoldiers === 0 && (syncStatus.hasSynced || search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && (
+        {totalSoldiers === 0 && showConnectionError && !search && (statusFilter === "all" || statusFilter === "active") && !showGapsOnly && !showRequestsOnly && (
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
+            <WifiOff size={28} className="text-muted-foreground mx-auto mb-1" />
+            <p className="font-medium">לא ניתן לטעון נתונים</p>
+            <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
+          </div>
+        )}
+        {totalSoldiers === 0 && (showEmpty || search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && !showLoading && !showConnectionError && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
             {(search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && (

@@ -3,10 +3,11 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, WifiOff } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
+import { useSyncReady } from "@/hooks/useSyncReady";
 import {
   ActivityDetail,
   type ActivityDetailData,
@@ -101,7 +102,7 @@ export default function ActivityPage() {
   const { selectedAssignment } = useCycle();
 
   const activityParams = useMemo(() => [id], [id]);
-  const { data: activityRows } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
+  const { data: activityRows, isLoading: activityLoading } = useQuery<RawActivity>(ACTIVITY_QUERY, activityParams);
   const activity = activityRows?.[0] ?? null;
 
   // Use the assignment for the activity's own cycle, not the globally selected one.
@@ -214,14 +215,7 @@ export default function ActivityPage() {
     };
   }, [activity, squadsRows, soldiersRows, reportsRows, role, activityAssignment]);
 
-  // Grace period: give PowerSync time to hydrate local SQLite after an
-  // offline shell load before showing "not found". The timeout is a hard
-  // upper bound — if data arrives before it, we skip straight to rendering.
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setTimedOut(true), 3000);
-    return () => clearTimeout(t);
-  }, []);
+  const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!data, activityLoading);
 
   return (
     <div>
@@ -235,7 +229,21 @@ export default function ActivityPage() {
         </Link>
       </div>
 
-      {!data && timedOut && (
+      {!data && showLoading && (
+        <div className="flex justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      )}
+
+      {!data && showConnectionError && (
+        <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
+          <WifiOff size={28} className="text-muted-foreground mx-auto mb-1" />
+          <p className="font-medium">לא ניתן לטעון נתונים</p>
+          <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
+        </div>
+      )}
+
+      {!data && showEmpty && (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
           <p className="font-medium text-destructive">הפעילות לא נמצאה</p>
           <Link
@@ -247,15 +255,9 @@ export default function ActivityPage() {
         </div>
       )}
 
-      {!data && !timedOut && (
-        <div className="flex justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
-      )}
-
       {data && (
         <ActivityDetail
-          key={`${data.squads.map((s) => s.id).join(",")}-${data.squads.some((s) => s.soldiers.length > 0) ? 1 : 0}`}
+          key={data.squads.map((s) => s.id).join(",")}
           initialData={data}
           initialGapsOnly={initialGapsOnly}
         />

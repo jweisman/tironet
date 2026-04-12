@@ -2,13 +2,13 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Bell } from "lucide-react";
+import { Plus, Bell, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { usePowerSync } from "@powersync/react";
-import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
+import { useSyncReady } from "@/hooks/useSyncReady";
 import { RequestCard, type RequestSummary } from "@/components/requests/RequestCard";
 import { CreateRequestForm } from "@/components/requests/CreateRequestForm";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
@@ -176,7 +176,6 @@ export default function RequestsPage() {
   const { selectedCycleId, selectedAssignment } = useCycle();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const syncStatus = useStatus();
   const db = usePowerSync();
   const { data: session } = useSession();
   const rawRole = (selectedAssignment?.role ?? "") as Role | "";
@@ -200,7 +199,11 @@ export default function RequestsPage() {
   }, []);
 
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
-  const { data: rawRequests } = useQuery<RawRequest>(REQUESTS_QUERY, queryParams);
+  const { data: rawRequests, isLoading: requestsLoading } = useQuery<RawRequest>(REQUESTS_QUERY, queryParams);
+  const { showLoading, showEmpty, showConnectionError } = useSyncReady(
+    (rawRequests ?? []).length > 0,
+    requestsLoading
+  );
 
   const isMedic = rawRole === "company_medic";
 
@@ -469,7 +472,7 @@ export default function RequestsPage() {
         {/* Open requests */}
         {viewTab === "open" && (
           <>
-            {sortedOpen.length === 0 && !syncStatus.hasSynced && (
+            {sortedOpen.length === 0 && showLoading && (
               <div className="divide-y divide-border">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -483,7 +486,14 @@ export default function RequestsPage() {
                 ))}
               </div>
             )}
-            {sortedOpen.length === 0 && syncStatus.hasSynced && (
+            {sortedOpen.length === 0 && showConnectionError && (
+              <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
+                <WifiOff size={28} className="text-muted-foreground mx-auto mb-1" />
+                <p className="font-medium">לא ניתן לטעון נתונים</p>
+                <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
+              </div>
+            )}
+            {sortedOpen.length === 0 && !showLoading && !showConnectionError && (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
                 <p className="font-medium">אין בקשות פתוחות</p>
                 {canCreate && (
@@ -511,7 +521,7 @@ export default function RequestsPage() {
         {/* Requires my action */}
         {viewTab === "mine" && (
           <>
-            {mineRequests.length === 0 && syncStatus.hasSynced && (
+            {mineRequests.length === 0 && !showLoading && (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
                 <p className="font-medium">אין בקשות הדורשות טיפולך</p>
               </div>
@@ -535,7 +545,7 @@ export default function RequestsPage() {
         {/* Active requests */}
         {viewTab === "active" && (
           <>
-            {activeRequests.length === 0 && syncStatus.hasSynced && (
+            {activeRequests.length === 0 && !showLoading && (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
                 <p className="font-medium">אין בקשות פעילות</p>
               </div>

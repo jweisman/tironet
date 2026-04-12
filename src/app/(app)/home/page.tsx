@@ -4,10 +4,11 @@ import { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, WifiOff } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
+import { useSyncReady } from "@/hooks/useSyncReady";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import type { SquadSummary } from "@/app/api/dashboard/route";
 import { effectiveRole, ROLE_LABELS } from "@/lib/auth/permissions";
@@ -261,15 +262,9 @@ export default function HomePage() {
     }
   }, [cycleLoading, activeCycles.length]);
 
-  // Grace period before showing "no data" — useQuery returns cached local
-  // SQLite data almost instantly for returning users, but on first load
-  // there is a brief window before PowerSync hydrates. Extended to 3s as
-  // a hard upper bound; if data arrives earlier, we render immediately.
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setTimedOut(true), 3000);
-    return () => clearTimeout(t);
-  }, []);
+  // Determine loading vs "no data" state using PowerSync's hasSynced signal.
+  // useQuery returns cached local SQLite data instantly for returning users;
+  // the hook only gates the empty-state message until sync confirms emptiness.
 
   const rawRole = selectedAssignment?.role ?? "";
   const role = rawRole ? effectiveRole(rawRole as Role) : "";
@@ -280,9 +275,14 @@ export default function HomePage() {
     [selectedCycleId, squadId]
   );
 
-  const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
+  const { data: rawSquads, isLoading: squadsLoading } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
   const { data: rawTopGaps } = useQuery<RawTopGap>(TOP_GAPS_QUERY, queryParams);
   const { data: rawSquadRequests } = useQuery<RawSquadRequests>(REQUESTS_QUERY, queryParams);
+
+  const { showLoading, showEmpty, showConnectionError } = useSyncReady(
+    (rawSquads ?? []).length > 0,
+    squadsLoading
+  );
 
   // Build top-3-gaps map per squad from flat rows (avoids json_group_array)
   const topGapsMap = useMemo(() => {
@@ -485,14 +485,22 @@ export default function HomePage() {
             </div>
           )}
 
-          {squads.length === 0 && !timedOut && (
+          {squads.length === 0 && showLoading && (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">טוען נתונים...</p>
             </div>
           )}
 
-          {squads.length === 0 && timedOut && (
+          {squads.length === 0 && showConnectionError && (
+            <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+              <WifiOff size={28} className="text-muted-foreground mx-auto mb-1" />
+              <p className="font-medium">לא ניתן לטעון נתונים</p>
+              <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
+            </div>
+          )}
+
+          {squads.length === 0 && showEmpty && (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
               <p className="font-medium">אין נתונים להצגה</p>
               <p className="text-sm text-muted-foreground">אין כיתות מוגדרות למחזור זה.</p>
