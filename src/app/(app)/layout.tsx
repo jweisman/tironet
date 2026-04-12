@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth/auth";
 import { AppShell } from "@/components/layout/AppShell";
 import { CycleProvider } from "@/contexts/CycleContext";
 import { TironetPowerSyncProvider } from "@/components/providers/PowerSyncProvider";
+import { TourProvider } from "@/contexts/TourContext";
 
 export default async function AppLayout({
   children,
@@ -20,7 +21,9 @@ export default async function AppLayout({
     <SessionProvider session={session}>
       <CycleProvider>
         <TironetPowerSyncProvider>
-          <AppShell>{children}</AppShell>
+          <TourProvider>
+            <AppShell>{children}</AppShell>
+          </TourProvider>
         </TironetPowerSyncProvider>
       </CycleProvider>
     </SessionProvider>

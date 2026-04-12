@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, Settings, LogOut, UserCog, FileText, BarChart3 } from "lucide-react";
+import { Home, Users, Activity, Settings, LogOut, UserCog, FileText, BarChart3, HelpCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
@@ -13,6 +13,7 @@ import { CyclePicker } from "./CyclePicker";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { SoldierLogo } from "@/components/SoldierLogo";
+import { useTourContext } from "@/contexts/TourContext";
 import type { Role } from "@/types";
 
 const allNavItems = [
@@ -28,6 +29,7 @@ export function Sidebar() {
   const { data: session } = useSession();
   const { activeCycles, selectedAssignment } = useCycle();
   const requestBadge = useRequestBadge();
+  const { startCurrentTour } = useTourContext();
   const isAdmin = session?.user?.isAdmin;
   const selectedRole = selectedAssignment?.role as Role | undefined;
   const isCommander = session?.user?.cycleAssignments?.some(
@@ -152,6 +154,14 @@ export function Sidebar() {
             )}
           </div>
         </div>
+        <button
+          type="button"
+          onClick={startCurrentTour}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
+          <HelpCircle size={16} />
+          <span>עזרה</span>
+        </button>
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

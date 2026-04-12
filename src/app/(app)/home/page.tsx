@@ -11,6 +11,9 @@ import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import type { SquadSummary } from "@/app/api/dashboard/route";
 import { effectiveRole, ROLE_LABELS } from "@/lib/auth/permissions";
+import { useTour } from "@/hooks/useTour";
+import { useTourContext } from "@/contexts/TourContext";
+import { homeTourSteps } from "@/lib/tour/steps";
 import type { Role } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -340,6 +343,11 @@ export default function HomePage() {
     return parts.join(" > ");
   }, [role, rawSquads]);
 
+  // Tour
+  const { registerTour, unregisterTour } = useTourContext();
+  const { startTour } = useTour({ page: "home", steps: homeTourSteps });
+  useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
+
   // While session / cycle context is still resolving, show nothing
   // (avoids flashing "no access" or "choose a cycle" before data arrives).
   if (cycleLoading) {
@@ -413,6 +421,7 @@ export default function HomePage() {
       {/* Requests requiring attention callout */}
       {requestBadge > 0 && (
         <button
+          data-tour="home-request-callout"
           type="button"
           onClick={() => router.push("/requests?filter=mine")}
           className="w-full flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3 text-start transition-colors hover:bg-amber-50 active:bg-amber-100"
@@ -439,16 +448,16 @@ export default function HomePage() {
         <>
           {/* Squad commander — single card */}
           {role === "squad_commander" && squads.length > 0 && (
-            <SquadSummaryCard squad={squads[0]} />
+            <SquadSummaryCard squad={squads[0]} dataTour="home-squad-card" />
           )}
 
           {/* Platoon commander — aggregate + one card per squad */}
           {isPlatoon && (
             <div className="space-y-3">
-              {squads.length > 1 && <AggregateRow squads={squads} />}
+              {squads.length > 1 && <div data-tour="home-aggregate"><AggregateRow squads={squads} /></div>}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {squads.map((s) => (
-                  <SquadSummaryCard key={s.squadId} squad={s} />
+                {squads.map((s, i) => (
+                  <SquadSummaryCard key={s.squadId} squad={s} dataTour={i === 0 ? "home-squad-card" : undefined} />
                 ))}
               </div>
             </div>
@@ -457,7 +466,7 @@ export default function HomePage() {
           {/* Company commander — grouped by platoon */}
           {isCompany && (
             <div className="space-y-6">
-              {platoons.map((platoon) => (
+              {platoons.map((platoon, pi) => (
                 <div key={platoon.platoonId} className="space-y-3">
                   <div className="flex items-center gap-3">
                     <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -465,10 +474,10 @@ export default function HomePage() {
                     </h2>
                     <div className="flex-1 h-px bg-border" />
                   </div>
-                  {platoon.squads.length > 1 && <AggregateRow squads={platoon.squads} />}
+                  {platoon.squads.length > 1 && <div data-tour={pi === 0 ? "home-aggregate" : undefined}><AggregateRow squads={platoon.squads} /></div>}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {platoon.squads.map((s) => (
-                      <SquadSummaryCard key={s.squadId} squad={s} />
+                    {platoon.squads.map((s, si) => (
+                      <SquadSummaryCard key={s.squadId} squad={s} dataTour={pi === 0 && si === 0 ? "home-squad-card" : undefined} />
                     ))}
                   </div>
                 </div>

@@ -22,6 +22,7 @@ export interface SoldierSummary {
 interface Props {
   soldier: SoldierSummary;
   onClick: () => void;
+  dataTour?: string;
 }
 
 const STATUS_LABEL: Record<SoldierStatus, string> = {
@@ -60,7 +61,7 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash];
 }
 
-export function SoldierCard({ soldier, onClick }: Props) {
+export function SoldierCard({ soldier, onClick, dataTour }: Props) {
   const initials =
     (soldier.givenName[0] ?? "") + (soldier.familyName[0] ?? "");
   const colorClass = getAvatarColor(soldier.givenName + soldier.familyName);
@@ -68,6 +69,7 @@ export function SoldierCard({ soldier, onClick }: Props) {
 
   return (
     <button
+      data-tour={dataTour}
       type="button"
       onClick={onClick}
       className="relative z-0 flex w-full items-center gap-3 py-3 px-4 text-start transition-colors hover:bg-muted/50 active:bg-muted"

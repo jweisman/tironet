@@ -24,6 +24,9 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { useTour } from "@/hooks/useTour";
+import { useTourContext } from "@/contexts/TourContext";
+import { requestsTourSteps } from "@/lib/tour/steps";
 import { canActOnRequest, getAvailableActions, getNextState } from "@/lib/requests/workflow";
 import { parseMedicalAppointments, hasUpcomingAppointment, formatAppointment } from "@/lib/requests/medical-appointments";
 
@@ -354,6 +357,11 @@ export default function RequestsPage() {
     setActionRequest(null);
   }
 
+  // Tour
+  const { registerTour, unregisterTour } = useTourContext();
+  const { startTour } = useTour({ page: "requests", steps: requestsTourSteps });
+  useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
+
   if (rawRole === "instructor") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
@@ -379,6 +387,7 @@ export default function RequestsPage() {
         <div className="flex items-center gap-1.5">
           {/* View tabs */}
           <button
+            data-tour="requests-tab-open"
             type="button"
             onClick={() => setViewTab("open")}
             className={cn(
@@ -393,6 +402,7 @@ export default function RequestsPage() {
           </button>
 
           <button
+            data-tour="requests-tab-active"
             type="button"
             onClick={() => setViewTab("active")}
             className={cn(
@@ -408,6 +418,7 @@ export default function RequestsPage() {
 
           {role && !isMedic && (
             <button
+              data-tour="requests-tab-mine"
               type="button"
               onClick={() => setViewTab("mine")}
               className={cn(
@@ -425,6 +436,7 @@ export default function RequestsPage() {
 
           {canCreate && (
             <button
+              data-tour="requests-add-btn"
               type="button"
               onClick={() => isMedic ? setCreateType("medical") : setTypeMenuOpen(true)}
               className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0 ms-auto"
@@ -433,7 +445,7 @@ export default function RequestsPage() {
             </button>
           )}
         </div>
-        {!isMedic && <div className="flex items-center gap-1.5">
+        {!isMedic && <div data-tour="requests-type-filters" className="flex items-center gap-1.5">
           {(["all", "leave", "medical", "hardship"] as const).map((t) => (
             <button
               key={t}
@@ -481,13 +493,14 @@ export default function RequestsPage() {
             )}
             {sortedOpen.length > 0 && (
               <div className="divide-y divide-border">
-                {sortedOpen.map((r) => (
+                {sortedOpen.map((r, i) => (
                   <RequestCard
                     key={r.id}
                     request={r}
                     userRole={rawRole as Role}
                     onClick={() => router.push(`/requests/${r.id}`)}
                     onLongPress={(pos) => handleLongPress(r, pos)}
+                    dataTour={i === 0 ? "requests-card" : undefined}
                   />
                 ))}
               </div>

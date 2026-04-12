@@ -38,6 +38,7 @@ interface Props {
   activeDetail?: string | null;
   onClick: () => void;
   onLongPress?: (e: { x: number; y: number }) => void;
+  dataTour?: string;
 }
 
 function formatDate(dateStr: string) {
@@ -50,7 +51,7 @@ function formatDate(dateStr: string) {
   });
 }
 
-export function RequestCard({ request, userRole, activeDetail, onClick, onLongPress }: Props) {
+export function RequestCard({ request, userRole, activeDetail, onClick, onLongPress, dataTour }: Props) {
   const isAssignedToMe =
     request.assignedRole !== null && userRole !== "admin" && canActOnRequest(userRole, request.assignedRole);
 
@@ -88,6 +89,7 @@ export function RequestCard({ request, userRole, activeDetail, onClick, onLongPr
 
   return (
     <button
+      data-tour={dataTour}
       type="button"
       onClick={() => {
         if (suppressClickRef.current) { suppressClickRef.current = false; return; }

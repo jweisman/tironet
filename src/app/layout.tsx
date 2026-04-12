@@ -5,6 +5,7 @@ import { getMessages } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { SerwistProvider } from "./serwist-provider";
+import "driver.js/dist/driver.css";
 import "./globals.css";
 
 const heebo = Heebo({

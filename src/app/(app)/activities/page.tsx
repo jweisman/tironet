@@ -8,6 +8,9 @@ import { useCycle } from "@/contexts/CycleContext";
 import { useQuery, usePowerSync } from "@powersync/react";
 import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { useTour } from "@/hooks/useTour";
+import { useTourContext } from "@/contexts/TourContext";
+import { activitiesTourSteps } from "@/lib/tour/steps";
 import type { Role } from "@/types";
 import { ActivityCard, type ActivitySummary } from "@/components/activities/ActivityCard";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
@@ -276,6 +279,11 @@ export default function ActivitiesPage() {
     ];
   }, [contextMenu, db]);
 
+  // Tour
+  const { registerTour, unregisterTour } = useTourContext();
+  const { startTour } = useTour({ page: "activities", steps: activitiesTourSteps });
+  useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
+
   if (rawRole === "company_medic") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
@@ -299,7 +307,7 @@ export default function ActivitiesPage() {
       {/* Sticky header */}
       <div ref={actHeaderRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: "var(--app-header-height, 0px)" }}>
         <div className="flex items-center gap-2">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
+          <div data-tour="activities-filters" className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
             {FILTER_PILLS.map((f) => (
               <button
                 key={f} type="button" onClick={() => setFilter(f)}
@@ -312,7 +320,7 @@ export default function ActivitiesPage() {
               </button>
             ))}
           </div>
-          <div className="relative shrink-0">
+          <div data-tour="activities-sort" className="relative shrink-0">
             <button
               type="button" onClick={() => setSortOpen((v) => !v)}
               className="flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -339,12 +347,14 @@ export default function ActivitiesPage() {
           {canCreate && (
             <>
               <button
+                data-tour="activities-import-btn"
                 type="button" onClick={() => setBulkOpen(true)}
                 className="hidden md:flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors shrink-0"
               >
                 <FileUp size={15} /> ייבוא
               </button>
               <button
+                data-tour="activities-add-btn"
                 type="button" onClick={() => setCreateOpen(true)}
                 className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
               >
@@ -380,7 +390,7 @@ export default function ActivitiesPage() {
         )}
         {filtered.length > 0 && activitiesByPlatoon && (
           <div>
-            {activitiesByPlatoon.map((platoonGroup) => (
+            {activitiesByPlatoon.map((platoonGroup, pi) => (
               <div key={platoonGroup.platoonName}>
                 <div className="sticky z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between border-b border-border" style={{ top: `calc(var(--app-header-height, 0px) + ${actHeaderH}px)` }}>
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -390,13 +400,14 @@ export default function ActivitiesPage() {
                     {platoonGroup.activities.length}
                   </span>
                 </div>
-                {platoonGroup.activities.map((activity) => (
+                {platoonGroup.activities.map((activity, ai) => (
                   <ActivityCard
                     key={activity.id}
                     activity={activity}
                     showPlatoon={false}
                     onClick={() => router.push(`/activities/${activity.id}`)}
                     onLongPress={canEdit ? (pos) => openContextMenu(activity, pos) : undefined}
+                    dataTour={pi === 0 && ai === 0 ? "activities-card" : undefined}
                   />
                 ))}
               </div>
@@ -405,13 +416,14 @@ export default function ActivitiesPage() {
         )}
         {filtered.length > 0 && !activitiesByPlatoon && (
           <div>
-            {filtered.map((activity) => (
+            {filtered.map((activity, i) => (
               <ActivityCard
                 key={activity.id}
                 activity={activity}
                 showPlatoon={showPlatoon}
                 onClick={() => router.push(`/activities/${activity.id}`)}
                 onLongPress={canEdit ? (pos) => openContextMenu(activity, pos) : undefined}
+                dataTour={i === 0 ? "activities-card" : undefined}
               />
             ))}
           </div>

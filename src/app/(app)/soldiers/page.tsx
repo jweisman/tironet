@@ -8,6 +8,9 @@ import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useSafeStatus as useStatus } from "@/hooks/useSafeStatus";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { useTour } from "@/hooks/useTour";
+import { useTourContext } from "@/contexts/TourContext";
+import { soldiersTourSteps } from "@/lib/tour/steps";
 import type { Role, RequestType } from "@/types";
 import { SoldierCard, type SoldierSummary } from "@/components/soldiers/SoldierCard";
 import { AddSoldierForm } from "@/components/soldiers/AddSoldierForm";
@@ -340,6 +343,11 @@ export default function SoldiersPage() {
     }
   }
 
+  // Tour
+  const { registerTour, unregisterTour } = useTourContext();
+  const { startTour } = useTour({ page: "soldiers", steps: soldiersTourSteps });
+  useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
+
   if (noAccess) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
@@ -376,7 +384,7 @@ export default function SoldiersPage() {
       {/* Sticky top search + gaps filter */}
       <div ref={stickyBarRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: "var(--app-header-height, 0px)" }}>
         <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+          <div data-tour="soldiers-search" className="relative flex-1">
             <Search
               size={16}
               className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
@@ -390,6 +398,7 @@ export default function SoldiersPage() {
           </div>
           <div className="hidden md:flex items-center gap-2 shrink-0">
             <button
+              data-tour="soldiers-import-btn"
               type="button"
               onClick={() => setImportOpen(true)}
               className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
@@ -398,6 +407,7 @@ export default function SoldiersPage() {
               ייבוא
             </button>
             <button
+              data-tour="soldiers-add-btn"
               type="button"
               onClick={() => setAddOpen(true)}
               className="flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -408,7 +418,7 @@ export default function SoldiersPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
+          <div data-tour="soldiers-status-filters" className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f}
@@ -426,6 +436,7 @@ export default function SoldiersPage() {
             ))}
           </div>
           <button
+            data-tour="soldiers-requests-filter"
             type="button"
             onClick={() => setShowRequestsOnly((v) => !v)}
             className={cn(
@@ -439,6 +450,7 @@ export default function SoldiersPage() {
             <span>בקשות פעילות</span>
           </button>
           <button
+            data-tour="soldiers-gaps-filter"
             type="button"
             onClick={() => setShowGapsOnly((v) => !v)}
             className={cn(
@@ -480,12 +492,13 @@ export default function SoldiersPage() {
 
         {role === "squad_commander" && (
           <div className="divide-y divide-border">
-            {filteredSquads.flatMap((sq) =>
-              sq.soldiers.map((s) => (
+            {filteredSquads.flatMap((sq, sqi) =>
+              sq.soldiers.map((s, si) => (
                 <SoldierCard
                   key={s.id}
                   soldier={s}
                   onClick={() => router.push(`/soldiers/${s.id}`)}
+                  dataTour={sqi === 0 && si === 0 ? "soldiers-card" : undefined}
                 />
               ))
             )}
@@ -494,7 +507,7 @@ export default function SoldiersPage() {
 
         {role === "platoon_commander" && (
           <div>
-            {filteredSquads.map((squad) => (
+            {filteredSquads.map((squad, sqi) => (
               <div key={squad.id}>
                 <div className="sticky z-10 bg-muted px-4 py-2 flex items-center justify-between border-b border-border" style={{ top: `calc(var(--app-header-height, 0px) + ${barH}px)` }}>
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -505,11 +518,12 @@ export default function SoldiersPage() {
                   </span>
                 </div>
                 <div className="divide-y divide-border">
-                  {squad.soldiers.map((s) => (
+                  {squad.soldiers.map((s, si) => (
                     <SoldierCard
                       key={s.id}
                       soldier={s}
                       onClick={() => router.push(`/soldiers/${s.id}`)}
+                      dataTour={sqi === 0 && si === 0 ? "soldiers-card" : undefined}
                     />
                   ))}
                 </div>
@@ -520,7 +534,7 @@ export default function SoldiersPage() {
 
         {role === "company_commander" && squadsByPlatoon && (
           <div>
-            {squadsByPlatoon.map((platoonGroup) => (
+            {squadsByPlatoon.map((platoonGroup, pi) => (
               <div key={platoonGroup.platoonName}>
                 <div ref={platoonHeaderRef} className="sticky z-[11] bg-background border-b border-border px-4 py-2 flex items-center justify-between" style={{ top: `calc(var(--app-header-height, 0px) + ${barH}px)` }}>
                   <span className="text-sm font-semibold">
@@ -530,7 +544,7 @@ export default function SoldiersPage() {
                     {platoonGroup.squads.reduce((sum, sq) => sum + sq.soldiers.length, 0)}
                   </span>
                 </div>
-                {platoonGroup.squads.map((squad) => (
+                {platoonGroup.squads.map((squad, sqi) => (
                   <div key={squad.id}>
                     <div className="sticky z-10 bg-muted px-4 py-1.5 flex items-center justify-between border-b border-border" style={{ top: `calc(var(--app-header-height, 0px) + ${barH + platoonH}px)` }}>
                       <span className="text-xs font-medium text-muted-foreground">
@@ -541,11 +555,12 @@ export default function SoldiersPage() {
                       </span>
                     </div>
                     <div className="divide-y divide-border">
-                      {squad.soldiers.map((s) => (
+                      {squad.soldiers.map((s, si) => (
                         <SoldierCard
                           key={s.id}
                           soldier={s}
                           onClick={() => router.push(`/soldiers/${s.id}`)}
+                          dataTour={pi === 0 && sqi === 0 && si === 0 ? "soldiers-card" : undefined}
                         />
                       ))}
                     </div>
