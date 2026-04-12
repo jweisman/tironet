@@ -23,6 +23,7 @@ interface SoldierData {
   givenName: string;
   familyName: string;
   idNumber: string | null;
+  civilianId: string | null;
   rank: string | null;
   status: SoldierStatus;
   profileImage: string | null;
@@ -41,6 +42,7 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
   const [givenName, setGivenName] = useState(soldier.givenName);
   const [familyName, setFamilyName] = useState(soldier.familyName);
   const [idNumber, setIdNumber] = useState(soldier.idNumber ?? "");
+  const [civilianId, setCivilianId] = useState(soldier.civilianId ?? "");
   const [rank, setRank] = useState(soldier.rank ?? "");
   const [status, setStatus] = useState<SoldierStatus>(soldier.status);
   const [phone, setPhone] = useState(soldier.phone ? toIsraeliDisplay(soldier.phone) : "");
@@ -70,6 +72,7 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
           givenName: givenName.trim(),
           familyName: familyName.trim(),
           idNumber: idNumber.trim() || null,
+          civilianId: civilianId.trim() || null,
           rank: rank || null,
           status,
           profileImage: imageBase64,
@@ -117,14 +120,25 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="edit-id-number">מספר אישי</Label>
-        <Input
-          id="edit-id-number"
-          value={idNumber}
-          onChange={(e) => setIdNumber(e.target.value)}
-          placeholder="מספר אישי"
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-id-number">מספר אישי</Label>
+          <Input
+            id="edit-id-number"
+            value={idNumber}
+            onChange={(e) => setIdNumber(e.target.value)}
+            placeholder="מספר אישי"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-civilian-id">מספר זהות</Label>
+          <Input
+            id="edit-civilian-id"
+            value={civilianId}
+            onChange={(e) => setCivilianId(e.target.value)}
+            placeholder="מספר זהות"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

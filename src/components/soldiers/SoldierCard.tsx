@@ -10,6 +10,7 @@ export interface SoldierSummary {
   givenName: string;
   familyName: string;
   idNumber: string | null;
+  civilianId: string | null;
   rank: string | null;
   status: SoldierStatus;
   profileImage: string | null;

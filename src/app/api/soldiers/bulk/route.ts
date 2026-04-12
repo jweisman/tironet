@@ -11,6 +11,7 @@ const soldierSchema = z.object({
   givenName: z.string().min(1),
   familyName: z.string().min(1),
   idNumber: z.string().nullable().optional(),
+  civilianId: z.string().nullable().optional(),
   rank: z.string().nullable().optional(),
   status: z.enum(["active", "transferred", "dropped", "injured"]).optional(),
   phone: z.string().nullable().optional(),
@@ -153,6 +154,7 @@ export async function POST(req: NextRequest) {
           givenName: s.givenName.trim(),
           familyName: s.familyName.trim(),
           idNumber: s.idNumber ?? null,
+          civilianId: s.civilianId ?? null,
           rank: s.rank ?? null,
           status: s.status ?? "active",
           phone: s.phone ? (toE164(s.phone) ?? null) : null,
@@ -167,6 +169,7 @@ export async function POST(req: NextRequest) {
         data: {
           givenName: s.givenName.trim(),
           familyName: s.familyName.trim(),
+          ...(s.civilianId !== undefined ? { civilianId: s.civilianId ?? null } : {}),
           rank: s.rank ?? null,
           status: s.status ?? "active",
           phone: s.phone ? (toE164(s.phone) ?? null) : null,

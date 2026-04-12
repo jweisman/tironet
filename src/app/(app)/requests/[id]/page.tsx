@@ -41,6 +41,8 @@ const REQUEST_QUERY = `
     r.*,
     s.given_name AS soldier_given_name,
     s.family_name AS soldier_family_name,
+    s.id_number AS soldier_id_number,
+    s.civilian_id AS soldier_civilian_id,
     sq.name AS squad_name,
     p.name AS platoon_name
   FROM requests r
@@ -79,6 +81,8 @@ interface RawRequest {
   updated_at: string;
   soldier_given_name: string;
   soldier_family_name: string;
+  soldier_id_number: string | null;
+  soldier_civilian_id: string | null;
   squad_name: string;
   platoon_name: string;
 }
@@ -383,6 +387,13 @@ export default function RequestDetailPage() {
               <p className="text-sm text-muted-foreground">
                 {raw.soldier_family_name} {raw.soldier_given_name} · {raw.squad_name}
               </p>
+              {(raw.soldier_id_number || raw.soldier_civilian_id) && (
+                <p className="text-xs text-muted-foreground">
+                  {raw.soldier_id_number && `מ.א. ${raw.soldier_id_number}`}
+                  {raw.soldier_id_number && raw.soldier_civilian_id && " · "}
+                  {raw.soldier_civilian_id && `מ.ז. ${raw.soldier_civilian_id}`}
+                </p>
+              )}
             </div>
           </div>
           <Badge variant={REQUEST_STATUS_VARIANT[requestStatus]}>

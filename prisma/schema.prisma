@@ -244,6 +244,7 @@ model Soldier {
   givenName    String        @map("given_name")
   familyName   String        @map("family_name")
   idNumber     String?       @map("id_number")
+  civilianId   String?       @map("civilian_id")
   rank         String?
   status         SoldierStatus @default(active)
   profileImage   String?       @map("profile_image")

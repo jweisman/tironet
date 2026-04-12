@@ -86,7 +86,7 @@ function formatDate(dateStr: string) {
 const SOLDIER_QUERY = `
   SELECT
     s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
-    s.id_number, s.cycle_id, s.squad_id, s.phone, s.emergency_phone, s.notes,
+    s.id_number, s.civilian_id, s.cycle_id, s.squad_id, s.phone, s.emergency_phone, s.notes,
     sq.name AS squad_name, sq.platoon_id,
     p.id AS platoon_id, p.name AS platoon_name
   FROM soldiers s
@@ -164,7 +164,7 @@ interface RawSoldierRequest {
 
 interface RawSoldier {
   id: string; given_name: string; family_name: string;
-  id_number: string | null; rank: string | null; status: string; profile_image: string | null;
+  id_number: string | null; civilian_id: string | null; rank: string | null; status: string; profile_image: string | null;
   phone: string | null; emergency_phone: string | null; notes: string | null;
   cycle_id: string; squad_id: string;
   squad_name: string; platoon_id: string; platoon_name: string;
@@ -281,6 +281,7 @@ export default function SoldierDetailPage() {
     givenName: raw.given_name,
     familyName: raw.family_name,
     idNumber: raw.id_number,
+    civilianId: raw.civilian_id,
     rank: raw.rank,
     status: raw.status as SoldierStatus,
     profileImage: raw.profile_image,
@@ -346,6 +347,9 @@ export default function SoldierDetailPage() {
                 )}
                 {raw.id_number && (
                   <p className="text-sm text-muted-foreground">מ.א. {raw.id_number}</p>
+                )}
+                {raw.civilian_id && (
+                  <p className="text-sm text-muted-foreground">מ.ז. {raw.civilian_id}</p>
                 )}
               </div>
               <div className="flex items-center gap-1.5">

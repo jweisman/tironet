@@ -46,6 +46,7 @@ interface ParsedRow {
   familyName: string;
   givenName: string;
   idNumber: string;
+  civilianId: string;
   rank: string;
   status: string;
   phone: string;
@@ -68,7 +69,7 @@ const VALID_STATUSES: Record<string, SoldierStatus> = {
   injured: "injured",
 };
 
-const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "מחלקה", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום"];
+const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "מספר זהות", "מחלקה", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום"];
 
 const FROM_FILE = "__from_file__";
 
@@ -76,10 +77,10 @@ function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    ["כהן", "דוד", "1234567", "מחלקה א", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543"],
-    ["לוי", "רחל", "", "", "", "", "", "", ""],
+    ["כהן", "דוד", "1234567", "123456789", "מחלקה א", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543"],
+    ["לוי", "רחל", "", "", "", "", "", "", "", ""],
   ]);
-  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
+  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, ws, "חיילים");
   XLSX.writeFile(wb, "תבנית-חיילים.xlsx");
 }
@@ -109,6 +110,7 @@ function parseSheet(
   const familyIdx = headers.findIndex((h) => h === "שם משפחה");
   const givenIdx = headers.findIndex((h) => h === "שם פרטי");
   const idNumberIdx = headers.findIndex((h) => h === "מספר אישי");
+  const civilianIdIdx = headers.findIndex((h) => h === "מספר זהות");
   const platoonIdx = headers.findIndex((h) => h === "מחלקה");
   const squadIdx = headers.findIndex((h) => h === "כיתה");
   const rankIdx = headers.findIndex((h) => h === "דרגה");
@@ -139,6 +141,7 @@ function parseSheet(
     const familyName = get(familyIdx);
     const givenName = get(givenIdx);
     const idNumber = get(idNumberIdx);
+    const civilianId = get(civilianIdIdx);
     const platoonName = get(platoonIdx);
     const squadName = get(squadIdx);
     const rank = get(rankIdx);
@@ -200,6 +203,7 @@ function parseSheet(
       familyName,
       givenName,
       idNumber,
+      civilianId,
       rank,
       status,
       phone,
@@ -332,6 +336,7 @@ export function BulkImportDialog({
             familyName: r.familyName,
             givenName: r.givenName,
             idNumber: r.idNumber || null,
+            civilianId: r.civilianId || null,
             rank: r.rank || null,
             status: (VALID_STATUSES[r.status] ?? "active") as SoldierStatus,
             phone: r.phone || null,

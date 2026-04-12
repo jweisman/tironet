@@ -64,7 +64,7 @@ const STATUS_FILTERS: StatusFilter[] = [
 
 const SOLDIERS_QUERY = `
   SELECT
-    s.id, s.given_name, s.family_name, s.id_number, s.rank, s.status, s.profile_image, s.phone,
+    s.id, s.given_name, s.family_name, s.id_number, s.civilian_id, s.rank, s.status, s.profile_image, s.phone,
     s.squad_id,
     (
       SELECT COUNT(*)
@@ -133,6 +133,7 @@ interface RawSoldier {
   given_name: string;
   family_name: string;
   id_number: string | null;
+  civilian_id: string | null;
   rank: string | null;
   status: string;
   profile_image: string | null;
@@ -155,6 +156,7 @@ function mapSoldier(raw: RawSoldier, approvedTypes: RequestType[]): SoldierSumma
     givenName: raw.given_name,
     familyName: raw.family_name,
     idNumber: raw.id_number ?? null,
+    civilianId: raw.civilian_id ?? null,
     rank: raw.rank ?? null,
     status: raw.status as SoldierStatus,
     profileImage: raw.profile_image ?? null,
@@ -280,8 +282,9 @@ export default function SoldiersPage() {
             const fullName = `${s.familyName} ${s.givenName}`.toLowerCase();
             const matchesName = fullName.includes(q);
             const matchesId = s.idNumber?.includes(q) ?? false;
+            const matchesCivilianId = s.civilianId?.includes(q) ?? false;
             const matchesPhone = s.phone?.includes(q) ?? false;
-            if (!matchesName && !matchesId && !matchesPhone) return false;
+            if (!matchesName && !matchesId && !matchesCivilianId && !matchesPhone) return false;
           }
           return true;
         }),
@@ -370,8 +373,8 @@ export default function SoldiersPage() {
     platoonName: s.platoon_name,
   }));
   const defaultSquadId =
-    role === "squad_commander" && squadsForForm.length === 1
-      ? squadsForForm[0].id
+    role === "squad_commander" && selectedAssignment?.unitId
+      ? selectedAssignment.unitId
       : undefined;
 
   return (
