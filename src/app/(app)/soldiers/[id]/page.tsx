@@ -27,6 +27,7 @@ import {
   ASSIGNED_ROLE_LABELS,
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
+import { isRequestActive } from "@/lib/requests/active";
 import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
@@ -136,7 +137,8 @@ const MISSING_QUERY = `
 
 // All requests for this soldier (full history)
 const SOLDIER_REQUESTS_QUERY = `
-  SELECT r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.created_at
+  SELECT r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.created_at,
+    r.departure_at, r.return_at, r.medical_appointments
   FROM requests r
   WHERE r.soldier_id = ?
   ORDER BY r.created_at DESC
@@ -160,6 +162,9 @@ interface RawSoldierRequest {
   description: string | null;
   urgent: number | null;
   created_at: string;
+  departure_at: string | null;
+  return_at: string | null;
+  medical_appointments: string | null;
 }
 
 interface RawSoldier {
@@ -456,7 +461,15 @@ export default function SoldierDetailPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
-            {soldierRequests.map((r) => (
+            {soldierRequests.map((r) => {
+              const isActive = isRequestActive({
+                status: r.status,
+                type: r.type,
+                departureAt: r.departure_at,
+                returnAt: r.return_at,
+                medicalAppointments: r.medical_appointments,
+              });
+              return (
               <Link
                 key={r.id}
                 href={`/requests/${r.id}`}
@@ -475,6 +488,9 @@ export default function SoldierDetailPage() {
                   <Badge variant={REQUEST_STATUS_VARIANT[r.status as RequestStatus]} className="text-xs">
                     {REQUEST_STATUS_LABELS[r.status as RequestStatus]}
                   </Badge>
+                  {isActive && (
+                    <span className="text-[10px] font-medium text-emerald-600">פעילה</span>
+                  )}
                   {r.assigned_role && (
                     <span className="text-[10px] text-muted-foreground">
                       {ASSIGNED_ROLE_LABELS[r.assigned_role as Role]}
@@ -482,7 +498,8 @@ export default function SoldierDetailPage() {
                   )}
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

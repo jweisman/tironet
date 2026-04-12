@@ -90,8 +90,7 @@ const SOLDIERS_QUERY = `
       FROM requests r
       WHERE r.soldier_id = s.id
         AND r.cycle_id = s.cycle_id
-        AND r.assigned_role IS NOT NULL
-        AND r.status != 'approved'
+        AND r.status = 'open'
     ) AS open_request_count
   FROM soldiers s
   WHERE s.cycle_id = ?

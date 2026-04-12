@@ -326,11 +326,15 @@ Denied requests pending acknowledgement (`status === "denied"`, `assignedRole !=
 
 ### Soldiers page "active requests" filter
 
-The soldiers page has a "בקשות פעילות" filter pill that shows soldiers with any request activity. A soldier passes the filter if they have `openRequestCount > 0` (pending workflow requests) **or** `approvedRequestTypes.length > 0` (active approved requests from `APPROVED_REQUESTS_QUERY`). The `APPROVED_REQUESTS_QUERY` uses the same active definition as the requests list Active tab — leave with future dates, medical with future appointments, or hardship.
+The soldiers page has a "בקשות פעילות" filter pill that shows soldiers with any request activity. A soldier passes the filter if they have `openRequestCount > 0` (requests with `status = 'open'` — still in the approval chain) **or** `approvedRequestTypes.length > 0` (active approved requests from `APPROVED_REQUESTS_QUERY`). The `APPROVED_REQUESTS_QUERY` uses the same active definition as the requests list Active tab — leave with future dates, medical with future appointments, or hardship.
 
 ### Soldier detail page — full request history
 
-The soldier detail page (`/soldiers/[id]`) shows **all** requests for the soldier in the current cycle, including completed denials and fully acknowledged approvals. This gives a complete picture of the soldier's request history.
+The soldier detail page (`/soldiers/[id]`) shows **all** requests for the soldier in the current cycle, including completed denials and fully acknowledged approvals. This gives a complete picture of the soldier's request history. Approved requests that are currently active (per the definitions in `docs/DEFINITIONS.md`) show a green "פעילה" label next to the status badge.
+
+### `isRequestActive()` — shared active request logic
+
+`src/lib/requests/active.ts` exports `isRequestActive(r, today?)` which encapsulates the "active request" definition: approved + leave with future dates, medical with future appointments, or hardship (always). This is used by the requests list page, soldier detail page, and daily forum report — do not duplicate this logic inline.
 
 ### Badge count scoping (`useRequestBadge`)
 
@@ -684,6 +688,8 @@ Generated once with `npx web-push generate-vapid-keys`. Stored as environment va
    - `POST /api/requests` — when a new request is created, notifies users with the initially assigned role
    - `PATCH /api/requests/[id]` (online path) — when a workflow action (`data.action`) sets a new `assignedRole`
    - `PATCH /api/requests/[id]` (connector path) — when the PowerSync connector uploads a status/assignedRole change
+
+   The notification title and body vary by request status: "בקשה חדשה" (open), "בקשה אושרה" (approved), "בקשה נדחתה" (denied). Both `notifyAssignedRole()` functions (in `route.ts` and `[id]/route.ts`) accept a `requestStatus` parameter.
 
    Opt-out via `requestAssignmentEnabled`.
 

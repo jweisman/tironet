@@ -5,7 +5,8 @@ import type { DisplayConfiguration } from "@/types/display-config";
 import { getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 import type { ActivitySummaryRow } from "@/lib/reports/render-activity-summary";
-import { parseMedicalAppointments, hasUpcomingAppointment, formatAppointment } from "@/lib/requests/medical-appointments";
+import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import { isRequestActive } from "@/lib/requests/active";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import {
   escapeHtml,
@@ -318,15 +319,13 @@ export async function fetchDailyForum(
     };
 
     // Check if actually active (future dates)
-    let isActive = false;
-    if (r.type === "leave") {
-      const dep = r.departureAt?.toISOString().split("T")[0];
-      const ret = r.returnAt?.toISOString().split("T")[0];
-      isActive = (dep != null && dep >= today) || (ret != null && ret >= today);
-    } else if (r.type === "medical") {
-      isActive = hasUpcomingAppointment(item.medicalAppointments ?? []);
-    }
-    if (!isActive) continue;
+    if (!isRequestActive({
+      status: r.status,
+      type: r.type,
+      departureAt: r.departureAt?.toISOString(),
+      returnAt: r.returnAt?.toISOString(),
+      medicalAppointments: item.medicalAppointments,
+    }, today)) continue;
 
     if (!activeByPlatoon.has(platoonId)) {
       activeByPlatoon.set(platoonId, { medical: [], leave: [] });
