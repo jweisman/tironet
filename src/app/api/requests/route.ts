@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
   // Notify users with the assigned role about the new request
   const soldierName = `${req.soldier.familyName} ${req.soldier.givenName}`;
   after(() =>
-    notifyAssignedRole(data.cycleId, assignedRole, data.type, soldierName).catch((err) =>
+    notifyAssignedRole(data.cycleId, assignedRole, data.type, soldierName, req.id).catch((err) =>
       console.warn("[push] request creation notification failed:", err),
     ),
   );
@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
  */
 const TYPE_LABELS: Record<string, string> = { leave: "יציאה", medical: "רפואה", hardship: 'ת"ש' };
 
-async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, soldierName: string): Promise<void> {
+async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, soldierName: string, requestId: string): Promise<void> {
   const roles: Role[] = assignedRole === "company_commander"
     ? ["company_commander", "deputy_company_commander"]
     : [assignedRole as Role];
@@ -169,7 +169,7 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string, request
     {
       title: "בקשה חדשה",
       body: `בקשה ${typeLabel} חדשה עבור ${soldierName} דורשת את פעולתך`,
-      url: "/requests?filter=action",
+      url: `/requests/${requestId}`,
     },
     "requestAssignmentEnabled",
   );

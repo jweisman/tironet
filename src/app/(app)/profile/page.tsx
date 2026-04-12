@@ -41,6 +41,7 @@ export default function ProfilePage() {
   const [dailyTasksEnabled, setDailyTasksEnabled] = useState(true);
   const [requestAssignmentEnabled, setRequestAssignmentEnabled] = useState(true);
   const [activeRequestsEnabled, setActiveRequestsEnabled] = useState(true);
+  const [newAppointmentEnabled, setNewAppointmentEnabled] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   // Load notification preferences from server
@@ -52,6 +53,7 @@ export default function ProfilePage() {
           setDailyTasksEnabled(data.dailyTasksEnabled);
           setRequestAssignmentEnabled(data.requestAssignmentEnabled);
           setActiveRequestsEnabled(data.activeRequestsEnabled);
+          setNewAppointmentEnabled(data.newAppointmentEnabled);
         }
         setPrefsLoaded(true);
       })
@@ -59,7 +61,7 @@ export default function ProfilePage() {
   }, []);
 
   const updatePreference = useCallback(
-    async (field: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled", value: boolean) => {
+    async (field: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled" | "newAppointmentEnabled", value: boolean) => {
       const res = await fetch("/api/push/preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -70,7 +72,8 @@ export default function ProfilePage() {
         // Revert
         if (field === "dailyTasksEnabled") setDailyTasksEnabled(!value);
         else if (field === "requestAssignmentEnabled") setRequestAssignmentEnabled(!value);
-        else setActiveRequestsEnabled(!value);
+        else if (field === "activeRequestsEnabled") setActiveRequestsEnabled(!value);
+        else setNewAppointmentEnabled(!value);
       }
     },
     [],
@@ -298,6 +301,20 @@ export default function ProfilePage() {
                 onCheckedChange={(v) => {
                   setActiveRequestsEnabled(v);
                   updatePreference("activeRequestsEnabled", v);
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">תור חדש</p>
+                <p className="text-xs text-muted-foreground">כאשר תור נוסף לבקשה רפואית</p>
+              </div>
+              <Switch
+                checked={newAppointmentEnabled}
+                disabled={!prefsLoaded}
+                onCheckedChange={(v) => {
+                  setNewAppointmentEnabled(v);
+                  updatePreference("newAppointmentEnabled", v);
                 }}
               />
             </div>

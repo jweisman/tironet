@@ -85,14 +85,14 @@ export async function sendPushToUser(
 export async function sendPushToUsers(
   userIds: string[],
   payload: PushPayload,
-  preferenceField: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled",
+  preferenceField: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled" | "newAppointmentEnabled",
 ): Promise<void> {
   if (userIds.length === 0) return;
 
   // Load preferences for all target users in one query.
   const prefs = await prisma.notificationPreference.findMany({
     where: { userId: { in: userIds } },
-    select: { userId: true, dailyTasksEnabled: true, requestAssignmentEnabled: true, activeRequestsEnabled: true },
+    select: { userId: true, dailyTasksEnabled: true, requestAssignmentEnabled: true, activeRequestsEnabled: true, newAppointmentEnabled: true },
   });
 
   const prefMap = new Map(prefs.map((p) => [p.userId, p[preferenceField]]));

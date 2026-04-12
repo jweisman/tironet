@@ -6,6 +6,7 @@ import { getRequestScope } from "@/lib/api/request-scope";
 import { getNextState } from "@/lib/requests/workflow";
 import { canActOnRequest } from "@/lib/requests/workflow";
 import { sendPushToUsers } from "@/lib/push/send";
+import { parseMedicalAppointments } from "@/lib/requests/medical-appointments";
 import { z } from "zod";
 import { effectiveRole } from "@/lib/auth/permissions";
 import type { RequestStatus, RequestType, Role, SessionUser } from "@/types";
@@ -145,7 +146,7 @@ export async function PATCH(
     // Send push notification to users with the newly assigned role
     if (transition.newAssignedRole) {
       after(() =>
-        notifyAssignedRole(req.cycleId, transition.newAssignedRole!, req.type, `${req.soldier.familyName} ${req.soldier.givenName}`).catch((err) =>
+        notifyAssignedRole(req.cycleId, transition.newAssignedRole!, req.type, `${req.soldier.familyName} ${req.soldier.givenName}`, id).catch((err) =>
           console.warn("[push] request assignment notification failed:", err),
         ),
       );
@@ -184,10 +185,22 @@ export async function PATCH(
     // Connector path: notify users assigned to the new role (if role changed)
     if (data.assignedRole && data.assignedRole !== req.assignedRole) {
       after(() =>
-        notifyAssignedRole(req.cycleId, data.assignedRole!, req.type, `${req.soldier.familyName} ${req.soldier.givenName}`).catch((err) =>
+        notifyAssignedRole(req.cycleId, data.assignedRole!, req.type, `${req.soldier.familyName} ${req.soldier.givenName}`, id).catch((err) =>
           console.warn("[push] request assignment notification failed:", err),
         ),
       );
+    }
+
+    // Notify on new appointments (connector path)
+    if (data.medicalAppointments !== undefined && req.type === "medical") {
+      const newDates = findNewAppointmentDates(req.medicalAppointments, data.medicalAppointments);
+      if (newDates.length > 0) {
+        after(() =>
+          notifyNewAppointment(req.soldierId, `${req.soldier.familyName} ${req.soldier.givenName}`, newDates, sessionUser.id, id).catch((err) =>
+            console.warn("[push] new appointment notification failed:", err),
+          ),
+        );
+      }
     }
 
     return NextResponse.json({ request: updated });
@@ -214,6 +227,18 @@ export async function PATCH(
     where: { id },
     data: updateData,
   });
+
+  // Notify on new appointments (regular edit path)
+  if (data.medicalAppointments !== undefined && req.type === "medical") {
+    const newDates = findNewAppointmentDates(req.medicalAppointments, data.medicalAppointments);
+    if (newDates.length > 0) {
+      after(() =>
+        notifyNewAppointment(req.soldierId, `${req.soldier.familyName} ${req.soldier.givenName}`, newDates, sessionUser.id, id).catch((err) =>
+          console.warn("[push] new appointment notification failed:", err),
+        ),
+      );
+    }
+  }
 
   return NextResponse.json({ request: updated });
 }
@@ -247,7 +272,7 @@ export async function DELETE(
  */
 const TYPE_LABELS: Record<string, string> = { leave: "יציאה", medical: "רפואה", hardship: 'ת"ש' };
 
-async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, soldierName: string): Promise<void> {
+async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, soldierName: string, requestId: string): Promise<void> {
   // For company_commander assignments, also include deputy_company_commander
   const roles: Role[] = assignedRole === "company_commander"
     ? ["company_commander", "deputy_company_commander"]
@@ -269,8 +294,70 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string, request
     {
       title: "בקשה חדשה",
       body: `בקשה ${typeLabel} חדשה עבור ${soldierName} דורשת את פעולתך`,
-      url: "/requests?filter=action",
+      url: `/requests/${requestId}`,
     },
     "requestAssignmentEnabled",
   );
+}
+
+/**
+ * Detect newly added appointments by comparing old vs new JSON arrays.
+ * Returns dates of new appointments (by id).
+ */
+function findNewAppointmentDates(
+  oldJson: unknown,
+  newJson: unknown,
+): string[] {
+  const oldAppts = parseMedicalAppointments(oldJson as string | null);
+  const newAppts = parseMedicalAppointments(newJson as string | null);
+  const oldIds = new Set(oldAppts.map((a) => a.id));
+  return newAppts.filter((a) => !oldIds.has(a.id) && a.date).map((a) => {
+    return new Date(a.date + "T00:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" });
+  });
+}
+
+/**
+ * Send notification to squad + platoon commanders when a new appointment is added.
+ * Excludes the user who made the change.
+ */
+async function notifyNewAppointment(
+  soldierId: string,
+  soldierName: string,
+  appointmentDates: string[],
+  excludeUserId: string,
+  requestId: string,
+): Promise<void> {
+  // Look up the soldier's squad → platoon
+  const soldier = await prisma.soldier.findUnique({
+    where: { id: soldierId },
+    select: { squadId: true, squad: { select: { platoonId: true } } },
+  });
+  if (!soldier) return;
+
+  // Find squad commanders for this squad + platoon commanders/sergeants for this platoon
+  const assignments = await prisma.userCycleAssignment.findMany({
+    where: {
+      OR: [
+        { unitId: soldier.squadId, role: "squad_commander" },
+        { unitId: soldier.squad.platoonId, role: { in: ["platoon_commander", "platoon_sergeant"] } },
+      ],
+      cycle: { isActive: true },
+    },
+    select: { userId: true },
+  });
+
+  const userIds = [...new Set(assignments.map((a) => a.userId))].filter((id) => id !== excludeUserId);
+  if (userIds.length === 0) return;
+
+  for (const dateStr of appointmentDates) {
+    await sendPushToUsers(
+      userIds,
+      {
+        title: "תור נוסף",
+        body: `תור ל-${dateStr} נוסף לבקשה רפואית של ${soldierName}`,
+        url: `/requests/${requestId}`,
+      },
+      "newAppointmentEnabled",
+    );
+  }
 }

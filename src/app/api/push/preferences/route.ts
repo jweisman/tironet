@@ -7,6 +7,7 @@ const patchSchema = z.object({
   dailyTasksEnabled: z.boolean().optional(),
   requestAssignmentEnabled: z.boolean().optional(),
   activeRequestsEnabled: z.boolean().optional(),
+  newAppointmentEnabled: z.boolean().optional(),
 });
 
 /**
@@ -27,6 +28,7 @@ export async function GET() {
     dailyTasksEnabled: pref?.dailyTasksEnabled ?? true,
     requestAssignmentEnabled: pref?.requestAssignmentEnabled ?? true,
     activeRequestsEnabled: pref?.activeRequestsEnabled ?? true,
+    newAppointmentEnabled: pref?.newAppointmentEnabled ?? true,
   });
 }
 
@@ -58,5 +60,6 @@ export async function PATCH(req: NextRequest) {
     dailyTasksEnabled: pref.dailyTasksEnabled,
     requestAssignmentEnabled: pref.requestAssignmentEnabled,
     activeRequestsEnabled: pref.activeRequestsEnabled,
+    newAppointmentEnabled: pref.newAppointmentEnabled,
   });
 }

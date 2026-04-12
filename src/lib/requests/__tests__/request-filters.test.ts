@@ -82,7 +82,7 @@ describe("request tab classification", () => {
   });
 
   describe("active tab filters by type-specific date criteria", () => {
-    const today = "2026-04-07";
+    const today = new Date().toISOString().split("T")[0];
 
     it("hardship approved requests are always active", () => {
       expect(isInActiveTab({ status: "approved", assignedRole: null, type: "hardship" }, today)).toBe(true);
@@ -95,21 +95,21 @@ describe("request tab classification", () => {
     it("leave with future departureAt is active", () => {
       expect(isInActiveTab({
         status: "approved", assignedRole: null, type: "leave",
-        departureAt: "2026-04-08T08:00:00Z", returnAt: "2026-04-10T20:00:00Z",
+        departureAt: `${futureDate(1)}T08:00:00Z`, returnAt: `${futureDate(3)}T20:00:00Z`,
       }, today)).toBe(true);
     });
 
     it("leave with past departureAt but future returnAt is active (currently on leave)", () => {
       expect(isInActiveTab({
         status: "approved", assignedRole: null, type: "leave",
-        departureAt: "2026-04-05T08:00:00Z", returnAt: "2026-04-08T20:00:00Z",
+        departureAt: `${futureDate(-2)}T08:00:00Z`, returnAt: `${futureDate(1)}T20:00:00Z`,
       }, today)).toBe(true);
     });
 
     it("leave with both dates in past is not active", () => {
       expect(isInActiveTab({
         status: "approved", assignedRole: null, type: "leave",
-        departureAt: "2026-04-01T08:00:00Z", returnAt: "2026-04-03T20:00:00Z",
+        departureAt: `${futureDate(-6)}T08:00:00Z`, returnAt: `${futureDate(-4)}T20:00:00Z`,
       }, today)).toBe(false);
     });
 
@@ -123,14 +123,14 @@ describe("request tab classification", () => {
     it("medical with future appointment is active", () => {
       expect(isInActiveTab({
         status: "approved", assignedRole: null, type: "medical",
-        medicalAppointments: JSON.stringify([{ id: "a1", date: "2026-04-10", place: "Hospital", type: "Checkup" }]),
+        medicalAppointments: JSON.stringify([{ id: "a1", date: futureDate(3), place: "Hospital", type: "Checkup" }]),
       }, today)).toBe(true);
     });
 
     it("medical with all past appointments is not active", () => {
       expect(isInActiveTab({
         status: "approved", assignedRole: null, type: "medical",
-        medicalAppointments: JSON.stringify([{ id: "a1", date: "2026-04-01", place: "Hospital", type: "Checkup" }]),
+        medicalAppointments: JSON.stringify([{ id: "a1", date: futureDate(-6), place: "Hospital", type: "Checkup" }]),
       }, today)).toBe(false);
     });
 
