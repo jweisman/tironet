@@ -2,13 +2,14 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward, MessageSquare, Pencil, Trash2, WifiOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
+import { useSyncReady } from "@/hooks/useSyncReady";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -172,15 +173,8 @@ export default function RequestDetailPage() {
     }
   }, []);
 
-  // Grace period: hard upper bound — if data arrives before it, we render immediately.
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setTimedOut(true), 3000);
-    return () => clearTimeout(t);
-  }, []);
-
   const requestParams = useMemo(() => [requestId], [requestId]);
-  const { data: requestRows } = useQuery<RawRequest>(REQUEST_QUERY, requestParams);
+  const { data: requestRows, isLoading: requestLoading } = useQuery<RawRequest>(REQUEST_QUERY, requestParams);
   const raw = requestRows?.[0] ?? null;
 
   const { data: actionRows } = useQuery<RawAction>(ACTIONS_QUERY, requestParams);
@@ -205,7 +199,19 @@ export default function RequestDetailPage() {
   const [editingAppointments, setEditingAppointments] = useState(false);
   const [editAppointmentsList, setEditAppointmentsList] = useState<MedicalAppointment[]>([]);
 
-  if (!raw && timedOut) {
+  const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!raw, requestLoading);
+
+  if (!raw && showConnectionError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+        <WifiOff size={28} className="text-muted-foreground mx-auto mb-1" />
+        <p className="font-medium">לא ניתן לטעון נתונים</p>
+        <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
+      </div>
+    );
+  }
+
+  if (!raw && showEmpty) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
         <p className="font-medium">בקשה לא נמצאה</p>

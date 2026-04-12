@@ -125,22 +125,24 @@ The UMD files are served from `public/@powersync/` (copied by `postinstall`). Th
 
 `useQuery` from `@powersync/react` runs against local SQLite synchronously. When a query's params change (e.g. because a prior query's result resolved and updated the params), the `loading` flag may never transition through `true` — the new result is available immediately. Do not rely on `loading: true` to gate downstream rendering.
 
-### `ActivityDetail` uses `useState(initialData)` — key on squad IDs + soldier presence
+### `ActivityDetail` uses `useState(initialData)` — merge new soldiers, never remount
 
-`ActivityDetail` initializes its internal state with `useState(initialData)` and never syncs with prop changes. When the page builds `localData` from chained `useQuery` calls (activity → platoon params → squads → soldiers), React may mount `ActivityDetail` with partially-loaded data (correct squads, empty soldiers) before soldiers resolve in the next render cycle.
+`ActivityDetail` initializes its internal state with `useState(initialData)` and uses a `useEffect` to merge new soldiers from prop changes into the existing `data` and `reports` state. This handles soldiers arriving incrementally during PowerSync sync without remounting the component (which would discard in-progress edits).
 
-**Fix:** key the component on squad IDs AND a binary "has soldiers" flag so it remounts exactly once when soldiers first arrive, but does NOT remount as additional soldiers trickle in during incremental sync (which would discard unsaved edits):
+The component is keyed on **squad IDs only** — not on soldier presence or count:
 
 ```tsx
 <ActivityDetail
-  key={`${data.squads.map(s => s.id).join(",")}-${data.squads.some(s => s.soldiers.length > 0) ? 1 : 0}`}
+  key={data.squads.map(s => s.id).join(",")}
   initialData={data}
 />
 ```
 
-**Do NOT** use the exact soldier count in the key — incremental sync updates would remount the component repeatedly, discarding any in-progress score/note edits.
+**Do NOT** add soldier presence or count to the key — on slow networks, soldiers trickle in during sync and a key change would remount the component, discarding unsaved report edits (this was the root cause of the "frozen reports" bug #98).
 
-If you ever add another `useState(initialData)` component fed by chained `useQuery` params, apply the same pattern.
+The merge `useEffect` in `ActivityDetail` adds new soldiers to each squad and initializes their reports with empty values. It never overwrites existing entries, so in-progress edits are preserved.
+
+If you ever add another `useState(initialData)` component fed by chained `useQuery` params, apply the same merge-via-effect pattern instead of relying on key changes.
 
 ### `ActivityDetail` debounce cleanup
 
@@ -219,15 +221,13 @@ PowerSync retries `fetchCredentials()` rapidly when the sync stream drops. Witho
 
 ### Offline indicator
 
-`useOnlineStatus()` in `src/hooks/useOnlineStatus.ts` combines two signals:
-- `navigator.onLine` — flips **immediately** when the network drops
-- `status.connected` from PowerSync — can take 10–30s to flip (WebSocket timeout)
+`useOnlineStatus()` in `src/hooks/useOnlineStatus.ts` uses `navigator.onLine` exclusively to determine device connectivity. The banner means "your device has no network" — it does **not** track PowerSync sync status. If the device is online but PowerSync can't connect (captive portal, server outage), data is still read/written locally and resyncs automatically when the issue resolves.
 
-Use `browserOnline && status.connected` so the banner appears instantly. `hasPendingUploads` is true when `status.dataFlowStatus.uploadError` is set (failed upload attempt while offline) — this drives the "שינויים ממתינים לסנכרון" pill in `OfflineBanner`.
+`hasPendingUploads` is true when `status.dataFlowStatus.uploadError` is set (failed upload attempt while offline) — this drives the "שינויים ממתינים לסנכרון" pill in `OfflineBanner`.
 
 **Debounce:** online → offline transitions are debounced by 2 seconds so brief network blips don't flash the banner. Offline → online is instant (no delay).
 
-The offline state is persisted to `localStorage` (`tironet:offline` key) so the banner appears immediately after MPA fallback reloads that reset React state.
+**Do not** add PowerSync `status.connected` checks to the banner logic — this was tried previously and caused the banner to flash during hydration (#81) because PowerSync takes seconds to establish its WebSocket, during which `status.connected` is false even though the device is online. Page-level `useSyncReady()` handles the "can't load data" case separately.
 
 ### NextAuth JWT maxAge
 
@@ -546,13 +546,21 @@ The `PowerSyncProvider` renders children **without** a context wrapper during SS
 
 **Workaround:** don't use `useStatus()` on pages that may be SSR'd. Use a timeout-based grace period instead, or create a wrapper hook that checks `useContext(PowerSyncContext)` before accessing status.
 
-### `hasSynced` does not reflect previously cached data
+### `hasSynced` is persisted in SQLite — beware the hydration gap
 
-`useStatus().hasSynced` only becomes `true` after a sync completes **in the current session**. It does NOT reflect data already available in the local SQLite DB from a previous session. `useQuery` returns that cached data immediately, but `hasSynced` stays `false` until `connect()` + sync finishes. Do not use `hasSynced` to gate "has data loaded" — use a timeout or check `data.length > 0` instead.
+`useStatus().hasSynced` is restored from SQLite after `init()`. For returning users it can be `true` before `useQuery()` has executed its first query. This creates a single-frame gap where `hasSynced=true` but query results are still `[]`. The `useSyncReady` hook handles this with a `requestAnimationFrame` settle guard — do not check `hasSynced` directly to decide empty states without a similar guard.
 
-### Detail page grace period pattern
+### `useSyncReady` hook — unified loading vs "no data" logic
 
-Detail pages (`/activities/[id]`, `/soldiers/[id]`, `/requests/[id]`) and the home page use a 3-second `timedOut` flag as a hard upper bound before showing "not found" / "no data". Data renders immediately when available — the timeout only gates the error state. A spinner is shown while waiting. The variable is named `timedOut` (not `ready`) to clarify that it represents the timeout expiring, not data being ready.
+All pages use `useSyncReady(hasData)` from `src/hooks/useSyncReady.ts` to determine whether to show a loading indicator, "no data" message, or connection error. The hook returns `{ showLoading, showEmpty, showConnectionError }`.
+
+**Decision tree:**
+- If `useQuery` returned data → render it immediately (regardless of sync status)
+- If empty AND `hasSynced` is false → show loading spinner/skeleton
+- If empty AND `hasSynced` is true → show "no data" / "not found"
+- If empty AND 15 seconds elapsed without sync → show connection error (WifiOff icon)
+
+**Do NOT** use hardcoded `setTimeout` grace periods for empty-state decisions. The old 3-second `timedOut` pattern caused premature "no data" messages on slow networks. Always use `useSyncReady` instead.
 
 ## Testing
 

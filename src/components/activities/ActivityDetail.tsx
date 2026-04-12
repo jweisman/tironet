@@ -140,6 +140,50 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     return map;
   });
 
+  // Merge new soldiers from parent useQuery updates into local state.
+  // The parent recalculates `initialData` as sync delivers soldiers
+  // incrementally. We add new soldiers to `data` and `reports` without
+  // touching existing entries — this avoids remounting the component
+  // (which would discard in-progress edits from useState).
+  useEffect(() => {
+    // Merge into reports Map: add soldiers we haven't seen yet
+    setReports((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const squad of initialData.squads) {
+        for (const soldier of squad.soldiers) {
+          if (!next.has(soldier.id)) {
+            next.set(soldier.id, { ...soldier.report });
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+
+    // Merge into data: add new soldiers to each squad, keep existing intact
+    setData((prev) => {
+      const prevSoldierIds = new Set<string>();
+      for (const sq of prev.squads) {
+        for (const s of sq.soldiers) prevSoldierIds.add(s.id);
+      }
+
+      let changed = false;
+      const mergedSquads = prev.squads.map((prevSq) => {
+        const incomingSq = initialData.squads.find((s) => s.id === prevSq.id);
+        if (!incomingSq) return prevSq;
+        const newSoldiers = incomingSq.soldiers.filter(
+          (s) => !prevSoldierIds.has(s.id)
+        );
+        if (newSoldiers.length === 0) return prevSq;
+        changed = true;
+        return { ...prevSq, soldiers: [...prevSq.soldiers, ...newSoldiers] };
+      });
+
+      return changed ? { ...prev, squads: mergedSquads } : prev;
+    });
+  }, [initialData]);
+
   // Metadata edit state
   const [metaName, setMetaName] = useState(data.name);
   const [metaDate, setMetaDate] = useState(data.date.split("T")[0]);
@@ -261,22 +305,26 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     try {
       const updates = new Map<string, SoldierReport>();
 
-      for (const { soldierId, report } of targets) {
-        if (report.id) {
-          await db.execute(
-            "UPDATE activity_reports SET result = ? WHERE id = ?",
-            [result, report.id]
-          );
-          updates.set(soldierId, { ...report, result });
-        } else {
-          const newId = crypto.randomUUID();
-          await db.execute(
-            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [newId, data.id, soldierId, result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
-          );
-          updates.set(soldierId, { ...report, result, id: newId });
+      // Batch all writes in a single transaction — one round-trip to the
+      // SQLite worker instead of N sequential awaits.
+      await db.writeTransaction(async (tx) => {
+        for (const { soldierId, report } of targets) {
+          if (report.id) {
+            await tx.execute(
+              "UPDATE activity_reports SET result = ? WHERE id = ?",
+              [result, report.id]
+            );
+            updates.set(soldierId, { ...report, result });
+          } else {
+            const newId = crypto.randomUUID();
+            await tx.execute(
+              "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              [newId, data.id, soldierId, result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
+            );
+            updates.set(soldierId, { ...report, result, id: newId });
+          }
         }
-      }
+      });
 
       setReports((prev) => {
         const next = new Map(prev);
@@ -297,24 +345,24 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     setSaveError(null);
     const updates = new Map<string, SoldierReport>();
 
-    for (const [soldierId, report] of imported) {
-      if (report.id) {
-        // UPDATE existing
-        await db.execute(
-          "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
-          [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, report.id]
-        );
-        updates.set(soldierId, report);
-      } else if (report.result !== null) {
-        // INSERT new
-        const newId = crypto.randomUUID();
-        await db.execute(
-          "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [newId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
-        );
-        updates.set(soldierId, { ...report, id: newId });
+    await db.writeTransaction(async (tx) => {
+      for (const [soldierId, report] of imported) {
+        if (report.id) {
+          await tx.execute(
+            "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
+            [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, report.id]
+          );
+          updates.set(soldierId, report);
+        } else if (report.result !== null) {
+          const newId = crypto.randomUUID();
+          await tx.execute(
+            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [newId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
+          );
+          updates.set(soldierId, { ...report, id: newId });
+        }
       }
-    }
+    });
 
     setReports((prev) => {
       const next = new Map(prev);
@@ -544,7 +592,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                   <ReportRow
                     key={soldier.id}
                     soldier={soldier}
-                    report={reports.get(soldier.id) ?? { ...EMPTY_REPORT }}
+                    report={reports.get(soldier.id) ?? EMPTY_REPORT}
                     activeScores={activeScores}
                     resultLabels={resultLabels}
                     noteOptions={noteOptions}
