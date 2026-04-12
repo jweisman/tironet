@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Table2, Loader2, ClipboardList, Calendar } from "lucide-react";
+import { FileText, Table2, ClipboardList, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSession } from "next-auth/react";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { SheetsExportDialog } from "@/components/reports/SheetsExportDialog";
 import type { Role } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -27,8 +28,7 @@ export default function ReportsPage() {
   const router = useRouter();
   const { selectedCycleId, isLoading: cycleLoading } = useCycle();
   const { data: session } = useSession();
-  const [sheetsLoading, setSheetsLoading] = useState(false);
-  const [sheetsUrl, setSheetsUrl] = useState<string | null>(null);
+  const [sheetsDialogOpen, setSheetsDialogOpen] = useState(false);
 
   // Activity type filter state — "" means all types
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
@@ -96,37 +96,12 @@ export default function ReportsPage() {
   // "" = all types, otherwise a single type ID
   const typesParam = selectedTypeId;
 
-  async function handleSheetsExport() {
+  function handleSheetsExport() {
     if (!navigator.onLine) {
       toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
       return;
     }
-
-    setSheetsLoading(true);
-    try {
-      const params = new URLSearchParams({ cycleId: selectedCycleId! });
-      if (typesParam) params.set("activityTypeIds", typesParam);
-      if (activityDateRange) params.set("dateRange", activityDateRange);
-      const res = await fetch(`/api/reports/all-activity/sheets?${params}`, {
-        method: "POST",
-      });
-      const data = await res.json();
-
-      if (data.needsAuth) {
-        window.location.href = data.authUrl;
-        return;
-      }
-
-      if (!res.ok) {
-        throw new Error(data.error || "Export failed");
-      }
-
-      setSheetsUrl(data.url);
-    } catch {
-      toast.error("שגיאה בהפקת הדוח");
-    } finally {
-      setSheetsLoading(false);
-    }
+    setSheetsDialogOpen(true);
   }
 
   function handleActivitySummary() {
@@ -257,15 +232,10 @@ export default function ReportsPage() {
             <button
               type="button"
               onClick={handleSheetsExport}
-              disabled={sheetsLoading}
-              className="flex w-full items-start gap-4 rounded-xl border border-border bg-background p-4 text-start hover:bg-muted/50 transition-colors disabled:opacity-60"
+              className="flex w-full items-start gap-4 rounded-xl border border-border bg-background p-4 text-start hover:bg-muted/50 transition-colors"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                {sheetsLoading ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : (
-                  <Table2 size={20} />
-                )}
+                <Table2 size={20} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -279,27 +249,19 @@ export default function ReportsPage() {
                 </p>
               </div>
             </button>
-            {sheetsUrl && (
-              <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-4 py-2.5">
-                <a
-                  href={sheetsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-semibold text-green-800 underline underline-offset-2"
-                >
-                  פתח את הדוח ב-Google Sheets
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setSheetsUrl(null)}
-                  className="text-green-600 hover:text-green-800 text-xs"
-                >
-                  סגור
-                </button>
-              </div>
-            )}
           </div>
         </section>
+        )}
+
+        {/* Sheets export dialog */}
+        {selectedCycleId && (
+          <SheetsExportDialog
+            open={sheetsDialogOpen}
+            onOpenChange={setSheetsDialogOpen}
+            cycleId={selectedCycleId}
+            activityTypeIds={typesParam || undefined}
+            dateRange={activityDateRange || undefined}
+          />
         )}
 
         {/* Request reports section */}

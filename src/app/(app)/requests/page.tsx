@@ -28,7 +28,8 @@ import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { requestsTourSteps } from "@/lib/tour/steps";
 import { canActOnRequest, getAvailableActions, getNextState } from "@/lib/requests/workflow";
-import { parseMedicalAppointments, hasUpcomingAppointment, formatAppointment } from "@/lib/requests/medical-appointments";
+import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import { isRequestActive } from "@/lib/requests/active";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,18 +93,7 @@ function mapRequest(raw: RawRequest): RequestSummary {
 }
 
 function isActiveRequest(r: RequestSummary, today: string): boolean {
-  if (r.status !== "approved") return false;
-  if (r.type === "hardship") return true;
-  if (r.type === "leave") {
-    const dep = r.departureAt?.split("T")[0];
-    const ret = r.returnAt?.split("T")[0];
-    return (dep != null && dep >= today) || (ret != null && ret >= today);
-  }
-  if (r.type === "medical") {
-    const appts = parseMedicalAppointments(r.medicalAppointments);
-    return hasUpcomingAppointment(appts);
-  }
-  return false;
+  return isRequestActive(r, today);
 }
 
 /** Sort key for active requests: soonest relevant date first. */

@@ -67,7 +67,7 @@ const STATUS_FILTERS: StatusFilter[] = [
 
 const SOLDIERS_QUERY = `
   SELECT
-    s.id, s.given_name, s.family_name, s.id_number, s.rank, s.status, s.profile_image, s.phone,
+    s.id, s.given_name, s.family_name, s.id_number, s.civilian_id, s.rank, s.status, s.profile_image, s.phone,
     s.squad_id,
     (
       SELECT COUNT(*)
@@ -93,8 +93,7 @@ const SOLDIERS_QUERY = `
       FROM requests r
       WHERE r.soldier_id = s.id
         AND r.cycle_id = s.cycle_id
-        AND r.assigned_role IS NOT NULL
-        AND r.status != 'approved'
+        AND r.status = 'open'
     ) AS open_request_count
   FROM soldiers s
   WHERE s.cycle_id = ?
@@ -136,6 +135,7 @@ interface RawSoldier {
   given_name: string;
   family_name: string;
   id_number: string | null;
+  civilian_id: string | null;
   rank: string | null;
   status: string;
   profile_image: string | null;
@@ -158,6 +158,7 @@ function mapSoldier(raw: RawSoldier, approvedTypes: RequestType[]): SoldierSumma
     givenName: raw.given_name,
     familyName: raw.family_name,
     idNumber: raw.id_number ?? null,
+    civilianId: raw.civilian_id ?? null,
     rank: raw.rank ?? null,
     status: raw.status as SoldierStatus,
     profileImage: raw.profile_image ?? null,
@@ -186,7 +187,7 @@ export default function SoldiersPage() {
   const { data: rawSoldiers, isLoading: soldiersLoading } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
   const { data: rawApprovedRequests } = useQuery<RawApprovedRequest>(APPROVED_REQUESTS_QUERY, queryParams);
-  const { showLoading, showEmpty, showConnectionError } = useSyncReady(
+  const { showLoading, showConnectionError } = useSyncReady(
     (rawSoldiers ?? []).length > 0,
     soldiersLoading
   );
@@ -283,8 +284,9 @@ export default function SoldiersPage() {
             const fullName = `${s.familyName} ${s.givenName}`.toLowerCase();
             const matchesName = fullName.includes(q);
             const matchesId = s.idNumber?.includes(q) ?? false;
+            const matchesCivilianId = s.civilianId?.includes(q) ?? false;
             const matchesPhone = s.phone?.includes(q) ?? false;
-            if (!matchesName && !matchesId && !matchesPhone) return false;
+            if (!matchesName && !matchesId && !matchesCivilianId && !matchesPhone) return false;
           }
           return true;
         }),
@@ -378,8 +380,8 @@ export default function SoldiersPage() {
     platoonName: s.platoon_name,
   }));
   const defaultSquadId =
-    role === "squad_commander" && squadsForForm.length === 1
-      ? squadsForForm[0].id
+    role === "squad_commander" && selectedAssignment?.unitId
+      ? selectedAssignment.unitId
       : undefined;
 
   return (
@@ -491,7 +493,7 @@ export default function SoldiersPage() {
             <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
           </div>
         )}
-        {totalSoldiers === 0 && (showEmpty || search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && !showLoading && !showConnectionError && (
+        {totalSoldiers === 0 && !showLoading && !showConnectionError && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
             {(search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && (

@@ -157,7 +157,7 @@ export default function ActivitiesPage() {
   const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
   const queryParams = useMemo(() => [squadId, selectedCycleId ?? ""], [squadId, selectedCycleId]);
   const { data: rawActivities, isLoading: activitiesLoading } = useQuery<RawActivity>(ACTIVITIES_QUERY, queryParams);
-  const { showLoading, showEmpty, showConnectionError } = useSyncReady(
+  const { showLoading, showConnectionError } = useSyncReady(
     (rawActivities ?? []).length > 0,
     activitiesLoading
   );
@@ -203,7 +203,7 @@ export default function ActivitiesPage() {
     } else if (filter === "completed") {
       list = list.filter(isCompleted);
     } else if (filter === "gaps") {
-      list = list.filter((a) => a.isRequired && a.date.split("T")[0] < todayStr && (a.missingCount > 0 || a.failedCount > 0));
+      list = list.filter((a) => a.isRequired && a.date.split("T")[0] <= todayStr && (a.missingCount > 0 || a.failedCount > 0));
     } else if (filter === "future") {
       list = list.filter((a) => a.date.split("T")[0] > todayStr);
     }
@@ -391,7 +391,7 @@ export default function ActivitiesPage() {
             <p className="text-sm text-muted-foreground">בדוק את החיבור לרשת ונסה שוב.</p>
           </div>
         )}
-        {filtered.length === 0 && (showEmpty || filter !== "open") && !showLoading && !showConnectionError && (
+        {filtered.length === 0 && !showLoading && !showConnectionError && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין פעילויות</p>
             {filter !== "open" && <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>}

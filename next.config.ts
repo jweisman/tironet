@@ -8,13 +8,13 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 // profile images), blob: (WASM workers), Google fonts/images, and PowerSync WS.
 const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:", // unsafe-inline: Next.js hydration scripts; unsafe-eval: wa-sqlite WASM
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://apis.google.com", // unsafe-inline: Next.js hydration scripts; unsafe-eval: wa-sqlite WASM; apis.google.com: Google Picker
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Tailwind injects inline styles; Google Fonts for report print
   "img-src 'self' data: blob: https://lh3.googleusercontent.com",
   "font-src 'self' https://fonts.gstatic.com",
   "connect-src 'self' http://localhost:* ws://localhost:* https://*.powersync.journeyapps.com wss://*.powersync.journeyapps.com https://accounts.google.com https://sheets.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com",
   "worker-src 'self' blob:",
-  "frame-src 'self' https://accounts.google.com",   // Google OAuth popup
+  "frame-src 'self' https://accounts.google.com https://docs.google.com",   // Google OAuth popup + Drive Picker
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
