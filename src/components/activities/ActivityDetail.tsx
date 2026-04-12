@@ -116,7 +116,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [data, setData] = useState<ActivityDetailData>(initialData);
   const [editingReports, setEditingReports] = useState(false);
   const [editingMetadata, setEditingMetadata] = useState(false);
-  const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saveError, setSaveError] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showGapsOnly, setShowGapsOnly] = useState(initialGapsOnly);
@@ -212,7 +211,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
   const saveReport = useCallback(
     async (soldierId: string, report: SoldierReport) => {
-      setSaving((prev) => new Set(prev).add(soldierId));
       setSaveError(null);
 
       try {
@@ -245,12 +243,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         }
       } catch {
         setSaveError("שגיאה בשמירת הדיווח");
-      } finally {
-        setSaving((prev) => {
-          const next = new Set(prev);
-          next.delete(soldierId);
-          return next;
-        });
       }
     },
     [data.id, db]
@@ -596,7 +588,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                     activeScores={activeScores}
                     resultLabels={resultLabels}
                     noteOptions={noteOptions}
-                    disabled={saving.has(soldier.id)}
                     onChange={handleReportChange}
                   />
                 ))}
