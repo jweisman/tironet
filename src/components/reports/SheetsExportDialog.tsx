@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, ExternalLink, FileSpreadsheet, FolderOpen, FilePlus } from "lucide-react";
+import { Loader2, ExternalLink, FileSpreadsheet, FolderOpen, FilePlus, Share, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 
@@ -147,6 +147,28 @@ export function SheetsExportDialog({
     onOpenChange(false);
   }
 
+  const isStandalone = typeof window !== "undefined" &&
+    (window.matchMedia("(display-mode: standalone)").matches ||
+     ("standalone" in navigator && (navigator as unknown as { standalone: boolean }).standalone));
+  const canShare = typeof navigator !== "undefined" && !!navigator.share;
+  const [copied, setCopied] = useState(false);
+
+  async function handleShare() {
+    if (!resultUrl) return;
+    try {
+      await navigator.share({ title: resultName ?? "דוח פעילויות", url: resultUrl });
+    } catch {
+      // User cancelled share sheet — ignore
+    }
+  }
+
+  async function handleCopy() {
+    if (!resultUrl) return;
+    await navigator.clipboard.writeText(resultUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
+
   // Confirmation phase
   if (resultUrl) {
     return (
@@ -162,15 +184,34 @@ export function SheetsExportDialog({
                 {resultUrl}
               </p>
             </div>
-            <a
-              href={resultUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              <ExternalLink size={16} />
-              פתח ב-Google Sheets
-            </a>
+
+            {isStandalone ? (
+              // PWA: direct link opens in-app browser without cookies — use share/copy instead
+              <div className="flex gap-2">
+                {canShare && (
+                  <Button className="flex-1" onClick={handleShare}>
+                    <Share size={16} className="me-1.5" />
+                    שתף
+                  </Button>
+                )}
+                <Button variant={canShare ? "outline" : "default"} className="flex-1" onClick={handleCopy}>
+                  {copied ? <Check size={16} className="me-1.5" /> : <Copy size={16} className="me-1.5" />}
+                  {copied ? "הועתק" : "העתק קישור"}
+                </Button>
+              </div>
+            ) : (
+              // Regular browser: direct link works fine
+              <a
+                href={resultUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <ExternalLink size={16} />
+                פתח ב-Google Sheets
+              </a>
+            )}
+
             <Button variant="ghost" className="w-full" onClick={handleClose}>
               סיום
             </Button>
