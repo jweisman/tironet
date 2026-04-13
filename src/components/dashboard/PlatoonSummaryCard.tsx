@@ -157,11 +157,11 @@ export function PlatoonSummaryCard({ platoonName, squads, sections }: Props) {
             <div className="flex-1 min-w-0 px-3 py-3 space-y-1">
               <p className="text-xs font-semibold text-muted-foreground mb-1.5">בקשות</p>
               {total.approvedRequests > 0 ? (
-                <StatButton onClick={() => router.push("/requests?tab=approved")}>
+                <StatButton onClick={() => router.push("/requests?filter=active")}>
                   <span className="text-xl font-bold text-green-600">
                     {total.approvedRequests}
                   </span>
-                  <span className="text-xs text-muted-foreground">אושרו</span>
+                  <span className="text-xs text-muted-foreground">פעילות</span>
                 </StatButton>
               ) : (
                 <p className="text-xs text-muted-foreground py-0.5">—</p>
