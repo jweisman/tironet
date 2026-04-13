@@ -35,6 +35,7 @@ type CreatedInvitation = {
   id: string;
   inviteUrl: string;
   hasEmail: boolean;
+  hasPhone: boolean;
 };
 
 const ALL_ROLES: Role[] = ["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander", "instructor", "company_medic"];
@@ -58,6 +59,8 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
   const [copied, setCopied] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const companies = structureByCycle[cycleId] ?? [];
@@ -114,7 +117,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
         return;
       }
       const data = await res.json();
-      setCreated({ id: data.id, inviteUrl: data.inviteUrl, hasEmail: !!email.trim() });
+      setCreated({ id: data.id, inviteUrl: data.inviteUrl, hasEmail: !!email.trim(), hasPhone: !!phone.trim() });
     } catch {
       setError("שגיאה ביצירת ההזמנה");
     } finally {
@@ -144,7 +147,22 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
     }
   }
 
-  // Post-creation screen: choose send email or copy link
+  async function sendSms() {
+    if (!created) return;
+    setSmsSending(true);
+    try {
+      await fetch("/api/invitations/send-sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId: created.id }),
+      });
+      setSmsSent(true);
+    } finally {
+      setSmsSending(false);
+    }
+  }
+
+  // Post-creation screen: choose send email, SMS, or copy link
   if (created) {
     return (
       <div className="space-y-5">
@@ -169,6 +187,17 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
               disabled={emailSending || emailSent}
             >
               {emailSent ? "המייל נשלח ✓" : emailSending ? "שולח..." : "שלח הזמנה במייל"}
+            </Button>
+          )}
+
+          {created.hasPhone && (
+            <Button
+              className="w-full"
+              variant={created.hasEmail ? "outline" : "default"}
+              onClick={sendSms}
+              disabled={smsSending || smsSent}
+            >
+              {smsSent ? "ההודעה נשלחה ✓" : smsSending ? "שולח..." : "שלח הזמנה ב-SMS"}
             </Button>
           )}
         </div>
