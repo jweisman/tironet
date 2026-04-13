@@ -10,6 +10,9 @@ import { useQuery } from "@powersync/react";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { useSyncReady } from "@/hooks/useSyncReady";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
+import { PlatoonSummaryCard } from "@/components/dashboard/PlatoonSummaryCard";
+import type { VisibleSections } from "@/components/dashboard/PlatoonSummaryCard";
+import { TodayActivities } from "@/components/dashboard/TodayActivities";
 import type { SquadSummary } from "@/app/api/dashboard/route";
 import { effectiveRole, ROLE_LABELS } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
@@ -340,6 +343,13 @@ export default function HomePage() {
     return parts.join(" > ");
   }, [role, rawSquads]);
 
+  // Role-based section visibility (#99)
+  const cardSections: VisibleSections | undefined = useMemo(() => {
+    if (rawRole === "instructor") return { soldiers: true, activities: true, requests: false, gaps: true };
+    if (rawRole === "company_medic") return { soldiers: false, activities: false, requests: true, gaps: false };
+    return undefined; // all visible
+  }, [rawRole]);
+
   // While session / cycle context is still resolving, show nothing
   // (avoids flashing "no access" or "choose a cycle" before data arrives).
   if (cycleLoading) {
@@ -411,7 +421,7 @@ export default function HomePage() {
       </div>
 
       {/* Requests requiring attention callout */}
-      {requestBadge > 0 && (
+      {requestBadge > 0 && rawRole !== "instructor" && (
         <button
           type="button"
           onClick={() => router.push("/requests?filter=mine")}
@@ -425,6 +435,15 @@ export default function HomePage() {
             <p className="text-xs text-muted-foreground">לחץ כדי לצפות</p>
           </div>
         </button>
+      )}
+
+      {/* Today's activities */}
+      {selectedCycleId && rawRole !== "company_medic" && (
+        <TodayActivities
+          cycleId={selectedCycleId}
+          squadId={squadId}
+          showPlatoon={isCompany}
+        />
       )}
 
       {/* No cycle selected */}
@@ -454,24 +473,16 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* Company commander — grouped by platoon */}
+          {/* Company level — platoon summary cards (#105, #99) */}
           {isCompany && (
-            <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {platoons.map((platoon) => (
-                <div key={platoon.platoonId} className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                      {platoon.platoonName}
-                    </h2>
-                    <div className="flex-1 h-px bg-border" />
-                  </div>
-                  {platoon.squads.length > 1 && <AggregateRow squads={platoon.squads} />}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {platoon.squads.map((s) => (
-                      <SquadSummaryCard key={s.squadId} squad={s} />
-                    ))}
-                  </div>
-                </div>
+                <PlatoonSummaryCard
+                  key={platoon.platoonId}
+                  platoonName={platoon.platoonName}
+                  squads={platoon.squads}
+                  sections={cardSections}
+                />
               ))}
             </div>
           )}
