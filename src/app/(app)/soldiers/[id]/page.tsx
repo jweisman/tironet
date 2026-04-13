@@ -8,6 +8,9 @@ import { toast } from "sonner";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSyncReady } from "@/hooks/useSyncReady";
+import { useTour } from "@/hooks/useTour";
+import { useTourContext } from "@/contexts/TourContext";
+import { soldierDetailTourSteps } from "@/lib/tour/steps";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -252,6 +255,11 @@ export default function SoldierDetailPage() {
   const raw = soldierRows?.[0] ?? null;
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!raw, soldierLoading);
 
+  // Tour
+  const { registerTour, unregisterTour } = useTourContext();
+  const { startTour } = useTour({ page: "soldier-detail", steps: soldierDetailTourSteps });
+  useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
+
   if (!raw && showConnectionError) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
@@ -322,7 +330,7 @@ export default function SoldierDetailPage() {
       </button>
 
       {/* Header card */}
-      <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+      <div data-tour="soldier-header" className="rounded-xl border border-border bg-card p-4 space-y-4">
         <div className="flex items-start gap-4">
           {/* Avatar */}
           <div
@@ -370,6 +378,7 @@ export default function SoldierDetailPage() {
                   </Button>
                 )}
                 <Button
+                  data-tour="soldier-edit-btn"
                   variant="outline"
                   size="icon-sm"
                   onClick={() => setEditOpen(true)}
@@ -439,7 +448,7 @@ export default function SoldierDetailPage() {
       </div>
 
       {/* Requests section */}
-      <div className="space-y-2">
+      <div data-tour="soldier-requests" className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-muted-foreground">בקשות</h2>
           {(userRole === "squad_commander" || userRole === "platoon_commander") && (
@@ -505,7 +514,7 @@ export default function SoldierDetailPage() {
       </div>
 
       {/* Gap activities section */}
-      <div className="space-y-2">
+      <div data-tour="soldier-gaps" className="space-y-2">
         <h2 className="text-sm font-semibold text-muted-foreground">
           פעילויות עם פערים
         </h2>
@@ -564,7 +573,7 @@ export default function SoldierDetailPage() {
       </div>
 
       {/* Completed activities section */}
-      <div className="space-y-2">
+      <div data-tour="soldier-completed" className="space-y-2">
         <h2 className="text-sm font-semibold text-muted-foreground">
           פעילויות שהושלמו
         </h2>

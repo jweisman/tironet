@@ -234,3 +234,140 @@ export const requestsTourSteps: DriveStep[] = [
     },
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Soldier detail page tour
+// ---------------------------------------------------------------------------
+export const soldierDetailTourSteps: DriveStep[] = [
+  {
+    element: "[data-tour='soldier-header']",
+    popover: {
+      title: "פרטי חייל",
+      description: "כאן תראו את הפרטים האישיים של החייל — שם, דרגה, סטטוס ופרטי קשר.",
+    },
+  },
+  {
+    element: "[data-tour='soldier-edit-btn']",
+    popover: {
+      title: "עריכת פרטים",
+      description: "לחצו כדי לערוך את הפרטים האישיים של החייל.",
+    },
+  },
+  {
+    element: "[data-tour='soldier-requests']",
+    popover: {
+      title: "בקשות",
+      description: "כל הבקשות של החייל במחזור הנוכחי. לחצו על בקשה כדי לצפות בפרטים, או צרו בקשה חדשה.",
+    },
+  },
+  {
+    element: "[data-tour='soldier-gaps']",
+    popover: {
+      title: "פעילויות עם פערים",
+      description: "פעילויות שהחייל נכשל בהן או חסר דיווח. לחצו כדי לעבור לפעילות.",
+    },
+  },
+  {
+    element: "[data-tour='soldier-completed']",
+    popover: {
+      title: "פעילויות שהושלמו",
+      description: "פעילויות שהחייל השלים בהצלחה, כולל ציונים והערות.",
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Activity detail page tour
+// ---------------------------------------------------------------------------
+export const activityDetailTourSteps: DriveStep[] = [
+  {
+    element: "[data-tour='activity-header']",
+    popover: {
+      title: "פרטי פעילות",
+      description: "שם הפעילות, סוג, תאריך ומחלקה.",
+    },
+  },
+  {
+    element: "[data-tour='activity-edit-meta']",
+    popover: {
+      title: "עריכת פרטים",
+      description: "ערכו את שם הפעילות, תאריך, סוג ואם היא חובה.",
+    },
+  },
+  {
+    element: "[data-tour='activity-import-reports']",
+    popover: {
+      title: "ייבוא דיווחים",
+      description: "העלו דיווחים מקובץ Excel/CSV — מתאים לדיווח מרוכז.",
+    },
+  },
+  {
+    element: "[data-tour='activity-edit-reports']",
+    popover: {
+      title: "עריכת דיווח",
+      description: "לחצו כדי לדווח על כל חייל — תוצאה, ציונים והערות. בסיום לחצו ׳סיים עריכה׳.",
+    },
+  },
+  {
+    element: "[data-tour='activity-gaps-filter']",
+    popover: {
+      title: "סינון פערים",
+      description: "הציגו רק חיילים עם פערים — חסרי דיווח או שנכשלו.",
+    },
+  },
+  {
+    element: "[data-tour='activity-soldier-row']",
+    popover: {
+      title: "שורת חייל",
+      description: "כאן תראו את הדיווח של כל חייל — תוצאה, ציונים והערה.",
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Request detail page tour
+// ---------------------------------------------------------------------------
+export const requestDetailTourSteps: DriveStep[] = [
+  {
+    element: "[data-tour='request-header']",
+    popover: {
+      title: "פרטי בקשה",
+      description: "סוג הבקשה, שם החייל וסטטוס נוכחי.",
+    },
+  },
+  {
+    element: "[data-tour='request-assignment']",
+    popover: {
+      title: "הקצאה",
+      description: "מי אחראי לטפל בבקשה כרגע. אם זה אתם — תראו התראה.",
+    },
+  },
+  {
+    element: "[data-tour='request-details']",
+    popover: {
+      title: "פרטי הבקשה",
+      description: "כל הפרטים הרלוונטיים — תיאור, תאריכים, תורים ועוד.",
+    },
+  },
+  {
+    element: "[data-tour='request-timeline']",
+    popover: {
+      title: "מהלך הטיפול",
+      description: "ציר הזמן של כל הפעולות — יצירה, אישור, דחייה והערות.",
+    },
+  },
+  {
+    element: "[data-tour='request-add-note']",
+    popover: {
+      title: "הוספת הערה",
+      description: "הוסיפו הערה בכל שלב — היא תופיע בציר הזמן ותהיה גלויה לכל המפקדים בשרשרת.",
+    },
+  },
+  {
+    element: "[data-tour='request-actions']",
+    popover: {
+      title: "פעולות",
+      description: "אשרו, דחו או אשרו קבלה של הבקשה — בהתאם לתפקידכם בשרשרת האישור.",
+    },
+  },
+];
