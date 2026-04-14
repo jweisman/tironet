@@ -383,7 +383,7 @@ export default function RequestsPage() {
                 : "bg-muted text-muted-foreground hover:text-foreground",
             )}
           >
-            פתוחות
+            ממתינות
             {openRequests.length > 0 && <span className="mr-1">({openRequests.length})</span>}
           </button>
 
@@ -475,7 +475,7 @@ export default function RequestsPage() {
             )}
             {sortedOpen.length === 0 && !showLoading && !showConnectionError && (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
-                <p className="font-medium">אין בקשות פתוחות</p>
+                <p className="font-medium">אין בקשות ממתינות</p>
                 {canCreate && (
                   <p className="text-sm text-muted-foreground">לחץ על + כדי ליצור בקשה חדשה</p>
                 )}

@@ -126,7 +126,7 @@ export function SquadSummaryCard({ squad, sections }: Props) {
                 <span className="text-base font-bold text-amber-600">
                   {squad.inProgressRequests}
                 </span>
-                <span className="text-xs text-muted-foreground">בטיפול</span>
+                <span className="text-xs text-muted-foreground">ממתינות</span>
               </StatButton>
             ) : (
               <p className="text-xs text-muted-foreground py-0.5">—</p>

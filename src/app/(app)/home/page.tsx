@@ -57,7 +57,7 @@ function AggregateRow({ squads }: { squads: SquadSummary[] }) {
         <span className="text-amber-600 font-semibold">{total.withGaps} עם פערים</span>
       )}
       {total.inProgress > 0 && (
-        <span className="text-amber-600 font-semibold">{total.inProgress} בקשות בטיפול</span>
+        <span className="text-amber-600 font-semibold">{total.inProgress} בקשות ממתינות</span>
       )}
       <span className="text-muted-foreground ms-auto">
         <span className="text-green-600 font-semibold">✓ {total.reported}</span>

@@ -586,7 +586,7 @@ function renderRequestDetailsHtml(req: OpenRequestItem, options?: { highlightDat
   return renderDetailColumnsHtml({ fields, appointments, notes });
 }
 
-const STATUS_LABELS: Record<string, string> = { open: "פתוח", approved: "אושר", denied: "נדחה" };
+const STATUS_LABELS: Record<string, string> = { open: "ממתינה", approved: "אושר", denied: "נדחה" };
 const ROLE_LABELS: Record<string, string> = {
   squad_commander: 'מ"כ', platoon_commander: 'מ"מ', platoon_sergeant: 'סמ"ח',
   company_commander: 'מ"פ', deputy_company_commander: 'סמ"פ', instructor: "מדריך", company_medic: 'חופ"ל',
@@ -740,7 +740,7 @@ export function renderDailyForumHtml(data: DailyForumData): string {
           renderRequestTypeSection('ת"ש', platoon.openRequests.hardship),
           renderRequestTypeSection("יציאה", platoon.openRequests.leave),
         ].join("\n")
-      : '<p class="no-data">אין בקשות פתוחות</p>';
+      : '<p class="no-data">אין בקשות ממתינות</p>';
 
     const totalActive = platoon.activeRequests.medical.length + platoon.activeRequests.leave.length;
 
@@ -756,7 +756,7 @@ export function renderDailyForumHtml(data: DailyForumData): string {
         ${multiPlatoon ? `<div class="platoon-header">${escapeHtml(platoon.companyName)} — ${escapeHtml(platoon.platoonName)}</div>` : ""}
 
         <div class="section-block">
-          <h2 class="section-title">בקשות פתוחות (${totalOpen})</h2>
+          <h2 class="section-title">בקשות ממתינות (${totalOpen})</h2>
           ${openHtml}
         </div>
 

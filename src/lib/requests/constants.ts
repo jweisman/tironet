@@ -18,7 +18,7 @@ export const REQUEST_TYPE_ICONS: Record<
 };
 
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
-  open: "פתוח",
+  open: "ממתינה",
   approved: "אושר",
   denied: "נדחה",
 };

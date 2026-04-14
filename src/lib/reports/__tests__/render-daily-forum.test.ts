@@ -403,7 +403,7 @@ describe("renderDailyForumHtml", () => {
   it("contains expected Hebrew headers", () => {
     const html = renderDailyForumHtml(emptyData);
     expect(html).toContain("דוח פורום יומי");
-    expect(html).toContain("בקשות פתוחות");
+    expect(html).toContain("בקשות ממתינות");
     expect(html).toContain("בקשות פעילות");
     expect(html).toContain("הספקים");
     expect(html).toContain("פעילויות היום");
@@ -499,7 +499,7 @@ describe("renderDailyForumHtml", () => {
 
   it("shows empty state messages", () => {
     const html = renderDailyForumHtml(emptyData);
-    expect(html).toContain("אין בקשות פתוחות");
+    expect(html).toContain("אין בקשות ממתינות");
     expect(html).toContain("אין בקשות פעילות");
     expect(html).toContain("אין פעילויות להיום");
     expect(html).toContain("אין פעילויות למחר");

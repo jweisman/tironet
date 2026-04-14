@@ -61,8 +61,8 @@ export interface RequestSummaryData {
 export type RequestStatusFilter = "open_active" | "open" | "active" | "approved" | "all";
 
 export const STATUS_FILTER_LABELS: Record<RequestStatusFilter, string> = {
-  open_active: "פתוחות ופעילות",
-  open: "פתוחות",
+  open_active: "פתוחות",
+  open: "ממתינות",
   active: "פעילות",
   approved: "מאושרות",
   all: "הכל",

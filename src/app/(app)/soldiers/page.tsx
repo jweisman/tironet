@@ -453,7 +453,7 @@ export default function SoldiersPage() {
             )}
           >
             <FileText size={12} />
-            <span>בקשות פעילות</span>
+            <span>בקשות פתוחות</span>
           </button>
           <button
             type="button"

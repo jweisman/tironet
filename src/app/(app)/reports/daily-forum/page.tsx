@@ -240,10 +240,10 @@ function PlatoonSection({ platoon, multiPlatoon }: { platoon: PlatoonForumSectio
       {/* Open requests */}
       <div className="mb-6">
         <h2 className="text-sm font-bold border-b border-border pb-1 mb-3">
-          בקשות פתוחות ({totalOpen})
+          בקשות ממתינות ({totalOpen})
         </h2>
         {totalOpen === 0 ? (
-          <p className="text-xs text-muted-foreground">אין בקשות פתוחות</p>
+          <p className="text-xs text-muted-foreground">אין בקשות ממתינות</p>
         ) : (
           <>
             <RequestTypeSection title="רפואה" requests={platoon.openRequests.medical} />

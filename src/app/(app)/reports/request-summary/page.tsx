@@ -15,8 +15,8 @@ import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns"
 import type { RequestSummaryData, RequestSummaryItem, RequestStatusFilter } from "@/app/api/reports/request-summary/route";
 
 const STATUS_FILTER_LABELS: Record<RequestStatusFilter, string> = {
-  open_active: "פתוחות ופעילות",
-  open: "פתוחות",
+  open_active: "פתוחות",
+  open: "ממתינות",
   active: "פעילות",
   approved: "מאושרות",
   all: "הכל",
