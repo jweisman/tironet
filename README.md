@@ -10,7 +10,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Bulk reporting** — Update an entire squad's activity results in one action; import reports from Excel/CSV with user-defined column mapping (saved per activity type)
 - **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), commander notes on approve/deny, and full offline support
 - **Reports** — Activity summary (PDF with pie charts and grade tables by unit), all-activity matrix (Google Sheets), and approved request summary (PDF grouped by unit); all scoped by role and filterable by type
-- **Dashboard** — Live summary of activity completion rates, gap counts, and missing reports per platoon/squad
+- **Dashboard** — Today's activities with progress bars, today's active requests (leave/medical), and live summary cards per squad (squad/platoon commander) or per platoon (company-level roles)
 - **Soldier profiles** — Photo upload with in-browser cropping and compression; bulk import from Excel
 - **Invitation system** — Admins invite users by email; each invitation scopes the user to a specific unit and role
 - **Authentication** — Google OAuth, email magic link (Nodemailer), and WhatsApp OTP (Twilio Verify)

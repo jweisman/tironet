@@ -43,6 +43,8 @@ const IDS = {
   soldier5: "e2e00000-0000-4000-8000-000000000074",
   soldier6: "e2e00000-0000-4000-8000-000000000075",
   soldier7: "e2e00000-0000-4000-8000-000000000076",
+  requestLeave: "e2e00000-0000-4000-8000-000000000090",
+  requestMedical: "e2e00000-0000-4000-8000-000000000091",
   invitation: "e2e00000-0000-4000-8000-000000000080",
   expiredInvitation: "e2e00000-0000-4000-8000-000000000081",
 };
@@ -174,6 +176,28 @@ async function seed() {
       { activityId: IDS.activity1, soldierId: IDS.soldier1, result: "passed", updatedByUserId: IDS.platoonCmdUser },
       { activityId: IDS.activity1, soldierId: IDS.soldier2, result: "failed", updatedByUserId: IDS.platoonCmdUser },
       { activityId: IDS.activity2, soldierId: IDS.soldier1, result: "passed", updatedByUserId: IDS.platoonCmdUser },
+    ],
+  });
+
+  // Seed approved requests — active today (for home page active requests callout)
+  const yesterday = new Date(today.getTime() - 86400000);
+  const tomorrow = new Date(today.getTime() + 86400000);
+  await prisma.request.createMany({
+    data: [
+      {
+        id: IDS.requestLeave, cycleId: IDS.cycle, soldierId: IDS.soldier1,
+        type: "leave", status: "approved", assignedRole: null,
+        departureAt: yesterday, returnAt: tomorrow,
+        createdByUserId: IDS.squadCmdUser,
+      },
+      {
+        id: IDS.requestMedical, cycleId: IDS.cycle, soldierId: IDS.soldier4,
+        type: "medical", status: "approved", assignedRole: null,
+        medicalAppointments: [
+          { id: "appt-e2e-1", date: today.toISOString().split("T")[0], place: "Base Clinic", type: "General" },
+        ],
+        createdByUserId: IDS.platoonCmdUser,
+      },
     ],
   });
 
