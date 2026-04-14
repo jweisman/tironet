@@ -141,7 +141,7 @@ export function ActiveRequestsCallout({ cycleId, squadId }: Props) {
   const hiddenCount = requests.length - INITIAL_LIMIT;
 
   return (
-    <div className="space-y-2">
+    <div data-tour="home-active-requests" className="space-y-2">
       <div className="flex items-center gap-2">
         <ClipboardList size={14} className="text-muted-foreground" />
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">

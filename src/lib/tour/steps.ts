@@ -20,6 +20,22 @@ export const homeTourSteps: DriveStep[] = [
     },
   },
   {
+    element: "[data-tour='home-active-requests']",
+    popover: {
+      title: "בקשות פעילות להיום",
+      description:
+        "חיילים שנמצאים ביציאה או עם תור רפואי היום. לחצו על בקשה כדי לצפות בפרטים.",
+    },
+  },
+  {
+    element: "[data-tour='home-today-activities']",
+    popover: {
+      title: "פעילויות היום",
+      description:
+        "פעילויות שמתוכננות להיום עם מד התקדמות הדיווח. לחצו כדי לעבור לדיווח.",
+    },
+  },
+  {
     element: "[data-tour='home-squad-card']",
     popover: {
       title: "כרטיס כיתה",
@@ -28,11 +44,19 @@ export const homeTourSteps: DriveStep[] = [
     },
   },
   {
+    element: "[data-tour='home-platoon-card']",
+    popover: {
+      title: "כרטיס מחלקה",
+      description:
+        "סיכום מחלקה — כלל החיילים, הפעילויות, הבקשות והפערים מכל הכיתות.",
+    },
+  },
+  {
     element: "[data-tour='home-stats-soldiers']",
     popover: {
       title: "חיילים",
       description:
-        "כאן תראו את מספר החיילים בכיתה וכמה מהם עם פערים. לחצו כדי לעבור לדף החיילים.",
+        "מספר החיילים וכמה מהם עם פערים. לחצו כדי לעבור לדף החיילים.",
     },
   },
   {
@@ -48,7 +72,7 @@ export const homeTourSteps: DriveStep[] = [
     popover: {
       title: "בקשות",
       description:
-        "מספר הבקשות שאושרו ושנמצאות בטיפול. לחצו כדי לעבור לדף הבקשות.",
+        "מספר הבקשות הפעילות ושנמצאות בטיפול. לחצו כדי לעבור לדף הבקשות.",
     },
   },
   {

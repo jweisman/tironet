@@ -509,12 +509,13 @@ export default function HomePage() {
           {/* Company level — platoon summary cards (#105, #99) */}
           {isCompany && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {platoons.map((platoon) => (
+              {platoons.map((platoon, i) => (
                 <PlatoonSummaryCard
                   key={platoon.platoonId}
                   platoonName={platoon.platoonName}
                   squads={platoon.squads}
                   sections={cardSections}
+                  dataTour={i === 0 ? "home-platoon-card" : undefined}
                 />
               ))}
             </div>
