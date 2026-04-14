@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, Trash2, Plus, RefreshCw, Send, Pencil, Copy, Check } from "lucide-react";
+import { UserPlus, Trash2, Plus, RefreshCw, Send, MessageSquare, Pencil, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +95,8 @@ export function UsersTable({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const [sentEmailId, setSentEmailId] = useState<string | null>(null);
+  const [sendingSmsId, setSendingSmsId] = useState<string | null>(null);
+  const [sentSmsId, setSentSmsId] = useState<string | null>(null);
 
   async function reloadUsers() {
     const res = await fetch("/api/admin/users");
@@ -154,6 +156,22 @@ export function UsersTable({
       setTimeout(() => setSentEmailId(null), 2500);
     } finally {
       setSendingEmailId(null);
+    }
+  }
+
+  async function resendSms(inv: Invitation) {
+    if (!inv.phone) return;
+    setSendingSmsId(inv.id);
+    try {
+      await fetch("/api/invitations/send-sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId: inv.id }),
+      });
+      setSentSmsId(inv.id);
+      setTimeout(() => setSentSmsId(null), 2500);
+    } finally {
+      setSendingSmsId(null);
     }
   }
 
@@ -410,6 +428,26 @@ export function UsersTable({
                               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                             ) : (
                               <Send className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Send / resend SMS — only shown when invitation has phone */}
+                        {inv.phone && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            aria-label="שלח הזמנה ב-SMS"
+                            disabled={sendingSmsId === inv.id}
+                            onClick={() => resendSms(inv)}
+                          >
+                            {sentSmsId === inv.id ? (
+                              <Check className="w-3.5 h-3.5 text-green-600" />
+                            ) : sendingSmsId === inv.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <MessageSquare className="w-3.5 h-3.5" />
                             )}
                           </Button>
                         )}

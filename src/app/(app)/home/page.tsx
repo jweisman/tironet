@@ -10,11 +10,16 @@ import { useQuery } from "@powersync/react";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { useSyncReady } from "@/hooks/useSyncReady";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
+import { PlatoonSummaryCard } from "@/components/dashboard/PlatoonSummaryCard";
+import type { VisibleSections } from "@/components/dashboard/PlatoonSummaryCard";
+import { TodayActivities } from "@/components/dashboard/TodayActivities";
+import { ActiveRequestsCallout } from "@/components/dashboard/ActiveRequestsCallout";
 import type { SquadSummary } from "@/app/api/dashboard/route";
 import { effectiveRole, ROLE_LABELS } from "@/lib/auth/permissions";
 import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { homeTourSteps } from "@/lib/tour/steps";
+import { isRequestActive } from "@/lib/requests/active";
 import type { Role } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -200,7 +205,8 @@ const TOP_GAPS_QUERY = `
   ORDER BY g.squad_id, g.gap_count DESC
 `;
 
-// Per-squad request counts — separate query to keep the main SQUADS_QUERY simpler
+// Per-squad request rows — fetched individually so we can apply isRequestActive()
+// client-side (single source of truth for "active" logic).
 // Params: [cycleId, squadId]
 const REQUESTS_QUERY = `
   WITH
@@ -216,13 +222,15 @@ const REQUESTS_QUERY = `
     )
   SELECT
     s.squad_id,
-    SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) AS approved_requests,
-    SUM(CASE WHEN r.status = 'open' THEN 1 ELSE 0 END) AS in_progress_requests
+    r.status,
+    r.type,
+    r.departure_at,
+    r.return_at,
+    r.medical_appointments
   FROM requests r
   JOIN soldiers s ON s.id = r.soldier_id
   WHERE r.cycle_id = (SELECT id FROM cycle)
     AND s.squad_id IN (SELECT squad_id FROM scope)
-  GROUP BY s.squad_id
 `;
 
 interface RawSquad {
@@ -232,10 +240,13 @@ interface RawSquad {
   soldier_count: number; soldiers_with_gaps: number;
   reported_activities: number; missing_report_activities: number;
 }
-interface RawSquadRequests {
+interface RawSquadRequest {
   squad_id: string;
-  approved_requests: number;
-  in_progress_requests: number;
+  status: string;
+  type: string;
+  departure_at: string | null;
+  return_at: string | null;
+  medical_appointments: string | null;
 }
 interface RawTopGap {
   squad_id: string; activity_id: string; activity_name: string; gap_count: number;
@@ -277,7 +288,7 @@ export default function HomePage() {
 
   const { data: rawSquads, isLoading: squadsLoading } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
   const { data: rawTopGaps } = useQuery<RawTopGap>(TOP_GAPS_QUERY, queryParams);
-  const { data: rawSquadRequests } = useQuery<RawSquadRequests>(REQUESTS_QUERY, queryParams);
+  const { data: rawSquadRequests } = useQuery<RawSquadRequest>(REQUESTS_QUERY, queryParams);
 
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(
     (rawSquads ?? []).length > 0,
@@ -297,14 +308,25 @@ export default function HomePage() {
     return map;
   }, [rawTopGaps]);
 
-  // Build request counts map per squad
+  // Build request counts map per squad — apply isRequestActive() client-side
   const requestsMap = useMemo(() => {
     const map = new Map<string, { approved: number; inProgress: number }>();
     for (const row of rawSquadRequests ?? []) {
-      map.set(row.squad_id, {
-        approved: Number(row.approved_requests ?? 0),
-        inProgress: Number(row.in_progress_requests ?? 0),
-      });
+      if (!map.has(row.squad_id)) map.set(row.squad_id, { approved: 0, inProgress: 0 });
+      const entry = map.get(row.squad_id)!;
+      if (row.status === "open") {
+        entry.inProgress++;
+      } else if (
+        isRequestActive({
+          status: row.status,
+          type: row.type,
+          departureAt: row.departure_at,
+          returnAt: row.return_at,
+          medicalAppointments: row.medical_appointments,
+        })
+      ) {
+        entry.approved++;
+      }
     }
     return map;
   }, [rawSquadRequests]);
@@ -347,6 +369,13 @@ export default function HomePage() {
   const { registerTour, unregisterTour } = useTourContext();
   const { startTour } = useTour({ page: "home", steps: homeTourSteps });
   useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
+
+  // Role-based section visibility (#99)
+  const cardSections: VisibleSections | undefined = useMemo(() => {
+    if (rawRole === "instructor") return { soldiers: true, activities: true, requests: false, gaps: true };
+    if (rawRole === "company_medic") return { soldiers: false, activities: false, requests: true, gaps: false };
+    return undefined; // all visible
+  }, [rawRole]);
 
   // While session / cycle context is still resolving, show nothing
   // (avoids flashing "no access" or "choose a cycle" before data arrives).
@@ -419,7 +448,7 @@ export default function HomePage() {
       </div>
 
       {/* Requests requiring attention callout */}
-      {requestBadge > 0 && (
+      {requestBadge > 0 && rawRole !== "instructor" && (
         <button
           data-tour="home-request-callout"
           type="button"
@@ -434,6 +463,20 @@ export default function HomePage() {
             <p className="text-xs text-muted-foreground">לחץ כדי לצפות</p>
           </div>
         </button>
+      )}
+
+      {/* Active requests callout (#108) */}
+      {selectedCycleId && rawRole !== "instructor" && (
+        <ActiveRequestsCallout cycleId={selectedCycleId} squadId={squadId} />
+      )}
+
+      {/* Today's activities */}
+      {selectedCycleId && rawRole !== "company_medic" && (
+        <TodayActivities
+          cycleId={selectedCycleId}
+          squadId={squadId}
+          showPlatoon={isCompany}
+        />
       )}
 
       {/* No cycle selected */}
@@ -463,24 +506,16 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* Company commander — grouped by platoon */}
+          {/* Company level — platoon summary cards (#105, #99) */}
           {isCompany && (
-            <div className="space-y-6">
-              {platoons.map((platoon, pi) => (
-                <div key={platoon.platoonId} className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                      {platoon.platoonName}
-                    </h2>
-                    <div className="flex-1 h-px bg-border" />
-                  </div>
-                  {platoon.squads.length > 1 && <div data-tour={pi === 0 ? "home-aggregate" : undefined}><AggregateRow squads={platoon.squads} /></div>}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {platoon.squads.map((s, si) => (
-                      <SquadSummaryCard key={s.squadId} squad={s} dataTour={pi === 0 && si === 0 ? "home-squad-card" : undefined} />
-                    ))}
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {platoons.map((platoon) => (
+                <PlatoonSummaryCard
+                  key={platoon.platoonId}
+                  platoonName={platoon.platoonName}
+                  squads={platoon.squads}
+                  sections={cardSections}
+                />
               ))}
             </div>
           )}

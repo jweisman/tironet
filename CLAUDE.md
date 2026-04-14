@@ -364,6 +364,7 @@ The request badge (home page callout, sidebar/tab bar dot) counts requests assig
 - **Activities:** can view, create (single + bulk, including "all platoons" option), edit activity metadata, and edit activity reports for all squads
 - **Cannot access:** soldiers page, requests page, request reports
 - **Navigation:** sees only Home + Activities + Reports (activity reports section only)
+- **Home page:** sees platoon summary cards with soldiers + activities columns only (no requests). Today's activities section is visible. Request callout and active requests callout are hidden.
 - **PowerSync claims:** gets `platoon_ids` expanded from company, same as company commanders
 - **Scope functions:** `getActivityScope()` returns `role: "instructor"`, `canCreate: true`, `canEditMetadataForPlatoon` checks platoon membership
 
@@ -373,6 +374,7 @@ The request badge (home page callout, sidebar/tab bar dot) counts requests assig
 - **Requests:** can view all request types but the list page filters to medical only; can add notes and edit request details but **cannot perform workflow actions** (approve/deny/acknowledge) — `getAvailableActions()` returns `[]` since medic doesn't match any `assignedRole`
 - **Cannot access:** soldiers page, activities page, activity reports
 - **Navigation:** sees only Home + Requests + Reports (request reports section only, forced to medical type)
+- **Home page:** sees platoon summary cards with requests column only (no soldiers, activities, or gaps). Today's activities section is hidden. Request callout and active requests callout are visible.
 - **Scope functions:** `getRequestScope()` returns `role: "company_medic"`, `canCreate: false`
 
 ### Page access guards
@@ -382,6 +384,29 @@ Navigation (Sidebar/TabBar) filters out inaccessible pages, but pages also guard
 - `/activities` — blocks `company_medic`
 - `/requests` — blocks `instructor`
 - `/reports` — conditionally shows activity reports section (hidden for medic) and request reports section (hidden for instructor)
+
+## Home Page Architecture
+
+The home page (`src/app/(app)/home/page.tsx`) is a role-aware dashboard with four sections, each conditionally rendered:
+
+1. **Requests requiring action** — amber callout linking to `/requests?filter=mine`. Hidden for `instructor`.
+2. **Active requests today** (`ActiveRequestsCallout`) — shows approved leave/medical requests active *today* (same logic as the morning cron notification: leave where `departureAt <= today AND returnAt >= today`, medical where an appointment date `=== today`). Hidden for `instructor`.
+3. **Today's activities** (`TodayActivities`) — activities scheduled for today with progress bars. Grid layout (2 columns on desktop), capped at 4 with "show more". Hidden for `company_medic`.
+4. **Summary cards** — role-dependent:
+   - **Squad commander:** single `SquadSummaryCard`
+   - **Platoon commander:** `AggregateRow` + grid of `SquadSummaryCard` (2 columns)
+   - **Company-level roles** (company commander, deputy, instructor, medic): grid of `PlatoonSummaryCard` (2 columns) — aggregated stats per platoon, not per squad
+
+### Card section visibility
+
+Both `SquadSummaryCard` and `PlatoonSummaryCard` accept an optional `sections` prop (`VisibleSections`) to control which stat columns render. This is used for role-based filtering:
+- **Instructor:** soldiers + activities only (no requests column, keeps gaps)
+- **Company medic:** requests only (no soldiers, activities, or gaps)
+- **All other roles:** all sections visible (default)
+
+### Active request counts use `isRequestActive()` client-side
+
+The home page's `REQUESTS_QUERY` fetches individual request rows (not pre-aggregated counts) so the `requestsMap` builder can apply `isRequestActive()` from `src/lib/requests/active.ts`. This keeps the "active" definition in one place — do not duplicate the active logic in SQL.
 
 ## API Conventions
 

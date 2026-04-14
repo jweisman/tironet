@@ -30,3 +30,10 @@ export async function verifyWhatsAppOtp(
     .verificationChecks.create({ to: phoneE164, code });
   return check.status === "approved";
 }
+
+/** Send an SMS via the Twilio Messaging Service. */
+export async function sendSms(to: string, body: string): Promise<void> {
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  if (!messagingServiceSid) throw new Error("TWILIO_MESSAGING_SERVICE_SID not configured");
+  await getClient().messages.create({ messagingServiceSid, to, body });
+}

@@ -3,10 +3,12 @@
 import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { SquadSummary } from "@/app/api/dashboard/route";
+import type { VisibleSections } from "./PlatoonSummaryCard";
 
 interface Props {
   squad: SquadSummary;
   dataTour?: string;
+  sections?: VisibleSections;
 }
 
 function StatButton({
@@ -31,9 +33,14 @@ function StatButton({
   );
 }
 
-export function SquadSummaryCard({ squad, dataTour }: Props) {
+export function SquadSummaryCard({ squad, dataTour, sections }: Props) {
   const router = useRouter();
   const hasGaps = squad.soldiersWithGaps > 0 || squad.missingReportActivities > 0;
+
+  const showSoldiers = sections?.soldiers !== false;
+  const showActivities = sections?.activities !== false;
+  const showRequests = sections?.requests !== false;
+  const showGaps = sections?.gaps !== false;
 
   return (
     <div
@@ -56,76 +63,82 @@ export function SquadSummaryCard({ squad, dataTour }: Props) {
         )}
       </div>
 
-      {/* Stats — 3 columns */}
+      {/* Stats columns */}
       <div className="flex border-b border-border">
         {/* Soldiers */}
-        <div data-tour="home-stats-soldiers" className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border">
-          <p className="text-xs font-semibold text-muted-foreground mb-1.5">חיילים</p>
-          <StatButton onClick={() => router.push("/soldiers")}>
-            <span className="text-xl font-bold">{squad.soldierCount}</span>
-            <span className="text-xs text-muted-foreground">סה״כ</span>
-          </StatButton>
-          {squad.soldiersWithGaps > 0 ? (
-            <StatButton onClick={() => router.push("/soldiers?filter=gaps")}>
-              <span className="text-base font-bold text-amber-600">
-                {squad.soldiersWithGaps}
-              </span>
-              <span className="text-xs text-muted-foreground">עם פערים</span>
+        {showSoldiers && (
+          <div data-tour="home-stats-soldiers" className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border last:border-e-0">
+            <p className="text-xs font-semibold text-muted-foreground mb-1.5">חיילים</p>
+            <StatButton onClick={() => router.push("/soldiers")}>
+              <span className="text-xl font-bold">{squad.soldierCount}</span>
+              <span className="text-xs text-muted-foreground">סה״כ</span>
             </StatButton>
-          ) : (
-            <p className="text-xs text-green-600 font-medium py-0.5">ללא פערים</p>
-          )}
-        </div>
+            {squad.soldiersWithGaps > 0 ? (
+              <StatButton onClick={() => router.push("/soldiers?filter=gaps")}>
+                <span className="text-base font-bold text-amber-600">
+                  {squad.soldiersWithGaps}
+                </span>
+                <span className="text-xs text-muted-foreground">עם פערים</span>
+              </StatButton>
+            ) : (
+              <p className="text-xs text-green-600 font-medium py-0.5">ללא פערים</p>
+            )}
+          </div>
+        )}
 
         {/* Activities */}
-        <div data-tour="home-stats-activities" className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border">
-          <p className="text-xs font-semibold text-muted-foreground mb-1.5">פעילויות</p>
-          <StatButton onClick={() => router.push("/activities")}>
-            <span className="text-xl font-bold text-green-600">
-              {squad.reportedActivities}
-            </span>
-            <span className="text-xs text-muted-foreground">דווחו</span>
-          </StatButton>
-          {squad.missingReportActivities > 0 ? (
-            <StatButton onClick={() => router.push("/activities?filter=gaps")}>
-              <span className="text-base font-bold text-amber-600">
-                {squad.missingReportActivities}
+        {showActivities && (
+          <div data-tour="home-stats-activities" className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border last:border-e-0">
+            <p className="text-xs font-semibold text-muted-foreground mb-1.5">פעילויות</p>
+            <StatButton onClick={() => router.push("/activities")}>
+              <span className="text-xl font-bold text-green-600">
+                {squad.reportedActivities}
               </span>
-              <span className="text-xs text-muted-foreground">חסרות דיווח</span>
+              <span className="text-xs text-muted-foreground">דווחו</span>
             </StatButton>
-          ) : (
-            <p className="text-xs text-green-600 font-medium py-0.5">הכל דווח</p>
-          )}
-        </div>
+            {squad.missingReportActivities > 0 ? (
+              <StatButton onClick={() => router.push("/activities?filter=gaps")}>
+                <span className="text-base font-bold text-amber-600">
+                  {squad.missingReportActivities}
+                </span>
+                <span className="text-xs text-muted-foreground">חסרות דיווח</span>
+              </StatButton>
+            ) : (
+              <p className="text-xs text-green-600 font-medium py-0.5">הכל דווח</p>
+            )}
+          </div>
+        )}
 
         {/* Requests */}
-        <div data-tour="home-stats-requests" className="flex-1 min-w-0 px-3 py-3 space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground mb-1.5">בקשות</p>
-          {squad.approvedRequests > 0 ? (
-            <StatButton onClick={() => router.push("/requests?tab=approved")}>
-              <span className="text-xl font-bold text-green-600">
-                {squad.approvedRequests}
-              </span>
-              <span className="text-xs text-muted-foreground">אושרו</span>
-            </StatButton>
-          ) : (
-            <p className="text-xs text-muted-foreground py-0.5">—</p>
-          )}
-          {squad.inProgressRequests > 0 ? (
-            <StatButton onClick={() => router.push("/requests")}>
-              <span className="text-base font-bold text-amber-600">
-                {squad.inProgressRequests}
-              </span>
-              <span className="text-xs text-muted-foreground">בטיפול</span>
-            </StatButton>
-          ) : (
-            <p className="text-xs text-muted-foreground py-0.5">—</p>
-          )}
-        </div>
+        {showRequests && (
+          <div data-tour="home-stats-requests" className="flex-1 min-w-0 px-3 py-3 space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-1.5">בקשות</p>
+            {squad.approvedRequests > 0 ? (
+              <StatButton onClick={() => router.push("/requests?filter=active")}>
+                <span className="text-xl font-bold text-green-600">
+                  {squad.approvedRequests}
+                </span>
+                <span className="text-xs text-muted-foreground">פעילות</span>
+              </StatButton>
+            ) : (
+              <p className="text-xs text-muted-foreground py-0.5">—</p>
+            )}
+            {squad.inProgressRequests > 0 ? (
+              <StatButton onClick={() => router.push("/requests")}>
+                <span className="text-base font-bold text-amber-600">
+                  {squad.inProgressRequests}
+                </span>
+                <span className="text-xs text-muted-foreground">בטיפול</span>
+              </StatButton>
+            ) : (
+              <p className="text-xs text-muted-foreground py-0.5">—</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Top gap activities */}
-      {squad.topGapActivities.length > 0 && (
+      {showGaps && squad.topGapActivities.length > 0 && (
         <div>
           <p className="px-4 pt-2.5 pb-1 text-xs font-semibold text-muted-foreground">
             פערים

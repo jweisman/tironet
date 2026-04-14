@@ -212,13 +212,13 @@ export default function RequestsPage() {
   }, [rawRequests, role, selectedAssignment?.unitId, isMedic]);
 
   // UI state — initialise from URL params
-  const [viewTab, setViewTab] = useState<ViewTab>(
-    searchParams.get("filter") === "mine"
-      ? "mine"
-      : searchParams.get("tab") === "active"
-        ? "active"
-        : "open"
-  );
+  const [viewTab, setViewTab] = useState<ViewTab>(() => {
+    const filter = searchParams.get("filter");
+    const tab = searchParams.get("tab");
+    if (filter === "mine") return "mine";
+    if (filter === "active" || tab === "active") return "active";
+    return "open";
+  });
   const [filterType, setFilterType] = useState<RequestType | "all">("all");
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [createType, setCreateType] = useState<RequestType | null>(null);
