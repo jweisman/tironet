@@ -97,24 +97,31 @@ const SOLDIERS_QUERY = `
   ORDER BY s.family_name ASC, s.given_name ASC
 `;
 
-const APPROVED_REQUESTS_QUERY = `
-  SELECT r.soldier_id, r.type
+// Open requests = active (approved + date criteria) OR in-progress (status open)
+// Used for the active request icons on soldier cards and the "active requests" filter
+const OPEN_REQUESTS_QUERY = `
+  SELECT r.soldier_id, r.type, r.status, r.urgent, r.special_conditions
   FROM requests r
   WHERE r.cycle_id = ?
-    AND r.status = 'approved'
     AND (
-      (r.type = 'leave' AND (r.departure_at >= DATE('now') OR r.return_at >= DATE('now')))
-      OR (r.type = 'medical' AND r.medical_appointments IS NOT NULL AND EXISTS (
-        SELECT 1 FROM json_each(r.medical_appointments) AS a
-        WHERE json_extract(a.value, '$.date') >= DATE('now')
+      (r.status = 'approved' AND (
+        (r.type = 'leave' AND (r.departure_at >= DATE('now') OR r.return_at >= DATE('now')))
+        OR (r.type = 'medical' AND r.medical_appointments IS NOT NULL AND EXISTS (
+          SELECT 1 FROM json_each(r.medical_appointments) AS a
+          WHERE json_extract(a.value, '$.date') >= DATE('now')
+        ))
+        OR r.type = 'hardship'
       ))
-      OR r.type = 'hardship'
+      OR r.status = 'open'
     )
 `;
 
-interface RawApprovedRequest {
+interface RawOpenRequest {
   soldier_id: string;
   type: string;
+  status: string;
+  urgent: number | null;
+  special_conditions: number | null;
 }
 
 const SQUADS_QUERY = `
@@ -149,7 +156,7 @@ interface RawSquad {
   platoon_name: string;
 }
 
-function mapSoldier(raw: RawSoldier, approvedTypes: RequestType[]): SoldierSummary {
+function mapSoldier(raw: RawSoldier, approvedRequests: { type: RequestType; urgent: boolean }[]): SoldierSummary {
   return {
     id: raw.id,
     givenName: raw.given_name,
@@ -162,7 +169,7 @@ function mapSoldier(raw: RawSoldier, approvedTypes: RequestType[]): SoldierSumma
     phone: raw.phone ?? null,
     gapCount: Number(raw.gap_count ?? 0),
     openRequestCount: Number(raw.open_request_count ?? 0),
-    approvedRequestTypes: approvedTypes,
+    approvedRequests,
   };
 }
 
@@ -183,19 +190,24 @@ export default function SoldiersPage() {
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
   const { data: rawSoldiers, isLoading: soldiersLoading } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
-  const { data: rawApprovedRequests } = useQuery<RawApprovedRequest>(APPROVED_REQUESTS_QUERY, queryParams);
+  const { data: rawOpenRequests } = useQuery<RawOpenRequest>(OPEN_REQUESTS_QUERY, queryParams);
   const { showLoading, showConnectionError } = useSyncReady(
     (rawSoldiers ?? []).length > 0,
     soldiersLoading
   );
 
   const allSquads: SquadData[] = useMemo(() => {
-    // Build soldier → approved request types map
-    const approvedMap = new Map<string, RequestType[]>();
-    for (const ar of rawApprovedRequests ?? []) {
-      const types = approvedMap.get(ar.soldier_id);
-      if (types) types.push(ar.type as RequestType);
-      else approvedMap.set(ar.soldier_id, [ar.type as RequestType]);
+    // Build soldier → approved requests map (with urgency info)
+    type ApprovedReq = { type: RequestType; urgent: boolean };
+    const approvedMap = new Map<string, ApprovedReq[]>();
+    for (const ar of rawOpenRequests ?? []) {
+      const entry: ApprovedReq = {
+        type: ar.type as RequestType,
+        urgent: (ar.type === "medical" && ar.urgent === 1) || (ar.type === "hardship" && (ar.special_conditions === 1 || ar.urgent === 1)),
+      };
+      const list = approvedMap.get(ar.soldier_id);
+      if (list) list.push(entry);
+      else approvedMap.set(ar.soldier_id, [entry]);
     }
 
     const squadMap = new Map<string, SquadData>();
@@ -218,7 +230,7 @@ export default function SoldiersPage() {
       squads = squads.filter((sq) => sq.id === selectedAssignment.unitId);
     }
     return squads;
-  }, [rawSoldiers, rawSquads, rawApprovedRequests, role, selectedAssignment?.unitId]);
+  }, [rawSoldiers, rawSquads, rawOpenRequests, role, selectedAssignment?.unitId]);
 
   const existingIdNumbers = useMemo(() => {
     const set = new Set<string>();
@@ -275,7 +287,7 @@ export default function SoldiersPage() {
         soldiers: squad.soldiers.filter((s) => {
           if (statusFilter !== "all" && s.status !== statusFilter) return false;
           if (showGapsOnly && s.gapCount === 0) return false;
-          if (showRequestsOnly && s.openRequestCount === 0 && s.approvedRequestTypes.length === 0) return false;
+          if (showRequestsOnly && s.openRequestCount === 0 && s.approvedRequests.length === 0) return false;
           if (search.trim()) {
             const q = search.trim().toLowerCase();
             const fullName = `${s.familyName} ${s.givenName}`.toLowerCase();

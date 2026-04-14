@@ -27,7 +27,7 @@ import {
   ASSIGNED_ROLE_LABELS,
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
-import { isRequestActive } from "@/lib/requests/active";
+import { isRequestActive, isRequestOpen, isRequestUrgent } from "@/lib/requests/active";
 import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
@@ -137,7 +137,7 @@ const MISSING_QUERY = `
 
 // All requests for this soldier (full history)
 const SOLDIER_REQUESTS_QUERY = `
-  SELECT r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.created_at,
+  SELECT r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.special_conditions, r.created_at,
     r.departure_at, r.return_at, r.medical_appointments
   FROM requests r
   WHERE r.soldier_id = ?
@@ -161,6 +161,7 @@ interface RawSoldierRequest {
   assigned_role: string | null;
   description: string | null;
   urgent: number | null;
+  special_conditions: number | null;
   created_at: string;
   departure_at: string | null;
   return_at: string | null;
@@ -476,7 +477,7 @@ export default function SoldierDetailPage() {
                 className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
               >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                  <RequestTypeIcon type={r.type as RequestType} size={16} />
+                  <RequestTypeIcon type={r.type as RequestType} size={16} urgent={isRequestOpen({ status: r.status, type: r.type, departureAt: r.departure_at, returnAt: r.return_at, medicalAppointments: r.medical_appointments }) && isRequestUrgent({ type: r.type, urgent: r.urgent, specialConditions: r.special_conditions })} />
                 </span>
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <p className="text-sm font-medium">{REQUEST_TYPE_LABELS[r.type as RequestType]}</p>

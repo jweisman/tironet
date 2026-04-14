@@ -17,7 +17,7 @@ export interface SoldierSummary {
   phone: string | null;
   gapCount: number;
   openRequestCount: number;
-  approvedRequestTypes: RequestType[];
+  approvedRequests: { type: RequestType; urgent: boolean }[];
 }
 
 interface Props {
@@ -100,10 +100,10 @@ export function SoldierCard({ soldier, onClick }: Props) {
               {soldier.rank}
             </span>
           )}
-          {soldier.approvedRequestTypes.length > 0 && (
+          {soldier.approvedRequests.length > 0 && (
             <span className="flex items-center gap-0.5 shrink-0">
-              {soldier.approvedRequestTypes.map((type, i) => (
-                <RequestTypeIcon key={`${type}-${i}`} type={type} size={14} className="text-emerald-600" />
+              {soldier.approvedRequests.map((req, i) => (
+                <RequestTypeIcon key={`${req.type}-${i}`} type={req.type} size={14} className="text-emerald-600" urgent={req.urgent} />
               ))}
             </span>
           )}

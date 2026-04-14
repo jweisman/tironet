@@ -10,6 +10,7 @@ import {
   ASSIGNED_ROLE_LABELS,
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
+import { isRequestOpen, isRequestUrgent } from "@/lib/requests/active";
 import { canActOnRequest } from "@/lib/requests/workflow";
 import type { RequestType, RequestStatus, Role } from "@/types";
 
@@ -25,6 +26,7 @@ export interface RequestSummary {
   createdAt: string;
   description: string | null;
   urgent: boolean | null;
+  specialConditions?: boolean | null;
   // Optional date fields for active-request filtering
   departureAt?: string | null;
   returnAt?: string | null;
@@ -102,7 +104,7 @@ export function RequestCard({ request, userRole, activeDetail, onClick, onLongPr
     >
       {/* Icon */}
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-        <RequestTypeIcon type={request.type} size={18} />
+        <RequestTypeIcon type={request.type} size={18} urgent={isRequestOpen(request) && isRequestUrgent(request)} />
       </span>
 
       {/* Content */}
@@ -111,11 +113,6 @@ export function RequestCard({ request, userRole, activeDetail, onClick, onLongPr
           <span className="text-sm font-medium truncate">
             {request.soldierName}
           </span>
-          {request.urgent && (
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-              דחוף
-            </Badge>
-          )}
         </div>
         <p className="text-xs text-muted-foreground truncate">
           {REQUEST_TYPE_LABELS[request.type]}

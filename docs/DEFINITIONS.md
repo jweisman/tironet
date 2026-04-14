@@ -9,14 +9,18 @@ This document summarizes the up-to-date definitions for terms used throughout th
 * _Gaps_: An activity has gaps when it is required, its date is today or in the past, and at least one soldier is missing a report or has a failed report
 
 ## Requests
-* _Open_: Status is open — still progressing through the approval chain
-* _Active_: Approved, with the following conditions:
+* _In progress (ממתינה)_: Status is `open` — still progressing through the approval chain
+* _Active (פעילה)_: Approved, with the following conditions:
   * leave requests where the departure or return date is today or in the future
   * medical requests with any appointment date in the future
   * hardship requests (always active once approved)
-* _Approved_: Status is approved (terminal — workflow is complete)
+* _Approved (אושרה)_: Status is approved (terminal — workflow is complete)
+* _Open (פתוחות)_: In progress or active
 * _Action Required ("Mine")_: Requests where `assignedRole` matches the user's role. Includes denied requests pending acknowledgement.
 * _All_: All requests regardless of status, including denied and fully completed
+* _Urgent_: When request is open (active or in progress)
+  * Medical - `urgent` flag
+  * Hardship - `specialConditions` flag OR `urgent` flag
 
 ## Roles
 * _Squad commander_:

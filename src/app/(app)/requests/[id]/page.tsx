@@ -26,6 +26,7 @@ import {
   TRANSPORTATION_LABELS,
 } from "@/lib/requests/constants";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
+import { isRequestOpen, isRequestUrgent } from "@/lib/requests/active";
 import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/requests/workflow";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
@@ -380,7 +381,7 @@ export default function RequestDetailPage() {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <RequestTypeIcon type={requestType} size={20} />
+              <RequestTypeIcon type={requestType} size={20} urgent={isRequestOpen({ status: raw.status, type: raw.type, departureAt: raw.departure_at, returnAt: raw.return_at, medicalAppointments: raw.medical_appointments }) && isRequestUrgent({ type: raw.type, urgent: raw.urgent, specialConditions: raw.special_conditions })} />
             </span>
             <div>
               <h1 className="text-lg font-bold">{REQUEST_TYPE_LABELS[requestType]}</h1>
