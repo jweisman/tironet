@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, WifiOff } from "lucide-react";
+import { Bell, WifiOff, LayoutDashboard } from "lucide-react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
@@ -475,6 +475,16 @@ export default function HomePage() {
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
           <p className="text-lg font-medium">בחר מחזור</p>
           <p className="text-muted-foreground text-sm">בחר מחזור פעיל כדי לצפות בלוח הבקרה.</p>
+        </div>
+      )}
+
+      {selectedCycleId && squads.length > 0 && (
+        <div className="flex items-center gap-2">
+          <LayoutDashboard size={14} className="text-muted-foreground" />
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            מצב היחידה
+          </h2>
+          <div className="flex-1 h-px bg-border" />
         </div>
       )}
 
