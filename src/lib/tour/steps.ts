@@ -213,7 +213,7 @@ export const requestsTourSteps: DriveStep[] = [
   {
     element: "[data-tour='requests-tab-open']",
     popover: {
-      title: "בקשות פתוחות",
+      title: "בקשות ממתינות",
       description:
         "בקשות שטרם אושרו או נדחו — ממתינות לטיפול.",
     },
