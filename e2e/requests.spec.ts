@@ -28,9 +28,9 @@ async function waitForRequestOnServer(page: Page, requestId: string, expectedSta
  */
 async function gotoRequestsPage(page: Page) {
   await page.goto("/requests");
-  // Wait for PowerSync sync — either the "open" tab button or empty state text
+  // Wait for PowerSync sync — either the "pending" tab button or empty state text
   await expect(
-    page.getByRole("button", { name: /פתוחות/ })
+    page.getByRole("button", { name: /ממתינות/ })
   ).toBeVisible({ timeout: 60000 });
 }
 
@@ -108,11 +108,11 @@ test.describe("Requests — squad commander", () => {
     await expect(page.getByText('ממתין למ"מ')).toBeVisible({ timeout: 10000 });
   });
 
-  test("sees open and active tabs", async ({ page }) => {
+  test("sees pending and active tabs", async ({ page }) => {
     await gotoRequestsPage(page);
 
     // Verify the page loads (open tab is default)
-    await expect(page.getByRole("button", { name: /פתוחות/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /ממתינות/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /פעילות/ })).toBeVisible();
   });
 });
@@ -138,11 +138,11 @@ test.describe("Requests — platoon commander", () => {
     await expect(page.getByText(soldierName).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test("request list shows open and active tabs", async ({ page }) => {
+  test("request list shows pending and active tabs", async ({ page }) => {
     await gotoRequestsPage(page);
 
     // Both tabs should be visible
-    await expect(page.getByRole("button", { name: /פתוחות/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /ממתינות/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /פעילות/ })).toBeVisible();
 
     // Switch to active tab

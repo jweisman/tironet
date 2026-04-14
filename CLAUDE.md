@@ -314,7 +314,7 @@ Request creation and workflow actions (approve/deny/acknowledge) write to the lo
 ### List page filtering
 
 The requests list page (`/requests`) has three tabs:
-- **Open** (`פתוחות`): requests where `status === "open"` (undecided, still being reviewed). Sorted with "assigned to me" first.
+- **Pending** (`ממתינות`): requests where `status === "open"` (in progress through the approval chain). Sorted with "assigned to me" first.
 - **Active** (`פעילות`): approved requests that are currently relevant, defined per type:
   - **Leave**: `departureAt >= today` OR `returnAt >= today` (upcoming or currently on leave)
   - **Medical**: any appointment in `medicalAppointments` JSON array has `date >= today`
@@ -322,19 +322,23 @@ The requests list page (`/requests`) has three tabs:
   - Sorted by soonest relevant date first (departure date for leave, next appointment for medical). Hardship sorts last (no activity date).
 - **Requires my action** (`דורשות טיפולי`): requests where `assignedRole !== null && canActOnRequest(userRole, assignedRole)` — cross-cuts open and active statuses
 
-Denied requests pending acknowledgement (`status === "denied"`, `assignedRole !== null`) appear **only** in the "requires my action" tab — not in "open" or "active". Completed denied requests (`assignedRole === null`) do not appear in any tab.
+Denied requests pending acknowledgement (`status === "denied"`, `assignedRole !== null`) appear **only** in the "requires my action" tab — not in "pending" or "active". Completed denied requests (`assignedRole === null`) do not appear in any tab.
 
 ### Soldiers page "active requests" filter
 
-The soldiers page has a "בקשות פעילות" filter pill that shows soldiers with any request activity. A soldier passes the filter if they have `openRequestCount > 0` (requests with `status = 'open'` — still in the approval chain) **or** `approvedRequestTypes.length > 0` (active approved requests from `APPROVED_REQUESTS_QUERY`). The `APPROVED_REQUESTS_QUERY` uses the same active definition as the requests list Active tab — leave with future dates, medical with future appointments, or hardship.
+The soldiers page has a "בקשות פתוחות" filter pill that shows soldiers with any open request (in progress or active, per `docs/DEFINITIONS.md`). A soldier passes the filter if they have `openRequestCount > 0` (requests with `status = 'open'` — in progress) **or** `approvedRequests.length > 0` (active approved requests from `OPEN_REQUESTS_QUERY`). The `OPEN_REQUESTS_QUERY` returns both in-progress and active requests, with urgency fields for the red dot indicator.
 
 ### Soldier detail page — full request history
 
 The soldier detail page (`/soldiers/[id]`) shows **all** requests for the soldier in the current cycle, including completed denials and fully acknowledged approvals. This gives a complete picture of the soldier's request history. Approved requests that are currently active (per the definitions in `docs/DEFINITIONS.md`) show a green "פעילה" label next to the status badge.
 
-### `isRequestActive()` — shared active request logic
+### Shared request status utilities (`src/lib/requests/active.ts`)
 
-`src/lib/requests/active.ts` exports `isRequestActive(r, today?)` which encapsulates the "active request" definition: approved + leave with future dates, medical with future appointments, or hardship (always). This is used by the requests list page, soldier detail page, and daily forum report — do not duplicate this logic inline.
+`src/lib/requests/active.ts` exports three functions — do not duplicate this logic inline:
+
+- **`isRequestActive(r, today?)`** — approved + leave with future dates, medical with future appointments, or hardship (always)
+- **`isRequestOpen(r, today?)`** — in progress (`status === 'open'`) OR active. This is the umbrella "open" definition from `docs/DEFINITIONS.md`
+- **`isRequestUrgent(r)`** — medical with `urgent` flag, or hardship with `specialConditions` or `urgent` flag. The urgent *indicator* (red dot on `RequestTypeIcon`) only shows when the request is also open: `isRequestOpen(r) && isRequestUrgent(r)`
 
 ### Badge count scoping (`useRequestBadge`)
 
@@ -404,7 +408,7 @@ Both `SquadSummaryCard` and `PlatoonSummaryCard` accept an optional `sections` p
 - **Company medic:** requests only (no soldiers, activities, or gaps)
 - **All other roles:** all sections visible (default)
 
-### Active request counts use `isRequestActive()` client-side
+### Active request counts use shared utilities client-side
 
 The home page's `REQUESTS_QUERY` fetches individual request rows (not pre-aggregated counts) so the `requestsMap` builder can apply `isRequestActive()` from `src/lib/requests/active.ts`. This keeps the "active" definition in one place — do not duplicate the active logic in SQL.
 
