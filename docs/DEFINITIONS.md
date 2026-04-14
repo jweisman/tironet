@@ -41,10 +41,12 @@ This document summarizes the up-to-date definitions for terms used throughout th
 * _Company medic_:
   * creates and edits medical requests for all soldiers in company
   * views request reports (limited to medical requests)
+  * dashboard view limited to medical requests
 * _Instructor_:
   * creates and edits activities for any platoon in company
   * adds activity reports for any activity
   * views activity reports
+  * dashboard view limited to activities
 * _Admin_:
   * administers the system via the Admin section
   * no effect on scope — requires a cycle assignment like all other roles
