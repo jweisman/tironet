@@ -166,7 +166,7 @@ export default function ReportsPage() {
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                סיכום יומי של בקשות פתוחות ופעילות, פעילויות היום והמחר, ופערים
+                סיכום יומי של בקשות פתוחות, פעילויות היום והמחר, ופערים
               </p>
             </div>
           </button>
@@ -276,8 +276,8 @@ export default function ReportsPage() {
               onChange={(e) => setRequestStatusFilter(e.target.value)}
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             >
-              <option value="open_active">פתוחות ופעילות</option>
-              <option value="open">פתוחות</option>
+              <option value="open_active">פתוחות</option>
+              <option value="open">ממתינות</option>
               <option value="active">פעילות</option>
               <option value="approved">מאושרות</option>
               <option value="all">הכל</option>

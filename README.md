@@ -240,6 +240,10 @@ AUTH_TRUST_HOST=true
 AUTH_GOOGLE_ID="..."
 AUTH_GOOGLE_SECRET="..."
 
+# Google Picker (for exporting reports to existing Google Sheets)
+NEXT_PUBLIC_GOOGLE_PICKER_API_KEY="..."
+NEXT_PUBLIC_GOOGLE_APP_ID="..."  # Numeric project number from Cloud Console
+
 # Email / SMTP
 # Dev: Mailhog (started by docker compose)
 EMAIL_SERVER="smtp://localhost:1026"
@@ -307,7 +311,7 @@ Configure a production SMTP provider and set `EMAIL_SERVER` and `FROM_EMAIL` in 
 
 ### 5. Twilio Verify
 
-Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID` in Vercel. The Verify service must have the **WhatsApp** or **SMS** channel enabled.
+Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`, and `TWILIO_MESSAGING_SERVICE_SID` in Vercel. The Verify service must have the **WhatsApp** or **SMS** channel enabled. The Messaging Service is used for sending invitation SMS messages.
 
 ### 6. Vercel environment variables
 

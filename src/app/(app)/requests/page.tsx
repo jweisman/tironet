@@ -43,7 +43,7 @@ type ViewTab = "open" | "active" | "mine";
 
 const REQUESTS_QUERY = `
   SELECT
-    r.id, r.type, r.status, r.assigned_role, r.description, r.urgent,
+    r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.special_conditions,
     r.created_at, r.departure_at, r.return_at, r.medical_appointments,
     s.family_name || ' ' || s.given_name AS soldier_name,
     s.squad_id,
@@ -63,6 +63,7 @@ interface RawRequest {
   assigned_role: string | null;
   description: string | null;
   urgent: number | null;
+  special_conditions: number | null;
   created_at: string;
   departure_at: string | null;
   return_at: string | null;
@@ -86,6 +87,7 @@ function mapRequest(raw: RawRequest): RequestSummary {
     createdAt: raw.created_at,
     description: raw.description,
     urgent: raw.urgent != null ? Boolean(raw.urgent) : null,
+    specialConditions: raw.special_conditions != null ? Boolean(raw.special_conditions) : null,
     departureAt: raw.departure_at,
     returnAt: raw.return_at,
     medicalAppointments: raw.medical_appointments,
@@ -390,7 +392,7 @@ export default function RequestsPage() {
                 : "bg-muted text-muted-foreground hover:text-foreground",
             )}
           >
-            פתוחות
+            ממתינות
             {openRequests.length > 0 && <span className="mr-1">({openRequests.length})</span>}
           </button>
 
@@ -485,7 +487,7 @@ export default function RequestsPage() {
             )}
             {sortedOpen.length === 0 && !showLoading && !showConnectionError && (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
-                <p className="font-medium">אין בקשות פתוחות</p>
+                <p className="font-medium">אין בקשות ממתינות</p>
                 {canCreate && (
                   <p className="text-sm text-muted-foreground">לחץ על + כדי ליצור בקשה חדשה</p>
                 )}

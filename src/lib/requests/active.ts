@@ -38,3 +38,31 @@ export function isRequestActive(r: ActiveCheckFields, today?: string): boolean {
 
   return false;
 }
+
+/**
+ * Returns true if a request is "open" per DEFINITIONS.md:
+ * in progress (status === 'open') OR active (approved + meets date criteria).
+ */
+export function isRequestOpen(r: ActiveCheckFields, today?: string): boolean {
+  if (r.status === "open") return true;
+  return isRequestActive(r, today);
+}
+
+/**
+ * Returns true if a request has the "urgent" flag per DEFINITIONS.md:
+ * - medical with the `urgent` flag
+ * - hardship with the `specialConditions` flag
+ *
+ * Accepts both boolean (API/Prisma) and number (PowerSync SQLite 0/1).
+ * Note: the urgent *indicator* should only show when the request is also open
+ * (in progress or active). Use `isRequestOpen(r) && isRequestUrgent(r)`.
+ */
+export function isRequestUrgent(r: {
+  type: string;
+  urgent?: boolean | number | null;
+  specialConditions?: boolean | number | null;
+}): boolean {
+  if (r.type === "medical" && (r.urgent === true || r.urgent === 1)) return true;
+  if (r.type === "hardship" && ((r.specialConditions === true || r.specialConditions === 1) || (r.urgent === true || r.urgent === 1))) return true;
+  return false;
+}
