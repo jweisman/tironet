@@ -73,7 +73,7 @@ export default defineConfig({
   webServer: {
     command: `DATABASE_URL="${TEST_DB_URL}" AUTH_TRUST_HOST=true npm run dev -- --port 3001`,
     url: "http://localhost:3001",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120_000,
   },
 });

@@ -644,7 +644,7 @@ Configuration is in `vitest.config.ts`. Tests use `vi.mock()` for Prisma, NextAu
 
 ### E2E Tests (Playwright)
 
-91 end-to-end tests across 12 spec files in `e2e/`. They run against the full stack (Next.js + PostgreSQL + PowerSync + Mailhog) via Docker Compose. Locally the suite runs in ~1 minute. CI uses 4 parallel workers and caches the `.next/` build directory to avoid repeated Turbopack compilation.
+91 end-to-end tests across 12 spec files in `e2e/`. They run against the full stack (Next.js + PostgreSQL + PowerSync + Mailhog) via Docker Compose. Locally the suite runs in ~1 minute. CI uses 4 parallel workers and overlaps Docker/Next.js startup with npm/Playwright install to minimize idle time.
 
 **Running:** `npm run e2e` (or `npm run e2e:ui` for the Playwright UI). The Docker Compose stack must be running with the e2e overlay:
 

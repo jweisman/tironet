@@ -26,9 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Start Docker services immediately after checkout — they initialize
-      # in the background while Node/npm/Playwright install below.
-      # By the time tests need them, PostgreSQL + MongoDB + PowerSync are warm.
+      # Start Docker services immediately — they initialize in the background
+      # while npm/Playwright/Next.js start up below.
       - name: Start Docker services
         run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
         env:
@@ -44,21 +43,18 @@ jobs:
 
       - run: npm ci
 
-      - name: Cache Next.js build
-        uses: actions/cache@v4
-        with:
-          path: .next
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
-            ${{ runner.os }}-nextjs-
-
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      # By now Docker services have had ~2 minutes to start.
-      # PostgreSQL and MongoDB should be ready; just init the replica set
-      # and confirm PowerSync is healthy.
+      # Start Next.js dev server in background — overlaps with Docker init
+      # below. Playwright config uses reuseExistingServer: true to connect
+      # to this instead of launching its own.
+      - name: Start dev server
+        run: npm run dev -- --port 3001 &
+        env:
+          AUTH_TRUST_HOST: "true"
+
+      # By now Docker services have had ~2 minutes to initialize.
       - name: Initialise MongoDB replica set
         run: |
           for i in $(seq 1 30); do
@@ -70,6 +66,13 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             curl -sf http://localhost:8080/probes/ready && break
+            sleep 2
+          done
+
+      - name: Wait for dev server
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3001 > /dev/null 2>&1 && break
             sleep 2
           done
 
