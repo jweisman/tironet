@@ -21,7 +21,7 @@ Before considering any issue or task complete, always:
 ## Tech Stack Summary
 
 - **Next.js 16** App Router, TypeScript, Tailwind CSS v4
-- **NextAuth v5** JWT strategy, Google OAuth + email magic link + WhatsApp OTP (Twilio Verify)
+- **NextAuth v5** JWT strategy, Google OAuth + email magic link + SMS OTP (Twilio Verify)
 - **PostgreSQL** via Prisma ORM
 - **PowerSync** (`@powersync/web` + `@powersync/react`) for offline-first sync — Sync Streams edition 3
 - **PWA** via `@serwist/turbopack` (service worker compiled via esbuild route handler)
@@ -404,8 +404,8 @@ Navigation (Sidebar/TabBar) filters out inaccessible pages, but pages also guard
 The home page (`src/app/(app)/home/page.tsx`) is a role-aware dashboard with four sections, each conditionally rendered:
 
 1. **Requests requiring action** — amber callout linking to `/requests?filter=mine`. Hidden for `instructor`.
-2. **Active requests today** (`ActiveRequestsCallout`) — shows approved leave/medical requests active *today* (same logic as the morning cron notification: leave where `departureAt <= today AND returnAt >= today`, medical where an appointment date `=== today`). Hidden for `instructor`.
-3. **Today's activities** (`TodayActivities`) — activities scheduled for today with progress bars. Grid layout (2 columns on desktop), capped at 4 with "show more". Hidden for `company_medic`.
+2. **Active requests today** (`ActiveRequestsCallout`) — shows approved leave/medical requests active *today* (same logic as the morning cron notification: leave where `departureAt <= today AND returnAt >= today`, medical where an appointment date `=== today`). Hidden for `instructor` and `hardship_coordinator`. Filtered to medical only for `company_medic` via `typeFilter` prop.
+3. **Today's activities** (`TodayActivities`) — activities scheduled for today with progress bars. Grid layout (2 columns on desktop), capped at 4 with "show more". Hidden for `company_medic`, `hardship_coordinator`, and `instructor`.
 4. **Summary cards** — role-dependent:
    - **Squad commander:** single `SquadSummaryCard`
    - **Platoon commander:** `AggregateRow` + grid of `SquadSummaryCard` (2 columns)

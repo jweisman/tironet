@@ -5,15 +5,15 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 ## Features
 
 - **Training hierarchy** — Cycles → Companies → Platoons → Squads → Soldiers
-- **Role-based access** — Admins, company commanders (and deputies), platoon commanders (and sergeants), squad commanders, instructors (activity-focused), and company medics (medical request-focused) each see only their slice of the hierarchy
+- **Role-based access** — Admins, company commanders (and deputies), platoon commanders (and sergeants), squad commanders, instructors (activity-focused), company medics (medical request-focused), and hardship coordinators (hardship request-focused) each see only their slice of the hierarchy
 - **Activity management** — Create training activities, assign them to platoons, and record per-soldier results (pass / fail / N/A) with up to 6 labeled scores per activity type and notes; bulk import activities from Excel/CSV
 - **Bulk reporting** — Update an entire squad's activity results in one action; import reports from Excel/CSV with user-defined column mapping (saved per activity type)
 - **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), commander notes on approve/deny, and full offline support
 - **Reports** — Activity summary (PDF with pie charts and grade tables by unit), all-activity matrix (Google Sheets), and approved request summary (PDF grouped by unit); all scoped by role and filterable by type
 - **Dashboard** — Today's activities with progress bars, today's active requests (leave/medical), and live summary cards per squad (squad/platoon commander) or per platoon (company-level roles)
 - **Soldier profiles** — Photo upload with in-browser cropping and compression; bulk import from Excel
-- **Invitation system** — Admins invite users by email; each invitation scopes the user to a specific unit and role
-- **Authentication** — Google OAuth, email magic link (Nodemailer), and WhatsApp OTP (Twilio Verify)
+- **Invitation system** — Admins invite users by email or SMS; each invitation scopes the user to a specific unit and role
+- **Authentication** — Google OAuth, email magic link (Nodemailer), and SMS OTP (Twilio Verify)
 - **Admin panel** — Manage cycles, companies, platoons, squads, activity types, and users
 - **Push notifications** — Daily task reminders for squad commanders (missing activity reports) and real-time request assignment alerts; opt-out per notification type in the profile page
 - **Offline-first** — Activity reports can be recorded and bulk-updated without a network connection; changes sync automatically when connectivity is restored
@@ -29,7 +29,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 | UI | Tailwind CSS v4, shadcn/ui (Base UI), Lucide icons |
 | Internationalisation | next-intl (Hebrew / RTL) |
 | Email | Nodemailer (dev: Mailhog; prod: SMTP) |
-| OTP | Twilio Verify (WhatsApp / SMS) |
+| OTP | Twilio Verify (SMS) |
 | Image processing | browser-image-compression, react-easy-crop |
 | Drag & drop | dnd-kit |
 | Excel import | xlsx |
@@ -249,7 +249,7 @@ NEXT_PUBLIC_GOOGLE_APP_ID="..."  # Numeric project number from Cloud Console
 EMAIL_SERVER="smtp://localhost:1026"
 FROM_EMAIL="Tironet <noreply@yourdomain.com>"
 
-# Twilio Verify — for WhatsApp OTP auth
+# Twilio Verify — for SMS OTP auth
 TWILIO_ACCOUNT_SID="..."
 TWILIO_AUTH_TOKEN="..."
 TWILIO_VERIFY_SERVICE_SID="..."
@@ -311,7 +311,7 @@ Configure a production SMTP provider and set `EMAIL_SERVER` and `FROM_EMAIL` in 
 
 ### 5. Twilio Verify
 
-Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`, and `TWILIO_MESSAGING_SERVICE_SID` in Vercel. The Verify service must have the **WhatsApp** or **SMS** channel enabled. The Messaging Service is used for sending invitation SMS messages.
+Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`, and `TWILIO_MESSAGING_SERVICE_SID` in Vercel. The Verify service must have the **SMS** channel enabled. The Messaging Service is used for sending invitation SMS messages.
 
 ### 6. Vercel environment variables
 
