@@ -173,6 +173,7 @@ enum Role {
   squad_commander
   instructor
   company_medic
+  hardship_coordinator
 }
 
 enum UnitType {

@@ -67,9 +67,10 @@ export default function ReportsPage() {
   const rawRoles = assignments.map((a) => a.role as Role);
   const isInstructor = rawRoles.includes("instructor");
   const isMedic = rawRoles.includes("company_medic");
+  const isCoordinator = rawRoles.includes("hardship_coordinator");
   const isAdmin = session?.user?.isAdmin;
-  const hasAccess = isAdmin || !!role || isInstructor || isMedic;
-  const showActivityReports = !isMedic;
+  const hasAccess = isAdmin || !!role || isInstructor || isMedic || isCoordinator;
+  const showActivityReports = !isMedic && !isCoordinator;
   const showRequestReports = !isInstructor;
   const showDailyForum = !!role; // platoon or company commander only
 
@@ -130,7 +131,7 @@ export default function ReportsPage() {
       return;
     }
     const params = new URLSearchParams();
-    const reqType = isMedic ? "medical" : selectedRequestType;
+    const reqType = isMedic ? "medical" : isCoordinator ? "hardship" : selectedRequestType;
     if (reqType) params.set("types", reqType);
     if (requestDateRange) params.set("dateRange", requestDateRange);
     if (requestStatusFilter) params.set("statusFilter", requestStatusFilter);
@@ -282,7 +283,7 @@ export default function ReportsPage() {
               <option value="approved">מאושרות</option>
               <option value="all">הכל</option>
             </select>
-            {!isMedic && (
+            {!isMedic && !isCoordinator && (
             <select
               value={selectedRequestType}
               onChange={(e) => setSelectedRequestType(e.target.value)}

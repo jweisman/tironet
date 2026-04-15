@@ -95,7 +95,7 @@ export function CreateRequestForm({
   const { data: session } = useSession();
 
   const isSquadRole = userRole === "squad_commander";
-  const isCompanyRole = userRole === "company_medic";
+  const isCompanyRole = userRole === "company_medic" || userRole === "hardship_coordinator";
 
   // For company-level roles (medic): load squads for the squad selector
   const squadsParams = useMemo(() => [unitId], [unitId]);

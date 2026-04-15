@@ -9,7 +9,8 @@ export type Role =
   | "platoon_sergeant"
   | "squad_commander"
   | "instructor"
-  | "company_medic";
+  | "company_medic"
+  | "hardship_coordinator";
 
 export type UnitType = "company" | "platoon" | "squad";
 

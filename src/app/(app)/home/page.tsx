@@ -34,6 +34,7 @@ const ROLE_SHORT: Record<string, string> = {
   deputy_company_commander: 'סמ"פ',
   instructor: "מדריך",
   company_medic: 'חופ"ל',
+  hardship_coordinator: 'מש"קית ת"ש',
 };
 
 // ---------------------------------------------------------------------------
@@ -373,7 +374,7 @@ export default function HomePage() {
   // Role-based section visibility (#99)
   const cardSections: VisibleSections | undefined = useMemo(() => {
     if (rawRole === "instructor") return { soldiers: true, activities: true, requests: false, gaps: true };
-    if (rawRole === "company_medic") return { soldiers: false, activities: false, requests: true, gaps: false };
+    if (rawRole === "company_medic" || rawRole === "hardship_coordinator") return { soldiers: false, activities: false, requests: true, gaps: false };
     return undefined; // all visible
   }, [rawRole]);
 
@@ -421,7 +422,7 @@ export default function HomePage() {
   }
   const platoons = Array.from(platoonMap.values());
 
-  const isCompany = role === "company_commander" || rawRole === "instructor" || rawRole === "company_medic";
+  const isCompany = role === "company_commander" || rawRole === "instructor" || rawRole === "company_medic" || rawRole === "hardship_coordinator";
   const isPlatoon = role === "platoon_commander";
 
   return (
@@ -465,13 +466,13 @@ export default function HomePage() {
         </button>
       )}
 
-      {/* Active requests callout (#108) */}
-      {selectedCycleId && rawRole !== "instructor" && (
-        <ActiveRequestsCallout cycleId={selectedCycleId} squadId={squadId} />
+      {/* Active requests callout (#108) — not for instructor or hardship coordinator */}
+      {selectedCycleId && rawRole !== "instructor" && rawRole !== "hardship_coordinator" && (
+        <ActiveRequestsCallout cycleId={selectedCycleId} squadId={squadId} typeFilter={rawRole === "company_medic" ? "medical" : undefined} />
       )}
 
-      {/* Today's activities */}
-      {selectedCycleId && rawRole !== "company_medic" && (
+      {/* Today's activities — not for medic, coordinator, or instructor */}
+      {selectedCycleId && rawRole !== "company_medic" && rawRole !== "hardship_coordinator" && rawRole !== "instructor" && (
         <TodayActivities
           cycleId={selectedCycleId}
           squadId={squadId}

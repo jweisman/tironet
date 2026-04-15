@@ -172,7 +172,7 @@ export default function RequestsPage() {
   const { data: session } = useSession();
   const rawRole = (selectedAssignment?.role ?? "") as Role | "";
   const role = rawRole ? effectiveRole(rawRole) : "";
-  const canCreate = role === "squad_commander" || role === "platoon_commander" || rawRole === "company_medic";
+  const canCreate = role === "squad_commander" || role === "platoon_commander" || rawRole === "company_medic" || rawRole === "hardship_coordinator";
 
   // -------- Sticky header offsets --------
   // AppShell publishes --app-header-height as a CSS variable.
@@ -198,10 +198,13 @@ export default function RequestsPage() {
   );
 
   const isMedic = rawRole === "company_medic";
+  const isCoordinator = rawRole === "hardship_coordinator";
+  const isTypeRestricted = isMedic || isCoordinator;
 
   const allRequests = useMemo(() => {
     let mapped = (rawRequests ?? []).map(mapRequest);
     if (isMedic) mapped = mapped.filter((r) => r.type === "medical");
+    if (isCoordinator) mapped = mapped.filter((r) => r.type === "hardship");
     const unitId = selectedAssignment?.unitId;
     if (!unitId || !role) return mapped;
     if (role === "squad_commander") {
@@ -211,7 +214,7 @@ export default function RequestsPage() {
       return mapped.filter((r) => r.platoonId === unitId);
     }
     return mapped;
-  }, [rawRequests, role, selectedAssignment?.unitId, isMedic]);
+  }, [rawRequests, role, selectedAssignment?.unitId, isMedic, isCoordinator]);
 
   // UI state — initialise from URL params
   const [viewTab, setViewTab] = useState<ViewTab>(() => {
@@ -316,7 +319,7 @@ export default function RequestsPage() {
   }
 
   const handleLongPress = useCallback((request: RequestSummary, pos: { x: number; y: number }) => {
-    if (!rawRole || rawRole === "company_medic") return;
+    if (!rawRole || isTypeRestricted) return;
     const actions = request.assignedRole
       ? getAvailableActions(request.status, request.assignedRole, rawRole as Role, request.type)
       : [];
@@ -325,7 +328,7 @@ export default function RequestsPage() {
   }, [rawRole]);
 
   function getContextMenuItems(request: RequestSummary): ContextMenuItem[] {
-    if (!rawRole || rawRole === "company_medic") return [];
+    if (!rawRole || isTypeRestricted) return [];
     const actions = request.assignedRole
       ? getAvailableActions(request.status, request.assignedRole, rawRole as Role, request.type)
       : [];
@@ -411,7 +414,7 @@ export default function RequestsPage() {
             {activeRequests.length > 0 && <span className="mr-1">({activeRequests.length})</span>}
           </button>
 
-          {role && !isMedic && (
+          {role && !isTypeRestricted && (
             <button
               data-tour="requests-tab-mine"
               type="button"
@@ -433,14 +436,14 @@ export default function RequestsPage() {
             <button
               data-tour="requests-add-btn"
               type="button"
-              onClick={() => isMedic ? setCreateType("medical") : setTypeMenuOpen(true)}
+              onClick={() => isTypeRestricted ? setCreateType(isMedic ? "medical" : "hardship") : setTypeMenuOpen(true)}
               className="hidden md:flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors shrink-0 ms-auto"
             >
-              <Plus size={15} /> {isMedic ? "בקשה רפואית חדשה" : "בקשה חדשה"}
+              <Plus size={15} /> {isMedic ? "בקשה רפואית חדשה" : isCoordinator ? 'בקשת ת"ש חדשה' : "בקשה חדשה"}
             </button>
           )}
         </div>
-        {!isMedic && <div data-tour="requests-type-filters" className="flex items-center gap-1.5">
+        {!isTypeRestricted && <div data-tour="requests-type-filters" className="flex items-center gap-1.5">
           {(["all", "leave", "medical", "hardship"] as const).map((t) => (
             <button
               key={t}
@@ -589,7 +592,7 @@ export default function RequestsPage() {
             <DialogTitle>בחר סוג בקשה</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            {(isMedic ? ["medical"] as RequestType[] : ["leave", "medical", "hardship"] as RequestType[]).map((type) => (
+            {(isMedic ? ["medical"] as RequestType[] : isCoordinator ? ["hardship"] as RequestType[] : ["leave", "medical", "hardship"] as RequestType[]).map((type) => (
               <button
                 key={type}
                 type="button"

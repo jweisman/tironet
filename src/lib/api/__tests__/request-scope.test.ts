@@ -227,6 +227,40 @@ describe("getRequestScope", () => {
     expect(result.scope!.canCreate).toBe(true);
   });
 
+  it("resolves hardship_coordinator scope: company-level, canCreate = true", async () => {
+    const user = mockSessionUser({
+      cycleAssignments: [
+        mockAssignment({
+          cycleId: "cycle-1",
+          role: "hardship_coordinator",
+          unitType: "company",
+          unitId: "co-1",
+        }),
+      ],
+    });
+    mockAuth.mockResolvedValue({ user } as never);
+    mockPrisma.platoon.findMany.mockResolvedValue([
+      { id: "pl-1" },
+      { id: "pl-2" },
+    ] as never);
+    mockPrisma.squad.findMany.mockResolvedValue([
+      { id: "sq-1" },
+      { id: "sq-2" },
+      { id: "sq-3" },
+    ] as never);
+    mockPrisma.soldier.findMany.mockResolvedValue([
+      { id: "sol-1" },
+      { id: "sol-2" },
+    ] as never);
+
+    const result = await getRequestScope("cycle-1");
+    expect(result.scope!.role).toBe("hardship_coordinator");
+    expect(result.scope!.platoonIds).toEqual(["pl-1", "pl-2"]);
+    expect(result.scope!.squadIds).toEqual(["sq-1", "sq-2", "sq-3"]);
+    expect(result.scope!.soldierIds).toEqual(["sol-1", "sol-2"]);
+    expect(result.scope!.canCreate).toBe(true);
+  });
+
   it("returns 403 for instructor (no request access)", async () => {
     const user = mockSessionUser({
       cycleAssignments: [

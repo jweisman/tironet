@@ -155,10 +155,11 @@ export async function PATCH(
     return NextResponse.json({ request: updated });
   }
 
-  // Handle field edits — assigned role, company medic, or platoon commander (medical requests only) can edit
+  // Handle field edits — assigned role, company medic, hardship coordinator, or platoon commander (medical requests only) can edit
   const isMedicOnMedical = scope.role === "company_medic" && req.type === "medical";
+  const isCoordinatorOnHardship = scope.role === "hardship_coordinator" && req.type === "hardship";
   const isPlatoonCmdrOnMedical = effectiveRole(scope.role as Role) === "platoon_commander" && req.type === "medical";
-  if (!isMedicOnMedical && !isPlatoonCmdrOnMedical && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
+  if (!isMedicOnMedical && !isCoordinatorOnHardship && !isPlatoonCmdrOnMedical && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
     return NextResponse.json({ error: "Only the assigned role can edit" }, { status: 403 });
   }
 

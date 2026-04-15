@@ -589,7 +589,7 @@ function renderRequestDetailsHtml(req: OpenRequestItem, options?: { highlightDat
 const STATUS_LABELS: Record<string, string> = { open: "ממתינה", approved: "אושר", denied: "נדחה" };
 const ROLE_LABELS: Record<string, string> = {
   squad_commander: 'מ"כ', platoon_commander: 'מ"מ', platoon_sergeant: 'סמ"ח',
-  company_commander: 'מ"פ', deputy_company_commander: 'סמ"פ', instructor: "מדריך", company_medic: 'חופ"ל',
+  company_commander: 'מ"פ', deputy_company_commander: 'סמ"פ', instructor: "מדריך", company_medic: 'חופ"ל', hardship_coordinator: 'מש"קית ת"ש',
 };
 
 function renderRequestTypeSection(title: string, requests: OpenRequestItem[], options?: { highlightDates?: boolean }): string {

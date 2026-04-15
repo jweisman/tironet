@@ -354,13 +354,14 @@ The request badge (home page callout, sidebar/tab bar dot) counts requests assig
 | `deputy_company_commander` | `company_commander` | 3 | company | Same permissions as company commander |
 | `instructor` | (self) | 3 | company | Activities and activity reports only — no soldiers page, no requests |
 | `company_medic` | (self) | 3 | company | Requests (medical only on list page) and request reports only — no activities, no soldiers page |
+| `hardship_coordinator` | (self) | 3 | company | Requests (hardship only on list page) and request reports only — no activities, no soldiers page |
 | `platoon_commander` | (self) | 2 | platoon | Full access within their platoon |
 | `platoon_sergeant` | `platoon_commander` | 2 | platoon | Same permissions as platoon commander |
 | `squad_commander` | (self) | 1 | squad | Access to their own squad only |
 
 ### `effectiveRole()` — deputy role mapping
 
-`effectiveRole()` maps `deputy_company_commander` → `company_commander` and `platoon_sergeant` → `platoon_commander`. The new roles (`instructor`, `company_medic`) pass through unchanged because they have distinct access patterns that differ from `company_commander`.
+`effectiveRole()` maps `deputy_company_commander` → `company_commander` and `platoon_sergeant` → `platoon_commander`. The roles `instructor`, `company_medic`, and `hardship_coordinator` pass through unchanged because they have distinct access patterns that differ from `company_commander`.
 
 ### Instructor (`instructor` / מדריך)
 
@@ -381,11 +382,20 @@ The request badge (home page callout, sidebar/tab bar dot) counts requests assig
 - **Home page:** sees platoon summary cards with requests column only (no soldiers, activities, or gaps). Today's activities section is hidden. Request callout and active requests callout are visible.
 - **Scope functions:** `getRequestScope()` returns `role: "company_medic"`, `canCreate: false`
 
+### Hardship Coordinator (`hardship_coordinator` / מש"קית ת"ש)
+
+- **Unit type:** company — assigned to a company, sees all platoons in that company
+- **Requests:** can view all request types but the list page filters to hardship only; can add notes and edit request details but **cannot perform workflow actions** (approve/deny/acknowledge)
+- **Cannot access:** soldiers page, activities page, activity reports
+- **Navigation:** sees only Home + Requests + Reports (request reports section only, forced to hardship type)
+- **Home page:** sees platoon summary cards with requests column only (no soldiers, activities, or gaps). Today's activities section is hidden.
+- **Scope functions:** `getRequestScope()` returns `role: "hardship_coordinator"`, `canCreate: true`
+
 ### Page access guards
 
 Navigation (Sidebar/TabBar) filters out inaccessible pages, but pages also guard against direct URL access:
-- `/soldiers` — blocks `instructor` and `company_medic`
-- `/activities` — blocks `company_medic`
+- `/soldiers` — blocks `instructor`, `company_medic`, and `hardship_coordinator`
+- `/activities` — blocks `company_medic` and `hardship_coordinator`
 - `/requests` — blocks `instructor`
 - `/reports` — conditionally shows activity reports section (hidden for medic) and request reports section (hidden for instructor)
 

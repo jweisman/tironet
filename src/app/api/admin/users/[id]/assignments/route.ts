@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/api/admin-guard";
 
 const schema = z.object({
   cycleId: z.string().uuid(),
-  role: z.enum(["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander", "instructor", "company_medic"]),
+  role: z.enum(["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander", "instructor", "company_medic", "hardship_coordinator"]),
   unitType: z.enum(["company", "platoon", "squad"]),
   unitId: z.string().uuid(),
 });

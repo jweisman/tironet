@@ -187,7 +187,7 @@ export default function SoldiersPage() {
 
   const rawRole = (selectedAssignment?.role ?? "") as Role | "";
   const role = rawRole ? effectiveRole(rawRole as Role) : "";
-  const noAccess = rawRole === "instructor" || rawRole === "company_medic";
+  const noAccess = rawRole === "instructor" || rawRole === "company_medic" || rawRole === "hardship_coordinator";
 
   // -------- PowerSync queries --------
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);

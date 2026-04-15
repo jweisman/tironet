@@ -256,8 +256,9 @@ export default function RequestDetailPage() {
   // Company medics and platoon commanders can edit medical request fields (appointments, etc.)
   const effRole = rawUserRole ? effectiveRole(rawUserRole as Role) : "";
   const isMedicOnMedical = rawUserRole === "company_medic" && requestType === "medical";
+  const isCoordinatorOnHardship = rawUserRole === "hardship_coordinator" && requestType === "hardship";
   const isPlatoonCmdrOnMedical = effRole === "platoon_commander" && requestType === "medical";
-  const canEditFields = isAssignedToMe || isMedicOnMedical || isPlatoonCmdrOnMedical;
+  const canEditFields = isAssignedToMe || isMedicOnMedical || isCoordinatorOnHardship || isPlatoonCmdrOnMedical;
 
   const userName = session?.user
     ? `${(session.user as { familyName?: string }).familyName ?? ""} ${(session.user as { givenName?: string }).givenName ?? ""}`.trim()

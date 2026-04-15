@@ -5,7 +5,7 @@ import type { SessionUser, CycleAssignment } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 
 export interface ReportScope {
-  role: "platoon_commander" | "company_commander" | "instructor" | "company_medic";
+  role: "platoon_commander" | "company_commander" | "instructor" | "company_medic" | "hardship_coordinator";
   platoonIds: string[];
   companyId?: string;
 }
@@ -79,7 +79,7 @@ export async function getReportScope(cycleId: string): Promise<ScopeResult> {
     };
   }
 
-  if (assignment.role === "instructor" || assignment.role === "company_medic") {
+  if (assignment.role === "instructor" || assignment.role === "company_medic" || assignment.role === "hardship_coordinator") {
     // Company-level roles with limited report access
     const platoons = await prisma.platoon.findMany({
       where: { companyId: assignment.unitId },

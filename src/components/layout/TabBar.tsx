@@ -30,13 +30,13 @@ export function TabBar() {
   const isCommander = session?.user?.cycleAssignments?.some(
     (a) => { const r = effectiveRole(a.role as Role); return r === "company_commander" || r === "platoon_commander"; }
   );
-  const canSeeReports = isAdmin || isCommander || selectedRole === "instructor" || selectedRole === "company_medic";
-  const canSeeCommanders = !isAdmin && isCommander && selectedRole !== "instructor" && selectedRole !== "company_medic";
+  const canSeeReports = isAdmin || isCommander || selectedRole === "instructor" || selectedRole === "company_medic" || selectedRole === "hardship_coordinator";
+  const canSeeCommanders = !isAdmin && isCommander && selectedRole !== "instructor" && selectedRole !== "company_medic" && selectedRole !== "hardship_coordinator";
 
   // Filter tabs by role
   const staticTabs = allTabs.filter(({ href }) => {
     if (selectedRole === "instructor") return href === "/home" || href === "/activities";
-    if (selectedRole === "company_medic") return href === "/home" || href === "/requests";
+    if (selectedRole === "company_medic" || selectedRole === "hardship_coordinator") return href === "/home" || href === "/requests";
     return true;
   });
 

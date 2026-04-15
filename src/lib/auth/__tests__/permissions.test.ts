@@ -25,6 +25,10 @@ describe("effectiveRole", () => {
     expect(effectiveRole("company_medic")).toBe("company_medic");
   });
 
+  it("passes hardship_coordinator through unchanged", () => {
+    expect(effectiveRole("hardship_coordinator")).toBe("hardship_coordinator");
+  });
+
   it("passes base roles through unchanged", () => {
     expect(effectiveRole("company_commander")).toBe("company_commander");
     expect(effectiveRole("platoon_commander")).toBe("platoon_commander");
@@ -42,7 +46,8 @@ describe("rolesInvitableBy", () => {
     expect(roles).toContain("squad_commander");
     expect(roles).toContain("instructor");
     expect(roles).toContain("company_medic");
-    expect(roles).toHaveLength(7);
+    expect(roles).toContain("hardship_coordinator");
+    expect(roles).toHaveLength(8);
   });
 
   it("company_commander can invite lower-ranked roles", () => {
@@ -151,6 +156,7 @@ describe("constants", () => {
     expect(ROLE_LABELS.squad_commander).toBe('מ"כ');
     expect(ROLE_LABELS.instructor).toBe("מדריך");
     expect(ROLE_LABELS.company_medic).toBe('חופ"ל');
+    expect(ROLE_LABELS.hardship_coordinator).toBe('מש"קית ת"ש');
   });
 
   it("UNIT_TYPE_FOR_ROLE maps roles to unit types", () => {
@@ -161,5 +167,6 @@ describe("constants", () => {
     expect(UNIT_TYPE_FOR_ROLE.squad_commander).toBe("squad");
     expect(UNIT_TYPE_FOR_ROLE.instructor).toBe("company");
     expect(UNIT_TYPE_FOR_ROLE.company_medic).toBe("company");
+    expect(UNIT_TYPE_FOR_ROLE.hardship_coordinator).toBe("company");
   });
 });

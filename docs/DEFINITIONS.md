@@ -46,6 +46,10 @@ This document summarizes the up-to-date definitions for terms used throughout th
   * creates and edits medical requests for all soldiers in company
   * views request reports (limited to medical requests)
   * dashboard view limited to medical requests
+* _Hardship coordinator_:
+  * creates and edits hardship requests for all soldiers in company
+  * views request reports (limited to hardship requests)
+  * dashboard view limited to hardship requests
 * _Instructor_:
   * creates and edits activities for any platoon in company
   * adds activity reports for any activity

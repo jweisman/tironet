@@ -157,6 +157,35 @@ export async function getRequestScope(cycleId: string): Promise<ScopeResult> {
     };
   }
 
+  if (assignment.role === "hardship_coordinator") {
+    // Company-level, can view + edit details on hardship requests
+    const platoons = await prisma.platoon.findMany({
+      where: { companyId: assignment.unitId },
+      select: { id: true },
+    });
+    const platoonIds = platoons.map((p) => p.id);
+    const squads = await prisma.squad.findMany({
+      where: { platoonId: { in: platoonIds } },
+      select: { id: true },
+    });
+    const squadIds = squads.map((s) => s.id);
+    const soldiers = await prisma.soldier.findMany({
+      where: { squadId: { in: squadIds }, cycleId },
+      select: { id: true },
+    });
+    return {
+      scope: {
+        role: "hardship_coordinator",
+        soldierIds: soldiers.map((s) => s.id),
+        squadIds,
+        platoonIds,
+        canCreate: true,
+      },
+      error: null,
+      user,
+    };
+  }
+
   return {
     scope: null,
     error: NextResponse.json({ error: "Unknown role" }, { status: 403 }),

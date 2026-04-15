@@ -101,9 +101,10 @@ function getTodayDetail(type: string, raw: RawActiveRequest, today: string): str
 interface Props {
   cycleId: string;
   squadId: string; // '' for platoon/company scope
+  typeFilter?: string; // e.g. "medical" — restricts to a single request type
 }
 
-export function ActiveRequestsCallout({ cycleId, squadId }: Props) {
+export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
   const router = useRouter();
 
   const params = useMemo(
@@ -119,6 +120,7 @@ export function ActiveRequestsCallout({ cycleId, squadId }: Props) {
     const today = new Date().toISOString().split("T")[0];
     return (raw ?? [])
       .filter((r) => isActiveToday(r, today))
+      .filter((r) => !typeFilter || r.type === typeFilter)
       .map((r) => ({
         id: r.id,
         type: r.type as RequestType,

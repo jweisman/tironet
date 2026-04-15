@@ -258,6 +258,58 @@ describe("POST /api/requests", () => {
     const body = await res.json();
     expect(body.error).toBe("Medics can only create medical requests");
   });
+
+  it("creates hardship request as hardship_coordinator → assigns to platoon_commander", async () => {
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "hardship_coordinator",
+        soldierIds: [validBody.soldierId],
+        squadIds: ["sq-1"],
+        platoonIds: ["pl-1"],
+        canCreate: true,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+    mockRequestCreate.mockResolvedValue({
+      id: "req-hardship",
+      assignedRole: "platoon_commander",
+      soldier: fakeSoldier,
+    } as never);
+
+    const req = createMockRequest("POST", "/api/requests", {
+      ...validBody,
+      type: "hardship",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+
+    const createCall = mockRequestCreate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(createCall.data.assignedRole).toBe("platoon_commander");
+  });
+
+  it("returns 403 when hardship_coordinator tries to create non-hardship request", async () => {
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "hardship_coordinator",
+        soldierIds: [validBody.soldierId],
+        squadIds: ["sq-1"],
+        platoonIds: ["pl-1"],
+        canCreate: true,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    const req = createMockRequest("POST", "/api/requests", {
+      ...validBody,
+      type: "medical",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/hardship/i);
+  });
 });
 
 // ---------------------------------------------------------------------------

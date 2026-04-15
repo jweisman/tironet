@@ -512,6 +512,57 @@ describe("PATCH /api/requests/[id] — field edits", () => {
     expect(res.status).toBe(403);
   });
 
+  it("allows hardship_coordinator to edit hardship request fields", async () => {
+    const hardshipRequest = { ...baseRequest, type: "hardship", assignedRole: "platoon_commander" };
+    mockCanActOnRequest.mockReturnValueOnce(false); // coordinator doesn't match assignedRole
+    mockRequestFindUnique.mockResolvedValue(hardshipRequest as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "hardship_coordinator",
+        soldierIds: ["sol-1"],
+        squadIds: [],
+        platoonIds: ["pl-1"],
+        canCreate: false,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+    mockRequestUpdate.mockResolvedValue({
+      ...hardshipRequest,
+      description: "Updated hardship description",
+    } as never);
+
+    const req = createMockRequest("PATCH", "/api/requests/req-1", {
+      description: "Updated hardship description",
+    });
+    const res = await PATCH(req, makeParams("req-1"));
+    expect(res.status).toBe(200);
+  });
+
+  it("blocks hardship_coordinator from editing non-hardship request fields", async () => {
+    mockCanActOnRequest.mockReturnValueOnce(false);
+    mockRequestFindUnique.mockResolvedValue({
+      ...baseRequest,
+      type: "medical",
+      assignedRole: "platoon_commander",
+    } as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "hardship_coordinator",
+        soldierIds: ["sol-1"],
+        squadIds: [],
+        platoonIds: ["pl-1"],
+        canCreate: false,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    const req = createMockRequest("PATCH", "/api/requests/req-1", { description: "Updated" });
+    const res = await PATCH(req, makeParams("req-1"));
+    expect(res.status).toBe(403);
+  });
+
   it("returns existing request when no fields to update", async () => {
     mockRequestFindUnique.mockResolvedValue(baseRequest as never);
     mockGetScope.mockResolvedValue({

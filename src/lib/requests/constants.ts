@@ -38,6 +38,7 @@ export const ASSIGNED_ROLE_LABELS: Record<Role, string> = {
   deputy_company_commander: 'סמ"פ',
   instructor: "מדריך",
   company_medic: 'חופ"ל',
+  hardship_coordinator: 'מש"קית ת"ש',
 };
 
 export const REQUEST_STATUS_VARIANT: Record<

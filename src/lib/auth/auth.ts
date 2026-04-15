@@ -167,7 +167,7 @@ async function resolvePowerSyncClaims(assignments: RawAssignment[]): Promise<{
   for (const a of assignments) {
     const role = a.role as import("@/types").Role;
     const eff = effectiveRole(role);
-    if (eff === "company_commander" || role === "instructor" || role === "company_medic") {
+    if (eff === "company_commander" || role === "instructor" || role === "company_medic" || role === "hardship_coordinator") {
       const platoons = await prisma.platoon.findMany({
         where: { companyId: a.unitId },
         select: { id: true },

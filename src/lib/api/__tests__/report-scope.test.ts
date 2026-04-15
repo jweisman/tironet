@@ -182,6 +182,29 @@ describe("getReportScope", () => {
     expect(result.scope!.companyId).toBe("co-1");
   });
 
+  it("resolves hardship_coordinator scope: company-level with platoons", async () => {
+    const user = mockSessionUser({
+      cycleAssignments: [
+        mockAssignment({
+          cycleId: "cycle-1",
+          role: "hardship_coordinator",
+          unitType: "company",
+          unitId: "co-1",
+        }),
+      ],
+    });
+    mockAuth.mockResolvedValue({ user } as never);
+    mockPrisma.platoon.findMany.mockResolvedValue([
+      { id: "pl-1" },
+      { id: "pl-3" },
+    ] as never);
+
+    const result = await getReportScope("cycle-1");
+    expect(result.scope!.role).toBe("hardship_coordinator");
+    expect(result.scope!.platoonIds).toEqual(["pl-1", "pl-3"]);
+    expect(result.scope!.companyId).toBe("co-1");
+  });
+
   it("scopes admin by cycle assignment, not isAdmin flag", async () => {
     const user = mockSessionUser({
       isAdmin: true,

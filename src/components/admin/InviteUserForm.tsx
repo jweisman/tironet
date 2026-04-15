@@ -38,7 +38,7 @@ type CreatedInvitation = {
   hasPhone: boolean;
 };
 
-const ALL_ROLES: Role[] = ["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander", "instructor", "company_medic"];
+const ALL_ROLES: Role[] = ["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander", "instructor", "company_medic", "hardship_coordinator"];
 
 export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSuccess, onCancel }: Props) {
   const roles = allowedRoles ?? ALL_ROLES;

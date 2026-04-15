@@ -287,7 +287,7 @@ export default function ActivitiesPage() {
   const { startTour } = useTour({ page: "activities", steps: activitiesTourSteps });
   useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
 
-  if (rawRole === "company_medic") {
+  if (rawRole === "company_medic" || rawRole === "hardship_coordinator") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
         <p className="text-lg font-medium">אין גישה לעמוד זה</p>

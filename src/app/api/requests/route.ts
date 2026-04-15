@@ -57,6 +57,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Medics can only create medical requests" }, { status: 403 });
   }
 
+  // Hardship coordinators can only create hardship requests
+  if (scope.role === "hardship_coordinator" && data.type !== "hardship") {
+    return NextResponse.json({ error: "Hardship coordinators can only create hardship requests" }, { status: 403 });
+  }
+
   // Determine initial assignment based on creator's role
   let assignedRole: Role;
   if (scope.role === "squad_commander") {
@@ -66,6 +71,9 @@ export async function POST(request: NextRequest) {
     assignedRole = "platoon_commander";
   } else if (scope.role === "company_medic") {
     // Medic creates medical request → goes through regular approval chain
+    assignedRole = "platoon_commander";
+  } else if (scope.role === "hardship_coordinator") {
+    // Coordinator creates hardship request → goes through regular approval chain
     assignedRole = "platoon_commander";
   } else if (scope.role === "platoon_commander") {
     // Platoon commander creates → goes directly to company commander
