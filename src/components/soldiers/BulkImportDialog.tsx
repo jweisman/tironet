@@ -51,6 +51,9 @@ interface ParsedRow {
   status: string;
   phone: string;
   emergencyPhone: string;
+  street: string;
+  apt: string;
+  city: string;
   platoonName: string;
   squadName: string;
   resolvedSquadId: string | null;
@@ -69,7 +72,7 @@ const VALID_STATUSES: Record<string, SoldierStatus> = {
   injured: "injured",
 };
 
-const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "מספר זהות", "מחלקה", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום"];
+const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "מספר זהות", "מחלקה", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום", "רחוב", "דירה", "עיר"];
 
 const FROM_FILE = "__from_file__";
 
@@ -77,10 +80,10 @@ function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    ["כהן", "דוד", "1234567", "123456789", "מחלקה א", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543"],
-    ["לוי", "רחל", "", "", "", "", "", "", "", ""],
+    ["כהן", "דוד", "1234567", "123456789", "מחלקה א", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543", "הרצל 5", "3", "תל אביב"],
+    ["לוי", "רחל", "", "", "", "", "", "", "", "", "", "", ""],
   ]);
-  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
+  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 8 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, ws, "חיילים");
   XLSX.writeFile(wb, "תבנית-חיילים.xlsx");
 }
@@ -117,6 +120,9 @@ function parseSheet(
   const statusIdx = headers.findIndex((h) => h === "סטטוס");
   const phoneIdx = headers.findIndex((h) => h === "טלפון");
   const emergencyPhoneIdx = headers.findIndex((h) => h === "טלפון חירום");
+  const streetIdx = headers.findIndex((h) => h === "רחוב");
+  const aptIdx = headers.findIndex((h) => h === "דירה");
+  const cityIdx = headers.findIndex((h) => h === "עיר");
 
   // Build platoon name → id lookup (case-insensitive, trimmed)
   const platoonLookup = new Map<string, string>();
@@ -148,6 +154,9 @@ function parseSheet(
     const status = get(statusIdx);
     const phone = get(phoneIdx);
     const emergencyPhone = get(emergencyPhoneIdx);
+    const street = get(streetIdx);
+    const apt = get(aptIdx);
+    const city = get(cityIdx);
 
     if (!familyName && !givenName && !rank && !status && !idNumber && !squadName && !platoonName && !phone && !emergencyPhone) return;
 
@@ -208,6 +217,9 @@ function parseSheet(
       status,
       phone,
       emergencyPhone,
+      street,
+      apt,
+      city,
       platoonName,
       squadName,
       resolvedSquadId,
@@ -341,6 +353,9 @@ export function BulkImportDialog({
             status: (VALID_STATUSES[r.status] ?? "active") as SoldierStatus,
             phone: r.phone || null,
             emergencyPhone: r.emergencyPhone || null,
+            street: r.street || null,
+            apt: r.apt || null,
+            city: r.city || null,
           })),
         }),
       });

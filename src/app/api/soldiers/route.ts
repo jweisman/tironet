@@ -19,6 +19,9 @@ const postSchema = z.object({
   profileImage: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   emergencyPhone: z.string().nullable().optional(),
+  street: z.string().nullable().optional(),
+  apt: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -179,7 +182,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { cycleId, squadId, givenName, familyName, idNumber, civilianId, rank, status, profileImage, phone, emergencyPhone, notes } =
+  const { cycleId, squadId, givenName, familyName, idNumber, civilianId, rank, status, profileImage, phone, emergencyPhone, street, apt, city, notes } =
     parsed.data;
 
   const imageError = validateProfileImage(profileImage);
@@ -230,6 +233,9 @@ export async function POST(req: NextRequest) {
       profileImage: profileImage ?? null,
       phone: phone ? (toE164(phone) ?? null) : null,
       emergencyPhone: emergencyPhone ? (toE164(emergencyPhone) ?? null) : null,
+      street: street ?? null,
+      apt: apt ?? null,
+      city: city ?? null,
       notes: notes ?? null,
     },
   });

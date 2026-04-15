@@ -252,6 +252,9 @@ model Soldier {
   profileImage   String?       @map("profile_image")
   phone          String?
   emergencyPhone String?       @map("emergency_phone")
+  street         String?
+  apt            String?
+  city           String?
   notes          String?
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz()

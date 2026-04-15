@@ -16,6 +16,9 @@ const soldierSchema = z.object({
   status: z.enum(["active", "transferred", "dropped", "injured"]).optional(),
   phone: z.string().nullable().optional(),
   emergencyPhone: z.string().nullable().optional(),
+  street: z.string().nullable().optional(),
+  apt: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
 });
 
 const bulkSchema = z.object({
@@ -159,6 +162,9 @@ export async function POST(req: NextRequest) {
           status: s.status ?? "active",
           phone: s.phone ? (toE164(s.phone) ?? null) : null,
           emergencyPhone: s.emergencyPhone ? (toE164(s.emergencyPhone) ?? null) : null,
+          street: s.street ?? null,
+          apt: s.apt ?? null,
+          city: s.city ?? null,
         },
         select: { id: true },
       })
@@ -174,6 +180,9 @@ export async function POST(req: NextRequest) {
           status: s.status ?? "active",
           phone: s.phone ? (toE164(s.phone) ?? null) : null,
           emergencyPhone: s.emergencyPhone ? (toE164(s.emergencyPhone) ?? null) : null,
+          ...(s.street !== undefined ? { street: s.street ?? null } : {}),
+          ...(s.apt !== undefined ? { apt: s.apt ?? null } : {}),
+          ...(s.city !== undefined ? { city: s.city ?? null } : {}),
         },
         select: { id: true },
       })

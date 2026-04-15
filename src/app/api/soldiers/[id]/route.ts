@@ -17,6 +17,9 @@ const patchSchema = z.object({
   profileImage: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   emergencyPhone: z.string().nullable().optional(),
+  street: z.string().nullable().optional(),
+  apt: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -259,6 +262,9 @@ export async function PATCH(
       updateData.emergencyPhone = null;
     }
   }
+  if (parsed.data.street !== undefined) updateData.street = parsed.data.street;
+  if (parsed.data.apt !== undefined) updateData.apt = parsed.data.apt;
+  if (parsed.data.city !== undefined) updateData.city = parsed.data.city;
   if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
 
   const soldier = await prisma.soldier.update({

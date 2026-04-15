@@ -48,6 +48,9 @@ const soldiers = new Table({
   profile_image: column.text,
   phone: column.text,
   emergency_phone: column.text,
+  street: column.text,
+  apt: column.text,
+  city: column.text,
   notes: column.text,
 });
 

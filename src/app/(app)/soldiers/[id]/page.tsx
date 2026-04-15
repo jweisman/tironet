@@ -90,7 +90,8 @@ function formatDate(dateStr: string) {
 const SOLDIER_QUERY = `
   SELECT
     s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
-    s.id_number, s.civilian_id, s.cycle_id, s.squad_id, s.phone, s.emergency_phone, s.notes,
+    s.id_number, s.civilian_id, s.cycle_id, s.squad_id, s.phone, s.emergency_phone,
+    s.street, s.apt, s.city, s.notes,
     sq.name AS squad_name, sq.platoon_id,
     p.id AS platoon_id, p.name AS platoon_name
   FROM soldiers s
@@ -174,7 +175,8 @@ interface RawSoldierRequest {
 interface RawSoldier {
   id: string; given_name: string; family_name: string;
   id_number: string | null; civilian_id: string | null; rank: string | null; status: string; profile_image: string | null;
-  phone: string | null; emergency_phone: string | null; notes: string | null;
+  phone: string | null; emergency_phone: string | null;
+  street: string | null; apt: string | null; city: string | null; notes: string | null;
   cycle_id: string; squad_id: string;
   squad_name: string; platoon_id: string; platoon_name: string;
 }
@@ -301,6 +303,9 @@ export default function SoldierDetailPage() {
     profileImage: raw.profile_image,
     phone: raw.phone,
     emergencyPhone: raw.emergency_phone,
+    street: raw.street,
+    apt: raw.apt,
+    city: raw.city,
     notes: raw.notes,
   };
 
@@ -415,7 +420,7 @@ export default function SoldierDetailPage() {
         </div>
 
         {/* Contact info & notes */}
-        {(raw.phone || raw.emergency_phone || raw.notes) && (
+        {(raw.phone || raw.emergency_phone || raw.street || raw.city || raw.notes) && (
           <div className="border-t border-border pt-3 space-y-1.5 text-sm">
             {raw.phone && (
               <div className="flex items-center gap-2">
@@ -436,6 +441,12 @@ export default function SoldierDetailPage() {
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">טלפון חירום:</span>
                 <a href={`tel:${raw.emergency_phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.emergency_phone)}</a>
+              </div>
+            )}
+            {(raw.street || raw.city) && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">כתובת:</span>
+                <span>{[raw.street, raw.apt ? `דירה ${raw.apt}` : null, raw.city].filter(Boolean).join(", ")}</span>
               </div>
             )}
             {raw.notes && (

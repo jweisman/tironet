@@ -29,6 +29,9 @@ interface SoldierData {
   profileImage: string | null;
   phone: string | null;
   emergencyPhone: string | null;
+  street: string | null;
+  apt: string | null;
+  city: string | null;
   notes: string | null;
 }
 
@@ -47,6 +50,9 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
   const [status, setStatus] = useState<SoldierStatus>(soldier.status);
   const [phone, setPhone] = useState(soldier.phone ? toIsraeliDisplay(soldier.phone) : "");
   const [emergencyPhone, setEmergencyPhone] = useState(soldier.emergencyPhone ? toIsraeliDisplay(soldier.emergencyPhone) : "");
+  const [street, setStreet] = useState(soldier.street ?? "");
+  const [apt, setApt] = useState(soldier.apt ?? "");
+  const [city, setCity] = useState(soldier.city ?? "");
   const [notes, setNotes] = useState(soldier.notes ?? "");
   const [imagePreview, setImagePreview] = useState<string | null>(
     soldier.profileImage
@@ -78,6 +84,9 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
           profileImage: imageBase64,
           phone: phone.trim() || null,
           emergencyPhone: emergencyPhone.trim() || null,
+          street: street.trim() || null,
+          apt: apt.trim() || null,
+          city: city.trim() || null,
           notes: notes.trim() || null,
         }),
       });
@@ -259,6 +268,36 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
             dir="ltr"
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-street">רחוב</Label>
+          <Input
+            id="edit-street"
+            value={street}
+            onChange={(e) => setStreet(e.target.value)}
+            placeholder="רחוב ומספר"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-city">עיר</Label>
+          <Input
+            id="edit-city"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="עיר"
+          />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="edit-apt">דירה</Label>
+        <Input
+          id="edit-apt"
+          value={apt}
+          onChange={(e) => setApt(e.target.value)}
+          placeholder="מספר דירה"
+        />
       </div>
 
       <div className="space-y-1.5">
