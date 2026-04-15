@@ -77,16 +77,19 @@ interface ActiveRequest {
 }
 
 function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("he-IL", {
-    day: "numeric",
-    month: "short",
-  });
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+  const hasTime = iso.includes("T") && !iso.endsWith("T00:00:00.000Z");
+  if (hasTime) {
+    const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+    return `${date} ${time}`;
+  }
+  return date;
 }
 
 function getTodayDetail(type: string, raw: RawActiveRequest, today: string): string | null {
   if (type === "leave") {
-    const ret = raw.return_at?.split("T")[0];
-    if (ret) return `חזרה ${formatShortDate(ret)}`;
+    if (raw.return_at) return `חזרה ${formatShortDate(raw.return_at)}`;
     return "ביציאה";
   }
   if (type === "medical") {

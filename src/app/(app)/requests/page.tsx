@@ -114,14 +114,21 @@ function activeRequestSortDate(r: RequestSummary): string {
 }
 
 function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+  const hasTime = iso.includes("T") && !iso.endsWith("T00:00:00.000Z");
+  if (hasTime) {
+    const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+    return `${date} ${time}`;
+  }
+  return date;
 }
 
 /** Brief explanation of why a request appears on a given date in the active tab. */
 function activeRequestDetail(r: RequestSummary): string | null {
   if (r.type === "leave") {
-    const dep = r.departureAt?.split("T")[0];
-    const ret = r.returnAt?.split("T")[0];
+    const dep = r.departureAt;
+    const ret = r.returnAt;
     if (dep && ret) return `יציאה ${formatShortDate(dep)} · חזרה ${formatShortDate(ret)}`;
     if (dep) return `יציאה ${formatShortDate(dep)}`;
     if (ret) return `חזרה ${formatShortDate(ret)}`;
