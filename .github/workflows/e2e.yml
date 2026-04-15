@@ -26,6 +26,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Start Docker services immediately after checkout — they initialize
+      # in the background while Node/npm/Playwright install below.
+      # By the time tests need them, PostgreSQL + MongoDB + PowerSync are warm.
+      - name: Start Docker services
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+        env:
+          PS_DATABASE_URL: postgresql://tironet:tironet@postgres:5432/tironet_test
+          PS_JWT_SECRET_B64URL: Y2ktdGVzdC1qd3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch
+          PS_JWT_AUDIENCE: http://localhost:8080
+          PS_MONGODB_URI: mongodb://mongo:27017/powersync_e2e
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -42,28 +53,12 @@ jobs:
             ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
             ${{ runner.os }}-nextjs-
 
-      - name: Install Playwright & pull Docker images
-        run: |
-          docker compose -f docker-compose.yml -f docker-compose.e2e.yml pull --quiet &
-          DOCKER_PID=$!
-          npx playwright install chromium --with-deps
-          wait $DOCKER_PID
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
 
-      - name: Start Docker services
-        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
-        env:
-          PS_DATABASE_URL: postgresql://tironet:tironet@postgres:5432/tironet_test
-          PS_JWT_SECRET_B64URL: Y2ktdGVzdC1qd3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch
-          PS_JWT_AUDIENCE: http://localhost:8080
-          PS_MONGODB_URI: mongodb://mongo:27017/powersync_e2e
-
-      - name: Wait for PostgreSQL
-        run: |
-          for i in $(seq 1 30); do
-            pg_isready -h 127.0.0.1 -p 5434 -U tironet && break
-            sleep 1
-          done
-
+      # By now Docker services have had ~2 minutes to start.
+      # PostgreSQL and MongoDB should be ready; just init the replica set
+      # and confirm PowerSync is healthy.
       - name: Initialise MongoDB replica set
         run: |
           for i in $(seq 1 30); do
