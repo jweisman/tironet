@@ -1,6 +1,6 @@
 export interface MedicalAppointment {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD or YYYY-MM-DDTHH:MM (with time)
   place: string;
   type: string;
 }
@@ -36,13 +36,18 @@ export function hasUpcomingAppointment(appointments: MedicalAppointment[]): bool
   return appointments.some((a) => a.date >= today);
 }
 
-/** Format a single appointment for display: סוג / תאריך / מקום */
+/** Format a single appointment for display: סוג / תאריך [שעה] / מקום */
 export function formatAppointment(a: MedicalAppointment): string {
-  const date = new Date(a.date + "T00:00:00").toLocaleDateString("he-IL", {
+  const hasTime = a.date.includes("T");
+  const d = new Date(hasTime ? a.date : a.date + "T00:00:00");
+  let dateStr = d.toLocaleDateString("he-IL", {
     day: "numeric",
     month: "numeric",
     year: "numeric",
   });
-  const parts = [a.type, date, a.place].filter(Boolean);
+  if (hasTime) {
+    dateStr += ` ${d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+  const parts = [a.type, dateStr, a.place].filter(Boolean);
   return parts.join(" / ");
 }

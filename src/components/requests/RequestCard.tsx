@@ -43,16 +43,6 @@ interface Props {
   dataTour?: string;
 }
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("he-IL", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export function RequestCard({ request, userRole, activeDetail, onClick, onLongPress, dataTour }: Props) {
   const isAssignedToMe =
     request.assignedRole !== null && userRole !== "admin" && canActOnRequest(userRole, request.assignedRole);
@@ -124,7 +114,7 @@ export function RequestCard({ request, userRole, activeDetail, onClick, onLongPr
           <p className="text-xs text-primary font-semibold">{activeDetail}</p>
         )}
         <p className="text-xs text-muted-foreground">
-          {request.squadName} · {formatDate(request.createdAt)}
+          {request.squadName}
         </p>
       </div>
 

@@ -333,7 +333,7 @@ export function CreateRequestForm({
               placeholder="לאן יוצא החייל"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="req-departure">שעת יציאה</Label>
               <Input
@@ -429,9 +429,9 @@ export function CreateRequestForm({
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <Label className="text-xs">תאריך</Label>
+                    <Label className="text-xs">תאריך ושעה</Label>
                     <Input
-                      type="date"
+                      type="datetime-local"
                       value={appt.date}
                       onChange={(e) => updateAppointment(appt.id, "date", e.target.value)}
                       dir="ltr"

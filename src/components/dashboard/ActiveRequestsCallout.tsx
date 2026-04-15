@@ -30,7 +30,7 @@ function isActiveToday(r: RawActiveRequest, today: string): boolean {
   }
   if (r.type === "medical") {
     const appts = parseMedicalAppointments(r.medical_appointments);
-    return appts.some((a) => a.date === today);
+    return appts.some((a) => a.date.split("T")[0] === today);
   }
   return false;
 }
@@ -94,7 +94,7 @@ function getTodayDetail(type: string, raw: RawActiveRequest, today: string): str
   }
   if (type === "medical") {
     const appts = parseMedicalAppointments(raw.medical_appointments);
-    const todayAppt = appts.find((a) => a.date === today);
+    const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
     if (todayAppt) return `תור: ${formatAppointment(todayAppt)}`;
     return null;
   }

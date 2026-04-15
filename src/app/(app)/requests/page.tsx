@@ -106,8 +106,8 @@ function activeRequestSortDate(r: RequestSummary): string {
   if (r.type === "medical") {
     const today = new Date().toISOString().split("T")[0];
     const appts = parseMedicalAppointments(r.medicalAppointments);
-    const next = appts.find((a) => a.date >= today);
-    return next?.date ?? "9999";
+    const next = appts.find((a) => a.date.split("T")[0] >= today);
+    return next?.date.split("T")[0] ?? "9999";
   }
   // Hardship: no activity date, sort last
   return "9999";
@@ -156,8 +156,8 @@ function groupByDate(requests: RequestSummary[]): [string, RequestSummary[]][] {
 }
 
 function formatGroupDate(dateKey: string): string {
-  if (dateKey === "9999") return "ת\"ש";
-  const d = new Date(dateKey + "T00:00:00");
+  if (dateKey === "9999") return 'ת"ש';
+  const d = new Date(dateKey.includes("T") ? dateKey : dateKey + "T00:00:00");
   return d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
 }
 

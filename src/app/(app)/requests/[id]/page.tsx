@@ -532,9 +532,9 @@ export default function RequestDetailPage() {
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div className="space-y-0.5">
-                              <Label className="text-xs">תאריך</Label>
+                              <Label className="text-xs">תאריך ושעה</Label>
                               <Input
-                                type="date"
+                                type="datetime-local"
                                 value={appt.date}
                                 onChange={(e) =>
                                   setEditAppointmentsList((prev) =>
