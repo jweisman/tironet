@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
+import { getRequestScope } from "@/lib/api/request-scope";
 import { z } from "zod";
 import type { SessionUser } from "@/types";
 
@@ -27,10 +28,16 @@ export async function POST(request: NextRequest) {
   const data = parsed.data;
   const sessionUser = session.user as SessionUser;
 
-  // Verify the request exists
+  // Verify the request exists and user has scope access
   const req = await prisma.request.findUnique({ where: { id: data.requestId } });
   if (!req) {
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
+  }
+
+  const { scope, error } = await getRequestScope(req.cycleId);
+  if (error || !scope) return error!;
+  if (!scope.soldierIds.includes(req.soldierId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const userName = data.userName || `${sessionUser.familyName} ${sessionUser.givenName}`;

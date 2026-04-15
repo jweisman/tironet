@@ -206,7 +206,6 @@ describe("POST /api/admin/invitations/[id] (refresh token)", () => {
 
     expect(res.status).toBe(200);
     expect(body.inviteUrl).toContain("/invite/");
-    expect(body.token).toBeDefined();
     expect(mockUpdateInvitation).toHaveBeenCalledWith({
       where: { id: "inv-1" },
       data: expect.objectContaining({

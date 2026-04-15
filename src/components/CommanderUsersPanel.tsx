@@ -61,7 +61,7 @@ type Invitation = {
   unitName: string;
   cycleName: string;
   expiresAt: string;
-  token: string;
+  inviteUrl: string;
   invitedByUserId: string | null;
 };
 
@@ -114,8 +114,7 @@ export function CommanderUsersPanel({
   }
 
   async function copyInviteLink(inv: Invitation) {
-    const inviteUrl = `${window.location.origin}/invite/${inv.token}`;
-    await navigator.clipboard.writeText(inviteUrl);
+    await navigator.clipboard.writeText(inv.inviteUrl);
     setCopiedId(inv.id);
     setTimeout(() => setCopiedId(null), 2500);
   }

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { signOut } from "next-auth/react";
+import { signOutAndClearCaches } from "@/lib/auth/sign-out";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -361,7 +361,7 @@ export default function ProfilePage() {
       <Button
         variant="outline"
         className="w-full md:hidden text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-        onClick={() => signOut({ callbackUrl: "/" })}
+        onClick={() => signOutAndClearCaches()}
       >
         התנתק
       </Button>

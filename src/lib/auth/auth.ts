@@ -32,31 +32,16 @@ const baseAdapter = PrismaAdapter(prisma);
 const tironetAdapter: Adapter = {
   ...baseAdapter,
 
-  // DEBUG: explicit verification token methods to trace the issue
   async createVerificationToken(data: { identifier: string; token: string; expires: Date }) {
-    console.log("[AUTH DEBUG] createVerificationToken called", { identifier: data.identifier, tokenLength: data.token.length });
-    const result = await prisma.verificationToken.create({ data });
-    console.log("[AUTH DEBUG] createVerificationToken result", result);
-    return result;
+    return prisma.verificationToken.create({ data });
   },
 
   async useVerificationToken(params: { identifier: string; token: string }) {
-    console.log("[AUTH DEBUG] useVerificationToken called", { identifier: params.identifier, tokenLength: params.token.length });
     try {
-      // First check what's in the DB
-      const existing = await prisma.verificationToken.findMany({
-        where: { identifier: params.identifier },
-      });
-      console.log("[AUTH DEBUG] existing tokens for identifier:", existing.map(t => ({ tokenLength: t.token.length, tokenPrefix: t.token.substring(0, 8), expires: t.expires })));
-      console.log("[AUTH DEBUG] looking for token prefix:", params.token.substring(0, 8));
-
-      const verificationToken = await prisma.verificationToken.delete({
+      return await prisma.verificationToken.delete({
         where: { identifier_token: { identifier: params.identifier, token: params.token } },
       });
-      console.log("[AUTH DEBUG] useVerificationToken SUCCESS", verificationToken);
-      return verificationToken;
     } catch (error: unknown) {
-      console.log("[AUTH DEBUG] useVerificationToken ERROR", error);
       if (error && typeof error === "object" && "code" in error && (error as { code: string }).code === "P2025") return null;
       throw error;
     }

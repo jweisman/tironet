@@ -84,6 +84,45 @@ export function canActOnRequest(
 }
 
 /**
+ * Validate that a (status, assignedRole) transition is reachable via some valid
+ * workflow action. Used to guard the connector path where the client sends the
+ * resulting state rather than the action name.
+ */
+export function isValidTransition(
+  currentStatus: RequestStatus,
+  currentAssignedRole: Role | null,
+  newStatus: RequestStatus | undefined,
+  newAssignedRole: Role | null | undefined,
+  requestType: RequestType,
+): boolean {
+  // If neither field changed, it's a field-only edit — always valid.
+  if (newStatus === undefined && newAssignedRole === undefined) return true;
+
+  const targetStatus = newStatus ?? currentStatus;
+  const targetRole = newAssignedRole !== undefined ? newAssignedRole : currentAssignedRole;
+
+  // If nothing actually changed, it's a no-op — allow it.
+  if (targetStatus === currentStatus && targetRole === currentAssignedRole) return true;
+
+  // Must have a current assigned role for any workflow action.
+  if (!currentAssignedRole) return false;
+
+  // Check if any valid action produces this exact transition.
+  const actions: WorkflowAction[] = ["approve", "deny", "acknowledge"];
+  for (const action of actions) {
+    const transition = getNextState(currentStatus, currentAssignedRole, action, requestType);
+    if (
+      transition &&
+      transition.newStatus === targetStatus &&
+      transition.newAssignedRole === targetRole
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Get available actions for a role on a request in a given state.
  */
 export function getAvailableActions(

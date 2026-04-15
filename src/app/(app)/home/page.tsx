@@ -264,7 +264,7 @@ export default function HomePage() {
   const requestBadge = useRequestBadge();
 
   // Check for pending invitations when user has no cycle assignments
-  const [pendingInvites, setPendingInvites] = useState<{ token: string; role: string; cycleName: string }[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<{ id: string; inviteUrl: string; role: string; cycleName: string }[]>([]);
   useEffect(() => {
     if (!cycleLoading && activeCycles.length === 0) {
       fetch("/api/invitations/pending")
@@ -394,8 +394,8 @@ export default function HomePage() {
             <p className="text-muted-foreground text-sm">נמצאו הזמנות ממתינות:</p>
             {pendingInvites.map((inv) => (
               <Link
-                key={inv.token}
-                href={`/invite/${inv.token}`}
+                key={inv.id}
+                href={inv.inviteUrl}
                 className="block rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
               >
                 {inv.cycleName} — {ROLE_LABELS[inv.role as Role] ?? inv.role}

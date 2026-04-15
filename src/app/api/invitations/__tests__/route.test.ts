@@ -663,7 +663,7 @@ describe("POST /api/invitations/[token]/accept", () => {
     expect(res.status).toBe(200);
   });
 
-  it("allows phone-only invitation when user has no phone set", async () => {
+  it("rejects phone-only invitation when user has no phone set", async () => {
     mockAuth.mockResolvedValue({
       user: mockSessionUser({ id: "user-1" }),
     } as never);
@@ -682,16 +682,15 @@ describe("POST /api/invitations/[token]/accept", () => {
       rank: undefined,
       profileImage: undefined,
     } as never);
-    // User has no phone (null)
+    // User has no phone (null) — should be rejected
     mockUserFindUnique
-      .mockResolvedValueOnce({ phone: null } as never)    // phone verification
-      .mockResolvedValueOnce(null as never)                // phoneOwner check
-      .mockResolvedValueOnce({ id: "user-1" } as never);  // session user exists
-    mockTransaction.mockResolvedValue([] as never);
+      .mockResolvedValueOnce({ phone: null } as never);
 
     const req = createMockRequest("POST", "/api/invitations/accept-token/accept");
     const res = await AcceptInvitation(req, tokenParams);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toBe("phone_mismatch");
   });
 
   it("returns 500 when transaction fails", async () => {

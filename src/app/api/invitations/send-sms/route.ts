@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
   if (!invitation) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  if (invitation.invitedByUserId !== session.user.id && !session.user.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   if (!invitation.phone) {
     return NextResponse.json({ error: "No phone on this invitation" }, { status: 400 });
   }

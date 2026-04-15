@@ -189,7 +189,6 @@ export async function GET() {
     unitName: unitMap.get(inv.unitId) ?? "",
     cycleName: inv.cycle.name,
     expiresAt: inv.expiresAt.toISOString(),
-    token: inv.token,
     invitedByUserId: inv.invitedByUserId,
   }));
 

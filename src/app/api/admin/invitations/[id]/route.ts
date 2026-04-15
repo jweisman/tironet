@@ -51,5 +51,5 @@ export async function POST(
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const inviteUrl = `${baseUrl}/invite/${token}`;
 
-  return NextResponse.json({ inviteUrl, token });
+  return NextResponse.json({ inviteUrl });
 }
