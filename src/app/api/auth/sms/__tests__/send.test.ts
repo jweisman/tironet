@@ -8,7 +8,7 @@ vi.mock("@/lib/db/prisma", () => ({
 }));
 
 vi.mock("@/lib/twilio", () => ({
-  sendWhatsAppOtp: vi.fn(),
+  sendSmsOtp: vi.fn(),
 }));
 
 vi.mock("@/lib/api/rate-limit", () => ({
@@ -17,20 +17,20 @@ vi.mock("@/lib/api/rate-limit", () => ({
 
 import { POST } from "../send/route";
 import { prisma } from "@/lib/db/prisma";
-import { sendWhatsAppOtp } from "@/lib/twilio";
+import { sendSmsOtp } from "@/lib/twilio";
 import { createMockRequest } from "@/__tests__/helpers/api";
 
 const mockFindUser = vi.mocked(prisma.user.findUnique);
 const mockFindInvitation = vi.mocked(prisma.invitation.findFirst);
-const mockSendOtp = vi.mocked(sendWhatsAppOtp);
+const mockSendOtp = vi.mocked(sendSmsOtp);
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("POST /api/auth/whatsapp/send", () => {
+describe("POST /api/auth/sms/send", () => {
   it("returns 400 when phone is missing", async () => {
-    const req = createMockRequest("POST", "/api/auth/whatsapp/send", {});
+    const req = createMockRequest("POST", "/api/auth/sms/send", {});
 
     const res = await POST(req);
     const body = await res.json();
@@ -41,7 +41,7 @@ describe("POST /api/auth/whatsapp/send", () => {
   });
 
   it("returns 400 when phone is empty string", async () => {
-    const req = createMockRequest("POST", "/api/auth/whatsapp/send", {
+    const req = createMockRequest("POST", "/api/auth/sms/send", {
       phone: "",
     });
 
@@ -53,7 +53,7 @@ describe("POST /api/auth/whatsapp/send", () => {
     mockFindUser.mockResolvedValue(null);
     mockFindInvitation.mockResolvedValue(null);
 
-    const req = createMockRequest("POST", "/api/auth/whatsapp/send", {
+    const req = createMockRequest("POST", "/api/auth/sms/send", {
       phone: "+972501234567",
     });
 
@@ -70,7 +70,7 @@ describe("POST /api/auth/whatsapp/send", () => {
     mockFindUser.mockResolvedValue({ id: "user-1" } as never);
     mockSendOtp.mockResolvedValue(undefined as never);
 
-    const req = createMockRequest("POST", "/api/auth/whatsapp/send", {
+    const req = createMockRequest("POST", "/api/auth/sms/send", {
       phone: "+972501234567",
     });
 
@@ -89,7 +89,7 @@ describe("POST /api/auth/whatsapp/send", () => {
     mockFindInvitation.mockResolvedValue({ id: "inv-1" } as never);
     mockSendOtp.mockResolvedValue(undefined as never);
 
-    const req = createMockRequest("POST", "/api/auth/whatsapp/send", {
+    const req = createMockRequest("POST", "/api/auth/sms/send", {
       phone: "+972501234567",
     });
 
@@ -105,7 +105,7 @@ describe("POST /api/auth/whatsapp/send", () => {
     mockFindUser.mockResolvedValue({ id: "user-1" } as never);
     mockSendOtp.mockRejectedValue(new Error("Twilio down"));
 
-    const req = createMockRequest("POST", "/api/auth/whatsapp/send", {
+    const req = createMockRequest("POST", "/api/auth/sms/send", {
       phone: "+972501234567",
     });
 
@@ -118,7 +118,7 @@ describe("POST /api/auth/whatsapp/send", () => {
 
   it("returns 400 when body is not valid JSON", async () => {
     // createMockRequest with no body sends no content-type header
-    const req = new Request("http://localhost:3000/api/auth/whatsapp/send", {
+    const req = new Request("http://localhost:3000/api/auth/sms/send", {
       method: "POST",
       body: "not json",
       headers: { "Content-Type": "application/json" },

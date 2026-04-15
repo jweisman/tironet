@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { SoldierLogo } from "@/components/SoldierLogo";
 import { toE164 } from "@/lib/phone";
 
-type WhatsAppStep = "idle" | "phone" | "code" | "sent";
+type SmsStep = "idle" | "phone" | "code" | "sent";
 
 function LoginForm() {
   const t = useTranslations("auth");
@@ -24,13 +24,13 @@ function LoginForm() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
-  // WhatsApp OTP state — auto-expand phone input when coming from a phone-only invite
-  const [waStep, setWaStep] = useState<WhatsAppStep>(isPhoneInvite ? "phone" : "idle");
+  // SMS OTP state — auto-expand phone input when coming from a phone-only invite
+  const [smsStep, setSmsStep] = useState<SmsStep>(isPhoneInvite ? "phone" : "idle");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
-  const [waSending, setWaSending] = useState(false);
-  const [waVerifying, setWaVerifying] = useState(false);
-  const [waError, setWaError] = useState<string | null>(null);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsVerifying, setSmsVerifying] = useState(false);
+  const [smsError, setSmsError] = useState<string | null>(null);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -43,55 +43,55 @@ function LoginForm() {
 
   async function handlePhoneSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setWaError(null);
+    setSmsError(null);
     const e164 = toE164(phone);
     if (!e164) {
-      setWaError("מספר טלפון לא תקין. הזן מספר ישראלי (לדוגמה: 050-123-4567)");
+      setSmsError("מספר טלפון לא תקין. הזן מספר ישראלי (לדוגמה: 050-123-4567)");
       return;
     }
-    setWaSending(true);
+    setSmsSending(true);
     try {
-      const res = await fetch("/api/auth/whatsapp/send", {
+      const res = await fetch("/api/auth/sms/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: e164 }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setWaError(data.error ?? "שגיאה בשליחת הקוד");
+        setSmsError(data.error ?? "שגיאה בשליחת הקוד");
         return;
       }
       setPhone(e164); // store in E.164 for verification
-      setWaStep("sent");
+      setSmsStep("sent");
     } catch {
-      setWaError("שגיאה בשליחת הקוד");
+      setSmsError("שגיאה בשליחת הקוד");
     } finally {
-      setWaSending(false);
+      setSmsSending(false);
     }
   }
 
   async function handleCodeSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setWaError(null);
+    setSmsError(null);
     if (!code.trim()) return;
-    setWaVerifying(true);
+    setSmsVerifying(true);
     try {
-      const result = await signIn("whatsapp-otp", {
+      const result = await signIn("sms-otp", {
         phone,
         code: code.trim(),
         callbackUrl,
         redirect: false,
       });
       if (result?.error) {
-        setWaError("קוד שגוי או שפג תוקפו. נסה שנית.");
+        setSmsError("קוד שגוי או שפג תוקפו. נסה שנית.");
         setCode("");
       } else {
         window.location.href = callbackUrl;
       }
     } catch {
-      setWaError("שגיאה באימות. נסה שנית.");
+      setSmsError("שגיאה באימות. נסה שנית.");
     } finally {
-      setWaVerifying(false);
+      setSmsVerifying(false);
     }
   }
 
@@ -112,12 +112,12 @@ function LoginForm() {
         ) : isPhoneInvite ? (
           /* Phone-only invite: show only SMS login */
           <div className="space-y-6">
-            {waStep === "phone" && (
+            {smsStep === "phone" && (
               <form onSubmit={handlePhoneSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="wa-phone">מספר טלפון</Label>
+                  <Label htmlFor="sms-phone">מספר טלפון</Label>
                   <Input
-                    id="wa-phone"
+                    id="sms-phone"
                     type="tel"
                     placeholder="לדוגמה: 050-123-4567"
                     value={phone}
@@ -127,22 +127,22 @@ function LoginForm() {
                     autoFocus
                   />
                 </div>
-                {waError && <p className="text-sm text-destructive">{waError}</p>}
-                <Button type="submit" className="w-full" disabled={waSending}>
-                  {waSending ? "שולח..." : "שלח קוד"}
+                {smsError && <p className="text-sm text-destructive">{smsError}</p>}
+                <Button type="submit" className="w-full" disabled={smsSending}>
+                  {smsSending ? "שולח..." : "שלח קוד"}
                 </Button>
               </form>
             )}
 
-            {waStep === "sent" && (
+            {smsStep === "sent" && (
               <form onSubmit={handleCodeSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="wa-code">קוד SMS</Label>
+                  <Label htmlFor="sms-code">קוד SMS</Label>
                   <p className="text-sm text-muted-foreground">
                     קוד אימות נשלח ב-SMS לטלפון שלך
                   </p>
                   <Input
-                    id="wa-code"
+                    id="sms-code"
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
@@ -154,18 +154,18 @@ function LoginForm() {
                     autoFocus
                   />
                 </div>
-                {waError && <p className="text-sm text-destructive">{waError}</p>}
+                {smsError && <p className="text-sm text-destructive">{smsError}</p>}
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => { setWaStep("phone"); setCode(""); setWaError(null); }}
+                    onClick={() => { setSmsStep("phone"); setCode(""); setSmsError(null); }}
                   >
                     חזרה
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={waVerifying}>
-                    {waVerifying ? "מאמת..." : "כניסה"}
+                  <Button type="submit" className="flex-1" disabled={smsVerifying}>
+                    {smsVerifying ? "מאמת..." : "כניסה"}
                   </Button>
                 </div>
               </form>
@@ -213,23 +213,23 @@ function LoginForm() {
               <Separator className="flex-1" />
             </div>
 
-            {/* WhatsApp OTP */}
-            {waStep === "idle" && (
+            {/* SMS OTP */}
+            {smsStep === "idle" && (
               <Button
                 className="w-full"
                 variant="outline"
-                onClick={() => { setWaStep("phone"); setWaError(null); }}
+                onClick={() => { setSmsStep("phone"); setSmsError(null); }}
               >
                 כניסה עם קוד SMS
               </Button>
             )}
 
-            {waStep === "phone" && (
+            {smsStep === "phone" && (
               <form onSubmit={handlePhoneSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="wa-phone">מספר טלפון</Label>
+                  <Label htmlFor="sms-phone">מספר טלפון</Label>
                   <Input
-                    id="wa-phone"
+                    id="sms-phone"
                     type="tel"
                     placeholder="לדוגמה: 050-123-4567"
                     value={phone}
@@ -239,32 +239,32 @@ function LoginForm() {
                     autoFocus
                   />
                 </div>
-                {waError && <p className="text-sm text-destructive">{waError}</p>}
+                {smsError && <p className="text-sm text-destructive">{smsError}</p>}
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => { setWaStep("idle"); setPhone(""); setWaError(null); }}
+                    onClick={() => { setSmsStep("idle"); setPhone(""); setSmsError(null); }}
                   >
                     ביטול
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={waSending}>
-                    {waSending ? "שולח..." : "שלח קוד"}
+                  <Button type="submit" className="flex-1" disabled={smsSending}>
+                    {smsSending ? "שולח..." : "שלח קוד"}
                   </Button>
                 </div>
               </form>
             )}
 
-            {waStep === "sent" && (
+            {smsStep === "sent" && (
               <form onSubmit={handleCodeSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="wa-code">קוד SMS</Label>
+                  <Label htmlFor="sms-code">קוד SMS</Label>
                   <p className="text-sm text-muted-foreground">
                     קוד אימות נשלח ב-SMS לטלפון שלך
                   </p>
                   <Input
-                    id="wa-code"
+                    id="sms-code"
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
@@ -276,18 +276,18 @@ function LoginForm() {
                     autoFocus
                   />
                 </div>
-                {waError && <p className="text-sm text-destructive">{waError}</p>}
+                {smsError && <p className="text-sm text-destructive">{smsError}</p>}
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => { setWaStep("phone"); setCode(""); setWaError(null); }}
+                    onClick={() => { setSmsStep("phone"); setCode(""); setSmsError(null); }}
                   >
                     חזרה
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={waVerifying}>
-                    {waVerifying ? "מאמת..." : "כניסה"}
+                  <Button type="submit" className="flex-1" disabled={smsVerifying}>
+                    {smsVerifying ? "מאמת..." : "כניסה"}
                   </Button>
                 </div>
               </form>

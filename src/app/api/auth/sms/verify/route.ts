@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { verifyWhatsAppOtp } from "@/lib/twilio";
+import { verifySmsOtp } from "@/lib/twilio";
 import { createRateLimiter } from "@/lib/api/rate-limit";
 
 const rateLimiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   let approved = false;
   try {
-    approved = await verifyWhatsAppOtp(phone, code);
+    approved = await verifySmsOtp(phone, code);
   } catch (err) {
     console.error("Twilio verify error:", err);
     return NextResponse.json({ error: "שגיאה באימות הקוד" }, { status: 500 });

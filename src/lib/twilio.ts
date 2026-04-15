@@ -11,16 +11,16 @@ function getClient() {
   return twilio(accountSid, authToken);
 }
 
-/** Send a WhatsApp OTP via Twilio Verify. */
-export async function sendWhatsAppOtp(phoneE164: string): Promise<void> {
+/** Send an SMS OTP via Twilio Verify. */
+export async function sendSmsOtp(phoneE164: string): Promise<void> {
   if (!serviceSid) throw new Error("TWILIO_VERIFY_SERVICE_SID not configured");
   await getClient().verify.v2
     .services(serviceSid)
     .verifications.create({ to: phoneE164, channel: "sms" });
 }
 
-/** Verify a WhatsApp OTP code. Returns true if approved. */
-export async function verifyWhatsAppOtp(
+/** Verify an SMS OTP code. Returns true if approved. */
+export async function verifySmsOtp(
   phoneE164: string,
   code: string
 ): Promise<boolean> {

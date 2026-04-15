@@ -12,7 +12,7 @@ test.describe("Authentication", () => {
     // Email magic link form
     await expect(page.locator("input#email")).toBeVisible();
 
-    // WhatsApp/SMS OTP button
+    // SMS OTP button
     await expect(page.getByRole("button", { name: /SMS/ })).toBeVisible();
   });
 

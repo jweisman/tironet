@@ -5,7 +5,7 @@ import Nodemailer from "next-auth/providers/nodemailer";
 import Credentials from "next-auth/providers/credentials";
 import type { Adapter, AdapterUser, AdapterAccount } from "next-auth/adapters";
 import { prisma } from "@/lib/db/prisma";
-import { verifyWhatsAppOtp } from "@/lib/twilio";
+import { verifySmsOtp } from "@/lib/twilio";
 import type { CycleAssignment } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 
@@ -203,8 +203,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       from: process.env.FROM_EMAIL ?? "Tironet <noreply@localhost>",
     }),
     Credentials({
-      id: "whatsapp-otp",
-      name: "WhatsApp OTP",
+      id: "sms-otp",
+      name: "SMS OTP",
       credentials: {
         phone: { label: "Phone", type: "text" },
         code: { label: "Code", type: "text" },
@@ -217,7 +217,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Verify OTP before touching the DB (don't create users on bad codes)
         let approved = false;
         try {
-          approved = await verifyWhatsAppOtp(phone, code);
+          approved = await verifySmsOtp(phone, code);
         } catch {
           return null;
         }

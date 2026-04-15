@@ -26,13 +26,13 @@ beforeEach(() => {
 // The module reads env vars at import time. We need to re-import after setting env.
 // Use dynamic import with vi.resetModules() to force re-evaluation.
 
-describe("sendWhatsAppOtp", () => {
+describe("sendSmsOtp", () => {
   it("calls Twilio verifications.create with SMS channel", async () => {
     mockCreate.mockResolvedValue({ sid: "VE_123" });
 
     vi.resetModules();
-    const { sendWhatsAppOtp } = await import("../twilio");
-    await sendWhatsAppOtp("+972501234567");
+    const { sendSmsOtp } = await import("../twilio");
+    await sendSmsOtp("+972501234567");
 
     expect(mockCreate).toHaveBeenCalledWith({
       to: "+972501234567",
@@ -41,13 +41,13 @@ describe("sendWhatsAppOtp", () => {
   });
 });
 
-describe("verifyWhatsAppOtp", () => {
+describe("verifySmsOtp", () => {
   it("returns true when status is approved", async () => {
     mockCheckCreate.mockResolvedValue({ status: "approved" });
 
     vi.resetModules();
-    const { verifyWhatsAppOtp } = await import("../twilio");
-    const result = await verifyWhatsAppOtp("+972501234567", "123456");
+    const { verifySmsOtp } = await import("../twilio");
+    const result = await verifySmsOtp("+972501234567", "123456");
     expect(result).toBe(true);
 
     expect(mockCheckCreate).toHaveBeenCalledWith({
@@ -60,8 +60,8 @@ describe("verifyWhatsAppOtp", () => {
     mockCheckCreate.mockResolvedValue({ status: "pending" });
 
     vi.resetModules();
-    const { verifyWhatsAppOtp } = await import("../twilio");
-    const result = await verifyWhatsAppOtp("+972501234567", "000000");
+    const { verifySmsOtp } = await import("../twilio");
+    const result = await verifySmsOtp("+972501234567", "000000");
     expect(result).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { sendWhatsAppOtp } from "@/lib/twilio";
+import { sendSmsOtp } from "@/lib/twilio";
 import { createRateLimiter } from "@/lib/api/rate-limit";
 
 const rateLimiter = createRateLimiter({ limit: 5, windowMs: 60_000 });
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await sendWhatsAppOtp(phone);
+    await sendSmsOtp(phone);
   } catch (err) {
     console.error("Twilio send error:", err);
     return NextResponse.json({ error: "שגיאה בשליחת הקוד" }, { status: 500 });

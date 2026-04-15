@@ -8,7 +8,7 @@ vi.mock("@/lib/db/prisma", () => ({
 }));
 
 vi.mock("@/lib/twilio", () => ({
-  verifyWhatsAppOtp: vi.fn(),
+  verifySmsOtp: vi.fn(),
 }));
 
 vi.mock("@/lib/api/rate-limit", () => ({
@@ -17,19 +17,19 @@ vi.mock("@/lib/api/rate-limit", () => ({
 
 import { POST } from "../verify/route";
 import { prisma } from "@/lib/db/prisma";
-import { verifyWhatsAppOtp } from "@/lib/twilio";
+import { verifySmsOtp } from "@/lib/twilio";
 import { createMockRequest } from "@/__tests__/helpers/api";
 
 const mockFindUser = vi.mocked(prisma.user.findUnique);
-const mockVerifyOtp = vi.mocked(verifyWhatsAppOtp);
+const mockVerifyOtp = vi.mocked(verifySmsOtp);
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("POST /api/auth/whatsapp/verify", () => {
+describe("POST /api/auth/sms/verify", () => {
   it("returns 400 when phone is missing", async () => {
-    const req = createMockRequest("POST", "/api/auth/whatsapp/verify", {
+    const req = createMockRequest("POST", "/api/auth/sms/verify", {
       code: "123456",
     });
 
@@ -38,7 +38,7 @@ describe("POST /api/auth/whatsapp/verify", () => {
   });
 
   it("returns 400 when code is missing", async () => {
-    const req = createMockRequest("POST", "/api/auth/whatsapp/verify", {
+    const req = createMockRequest("POST", "/api/auth/sms/verify", {
       phone: "+972501234567",
     });
 
@@ -47,7 +47,7 @@ describe("POST /api/auth/whatsapp/verify", () => {
   });
 
   it("returns 400 when body is empty", async () => {
-    const req = createMockRequest("POST", "/api/auth/whatsapp/verify", {});
+    const req = createMockRequest("POST", "/api/auth/sms/verify", {});
 
     const res = await POST(req);
     expect(res.status).toBe(400);
@@ -56,7 +56,7 @@ describe("POST /api/auth/whatsapp/verify", () => {
   it("returns 401 when user not found", async () => {
     mockFindUser.mockResolvedValue(null);
 
-    const req = createMockRequest("POST", "/api/auth/whatsapp/verify", {
+    const req = createMockRequest("POST", "/api/auth/sms/verify", {
       phone: "+972501234567",
       code: "123456",
     });
@@ -74,7 +74,7 @@ describe("POST /api/auth/whatsapp/verify", () => {
     mockFindUser.mockResolvedValue({ id: "user-1", email: "a@b.com" } as never);
     mockVerifyOtp.mockResolvedValue(false);
 
-    const req = createMockRequest("POST", "/api/auth/whatsapp/verify", {
+    const req = createMockRequest("POST", "/api/auth/sms/verify", {
       phone: "+972501234567",
       code: "000000",
     });
@@ -94,7 +94,7 @@ describe("POST /api/auth/whatsapp/verify", () => {
     } as never);
     mockVerifyOtp.mockResolvedValue(true);
 
-    const req = createMockRequest("POST", "/api/auth/whatsapp/verify", {
+    const req = createMockRequest("POST", "/api/auth/sms/verify", {
       phone: "+972501234567",
       code: "123456",
     });
@@ -111,7 +111,7 @@ describe("POST /api/auth/whatsapp/verify", () => {
     mockFindUser.mockResolvedValue({ id: "user-1", email: "a@b.com" } as never);
     mockVerifyOtp.mockRejectedValue(new Error("Twilio error"));
 
-    const req = createMockRequest("POST", "/api/auth/whatsapp/verify", {
+    const req = createMockRequest("POST", "/api/auth/sms/verify", {
       phone: "+972501234567",
       code: "123456",
     });
