@@ -459,5 +459,289 @@ describe("TironetConnector", () => {
       const tx = await (db as { getNextCrudTransaction: () => Promise<{ complete: () => void }> }).getNextCrudTransaction();
       expect(tx.complete).toHaveBeenCalled();
     });
+
+    // --- Requests ---
+
+    it("uploads requests PUT with snake_case to camelCase transform", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "requests",
+          op: UpdateType.PUT,
+          id: "req-uuid",
+          opData: {
+            cycle_id: "c1",
+            soldier_id: "s1",
+            type: "leave",
+            description: "Family visit",
+            place: "Tel Aviv",
+            departure_at: "2026-04-10T08:00:00Z",
+            return_at: "2026-04-12T18:00:00Z",
+            transportation: "bus",
+            urgent: null,
+            paramedic_date: null,
+            medical_appointments: null,
+            sick_leave_days: null,
+            special_conditions: null,
+          },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0][1] as { body: string }).body,
+      );
+      expect(body.id).toBe("req-uuid");
+      expect(body.cycleId).toBe("c1");
+      expect(body.soldierId).toBe("s1");
+      expect(body.type).toBe("leave");
+      expect(body.description).toBe("Family visit");
+      expect(body.place).toBe("Tel Aviv");
+      expect(body.departureAt).toBe("2026-04-10T08:00:00Z");
+      expect(body.returnAt).toBe("2026-04-12T18:00:00Z");
+      expect(body.transportation).toBe("bus");
+      expect(body.sickLeaveDays).toBeNull();
+    });
+
+    it("uploads requests PUT with medical_appointments JSON parsing", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const appts = JSON.stringify([{ id: "a1", date: "2026-04-20", place: "Hospital", type: "Checkup" }]);
+      const db = mockDatabase([
+        {
+          table: "requests",
+          op: UpdateType.PUT,
+          id: "req-med",
+          opData: {
+            cycle_id: "c1",
+            soldier_id: "s1",
+            type: "medical",
+            description: null,
+            place: null,
+            departure_at: null,
+            return_at: null,
+            transportation: null,
+            urgent: 1,
+            paramedic_date: "2026-04-18",
+            medical_appointments: appts,
+            sick_leave_days: 3,
+            special_conditions: null,
+          },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0][1] as { body: string }).body,
+      );
+      expect(body.medicalAppointments).toEqual([{ id: "a1", date: "2026-04-20", place: "Hospital", type: "Checkup" }]);
+      expect(body.urgent).toBe(true);
+      expect(body.paramedicDate).toBe("2026-04-18");
+      expect(body.sickLeaveDays).toBe(3);
+    });
+
+    it("uploads requests PATCH with snake_case to camelCase mapping", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "requests",
+          op: UpdateType.PATCH,
+          id: "req-1",
+          opData: {
+            status: "approved",
+            assigned_role: "company_commander",
+          },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/requests/req-1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "approved",
+          assignedRole: "company_commander",
+        }),
+      });
+    });
+
+    it("uploads requests PATCH with boolean conversion for urgent/specialConditions", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "requests",
+          op: UpdateType.PATCH,
+          id: "req-2",
+          opData: {
+            urgent: 1,
+            special_conditions: 0,
+          },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0][1] as { body: string }).body,
+      );
+      expect(body.urgent).toBe(true);
+      expect(body.specialConditions).toBe(false);
+    });
+
+    it("uploads requests PATCH with medicalAppointments JSON string parsing", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const appts = JSON.stringify([{ id: "a1", date: "2026-04-20", place: "Clinic", type: "Visit" }]);
+      const db = mockDatabase([
+        {
+          table: "requests",
+          op: UpdateType.PATCH,
+          id: "req-3",
+          opData: {
+            medical_appointments: appts,
+          },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0][1] as { body: string }).body,
+      );
+      expect(body.medicalAppointments).toEqual([{ id: "a1", date: "2026-04-20", place: "Clinic", type: "Visit" }]);
+    });
+
+    it("uploads requests DELETE", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "requests",
+          op: UpdateType.DELETE,
+          id: "req-del",
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/requests/req-del", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    // --- Request Actions ---
+
+    it("uploads request_actions PUT with camelCase transform", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "request_actions",
+          op: UpdateType.PUT,
+          id: "ra-uuid",
+          opData: {
+            request_id: "req-1",
+            action: "approve",
+            note: "Approved",
+            user_name: "Cohen Avi",
+          },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/request-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "ra-uuid",
+          requestId: "req-1",
+          action: "approve",
+          note: "Approved",
+          userName: "Cohen Avi",
+        }),
+      });
+    });
+
+    it("uploads request_actions PATCH with note", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "request_actions",
+          op: UpdateType.PATCH,
+          id: "ra-1",
+          opData: { note: "Updated note" },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/request-actions/ra-1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: "Updated note" }),
+      });
+    });
+
+    it("uploads request_actions PATCH with null note", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "request_actions",
+          op: UpdateType.PATCH,
+          id: "ra-2",
+          opData: {},
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/request-actions/ra-2", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: null }),
+      });
+    });
+
+    // --- Activities PATCH with field mapping ---
+
+    it("uploads activities PATCH with snake_case to camelCase field mapping", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "activities",
+          op: UpdateType.PATCH,
+          id: "act-2",
+          opData: {
+            activity_type_id: "type-1",
+            is_required: 1,
+            status: "active",
+            date: "2026-04-20",
+          },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0][1] as { body: string }).body,
+      );
+      expect(body).toEqual({
+        date: "2026-04-20",
+        activityTypeId: "type-1",
+        isRequired: true,
+        status: "active",
+      });
+    });
   });
 });
