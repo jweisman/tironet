@@ -16,6 +16,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Authentication** — Google OAuth, email magic link (Nodemailer), and SMS OTP (Twilio Verify)
 - **Admin panel** — Manage cycles, companies, platoons, squads, activity types, and users
 - **Push notifications** — Daily task reminders for squad commanders (missing activity reports) and real-time request assignment alerts; opt-out per notification type in the profile page
+- **Guided tour** — Interactive walkthrough (driver.js) on each main page; auto-starts on first visit, re-launchable via the help button in the header/sidebar
 - **Offline-first** — Activity reports can be recorded and bulk-updated without a network connection; changes sync automatically when connectivity is restored
 - **PWA** — Installable on iOS (Add to Home Screen) and Android; works as a standalone app with full offline support
 

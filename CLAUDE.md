@@ -587,6 +587,17 @@ All user-facing mutations should show a `toast.success()` on completion (from `s
 
 The auto-select `useEffect` depends on a stable key of all active cycle IDs (`activeCycles.map(a => a.cycleId).join(",")`) — not just `activeCycles.length`. This ensures the effect re-fires when cycles are swapped out even if the count stays the same (e.g. two old cycles deactivated and two new ones created).
 
+### Guided tour (driver.js)
+
+An interactive walkthrough runs on 7 pages: home, soldiers, activities, requests (list pages), and soldier detail, activity detail, request detail. Implementation:
+
+- **`driver.js`** (v1.4) — lightweight step-by-step tour library. CSS imported globally in `src/app/layout.tsx`. RTL overrides in `globals.css` (class `.tironet-tour-popover`).
+- **`useTour` hook** (`src/hooks/useTour.ts`) — wraps driver.js. Auto-starts on first visit by observing the DOM via `MutationObserver` until a tour-targeted element is visible (no fixed delay). Tracks completion per page in `localStorage` (`tironet:tour-seen:<page>`). Filters steps to only those whose `element` is visible in the DOM — handles role-based UI and mobile/desktop differences automatically.
+- **`TourContext`** (`src/contexts/TourContext.tsx`) — each page registers its `startTour` function so the help button in `AppShell` (mobile) and `Sidebar` (desktop) can trigger the current page's tour.
+- **Tour steps** (`src/lib/tour/steps.ts`) — Hebrew step configs per page. Steps target `data-tour="..."` attributes on UI elements.
+- **`data-tour` attributes** — added to key UI elements on each page. When both a desktop and mobile variant exist (e.g. desktop header button + mobile FAB), both get the same `data-tour` value; the `useTour` visibility check picks the one actually rendered.
+- **Adding a tour to a new page:** (1) define steps in `steps.ts`, (2) add `data-tour` attributes to target elements, (3) call `useTour()` and register via `useTourContext()` in a `useEffect`. Place the hooks before any early returns so they're called unconditionally.
+
 ## PowerSync + React Rendering Gotchas (continued)
 
 ### `useStatus()` crashes during SSR
