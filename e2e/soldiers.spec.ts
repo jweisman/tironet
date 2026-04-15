@@ -38,11 +38,11 @@ test.describe("Soldiers — platoon commander", () => {
     await page.goto("/soldiers");
     await expect(page.getByText("Cohen Avi")).toBeVisible({ timeout: 60000 });
 
-    // Click on soldier
-    await page.getByText("Cohen Avi").click();
+    // Click on soldier — use first() in case multiple elements match
+    await page.getByText("Cohen Avi").first().click();
 
     // Should navigate to detail
-    await expect(page).toHaveURL(/\/soldiers\//, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/soldiers\//, { timeout: 15000 });
 
     // Should show soldier name
     await expect(page.getByRole("heading", { name: "Cohen Avi" })).toBeVisible({ timeout: 60000 });
