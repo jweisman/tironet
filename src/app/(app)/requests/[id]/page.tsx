@@ -819,7 +819,7 @@ export default function RequestDetailPage() {
               rows={3}
             />
           </div>
-          <div className="flex gap-2 pt-2">
+          <div className="flex flex-row-reverse gap-2 pt-2">
             <Button variant="outline" onClick={() => setAddNoteOpen(false)} className="flex-1">
               ביטול
             </Button>
@@ -853,7 +853,7 @@ export default function RequestDetailPage() {
               rows={3}
             />
           </div>
-          <div className="flex gap-2 pt-2">
+          <div className="flex flex-row-reverse gap-2 pt-2">
             <Button variant="outline" onClick={() => setNoteDialogOpen(false)} className="flex-1">
               ביטול
             </Button>

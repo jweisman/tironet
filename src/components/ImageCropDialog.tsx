@@ -139,7 +139,7 @@ export function ImageCropDialog({ file, onConfirm, onCancel }: Props) {
           </div>
         </div>
 
-        <div className="flex gap-2 justify-end pt-1">
+        <div className="flex flex-row-reverse gap-2 justify-end pt-1">
           <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>
             ביטול
           </Button>

@@ -203,7 +203,7 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
         <p className="text-sm text-destructive">{error}</p>
       )}
 
-      <div className="flex gap-2 pt-2">
+      <div className="flex flex-row-reverse gap-2 pt-2">
         <Button
           type="button"
           variant="outline"

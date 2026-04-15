@@ -668,7 +668,7 @@ export default function RequestsPage() {
               value={actionNote}
               onChange={(e) => setActionNote(e.target.value)}
             />
-            <div className="flex gap-2 justify-end">
+            <div className="flex flex-row-reverse gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => { setNoteDialogOpen(false); setActionRequest(null); }}

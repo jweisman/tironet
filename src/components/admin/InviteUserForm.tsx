@@ -344,7 +344,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="flex gap-2 justify-end pt-2">
+      <div className="flex flex-row-reverse gap-2 justify-end pt-2">
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
           ביטול
         </Button>

@@ -328,7 +328,7 @@ export function SheetsExportDialog({
               </p>
             )}
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-row-reverse gap-2 pt-2">
               <Button
                 variant="outline"
                 className="flex-1"
