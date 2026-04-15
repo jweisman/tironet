@@ -34,6 +34,7 @@
     "@powersync/web": "^1.36.0",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
+    "@sentry/nextjs": "^10.48.0",
     "@serwist/next": "^9.5.7",
     "@serwist/turbopack": "^9.5.7",
     "@sparticuz/chromium-min": "^143.0.4",

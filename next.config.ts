@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { withSerwist } from "@serwist/turbopack";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
@@ -12,7 +13,7 @@ const cspDirectives = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Tailwind injects inline styles; Google Fonts for report print
   "img-src 'self' data: blob: https://lh3.googleusercontent.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' http://localhost:* ws://localhost:* https://*.powersync.journeyapps.com wss://*.powersync.journeyapps.com https://accounts.google.com https://sheets.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com",
+  "connect-src 'self' http://localhost:* ws://localhost:* https://*.powersync.journeyapps.com wss://*.powersync.journeyapps.com https://accounts.google.com https://sheets.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com https://*.ingest.sentry.io https://*.ingest.de.sentry.io",
   "worker-src 'self' blob:",
   "frame-src 'self' https://accounts.google.com https://docs.google.com",   // Google OAuth popup + Drive Picker
   "object-src 'none'",
@@ -63,4 +64,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSerwist(withNextIntl(nextConfig));
+export default withSentryConfig(withSerwist(withNextIntl(nextConfig)), {
+  // Upload source maps for readable stack traces in Sentry
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+  // Suppress Sentry CLI logs during build
+  silent: !process.env.CI,
+  // Disable Sentry telemetry
+  telemetry: false,
+});
