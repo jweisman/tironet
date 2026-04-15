@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { HelpCircle } from "lucide-react";
 import { TabBar } from "./TabBar";
 import { Sidebar } from "./Sidebar";
 import { UserAvatar } from "./UserAvatar";
@@ -8,8 +9,10 @@ import { CyclePicker } from "./CyclePicker";
 import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
 import { SoldierLogo } from "@/components/SoldierLogo";
+import { useTourContext } from "@/contexts/TourContext";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const headerRef = useRef<HTMLElement>(null);
+  const { startCurrentTour } = useTourContext();
 
   // Dismiss the inline splash screen once the app shell has mounted and
   // painted. This avoids the blank/black gap between splash hide and app
@@ -54,6 +57,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-lg font-bold">טירונט</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={startCurrentTour}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
+              aria-label="עזרה"
+            >
+              <HelpCircle size={20} />
+            </button>
             <CyclePicker compact />
             <UserAvatar size={36} />
           </div>

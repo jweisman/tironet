@@ -25,6 +25,7 @@ interface Props {
   showPlatoon?: boolean;
   onClick: () => void;
   onLongPress?: (e: { x: number; y: number }) => void;
+  dataTour?: string;
 }
 
 function formatDate(isoString: string): string {
@@ -38,7 +39,7 @@ function formatDate(isoString: string): string {
   });
 }
 
-export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPress }: Props) {
+export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPress, dataTour }: Props) {
   const isPast = activity.date.split("T")[0] < new Date().toISOString().split("T")[0];
   const hasIssues = activity.isRequired && isPast && (activity.missingCount > 0 || activity.failedCount > 0);
 
@@ -76,6 +77,7 @@ export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPre
 
   return (
     <button
+      data-tour={dataTour}
       type="button"
       onClick={() => {
         if (suppressClickRef.current) { suppressClickRef.current = false; return; }

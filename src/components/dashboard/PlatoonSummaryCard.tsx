@@ -15,6 +15,7 @@ interface Props {
   platoonName: string;
   squads: SquadSummary[];
   sections?: VisibleSections;
+  dataTour?: string;
 }
 
 function StatButton({
@@ -39,7 +40,7 @@ function StatButton({
   );
 }
 
-export function PlatoonSummaryCard({ platoonName, squads, sections }: Props) {
+export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: Props) {
   const router = useRouter();
 
   const showSoldiers = sections?.soldiers !== false;
@@ -89,6 +90,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections }: Props) {
 
   return (
     <div
+      data-tour={dataTour}
       className={`rounded-xl border bg-card overflow-hidden ${
         hasGaps ? "border-amber-200" : "border-border"
       }`}

@@ -7,6 +7,7 @@ import type { VisibleSections } from "./PlatoonSummaryCard";
 
 interface Props {
   squad: SquadSummary;
+  dataTour?: string;
   sections?: VisibleSections;
 }
 
@@ -32,7 +33,7 @@ function StatButton({
   );
 }
 
-export function SquadSummaryCard({ squad, sections }: Props) {
+export function SquadSummaryCard({ squad, dataTour, sections }: Props) {
   const router = useRouter();
   const hasGaps = squad.soldiersWithGaps > 0 || squad.missingReportActivities > 0;
 
@@ -43,6 +44,7 @@ export function SquadSummaryCard({ squad, sections }: Props) {
 
   return (
     <div
+      data-tour={dataTour}
       className={`rounded-xl border bg-card overflow-hidden ${
         hasGaps ? "border-amber-200" : "border-border"
       }`}
@@ -65,7 +67,7 @@ export function SquadSummaryCard({ squad, sections }: Props) {
       <div className="flex border-b border-border">
         {/* Soldiers */}
         {showSoldiers && (
-          <div className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border last:border-e-0">
+          <div data-tour="home-stats-soldiers" className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border last:border-e-0">
             <p className="text-xs font-semibold text-muted-foreground mb-1.5">חיילים</p>
             <StatButton onClick={() => router.push("/soldiers")}>
               <span className="text-xl font-bold">{squad.soldierCount}</span>
@@ -86,7 +88,7 @@ export function SquadSummaryCard({ squad, sections }: Props) {
 
         {/* Activities */}
         {showActivities && (
-          <div className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border last:border-e-0">
+          <div data-tour="home-stats-activities" className="flex-1 min-w-0 px-3 py-3 space-y-1 border-e border-border last:border-e-0">
             <p className="text-xs font-semibold text-muted-foreground mb-1.5">פעילויות</p>
             <StatButton onClick={() => router.push("/activities")}>
               <span className="text-xl font-bold text-green-600">
@@ -109,7 +111,7 @@ export function SquadSummaryCard({ squad, sections }: Props) {
 
         {/* Requests */}
         {showRequests && (
-          <div className="flex-1 min-w-0 px-3 py-3 space-y-1">
+          <div data-tour="home-stats-requests" className="flex-1 min-w-0 px-3 py-3 space-y-1">
             <p className="text-xs font-semibold text-muted-foreground mb-1.5">בקשות</p>
             {squad.approvedRequests > 0 ? (
               <StatButton onClick={() => router.push("/requests?filter=active")}>

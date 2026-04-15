@@ -127,3 +127,56 @@
     @apply font-sans;
   }
 }
+
+/* driver.js RTL overrides */
+.tironet-tour-popover {
+  direction: rtl;
+  text-align: right;
+}
+
+.tironet-tour-popover .driver-popover-title {
+  font-family: var(--font-heebo, system-ui, sans-serif);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tironet-tour-popover .driver-popover-description {
+  font-family: var(--font-heebo, system-ui, sans-serif);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* Close button: flip from right to left for RTL */
+.tironet-tour-popover .driver-popover-close-btn {
+  right: unset;
+  left: 0;
+}
+
+/* Footer: RTL direction so prev is on the right, next on the left */
+.tironet-tour-popover .driver-popover-footer {
+  direction: rtl;
+}
+
+/* Flip nav buttons to the left side (start in RTL) */
+.tironet-tour-popover .driver-popover-navigation-btns {
+  display: flex;
+  flex-direction: row-reverse;
+  flex-grow: 0;
+}
+
+/* Button spacing: flip margin from left to right for RTL */
+.tironet-tour-popover .driver-popover-navigation-btns button + button {
+  margin-left: 0;
+  margin-right: 4px;
+}
+
+.tironet-tour-popover .driver-popover-progress-text {
+  font-family: var(--font-heebo, system-ui, sans-serif);
+  font-size: 0.75rem;
+}
+
+/* Highlight the active element with a pulsing ring */
+.driver-active-element {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.7), 0 0 14px 4px rgba(59, 130, 246, 0.25) !important;
+  border-radius: inherit;
+}

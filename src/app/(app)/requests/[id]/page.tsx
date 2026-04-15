@@ -10,6 +10,9 @@ import { useSession } from "next-auth/react";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSyncReady } from "@/hooks/useSyncReady";
+import { useTour } from "@/hooks/useTour";
+import { useTourContext } from "@/contexts/TourContext";
+import { requestDetailTourSteps } from "@/lib/tour/steps";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -206,6 +209,11 @@ export default function RequestDetailPage() {
 
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!raw, requestLoading);
 
+  // Tour
+  const { registerTour, unregisterTour } = useTourContext();
+  const { startTour } = useTour({ page: "request-detail", steps: requestDetailTourSteps });
+  useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
+
   if (!raw && showConnectionError) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
@@ -377,7 +385,7 @@ export default function RequestDetailPage() {
       </button>
 
       {/* Header card */}
-      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+      <div data-tour="request-header" className="rounded-xl border border-border bg-card p-4 space-y-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
@@ -405,6 +413,7 @@ export default function RequestDetailPage() {
         {/* Assignment indicator */}
         {assignedRole && (
           <div
+            data-tour="request-assignment"
             className={`rounded-lg px-3 py-2 text-sm ${
               isAssignedToMe
                 ? "bg-amber-50 text-amber-800 border border-amber-200"
@@ -423,7 +432,7 @@ export default function RequestDetailPage() {
         )}
 
         {!assignedRole && requestStatus === "approved" && (
-          <div className="rounded-lg px-3 py-2 text-sm bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <div data-tour="request-assignment" className="rounded-lg px-3 py-2 text-sm bg-emerald-50 text-emerald-800 border border-emerald-200">
             הטיפול בבקשה הושלם
           </div>
         )}
@@ -434,7 +443,7 @@ export default function RequestDetailPage() {
       </div>
 
       {/* Details card */}
-      <div className="rounded-xl border border-border bg-card p-4 space-y-1">
+      <div data-tour="request-details" className="rounded-xl border border-border bg-card p-4 space-y-1">
         <h2 className="text-sm font-semibold text-muted-foreground mb-2">פרטי הבקשה</h2>
 
         {raw.description && (
@@ -631,7 +640,7 @@ export default function RequestDetailPage() {
 
       {/* Audit trail */}
       {actionRows && actionRows.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div data-tour="request-timeline" className="rounded-xl border border-border bg-card p-4 space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">מהלך הטיפול</h2>
           <div className="space-y-0">
             {actionRows.map((a, i) => {
@@ -745,6 +754,7 @@ export default function RequestDetailPage() {
           </div>
           {rawUserRole && (
             <button
+              data-tour="request-add-note"
               type="button"
               onClick={() => { setAddNoteText(""); setAddNoteOpen(true); }}
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -758,7 +768,7 @@ export default function RequestDetailPage() {
 
       {/* Action buttons */}
       {actions.length > 0 && (
-        <div className="flex gap-2">
+        <div data-tour="request-actions" className="flex gap-2">
           {actions.includes("approve") && (
             <Button
               onClick={() => openNoteDialog("approve")}

@@ -151,7 +151,7 @@ export function TodayActivities({ cycleId, squadId, showPlatoon = false }: Props
   const hiddenCount = activities.length - INITIAL_LIMIT;
 
   return (
-    <div className="space-y-2">
+    <div data-tour="home-today-activities" className="space-y-2">
       <div className="flex items-center gap-2">
         <CalendarDays size={14} className="text-muted-foreground" />
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">

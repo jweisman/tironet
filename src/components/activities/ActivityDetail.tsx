@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePowerSync } from "@powersync/react";
 import { toast } from "sonner";
@@ -33,7 +33,10 @@ import type { ActiveScore } from "@/types/score-config";
 import type { DisplayConfiguration } from "@/types/display-config";
 import { getResultLabels, getNoteOptions } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
-import { useEffect, useRef } from "react";
+import { useTour } from "@/hooks/useTour";
+import { useTourContext } from "@/contexts/TourContext";
+import { activityDetailTourSteps } from "@/lib/tour/steps";
+import { useRef } from "react";
 
 export type GradeKey = "grade1" | "grade2" | "grade3" | "grade4" | "grade5" | "grade6";
 export const GRADE_KEYS: GradeKey[] = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"];
@@ -123,6 +126,11 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [importReportsOpen, setImportReportsOpen] = useState(false);
+
+  // Tour
+  const { registerTour, unregisterTour } = useTourContext();
+  const { startTour } = useTour({ page: "activity-detail", steps: activityDetailTourSteps });
+  useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
 
   const activeScores = data.activityType.activeScores;
   const resultLabels = getResultLabels(data.activityType.displayConfiguration);
@@ -457,7 +465,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     <div className="-mx-4 -my-6">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-border space-y-3">
-        <div className="flex items-start gap-3">
+        <div data-tour="activity-header" className="flex items-start gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-base font-bold text-muted-foreground">
             <ActivityTypeIcon
               icon={data.activityType.icon}
@@ -486,6 +494,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             {data.canEditMetadata && (
               <>
                 <Button
+                  data-tour="activity-edit-meta"
                   size="sm"
                   variant="outline"
                   onClick={() => {
@@ -512,6 +521,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             {data.canEditReports && (
               <>
                 <Button
+                  data-tour="activity-import-reports"
                   size="sm"
                   variant="outline"
                   onClick={() => setImportReportsOpen(true)}
@@ -519,6 +529,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                   ייבוא דיווחים
                 </Button>
                 <Button
+                  data-tour="activity-edit-reports"
                   size="sm"
                   variant={editingReports ? "default" : "outline"}
                   onClick={() => setEditingReports((v) => !v)}
@@ -532,6 +543,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
         {gapsCount > 0 && (
           <button
+            data-tour="activity-gaps-filter"
             type="button"
             onClick={() => setShowGapsOnly((v) => !v)}
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
@@ -559,7 +571,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
       {/* Squads & soldiers */}
       <div className="pb-24">
-        {data.squads.map((squad) => {
+        {(() => { let firstSoldierTagged = false; return data.squads.map((squad) => {
           const visibleSoldiers = showGapsOnly
             ? squad.soldiers.filter((s) => isGap(s.id))
             : squad.soldiers;
@@ -613,8 +625,10 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 {visibleSoldiers.map((soldier) => {
                   const report = reports.get(soldier.id) ?? { ...EMPTY_REPORT };
                   const hasGrades = activeScores.some((s) => report[s.gradeKey] != null);
+                  const tagRow = !firstSoldierTagged;
+                  if (tagRow) firstSoldierTagged = true;
                   return (
-                    <div key={soldier.id} className="px-4 py-3">
+                    <div key={soldier.id} data-tour={tagRow ? "activity-soldier-row" : undefined} className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <span className="text-sm font-medium">
@@ -670,7 +684,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             )}
           </div>
           );
-        })}
+        }); })()}
       </div>
 
       {/* Import reports dialog */}
