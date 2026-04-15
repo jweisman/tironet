@@ -23,8 +23,6 @@ test("warmup admin routes", async ({ page }) => {
   for (const route of routes) {
     console.log(`Warming up: ${route}`);
     await page.goto(route, { timeout: 120000, waitUntil: "domcontentloaded" });
-    // Brief wait for any triggered background compilations
-    await page.waitForTimeout(1000);
   }
 
   // Warm up API routes used by admin tests

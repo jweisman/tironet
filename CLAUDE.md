@@ -644,7 +644,7 @@ Configuration is in `vitest.config.ts`. Tests use `vi.mock()` for Prisma, NextAu
 
 ### E2E Tests (Playwright)
 
-81 end-to-end tests across 12 spec files in `e2e/`. They run against the full stack (Next.js + PostgreSQL + PowerSync + Mailhog) via Docker Compose. Locally the suite runs in ~1 minute; CI takes 5–6 minutes due to slower GitHub Actions runners (shared VM, Docker overhead, serial execution).
+91 end-to-end tests across 12 spec files in `e2e/`. They run against the full stack (Next.js + PostgreSQL + PowerSync + Mailhog) via Docker Compose. Locally the suite runs in ~1 minute. CI uses 4 parallel workers and caches the `.next/` build directory to avoid repeated Turbopack compilation.
 
 **Running:** `npm run e2e` (or `npm run e2e:ui` for the Playwright UI). The Docker Compose stack must be running with the e2e overlay:
 
@@ -657,7 +657,7 @@ This creates a separate `tironet_test` database so e2e tests don't touch the dev
 **Architecture:**
 - `playwright.config.ts` defines 5 projects: `setup` (logs in 3 users via Mailhog), `admin-warmup` (pre-compiles admin routes), then `admin-tests`, `commander-tests`, `squad-tests` each using saved `storageState`
 - `e2e/admin-warmup.ts` visits all admin pages and API endpoints before admin tests run, preventing Turbopack compilation-induced hangs (see gotcha #7)
-- `e2e/global-setup.ts` seeds the test DB (Prisma), authenticates users via the magic link flow (Mailhog API), and saves auth state to `e2e/.auth/*.json`
+- `e2e/global-setup.ts` seeds the test DB (Prisma), authenticates all 3 users in parallel via the magic link flow (Mailhog API), and saves auth state to `e2e/.auth/*.json`
 - `e2e/global-teardown.ts` truncates all tables after the run
 
 **Key gotchas for writing e2e tests:**
@@ -692,6 +692,8 @@ This creates a separate `tironet_test` database so e2e tests don't touch the dev
    This is especially important in CI where slower execution makes fixed timeouts unreliable.
 
 9. **Profile test interference with admin assertions** — The profile edit test (`e2e/profile.spec.ts`) temporarily changes the admin user's display name. Admin tests that assert on the admin user should use the email (`admin-e2e@test.com`) rather than the display name to avoid flaky failures from parallel execution.
+
+10. **Guided tour overlay blocks interactions** — The driver.js tour auto-starts on first visit and its SVG overlay intercepts all pointer events, causing clicks to fail. The `loginAndSaveState` helper pre-sets `tironet:tour-seen:*` localStorage flags for all 7 tour pages so tours never trigger during tests. If you add a new tour page, add its key to the list in `e2e/helpers/auth.ts`.
 
 ## Environment Variable Naming
 

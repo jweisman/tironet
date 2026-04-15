@@ -1,5 +1,5 @@
 import { type Browser, type BrowserContext } from "@playwright/test";
-import { getLatestEmail, extractVerificationUrl, clearMailhog } from "./mailhog";
+import { getLatestEmail, extractVerificationUrl } from "./mailhog";
 
 /**
  * Log in a user via the magic link flow and save storageState.
@@ -16,9 +16,6 @@ export async function loginAndSaveState(
   email: string,
   storageStatePath: string
 ): Promise<void> {
-  // Clear any previous emails for this address
-  await clearMailhog();
-
   const context = await browser.newContext();
   const page = await context.newPage();
 
@@ -29,10 +26,7 @@ export async function loginAndSaveState(
   await page.fill('input#email', email);
   await page.click('form button[type="submit"]');
 
-  // Wait for the "check your email" confirmation
-  await page.waitForTimeout(1000);
-
-  // Fetch the verification email from Mailhog
+  // Fetch the verification email from Mailhog (retries internally until delivery)
   const message = await getLatestEmail(email);
   const verifyUrl = extractVerificationUrl(message);
 
@@ -41,6 +35,17 @@ export async function loginAndSaveState(
 
   // Wait for redirect to /home (authenticated)
   await page.waitForURL("**/home", { timeout: 15000 });
+
+  // Dismiss all guided tours so the driver.js overlay doesn't block interactions
+  await page.evaluate(() => {
+    const pages = [
+      "home", "soldiers", "activities", "requests",
+      "soldier-detail", "activity-detail", "request-detail",
+    ];
+    for (const p of pages) {
+      localStorage.setItem(`tironet:tour-seen:${p}`, "1");
+    }
+  });
 
   // Save the authenticated state
   await context.storageState({ path: storageStatePath });
