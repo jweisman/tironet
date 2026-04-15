@@ -62,19 +62,6 @@ jobs:
             sleep 2
           done
 
-      - name: Wait for PowerSync
-        run: |
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:8080/probes/ready; then
-              echo "PowerSync ready after $((i * 2 - 2))s"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::PowerSync failed to become ready within 120s"
-          docker compose logs powersync | tail -30
-          exit 1
-
       - name: Wait for dev server
         run: |
           for i in $(seq 1 60); do

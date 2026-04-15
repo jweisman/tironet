@@ -203,7 +203,7 @@ export default function ActivitiesPage() {
     } else if (filter === "completed") {
       list = list.filter(isCompleted);
     } else if (filter === "gaps") {
-      list = list.filter((a) => a.isRequired && a.date.split("T")[0] <= todayStr && (a.missingCount > 0 || a.failedCount > 0));
+      list = list.filter((a) => a.isRequired && a.date.split("T")[0] < todayStr && (a.missingCount > 0 || a.failedCount > 0));
     } else if (filter === "future") {
       list = list.filter((a) => a.date.split("T")[0] > todayStr);
     }

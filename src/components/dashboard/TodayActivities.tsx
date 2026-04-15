@@ -104,6 +104,7 @@ interface TodayActivity {
   reportedCount: number;
   passedCount: number;
   failedCount: number;
+  naCount: number;
   missingCount: number;
 }
 
@@ -137,6 +138,7 @@ export function TodayActivities({ cycleId, squadId, showPlatoon = false }: Props
         reportedCount: Number(r.reported_count),
         passedCount: Number(r.passed_count),
         failedCount: Number(r.failed_count),
+        naCount: Number(r.reported_count) - Number(r.passed_count) - Number(r.failed_count),
         missingCount: Number(r.total_soldiers) - Number(r.reported_count),
       })),
     [raw]
@@ -197,8 +199,12 @@ function TodayActivityCard({
   showPlatoon: boolean;
   onClick: () => void;
 }) {
-  const pct = a.totalSoldiers > 0 ? (a.reportedCount / a.totalSoldiers) * 100 : 0;
-  const isComplete = a.missingCount === 0 && a.totalSoldiers > 0;
+  const total = a.totalSoldiers || 1; // avoid division by zero
+  const passedPct = (a.passedCount / total) * 100;
+  const failedPct = (a.failedCount / total) * 100;
+  const naPct = (a.naCount / total) * 100;
+  const missingPct = (a.missingCount / total) * 100;
+  const isComplete = a.missingCount === 0 && a.failedCount === 0 && a.totalSoldiers > 0;
 
   return (
     <button
@@ -222,20 +228,33 @@ function TodayActivityCard({
         <ChevronLeft size={14} className="shrink-0 text-muted-foreground/40" />
       </div>
 
-      {/* Progress bar + fraction */}
+      {/* Stacked progress bar + fraction */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-          <div
-            className={cn(
-              "h-full rounded-full transition-all duration-300",
-              isComplete
-                ? "bg-green-500 dark:bg-green-400"
-                : a.failedCount > 0
-                  ? "bg-amber-500 dark:bg-amber-400"
-                  : "bg-primary"
-            )}
-            style={{ width: `${Math.max(pct, pct > 0 ? 4 : 0)}%` }}
-          />
+        <div className="flex flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+          {passedPct > 0 && (
+            <div
+              className="h-full bg-green-500 dark:bg-green-400 transition-all duration-300"
+              style={{ width: `${passedPct}%` }}
+            />
+          )}
+          {failedPct > 0 && (
+            <div
+              className="h-full bg-red-500 dark:bg-red-400 transition-all duration-300"
+              style={{ width: `${failedPct}%` }}
+            />
+          )}
+          {naPct > 0 && (
+            <div
+              className="h-full bg-muted-foreground/30 transition-all duration-300"
+              style={{ width: `${naPct}%` }}
+            />
+          )}
+          {missingPct > 0 && (
+            <div
+              className="h-full bg-amber-400 dark:bg-amber-500 transition-all duration-300"
+              style={{ width: `${missingPct}%` }}
+            />
+          )}
         </div>
         <span
           className={cn(

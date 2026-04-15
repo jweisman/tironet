@@ -6,7 +6,7 @@ This document summarizes the up-to-date definitions for terms used throughout th
 * _Open_: Required activities whose date is today or in the past that have gaps
 * _Completed_: Activities whose date is today or in the past with no gaps
 * _Future_: Activities whose date is in the future (after today)
-* _Gaps_: An activity has gaps when it is required, its date is today or in the past, and at least one soldier is missing a report or has a failed report
+* _Gaps_: An activity has gaps when it is required, its date is in the past, and at least one soldier is missing a report or has a failed report
 
 ## Requests
 * _In progress (ממתינה)_: Status is `open` — still progressing through the approval chain
