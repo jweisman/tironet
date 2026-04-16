@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PowerSyncContext } from "@powersync/react";
+import * as Sentry from "@sentry/nextjs";
 import { db } from "@/lib/powersync/database";
 import { TironetConnector } from "@/lib/powersync/connector";
 
@@ -48,12 +49,33 @@ export function TironetPowerSyncProvider({
         if (!localDb.currentStatus?.hasSynced && !localDb.connected) {
           console.error("[PowerSync] init() failed — offline mode unavailable:", err);
           setInitFailed(true);
+          Sentry.captureException(err, {
+            tags: { component: "powersync", phase: "init" },
+            extra: { userAgent: navigator.userAgent },
+          });
         } else {
           console.warn("[PowerSync] connect() failed (DB still open from init):", err);
         }
       });
 
+    // Report if sync hasn't completed after 30 seconds — helps diagnose
+    // cases where the DB opens but no data arrives (e.g. unsupported browser)
+    const syncTimeout = setTimeout(() => {
+      if (localDb && !localDb.currentStatus?.hasSynced) {
+        Sentry.captureMessage("PowerSync sync not completed after 30s", {
+          level: "warning",
+          tags: { component: "powersync", phase: "sync-timeout" },
+          extra: {
+            userAgent: navigator.userAgent,
+            connected: localDb.connected,
+            status: JSON.stringify(localDb.currentStatus),
+          },
+        });
+      }
+    }, 30_000);
+
     return () => {
+      clearTimeout(syncTimeout);
       localDb.disconnect().catch(() => {});
     };
   }, []);
