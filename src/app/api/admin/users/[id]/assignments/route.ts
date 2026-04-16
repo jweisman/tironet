@@ -24,9 +24,15 @@ export async function POST(
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const assignment = await prisma.userCycleAssignment.create({
-    data: { userId: id, ...parsed.data },
-  });
-
-  return NextResponse.json({ id: assignment.id }, { status: 201 });
+  try {
+    const assignment = await prisma.userCycleAssignment.create({
+      data: { userId: id, ...parsed.data },
+    });
+    return NextResponse.json({ id: assignment.id }, { status: 201 });
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002") {
+      return NextResponse.json({ error: "למשתמש כבר יש שיוך במחזור זה" }, { status: 409 });
+    }
+    throw err;
+  }
 }

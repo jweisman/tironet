@@ -14,8 +14,9 @@ declare module "next-auth" {
       cycleAssignments: CycleAssignment[];
       // PowerSync sync-rule claims (populated from JWT, used by /api/powersync/token)
       cycle_ids: string[];
+      squad_ids: string[];
       platoon_ids: string[];
-      squad_id: string | null;
+      company_ids: string[];
     } & DefaultSession["user"];
   }
 }

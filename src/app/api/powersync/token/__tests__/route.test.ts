@@ -59,8 +59,9 @@ describe("GET /api/powersync/token", () => {
     const user = mockSessionUser({
       id: "user-1",
       cycle_ids: ["cycle-1", "cycle-2"],
+      squad_ids: ["squad-1"],
       platoon_ids: ["platoon-1", "platoon-2"],
-      squad_id: "squad-1",
+      company_ids: ["company-1"],
     } as never);
 
     mockAuth.mockResolvedValue({ user } as never);
@@ -81,8 +82,9 @@ describe("GET /api/powersync/token", () => {
     expect(payload.sub).toBe("user-1");
     expect(payload.aud).toBe(TEST_POWERSYNC_URL);
     expect(payload.cycle_ids).toEqual(["cycle-1", "cycle-2"]);
+    expect(payload.squad_ids).toEqual(["squad-1"]);
     expect(payload.platoon_ids).toEqual(["platoon-1", "platoon-2"]);
-    expect(payload.squad_id).toBe("squad-1");
+    expect(payload.company_ids).toEqual(["company-1"]);
     // Verify expiration is approximately 5 minutes from now
     const now = Math.floor(Date.now() / 1000);
     expect(payload.exp).toBeGreaterThan(now);
@@ -91,8 +93,8 @@ describe("GET /api/powersync/token", () => {
 
   it("returns default empty claims when user has no assignments", async () => {
     const user = mockSessionUser({ id: "user-2" });
-    // The route reads cycle_ids, platoon_ids, squad_id from session.user
-    // These default to [], [], null when not present
+    // The route reads cycle_ids, squad_ids, platoon_ids, company_ids from session.user
+    // These default to [] when not present
     mockAuth.mockResolvedValue({ user } as never);
 
     const res = await GET();
@@ -106,8 +108,9 @@ describe("GET /api/powersync/token", () => {
 
     expect(payload.sub).toBe("user-2");
     expect(payload.cycle_ids).toEqual([]);
+    expect(payload.squad_ids).toEqual([]);
     expect(payload.platoon_ids).toEqual([]);
-    expect(payload.squad_id).toBeNull();
+    expect(payload.company_ids).toEqual([]);
   });
 
   it("uses HS256 algorithm with kid header", async () => {

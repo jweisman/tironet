@@ -19,13 +19,13 @@ export async function GET() {
     );
   }
 
-  const { cycle_ids = [], platoon_ids = [], squad_id = null } = session.user;
+  const { cycle_ids = [], squad_ids = [], platoon_ids = [], company_ids = [] } = session.user;
 
   // Audience must match client_auth.audience in powersync.config.yaml.
   const audience = powersyncUrl;
 
   const secret = new TextEncoder().encode(jwtSecret);
-  const token = await new jose.SignJWT({ cycle_ids, platoon_ids, squad_id })
+  const token = await new jose.SignJWT({ cycle_ids, squad_ids, platoon_ids, company_ids })
     .setProtectedHeader({ alg: "HS256", kid: "tironet-dev" })
     .setSubject(session.user.id)
     .setAudience(audience)

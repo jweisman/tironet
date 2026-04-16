@@ -36,38 +36,53 @@ Config lives in [`src/lib/powersync/sync-config.yaml`](src/lib/powersync/sync-co
 
 ### JWT claims for sync scoping
 
-The `/api/powersync/token` endpoint signs a JWT with three custom claims resolved from the user's `UserCycleAssignment` rows:
+The `/api/powersync/token` endpoint signs a JWT with four custom claims resolved from the user's **active** `UserCycleAssignment` rows. Claims are **truthful** — they represent the user's actual role assignments, not pre-expanded scopes. Expansion into visible units is handled by global CTEs in the sync config.
 
 | Claim | Type | Meaning |
 |---|---|---|
-| `cycle_ids` | `string[]` | All cycles the user is assigned to |
-| `platoon_ids` | `string[]` | All platoons the user can see (pre-expanded: company commanders get all platoons in their company) |
-| `squad_id` | `string \| null` | The squad for squad commanders; null otherwise |
+| `cycle_ids` | `string[]` | All active cycles the user is assigned to |
+| `squad_ids` | `string[]` | Squads where user is `squad_commander` |
+| `platoon_ids` | `string[]` | Platoons where user is `platoon_commander` (NOT pre-expanded) |
+| `company_ids` | `string[]` | Companies where user is `company_commander`, `instructor`, `company_medic`, or `hardship_coordinator` |
 
-Sync streams use `auth.parameter('cycle_ids')` etc. to filter rows server-side. No client-side subscription parameters are needed — all streams use `auto_subscribe: true`.
+**Inactive cycle filtering:** `resolvePowerSyncClaims()` in `auth.ts` filters out assignments where `cycle.isActive === false` before building claims. This prevents stale roles (e.g. a squad_commander assignment in a deactivated cycle) from polluting the sync scope.
+
+Sync streams use `auth.parameter('key')` to read claims, and global CTEs to expand them. No client-side subscription parameters are needed — all streams use `auto_subscribe: true`.
+
+### Global CTEs for scope expansion
+
+The sync config defines two global CTEs that expand raw role claims into the full set of visible units:
+
+- **`visible_squad_ids`** — all squads the user can see (direct squad assignments + squads in their platoons + squads in their companies). Used for soldier-level and request-level scoping.
+- **`visible_platoon_ids`** — all platoons the user can see (platoon of their squad + direct platoon assignments + platoons in their companies). Used for activity/structure/report-level scoping.
+
+```yaml
+with:
+  visible_squad_ids: >
+    SELECT id FROM squads
+    WHERE id IN auth.parameter('squad_ids')
+    OR platoon_id IN auth.parameter('platoon_ids')
+    OR platoon_id IN (SELECT id FROM platoons WHERE company_id IN auth.parameter('company_ids'))
+
+  visible_platoon_ids: >
+    SELECT id FROM platoons
+    WHERE id IN (SELECT platoon_id FROM squads WHERE id IN auth.parameter('squad_ids'))
+    OR id IN auth.parameter('platoon_ids')
+    OR company_id IN auth.parameter('company_ids')
+```
+
+Streams then use `WHERE squad_id IN visible_squad_ids` or `WHERE platoon_id IN visible_platoon_ids`. This means squad commanders see only their squad's soldiers and requests, but the full platoon's activities and structure.
 
 ### Sync stream query patterns for `auth.parameter()`
 
-`IN auth.parameter('key')` works correctly when the filtered column is on the **primary (FROM) table**:
+`IN auth.parameter('key')` works correctly when the filtered column is on the **primary (FROM) table**. When the filtered column is on a **joined table** (not the primary table), use a **subquery** instead. The `json_each` JOIN pattern (e.g. `JOIN json_each(auth.parameter('platoon_ids')) AS p ON a.platoon_id = p.value`) appears valid per the docs but causes PowerSync to key buckets incorrectly (by the joined table's row ID instead of the parameter value), resulting in all rows being processed as REMOVE operations and 0 rows in the local DB.
 
-```yaml
-query: >
-  SELECT id, name FROM activities
-  WHERE platoon_id IN auth.parameter('platoon_ids')
-```
-
-When the filtered column is on a **joined table** (not the primary table), use a **subquery** instead. The `json_each` JOIN pattern (e.g. `JOIN json_each(auth.parameter('platoon_ids')) AS p ON a.platoon_id = p.value`) appears valid per the docs but causes PowerSync to key buckets incorrectly (by the joined table's row ID instead of the parameter value), resulting in all rows being processed as REMOVE operations and 0 rows in the local DB.
-
-Correct pattern for `activity_reports`, which has no `platoon_id` of its own:
-
-```yaml
-query: >
-  SELECT id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note
-  FROM activity_reports
-  WHERE activity_id IN (
-    SELECT id FROM activities WHERE platoon_id IN auth.parameter('platoon_ids')
-  )
-```
+**CTE limitations (PowerSync v1.20.x):**
+- Global CTEs require edition 3 (which we use)
+- Each CTE must be a single `SELECT` — no `UNION`
+- Only inner `JOIN` is supported in CTEs (no `LEFT JOIN`)
+- CTEs cannot reference other CTEs — each must be self-contained
+- Use `OR` + subqueries to combine multiple scope conditions in a single `SELECT`
 
 **Debugging tip:** if a stream appears in `ps_buckets` with non-zero `count_at_last` but the actual table is empty and `ps_oplog` is also empty after a full sync (`hasSynced: true`), the rows were received as REMOVE operations — likely a bucket keying mismatch from the wrong query pattern.
 
@@ -253,6 +268,10 @@ This matters because PowerSync scopes `activity_reports` to users via a JOIN on 
 
 Similarly, `Soldier.squadId` is write-once. The "transferred" status (`SoldierStatus.transferred`) marks a soldier as inactive rather than moving them.
 
+### One role per user per cycle
+
+`UserCycleAssignment` has a `@@unique([userId, cycleId])` constraint — a user can only have one role in each cycle. The admin assignment endpoint returns a 409 with a Hebrew message if a duplicate is attempted. This also prevents sync claim pollution (e.g. a user getting both squad-level and platoon-level claims in the same cycle).
+
 ## Requests (בקשות) Workflow
 
 ### Request types
@@ -303,6 +322,12 @@ Approve and deny actions open a dialog with an optional note field. The note is 
 
 The `userName` column is denormalized from the user's `familyName givenName` at write time so the timeline renders correctly offline (the `users` table is not synced via PowerSync).
 
+### Authorization on request mutations
+
+- **DELETE `/api/requests/[id]`** verifies `createdByUserId` matches the authenticated user — only the creator can delete their own open requests.
+- **POST `/api/request-actions`** calls `getRequestScope()` and verifies the request's soldier is in the user's scope before creating an audit entry.
+- **PATCH `/api/requests/[id]` (connector path)** validates that the `(status, assignedRole)` transition is reachable via a valid workflow action using `isValidTransition()` from `src/lib/requests/workflow.ts`. This prevents the PowerSync connector from bypassing the state machine (e.g. jumping directly from open to approved).
+
 ### Offline writes
 
 Request creation and workflow actions (approve/deny/acknowledge) write to the local PowerSync SQLite DB via `db.execute()`. Each workflow action writes **two rows**: an UPDATE to `requests` (status/assignedRole) and an INSERT to `request_actions` (audit entry). The connector uploads them separately — the request UPDATE via PATCH to `/api/requests/[id]` and the action INSERT via POST to `/api/request-actions`. The server-side PATCH handler also creates a `RequestAction` when it receives an explicit `action` field (online path), but the connector does NOT pass `action` in the PATCH body, avoiding duplicates.
@@ -342,7 +367,7 @@ The soldier detail page (`/soldiers/[id]`) shows **all** requests for the soldie
 
 ### Badge count scoping (`useRequestBadge`)
 
-The request badge (home page callout, sidebar/tab bar dot) counts requests assigned to the user's **effective role** (e.g. `platoon_sergeant` → `platoon_commander`). For squad commanders, the count is further scoped to their own squad via `s.squad_id = ?` — without this, the badge would include requests from all squads in the platoon (since the sync stream delivers the full platoon).
+The request badge (home page callout, sidebar/tab bar dot) counts requests assigned to the user's **effective role** (e.g. `platoon_sergeant` → `platoon_commander`). For squad commanders, the count is further scoped to their own squad via `s.squad_id = ?`.
 
 ## Roles and Access Control
 
@@ -445,7 +470,13 @@ All soldier-facing views (soldiers page, requests page, activity reports) filter
 - **Platoon commanders** see only soldiers in their platoon's squads
 - **Company commanders** see soldiers across all platoons in their company
 
-PowerSync sync streams deliver all soldiers within the user's `platoon_ids` for offline access (needed for activity reports). Client-side pages must further filter by squad when the role is `squad_commander`. The soldiers page and requests page both use `selectedAssignment.unitId` with `role` to filter the query results client-side. Server-side API routes use `getRequestScope().soldierIds` which is already correctly scoped.
+PowerSync sync streams scope soldiers by `visible_squad_ids` (the global CTE), so squad commanders receive only their own squad's soldiers. Platoon and company commanders receive all soldiers within their visible platoons. Client-side pages may still filter by squad for UI purposes. Server-side API routes use `getRequestScope().soldierIds` which is already correctly scoped.
+
+### Invitation security
+
+- **Send endpoints** (`/api/invitations/send-email`, `/api/invitations/send-sms`) verify the requester is the invitation creator or an admin before sending.
+- **Tokens are never exposed in API responses.** All endpoints return `inviteUrl` (the full `/invite/{token}` URL) instead of the raw `token`. This applies to the admin list, admin refresh, hierarchy, and pending invitations endpoints.
+- **Phone-only invitation acceptance** requires the accepting user to have a matching phone number. Users without a phone set are rejected with `phone_mismatch` (403).
 
 ## Bulk Import Pattern (Spreadsheet Upload)
 
@@ -540,6 +571,10 @@ Navigation preload is **disabled**. Safari (pre-18.5) has a critical bug where c
 ### Service worker registration (no auto-reload on update)
 
 `serwist-provider.tsx` uses manual `navigator.serviceWorker.register()` instead of `@serwist/turbopack/react`'s `SerwistProvider`. The library's provider automatically reloads the page on `controllerchange` (when a new SW takes control via `skipWaiting` + `clientsClaim`). On iOS, that reload combined with any RSC error recovery = two rapid reloads = "A problem repeatedly occurred" crash. The manual registration intentionally omits the `controllerchange` listener — the new SW silently takes over and the next user navigation uses its cached content.
+
+### Cache clearing on sign-out
+
+`src/lib/auth/sign-out.ts` exports `signOutAndClearCaches()` which sends a `CLEAR_CACHES` postMessage to the service worker before calling NextAuth's `signOut()`. The SW handler deletes all caches (app shells, runtime caches) to prevent sensitive data from persisting on shared devices after logout. Both sign-out buttons (Sidebar and profile page) use this function instead of calling `signOut()` directly.
 
 ### `AUTH_TRUST_HOST=true`
 
@@ -673,7 +708,7 @@ This creates a separate `tironet_test` database so e2e tests don't touch the dev
    - `{ exact: true }` to avoid substring matches (e.g. `getByRole("button", { name: "טיוטה", exact: true })`)
    - Scope to `page.getByRole("main")` to avoid matching sidebar text (e.g. "Squad Commander" matching `getByText("Squad C")`)
 
-5. **Sync delivers full platoon, but UI filters by squad** — PowerSync sync streams deliver all soldiers within the user's `platoon_ids` (not filtered by squad). However, the UI pages (soldiers, requests) filter client-side so squad commanders only see their own squad's soldiers. E2E tests should assert that squad commanders see only their squad's soldiers on these pages.
+5. **Sync scopes soldiers by squad for squad commanders** — PowerSync sync streams use the `visible_squad_ids` CTE, so squad commanders only receive their own squad's soldiers (not the full platoon). E2E tests should assert that squad commanders see only their squad's soldiers on these pages.
 
 6. **Mailhog quoted-printable encoding** — Email bodies use `=3D` for `=` and soft line breaks (`=\r\n`). The `extractVerificationUrl` helper in `e2e/helpers/mailhog.ts` handles decoding.
 

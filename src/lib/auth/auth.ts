@@ -138,39 +138,42 @@ type RawAssignment = {
   role: string;
   unitType: string;
   unitId: string;
+  cycle?: { isActive: boolean };
 };
 
 async function resolvePowerSyncClaims(assignments: RawAssignment[]): Promise<{
   cycle_ids: string[];
+  squad_ids: string[];
   platoon_ids: string[];
-  squad_id: string | null;
+  company_ids: string[];
 }> {
-  const cycle_ids = [...new Set(assignments.map((a) => a.cycleId))];
+  // Only include active cycles — inactive cycle assignments should not pollute
+  // the sync scope (e.g. a squad_commander role in a past cycle should not
+  // affect a platoon_commander's view in the current one).
+  const active = assignments.filter((a) => a.cycle?.isActive !== false);
+  const cycle_ids = [...new Set(active.map((a) => a.cycleId))];
+  const squad_ids = new Set<string>();
   const platoon_ids = new Set<string>();
-  let squad_id: string | null = null;
+  const company_ids = new Set<string>();
 
-  for (const a of assignments) {
+  for (const a of active) {
     const role = a.role as import("@/types").Role;
     const eff = effectiveRole(role);
     if (eff === "company_commander" || role === "instructor" || role === "company_medic" || role === "hardship_coordinator") {
-      const platoons = await prisma.platoon.findMany({
-        where: { companyId: a.unitId },
-        select: { id: true },
-      });
-      platoons.forEach((p) => platoon_ids.add(p.id));
+      company_ids.add(a.unitId);
     } else if (eff === "platoon_commander") {
       platoon_ids.add(a.unitId);
     } else if (eff === "squad_commander") {
-      squad_id = a.unitId;
-      const squad = await prisma.squad.findUnique({
-        where: { id: a.unitId },
-        select: { platoonId: true },
-      });
-      if (squad) platoon_ids.add(squad.platoonId);
+      squad_ids.add(a.unitId);
     }
   }
 
-  return { cycle_ids, platoon_ids: Array.from(platoon_ids), squad_id };
+  return {
+    cycle_ids,
+    squad_ids: Array.from(squad_ids),
+    platoon_ids: Array.from(platoon_ids),
+    company_ids: Array.from(company_ids),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -312,8 +315,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // PowerSync sync-rule claims
           const ps = await resolvePowerSyncClaims(dbUser.cycleAssignments);
           token.cycle_ids = ps.cycle_ids;
+          token.squad_ids = ps.squad_ids;
           token.platoon_ids = ps.platoon_ids;
-          token.squad_id = ps.squad_id;
+          token.company_ids = ps.company_ids;
         }
       } else if (token.sub) {
         // On subsequent token refreshes, re-read isAdmin and cycleAssignments
@@ -366,8 +370,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // PowerSync sync-rule claims
           const ps = await resolvePowerSyncClaims(fresh.cycleAssignments);
           token.cycle_ids = ps.cycle_ids;
+          token.squad_ids = ps.squad_ids;
           token.platoon_ids = ps.platoon_ids;
-          token.squad_id = ps.squad_id;
+          token.company_ids = ps.company_ids;
         }
       }
       return token;
@@ -384,8 +389,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.cycleAssignments =
         (token.cycleAssignments as CycleAssignment[]) ?? [];
       session.user.cycle_ids = (token.cycle_ids as string[]) ?? [];
+      session.user.squad_ids = (token.squad_ids as string[]) ?? [];
       session.user.platoon_ids = (token.platoon_ids as string[]) ?? [];
-      session.user.squad_id = (token.squad_id as string | null) ?? null;
+      session.user.company_ids = (token.company_ids as string[]) ?? [];
       return session;
     },
 
