@@ -13,7 +13,7 @@ const cspDirectives = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Tailwind injects inline styles; Google Fonts for report print
   "img-src 'self' data: blob: https://lh3.googleusercontent.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' http://localhost:* ws://localhost:* https://*.powersync.journeyapps.com wss://*.powersync.journeyapps.com https://accounts.google.com https://sheets.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com https://*.ingest.sentry.io https://*.ingest.de.sentry.io",
+  "connect-src 'self' http://localhost:* ws://localhost:* https://*.powersync.journeyapps.com wss://*.powersync.journeyapps.com https://accounts.google.com https://sheets.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://cdn.jsdelivr.net",
   "worker-src 'self' blob:",
   "frame-src 'self' https://accounts.google.com https://docs.google.com",   // Google OAuth popup + Drive Picker
   "object-src 'none'",
