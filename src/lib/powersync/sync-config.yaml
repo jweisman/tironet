@@ -23,7 +23,7 @@ streams:
   companies:
     auto_subscribe: true
     query: >
-      SELECT id, cycle_id, name, sort_order
+      SELECT id, cycle_id, name, logo, sort_order
       FROM companies
       WHERE cycle_id IN auth.parameter('cycle_ids')
 

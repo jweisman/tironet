@@ -169,6 +169,27 @@ async function collectDiagnostics(
     diagnostics["Service Worker"] = { registered: false };
   }
 
+  // PWA / splash screen diagnostics
+  try {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const splashLinks = Array.from(document.querySelectorAll('link[rel="apple-touch-startup-image"]'));
+    const matchingSplash = splashLinks.filter((link) => {
+      const media = link.getAttribute("media");
+      return media ? window.matchMedia(media).matches : false;
+    });
+    diagnostics["PWA"] = {
+      isIOS,
+      standalone: window.matchMedia("(display-mode: standalone)").matches
+        || ("standalone" in navigator && (navigator as unknown as { standalone: boolean }).standalone),
+      splashLinksTotal: splashLinks.length,
+      matchingSplashMedia: matchingSplash.length > 0
+        ? matchingSplash.map((l) => l.getAttribute("media"))
+        : `none matching (device: ${screen.width}×${screen.height} @${window.devicePixelRatio}x)`,
+    };
+  } catch (e) {
+    diagnostics["PWA"] = { error: String(e) };
+  }
+
   return diagnostics;
 }
 

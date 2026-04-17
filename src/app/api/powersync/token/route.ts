@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth/auth";
 const powersyncUrl =
   process.env.NEXT_PUBLIC_POWERSYNC_URL ?? "http://localhost:8080";
 
-export async function GET(request?: Request) {
+export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,9 +18,6 @@ export async function GET(request?: Request) {
       { status: 500 }
     );
   }
-
-  const ua = request?.headers.get("user-agent") ?? "unknown";
-  console.log(`[powersync/token] user=${session.user.id} ua=${ua}`);
 
   const { cycle_ids = [], platoon_ids = [], squad_id = null } = session.user;
 

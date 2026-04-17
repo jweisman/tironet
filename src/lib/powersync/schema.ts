@@ -12,6 +12,7 @@ const cycles = new Table({
 const companies = new Table({
   cycle_id: column.text,
   name: column.text,
+  logo: column.text,
   sort_order: column.integer,
 });
 

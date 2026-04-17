@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -33,6 +33,7 @@ import {
   Building2,
   Users,
   Shield,
+  ImagePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,10 +56,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { LogoCropDialog } from "@/components/LogoCropDialog";
+import { validateProfileImage } from "@/lib/api/validate-image";
 
 type Squad = { id: string; name: string };
 type Platoon = { id: string; name: string; squads: Squad[] };
-type Company = { id: string; name: string; battalionId: string | null; platoons: Platoon[] };
+type Company = { id: string; name: string; logo?: string | null; battalionId: string | null; platoons: Platoon[] };
 type Battalion = { id: string; name: string; sortOrder: number };
 type Cycle = { id: string; name: string; isActive: boolean };
 
@@ -247,6 +250,9 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [editingPlatoonId, setEditingPlatoonId] = useState<string | null>(null);
   const [editingSquadId, setEditingSquadId] = useState<string | null>(null);
+  const [logoCropFile, setLogoCropFile] = useState<File | null>(null);
+  const [logoCropCompanyId, setLogoCropCompanyId] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -388,6 +394,20 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
       prev.map((c) => (c.id === companyId ? { ...c, name } : c))
     );
     setEditingCompanyId(null);
+  }
+
+  async function updateCompanyLogo(companyId: string, logo: string | null) {
+    const company = companies.find((c) => c.id === companyId);
+    if (!company) return;
+    if (logo) {
+      const err = validateProfileImage(logo);
+      if (err) { toast.error(err); return; }
+    }
+    await mutate(`/api/admin/structure/${companyId}`, "PATCH", { type: "company", name: company.name, logo });
+    updateStructure(selectedCycleId, (prev) =>
+      prev.map((c) => (c.id === companyId ? { ...c, logo } : c))
+    );
+    toast.success(logo ? "הלוגו עודכן" : "הלוגו הוסר");
   }
 
   async function deleteCompany(companyId: string) {
@@ -657,7 +677,15 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
                               <ChevronRight className="w-4 h-4" />
                             )}
                           </button>
-                          <Building2 className="w-4 h-4 text-primary shrink-0" />
+                          {company.logo && editingCompanyId !== company.id && (
+                            <img src={company.logo} alt="" className="h-6 w-6 rounded object-contain shrink-0" />
+                          )}
+                          {!company.logo && editingCompanyId !== company.id && (
+                            <Building2 className="w-4 h-4 text-primary shrink-0" />
+                          )}
+                          {editingCompanyId === company.id && (
+                            <Building2 className="w-4 h-4 text-primary shrink-0" />
+                          )}
                           {editingCompanyId === company.id ? (
                             <EditInline
                               initialName={company.name}
@@ -738,6 +766,42 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
                             </>
                           )}
                         </div>
+
+                        {/* Logo upload area — visible when editing */}
+                        {editingCompanyId === company.id && (
+                          <div className="flex items-center gap-3 px-3 pb-2 bg-muted/30">
+                            {company.logo ? (
+                              <img src={company.logo} alt="" className="h-10 w-10 rounded object-contain bg-background border" />
+                            ) : (
+                              <div className="h-10 w-10 rounded bg-background border flex items-center justify-center">
+                                <ImagePlus className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                setLogoCropCompanyId(company.id);
+                                logoInputRef.current?.click();
+                              }}
+                            >
+                              <ImagePlus className="w-3 h-3 ms-1" />
+                              {company.logo ? "החלף לוגו" : "העלה לוגו"}
+                            </Button>
+                            {company.logo && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs text-destructive hover:text-destructive"
+                                onClick={() => updateCompanyLogo(company.id, null)}
+                              >
+                                <Trash2 className="w-3 h-3 ms-1" />
+                                הסר
+                              </Button>
+                            )}
+                          </div>
+                        )}
 
                         {/* Platoons */}
                         {companyExpanded && (
@@ -1103,6 +1167,31 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
           </Button>
         </div>
       )}
+
+      {/* Hidden file input + crop dialog for company logo */}
+      <input
+        ref={logoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) setLogoCropFile(file);
+          e.target.value = "";
+        }}
+      />
+      <LogoCropDialog
+        file={logoCropFile}
+        onConfirm={(base64) => {
+          if (logoCropCompanyId) updateCompanyLogo(logoCropCompanyId, base64);
+          setLogoCropFile(null);
+          setLogoCropCompanyId(null);
+        }}
+        onCancel={() => {
+          setLogoCropFile(null);
+          setLogoCropCompanyId(null);
+        }}
+      />
     </div>
   );
 }

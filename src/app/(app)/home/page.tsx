@@ -98,6 +98,7 @@ const SQUADS_QUERY = `
     p.id    AS platoon_id,
     p.name  AS platoon_name,
     c.name  AS company_name,
+    c.logo  AS company_logo,
 
     (SELECT COUNT(*)
      FROM soldiers s
@@ -237,7 +238,7 @@ const REQUESTS_QUERY = `
 interface RawSquad {
   squad_id: string; squad_name: string;
   platoon_id: string; platoon_name: string;
-  company_name: string;
+  company_name: string; company_logo: string | null;
   soldier_count: number; soldiers_with_gaps: number;
   reported_activities: number; missing_report_activities: number;
 }
@@ -366,6 +367,8 @@ export default function HomePage() {
     return parts.join(" > ");
   }, [role, rawSquads]);
 
+  const companyLogo = rawSquads?.[0]?.company_logo ?? null;
+
   // Tour
   const { registerTour, unregisterTour } = useTourContext();
   const { startTour } = useTour({ page: "home", steps: homeTourSteps });
@@ -428,23 +431,32 @@ export default function HomePage() {
   return (
     <div className="space-y-5">
       {/* User context header */}
-      <div>
-        <h1 className="text-2xl font-bold">
-          {user?.rank ? `${user.rank} ` : ""}
-          {user?.givenName ?? ""}
-        </h1>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {rawRole && (
-            <span className="text-sm font-medium text-primary">
-              {ROLE_SHORT[rawRole] ?? rawRole}
-            </span>
-          )}
-          {rawRole && (unitPath || cycleName) && (
-            <span className="text-muted-foreground text-sm">·</span>
-          )}
-          {(unitPath || cycleName) && (
-            <span className="text-sm text-muted-foreground">{unitPath || cycleName}</span>
-          )}
+      <div className="flex items-center gap-4">
+        <div className="flex h-14 md:h-16 w-auto max-w-24 items-center justify-center rounded-lg bg-muted p-1.5 shrink-0">
+          <img
+            src={companyLogo ?? "/images/idf-logo.png"}
+            alt=""
+            className="h-full w-auto object-contain"
+          />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">
+            {user?.rank ? `${user.rank} ` : ""}
+            {user?.givenName ?? ""}
+          </h1>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {rawRole && (
+              <span className="text-sm font-medium text-primary">
+                {ROLE_SHORT[rawRole] ?? rawRole}
+              </span>
+            )}
+            {rawRole && (unitPath || cycleName) && (
+              <span className="text-muted-foreground text-sm">·</span>
+            )}
+            {(unitPath || cycleName) && (
+              <span className="text-sm text-muted-foreground">{unitPath || cycleName}</span>
+            )}
+          </div>
         </div>
       </div>
 
