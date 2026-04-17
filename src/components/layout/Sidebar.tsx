@@ -138,10 +138,10 @@ export function Sidebar() {
       </nav>
 
       {/* User section */}
-      <div className="border-t border-border px-4 py-4 space-y-3">
+      <div className="border-t border-border px-4 py-3">
         <div className="flex items-center gap-3">
           <UserAvatar size={40} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">
               {session?.user
                 ? `${session.user.givenName} ${session.user.familyName}`.trim()
@@ -153,29 +153,32 @@ export function Sidebar() {
               </p>
             )}
           </div>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={startCurrentTour}
+              className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="עזרה"
+            >
+              <HelpCircle size={16} />
+            </button>
+            <Link
+              href="/support"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="תמיכה"
+            >
+              <LifeBuoy size={16} />
+            </Link>
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title={t("logout")}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={startCurrentTour}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <HelpCircle size={16} />
-          <span>עזרה</span>
-        </button>
-        <Link
-          href="/support"
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <LifeBuoy size={16} />
-          <span>תמיכה</span>
-        </Link>
-        <button
-          onClick={() => signOut({ callbackUrl: "/" })}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <LogOut size={16} />
-          <span>{t("logout")}</span>
-        </button>
       </div>
     </aside>
   );

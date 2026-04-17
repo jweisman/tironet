@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle, WifiOff } from "lucide-react";
+import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle, WifiOff, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
@@ -221,6 +221,7 @@ export default function SoldierDetailPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [requestTypeMenuOpen, setRequestTypeMenuOpen] = useState(false);
   const [createRequestType, setCreateRequestType] = useState<RequestType | null>(null);
+  const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const { selectedCycleId, selectedAssignment } = useCycle();
   const rawUserRole = (selectedAssignment?.role ?? "") as Role | "";
   const userRole = rawUserRole ? effectiveRole(rawUserRole) : "";
@@ -339,20 +340,29 @@ export default function SoldierDetailPage() {
       <div data-tour="soldier-header" className="rounded-xl border border-border bg-card p-4 space-y-4">
         <div className="flex items-start gap-4">
           {/* Avatar */}
-          <div
-            className={`relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full text-white font-bold text-2xl ${colorClass}`}
+          <button
+            type="button"
+            data-tour="soldier-avatar"
+            disabled={!raw.profile_image}
+            onClick={() => raw.profile_image && setImageZoomOpen(true)}
+            className={`relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full text-white font-bold text-2xl ${colorClass} ${raw.profile_image ? "cursor-zoom-in group" : ""}`}
           >
             {raw.profile_image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={raw.profile_image}
-                alt={`${raw.given_name} ${raw.family_name}`}
-                className="h-20 w-20 rounded-full object-cover"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={raw.profile_image}
+                  alt={`${raw.given_name} ${raw.family_name}`}
+                  className="h-20 w-20 rounded-full object-cover"
+                />
+                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 group-hover:bg-black/30 transition-colors">
+                  <ZoomIn size={20} className="opacity-0 group-hover:opacity-100 transition-opacity text-white" />
+                </span>
+              </>
             ) : (
               <span>{initials}</span>
             )}
-          </div>
+          </button>
 
           {/* Info */}
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -639,6 +649,23 @@ export default function SoldierDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Image zoom dialog */}
+      {raw.profile_image && (
+        <Dialog open={imageZoomOpen} onOpenChange={setImageZoomOpen}>
+          <DialogContent className="max-w-sm p-0 overflow-hidden bg-transparent border-none shadow-none">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{raw.family_name} {raw.given_name}</DialogTitle>
+            </DialogHeader>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={raw.profile_image}
+              alt={`${raw.family_name} ${raw.given_name}`}
+              className="w-full h-auto rounded-xl"
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Request type selection dialog */}
       <Dialog open={requestTypeMenuOpen} onOpenChange={setRequestTypeMenuOpen}>
