@@ -11,12 +11,18 @@ vi.mock("@/lib/auth/auth", () => ({
   auth: vi.fn(),
 }));
 
+vi.mock("@/lib/api/request-scope", () => ({
+  getRequestScope: vi.fn(),
+}));
+
 import { POST } from "../route";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
+import { getRequestScope } from "@/lib/api/request-scope";
 import { createMockRequest } from "@/__tests__/helpers/api";
 
 const mockAuth = vi.mocked(auth);
+const mockGetRequestScope = vi.mocked(getRequestScope);
 const mockRequestFindUnique = vi.mocked(prisma.request.findUnique);
 const mockActionCreate = vi.mocked(prisma.requestAction.create);
 
@@ -60,11 +66,32 @@ describe("POST /api/request-actions", () => {
     expect(res.status).toBe(404);
   });
 
+  it("returns 403 when soldier not in scope", async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: "user-1", familyName: "Cohen", givenName: "Avi" },
+    } as never);
+    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId, cycleId: "cycle-1", soldierId: "soldier-1" } as never);
+    mockGetRequestScope.mockResolvedValue({
+      scope: { role: "squad_commander" as never, soldierIds: ["other-soldier"], squadIds: [], platoonIds: [], canCreate: true },
+      error: null,
+      user: { id: "user-1" } as never,
+    });
+
+    const req = createMockRequest("POST", "/api/request-actions", validBody);
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+  });
+
   it("creates action with server-determined userId", async () => {
     mockAuth.mockResolvedValue({
       user: { id: "user-1", familyName: "Cohen", givenName: "Avi" },
     } as never);
-    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId } as never);
+    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId, cycleId: "cycle-1", soldierId: "soldier-1" } as never);
+    mockGetRequestScope.mockResolvedValue({
+      scope: { role: "squad_commander" as never, soldierIds: ["soldier-1"], squadIds: [], platoonIds: [], canCreate: true },
+      error: null,
+      user: { id: "user-1" } as never,
+    });
     mockActionCreate.mockResolvedValue({ id: "action-1" } as never);
 
     const req = createMockRequest("POST", "/api/request-actions", validBody);
@@ -89,7 +116,12 @@ describe("POST /api/request-actions", () => {
     mockAuth.mockResolvedValue({
       user: { id: "user-1", familyName: "Cohen", givenName: "Avi" },
     } as never);
-    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId } as never);
+    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId, cycleId: "cycle-1", soldierId: "soldier-1" } as never);
+    mockGetRequestScope.mockResolvedValue({
+      scope: { role: "squad_commander" as never, soldierIds: ["soldier-1"], squadIds: [], platoonIds: [], canCreate: true },
+      error: null,
+      user: { id: "user-1" } as never,
+    });
     mockActionCreate.mockResolvedValue({ id: clientId } as never);
 
     const req = createMockRequest("POST", "/api/request-actions", {
@@ -107,7 +139,12 @@ describe("POST /api/request-actions", () => {
     mockAuth.mockResolvedValue({
       user: { id: "user-1", familyName: "Cohen", givenName: "Avi" },
     } as never);
-    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId } as never);
+    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId, cycleId: "cycle-1", soldierId: "soldier-1" } as never);
+    mockGetRequestScope.mockResolvedValue({
+      scope: { role: "squad_commander" as never, soldierIds: ["soldier-1"], squadIds: [], platoonIds: [], canCreate: true },
+      error: null,
+      user: { id: "user-1" } as never,
+    });
     mockActionCreate.mockResolvedValue({ id: "action-note" } as never);
 
     const req = createMockRequest("POST", "/api/request-actions", {
@@ -132,7 +169,12 @@ describe("POST /api/request-actions", () => {
     mockAuth.mockResolvedValue({
       user: { id: "user-1", familyName: "Cohen", givenName: "Avi" },
     } as never);
-    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId } as never);
+    mockRequestFindUnique.mockResolvedValue({ id: validBody.requestId, cycleId: "cycle-1", soldierId: "soldier-1" } as never);
+    mockGetRequestScope.mockResolvedValue({
+      scope: { role: "squad_commander" as never, soldierIds: ["soldier-1"], squadIds: [], platoonIds: [], canCreate: true },
+      error: null,
+      user: { id: "user-1" } as never,
+    });
     mockActionCreate.mockResolvedValue({ id: "action-2" } as never);
 
     const req = createMockRequest("POST", "/api/request-actions", {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Users, Activity, Settings, LogOut, UserCog, FileText, BarChart3, HelpCircle, LifeBuoy } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { signOut } from "next-auth/react";
+import { signOutAndClearCaches } from "@/lib/auth/sign-out";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
@@ -171,7 +171,7 @@ export function Sidebar() {
             </Link>
             <button
               type="button"
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={() => signOutAndClearCaches()}
               className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               title={t("logout")}
             >

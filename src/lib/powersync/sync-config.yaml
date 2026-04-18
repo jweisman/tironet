@@ -1,10 +1,31 @@
-# PowerSync sync config — Sync Streams (edition 3, recommended for all new apps).
+# PowerSync sync config — Sync Streams (edition 3).
 # auth.parameter('key') reads JWT claims set by /api/powersync/token.
-# Claims: cycle_ids (array), platoon_ids (array), squad_id (string|null)
-# See: https://docs.powersync.com/sync/streams/overview
+#
+# Claims (truthful — represent actual role assignments, not pre-expanded):
+#   cycle_ids    string[]  — all active cycles the user is assigned to
+#   squad_ids    string[]  — squads where user is squad_commander
+#   platoon_ids  string[]  — platoons where user is platoon_commander
+#   company_ids  string[]  — companies where user is company_commander/instructor/medic/coordinator
+#
+# Global CTEs expand these raw assignments into the full set of visible units.
+# - visible_squad_ids:   squad-level scoping (soldiers)
+# - visible_platoon_ids: platoon-level scoping (activities, structure, reports)
 
 config:
   edition: 3
+
+with:
+  visible_squad_ids: >
+    SELECT id FROM squads
+    WHERE id IN auth.parameter('squad_ids')
+    OR platoon_id IN auth.parameter('platoon_ids')
+    OR platoon_id IN (SELECT id FROM platoons WHERE company_id IN auth.parameter('company_ids'))
+
+  visible_platoon_ids: >
+    SELECT id FROM platoons
+    WHERE id IN (SELECT platoon_id FROM squads WHERE id IN auth.parameter('squad_ids'))
+    OR id IN auth.parameter('platoon_ids')
+    OR company_id IN auth.parameter('company_ids')
 
 streams:
   activity_types:
@@ -30,30 +51,33 @@ streams:
   soldiers:
     auto_subscribe: true
     query: >
-      SELECT id, cycle_id, squad_id, given_name, family_name, id_number, civilian_id, rank, status, profile_image, phone, emergency_phone, street, apt, city, notes
+      SELECT id, cycle_id, squad_id, given_name, family_name, id_number,
+             civilian_id, rank, status, profile_image, phone, emergency_phone,
+             street, apt, city, notes
       FROM soldiers
       WHERE cycle_id IN auth.parameter('cycle_ids')
+      AND squad_id IN visible_squad_ids
 
   platoons:
     auto_subscribe: true
     query: >
       SELECT id, company_id, name, sort_order
       FROM platoons
-      WHERE id IN auth.parameter('platoon_ids')
+      WHERE id IN visible_platoon_ids
 
   squads:
     auto_subscribe: true
     query: >
       SELECT id, platoon_id, name, sort_order
       FROM squads
-      WHERE platoon_id IN auth.parameter('platoon_ids')
+      WHERE platoon_id IN visible_platoon_ids
 
   activities:
     auto_subscribe: true
     query: >
       SELECT id, platoon_id, cycle_id, activity_type_id, name, date, is_required, status
       FROM activities
-      WHERE platoon_id IN auth.parameter('platoon_ids')
+      WHERE platoon_id IN visible_platoon_ids
 
   activity_reports:
     auto_subscribe: true
@@ -62,7 +86,7 @@ streams:
              grade1, grade2, grade3, grade4, grade5, grade6, note
       FROM activity_reports
       WHERE activity_id IN (
-        SELECT id FROM activities WHERE platoon_id IN auth.parameter('platoon_ids')
+        SELECT id FROM activities WHERE platoon_id IN visible_platoon_ids
       )
 
   requests:
@@ -76,6 +100,7 @@ streams:
              special_conditions, created_at, updated_at
       FROM requests
       WHERE cycle_id IN auth.parameter('cycle_ids')
+      AND soldier_id IN (SELECT id FROM soldiers WHERE squad_id IN visible_squad_ids)
 
   request_actions:
     auto_subscribe: true
@@ -83,5 +108,7 @@ streams:
       SELECT id, request_id, user_id, action, note, user_name, created_at
       FROM request_actions
       WHERE request_id IN (
-        SELECT id FROM requests WHERE cycle_id IN auth.parameter('cycle_ids')
+        SELECT id FROM requests
+        WHERE cycle_id IN auth.parameter('cycle_ids')
+        AND soldier_id IN (SELECT id FROM soldiers WHERE squad_id IN visible_squad_ids)
       )

@@ -13,10 +13,14 @@ vi.mock("@/lib/api/request-scope", () => ({
   getRequestScope: vi.fn(),
 }));
 
-vi.mock("@/lib/requests/workflow", () => ({
-  getNextState: vi.fn(),
-  canActOnRequest: vi.fn(() => true),
-}));
+vi.mock("@/lib/requests/workflow", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/requests/workflow")>();
+  return {
+    ...actual,
+    getNextState: vi.fn(),
+    canActOnRequest: vi.fn(() => true),
+  };
+});
 
 vi.mock("@/lib/auth/permissions", () => ({
   effectiveRole: vi.fn((role: string) => {
@@ -356,7 +360,7 @@ describe("PATCH /api/requests/[id] — field edits", () => {
     expect(res.status).toBe(200);
   });
 
-  it("applies connector sync fields (status + assignedRole)", async () => {
+  it("applies connector sync fields for valid transition", async () => {
     mockRequestFindUnique.mockResolvedValue(baseRequest as never);
     mockGetScope.mockResolvedValue({
       scope: {
@@ -369,18 +373,49 @@ describe("PATCH /api/requests/[id] — field edits", () => {
       error: null,
       user: mockSessionUser(),
     });
-    mockRequestUpdate.mockResolvedValue({ ...baseRequest, status: "approved", assignedRole: null } as never);
+    // isValidTransition calls getNextState for each action — make "approve" return the target state
+    mockGetNextState.mockImplementation((status, role, action) => {
+      if (status === "open" && role === "platoon_commander" && action === "approve") {
+        return { newStatus: "open", newAssignedRole: "company_commander" };
+      }
+      return null;
+    });
+    mockRequestUpdate.mockResolvedValue({ ...baseRequest, status: "open", assignedRole: "company_commander" } as never);
+
+    const req = createMockRequest("PATCH", "/api/requests/req-1", {
+      status: "open",
+      assignedRole: "company_commander",
+    });
+    const res = await PATCH(req, makeParams("req-1"));
+    expect(res.status).toBe(200);
+
+    const updateCall = mockRequestUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(updateCall.data.status).toBe("open");
+    expect(updateCall.data.assignedRole).toBe("company_commander");
+  });
+
+  it("rejects invalid connector sync transition", async () => {
+    mockRequestFindUnique.mockResolvedValue(baseRequest as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "platoon_commander",
+        soldierIds: ["sol-1"],
+        squadIds: ["sq-1"],
+        platoonIds: ["pl-1"],
+        canCreate: true,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+    // No valid action produces this transition
+    mockGetNextState.mockReturnValue(null);
 
     const req = createMockRequest("PATCH", "/api/requests/req-1", {
       status: "approved",
       assignedRole: null,
     });
     const res = await PATCH(req, makeParams("req-1"));
-    expect(res.status).toBe(200);
-
-    const updateCall = mockRequestUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
-    expect(updateCall.data.status).toBe("approved");
-    expect(updateCall.data.assignedRole).toBeNull();
+    expect(res.status).toBe(400);
   });
 
   it("allows company_medic to edit medical request fields", async () => {

@@ -63,7 +63,7 @@ type Invitation = {
   unitName: string;
   cycleName: string;
   expiresAt: string;
-  token: string;
+  inviteUrl: string;
 };
 
 type Squad = { id: string; name: string };
@@ -138,8 +138,7 @@ export function UsersTable({
   }
 
   async function copyInviteLink(inv: Invitation) {
-    const inviteUrl = `${window.location.origin}/invite/${inv.token}`;
-    await navigator.clipboard.writeText(inviteUrl);
+    await navigator.clipboard.writeText(inv.inviteUrl);
     setCopiedId(inv.id);
     setTimeout(() => setCopiedId(null), 2500);
   }

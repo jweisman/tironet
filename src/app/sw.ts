@@ -81,13 +81,20 @@ type MessageEvent = Event & { data: unknown; waitUntil?(p: Promise<unknown>): vo
 (self as unknown as { addEventListener(t: string, h: (e: MessageEvent) => void): void }).addEventListener(
   "message",
   (event) => {
-    if (
-      event.data &&
-      typeof event.data === "object" &&
-      (event.data as Record<string, unknown>).type === "WARM_SHELLS"
-    ) {
+    if (!event.data || typeof event.data !== "object") return;
+    const msgType = (event.data as Record<string, unknown>).type;
+
+    if (msgType === "WARM_SHELLS") {
       swLog("warming shells from client message");
       const p = warmShellCache();
+      if (event.waitUntil) event.waitUntil(p);
+    }
+
+    if (msgType === "CLEAR_CACHES") {
+      swLog("clearing all caches (logout)");
+      const p = caches.keys().then((names) =>
+        Promise.all(names.map((name) => caches.delete(name)))
+      );
       if (event.waitUntil) event.waitUntil(p);
     }
   }

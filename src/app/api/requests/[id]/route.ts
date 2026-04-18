@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { getRequestScope } from "@/lib/api/request-scope";
-import { getNextState } from "@/lib/requests/workflow";
+import { getNextState, isValidTransition } from "@/lib/requests/workflow";
 import { canActOnRequest } from "@/lib/requests/workflow";
 import { sendPushToUsers } from "@/lib/push/send";
 import { parseMedicalAppointments } from "@/lib/requests/medical-appointments";
@@ -163,8 +163,18 @@ export async function PATCH(
     return NextResponse.json({ error: "Only the assigned role can edit" }, { status: 403 });
   }
 
-  // If this is from the connector (has status/assignedRole), apply directly
+  // If this is from the connector (has status/assignedRole), validate the transition
   if (data.status !== undefined || data.assignedRole !== undefined) {
+    if (!isValidTransition(
+      req.status as RequestStatus,
+      req.assignedRole as Role | null,
+      data.status as RequestStatus | undefined,
+      data.assignedRole as Role | null | undefined,
+      req.type as RequestType,
+    )) {
+      return NextResponse.json({ error: "Invalid state transition" }, { status: 400 });
+    }
+
     const updated = await prisma.request.update({
       where: { id },
       data: {
@@ -256,10 +266,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { scope, error } = await getRequestScope(req.cycleId);
+  const { scope, error, user } = await getRequestScope(req.cycleId);
   if (error || !scope) return error!;
 
   // Only the creator can delete, and only open requests
+  if (req.createdByUserId !== user?.id) {
+    return NextResponse.json({ error: "Only the creator can delete" }, { status: 403 });
+  }
   if (req.status !== "open") {
     return NextResponse.json({ error: "Can only delete open requests" }, { status: 400 });
   }

@@ -81,7 +81,7 @@ export default async function UsersPage() {
     unitName: unitMap.get(inv.unitId) ?? "",
     cycleName: inv.cycle.name,
     expiresAt: inv.expiresAt.toISOString(),
-    token: inv.token,
+    inviteUrl: `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/invite/${inv.token}`,
   }));
 
   const structureByCycle: Record<string, typeof companies> = {};

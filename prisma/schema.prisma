@@ -198,7 +198,7 @@ model UserCycleAssignment {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   cycle Cycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, cycleId])
+  @@unique([userId, cycleId], name: "uq_user_cycle")
   @@index([userId], name: "idx_user_assignments_user")
   @@index([cycleId], name: "idx_user_assignments_cycle")
   @@map("user_cycle_assignments")

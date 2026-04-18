@@ -34,6 +34,7 @@ export async function GET() {
       OR: conditions,
     },
     select: {
+      id: true,
       token: true,
       role: true,
       cycle: { select: { name: true } },
@@ -41,9 +42,12 @@ export async function GET() {
     take: 5,
   });
 
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+
   return NextResponse.json({
     invitations: invitations.map((inv) => ({
-      token: inv.token,
+      id: inv.id,
+      inviteUrl: `${baseUrl}/invite/${inv.token}`,
       role: inv.role,
       cycleName: inv.cycle.name,
     })),
