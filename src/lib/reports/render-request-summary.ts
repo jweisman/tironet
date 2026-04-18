@@ -15,6 +15,7 @@ import {
   renderDetailColumnsHtml,
   DETAIL_COLUMNS_CSS,
 } from "@/lib/reports/detail-columns";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -368,7 +369,7 @@ ${DETAIL_COLUMNS_CSS}
 <body>
   <div class="page-header">
     <h1>דוח בקשות — ${escapeHtml(data.cycleName)}</h1>
-    <p>${STATUS_FILTER_LABELS[data.statusFilter]} · סה״כ ${data.totalCount} בקשות · תאריך הפקה: ${printDate}</p>
+    <p>${STATUS_FILTER_LABELS[data.statusFilter]} · סה״כ ${hebrewCount(data.totalCount, "בקשה", "בקשות")} · תאריך הפקה: ${printDate}</p>
   </div>
   ${data.totalCount === 0 ? '<p class="no-data">אין בקשות</p>' : groupsHtml}
 </body>

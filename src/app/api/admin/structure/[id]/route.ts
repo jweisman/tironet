@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/api/admin-guard";
+import { validateProfileImage } from "@/lib/api/validate-image";
 
 const patchSchema = z.object({
   type: z.enum(["battalion", "company", "platoon", "squad"]),
   name: z.string().min(1),
   battalionId: z.string().uuid().nullable().optional(),
+  logo: z.string().nullable().optional(),
 });
 
 const deleteSchema = z.object({
@@ -27,7 +29,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { type, name, battalionId } = parsed.data;
+  const { type, name, battalionId, logo } = parsed.data;
 
   if (type === "battalion") {
     const battalion = await prisma.battalion.update({ where: { id }, data: { name } });
@@ -36,6 +38,15 @@ export async function PATCH(
   if (type === "company") {
     const data: Record<string, unknown> = { name };
     if (battalionId !== undefined) data.battalionId = battalionId;
+    if (logo !== undefined) {
+      if (logo !== null) {
+        const imageError = validateProfileImage(logo);
+        if (imageError) {
+          return NextResponse.json({ error: imageError }, { status: 400 });
+        }
+      }
+      data.logo = logo;
+    }
     const company = await prisma.company.update({ where: { id }, data });
     return NextResponse.json(company);
   }

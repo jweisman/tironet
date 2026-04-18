@@ -13,6 +13,7 @@ import { formatAppointment } from "@/lib/requests/medical-appointments";
 import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns";
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import type { RequestSummaryData, RequestSummaryItem, RequestStatusFilter } from "@/app/api/reports/request-summary/route";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 const STATUS_FILTER_LABELS: Record<RequestStatusFilter, string> = {
   open_active: "פתוחות",
@@ -160,7 +161,7 @@ export default function RequestSummaryPage() {
         </div>
         {data && (
           <p className="text-xs text-muted-foreground mt-1">
-            מחזור {data.cycleName} — {STATUS_FILTER_LABELS[statusFilter]} · {data.totalCount} בקשות
+            מחזור {data.cycleName} — {STATUS_FILTER_LABELS[statusFilter]} · {hebrewCount(data.totalCount, "בקשה", "בקשות")}
             {dateRange === "week" && " · שבוע אחרון"}
             {dateRange === "month" && " · חודש אחרון"}
           </p>

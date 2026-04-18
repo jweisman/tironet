@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, LifeBuoy } from "lucide-react";
+import Link from "next/link";
 import { TabBar } from "./TabBar";
 import { Sidebar } from "./Sidebar";
 import { UserAvatar } from "./UserAvatar";
@@ -57,6 +58,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-lg font-bold">טירונט</span>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/support"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
+              aria-label="תמיכה"
+            >
+              <LifeBuoy size={20} />
+            </Link>
             <button
               type="button"
               onClick={startCurrentTour}

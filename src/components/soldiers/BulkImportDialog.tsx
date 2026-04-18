@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { isValidIsraeliPhone } from "@/lib/phone";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { Download, Upload } from "lucide-react";
 
 type SoldierStatus = "active" | "transferred" | "dropped" | "injured";
@@ -500,9 +501,9 @@ export function BulkImportDialog({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">
-                  {rows.length} שורות
+                  {hebrewCount(rows.length, "שורה", "שורות")}
                   {hasErrors && (
-                    <span className="text-destructive me-1"> ({errorRows.length} שגיאות)</span>
+                    <span className="text-destructive me-1"> ({hebrewCount(errorRows.length, "שגיאה", "שגיאות")})</span>
                   )}
                 </p>
                 {validRows.length > 0 && (
@@ -625,7 +626,7 @@ export function BulkImportDialog({
                     </p>
                   ))}
                   {errorRows.length > 5 && (
-                    <p>ועוד {errorRows.length - 5} שגיאות נוספות...</p>
+                    <p>ועוד {hebrewCount(errorRows.length - 5, "שגיאה נוספת", "שגיאות נוספות")}...</p>
                   )}
                   <p className="font-medium mt-1">שורות עם שגיאות לא יוובאו.</p>
                 </div>
@@ -651,7 +652,7 @@ export function BulkImportDialog({
               ? "מייבא..."
               : updateRows.length > 0
                 ? `ייבא ${newRows.length} חדשים, עדכן ${updateRows.length}`
-                : `ייבא ${validRows.length > 0 ? validRows.length : ""} חיילים`}
+                : `ייבא ${validRows.length > 0 ? hebrewCount(validRows.length, "חייל", "חיילים") : ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>

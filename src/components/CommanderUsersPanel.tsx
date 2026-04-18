@@ -27,6 +27,7 @@ import {
 import { InviteUserForm } from "@/components/admin/InviteUserForm";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type { Role } from "@/types";
 
 type Assignment = {
@@ -178,7 +179,7 @@ export function CommanderUsersPanel({
         {/* Users */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{visibleUsers.length} מפקדים</p>
+            <p className="text-sm text-muted-foreground">{hebrewCount(visibleUsers.length, "מפקד", "מפקדים")}</p>
             <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
               <DialogTrigger
                 render={

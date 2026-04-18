@@ -120,6 +120,7 @@ model Company {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   cycleId     String    @map("cycle_id") @db.Uuid
   name        String
+  logo        String?   @db.Text
   sortOrder   Int       @default(0) @map("sort_order")
   battalionId String?   @map("battalion_id") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()

@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, AlertCircle, FileUp, FileText, WifiOff } from "lucide-react";
 import { toast } from "sonner";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useSyncReady } from "@/hooks/useSyncReady";
@@ -326,8 +327,8 @@ export default function SoldiersPage() {
   function handleImportSuccess(created: number, updated: number, activeActivityCount: number, soldierIds?: string[]) {
     setImportOpen(false);
     const parts: string[] = [];
-    if (created > 0) parts.push(`${created} חיילים נוספו`);
-    if (updated > 0) parts.push(`${updated} חיילים עודכנו`);
+    if (created > 0) parts.push(`${hebrewCount(created, "חייל נוסף", "חיילים נוספו")}`);
+    if (updated > 0) parts.push(`${hebrewCount(updated, "חייל עודכן", "חיילים עודכנו")}`);
     toast.success(parts.join(", ") || "הייבוא הושלם");
     if (activeActivityCount > 0 && created > 0 && soldierIds?.length) {
       setLateJoinerInfo({ count: activeActivityCount, soldierId: "__bulk__", soldierIds });
@@ -654,7 +655,9 @@ export default function SoldiersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>פעילויות קיימות</AlertDialogTitle>
             <AlertDialogDescription>
-              קיימות {lateJoinerInfo?.count} פעילויות פעילות לחייל. לסמן כ-לא רלוונטי?
+              {lateJoinerInfo?.count === 1
+                ? "קיימת פעילות פעילה 1 לחייל. לסמן כ-לא רלוונטי?"
+                : `קיימות ${lateJoinerInfo?.count} פעילויות פעילות לחייל. לסמן כ-לא רלוונטי?`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

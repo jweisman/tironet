@@ -83,6 +83,14 @@ export const homeTourSteps: DriveStep[] = [
         "שורת סיכום של כל הכיתות — כלל החיילים, הפערים, הבקשות והדיווחים.",
     },
   },
+  {
+    element: "[data-tour='user-avatar']",
+    popover: {
+      title: "פרופיל",
+      description:
+        "לחצו על התמונה כדי לעבור לדף הפרופיל — עדכון פרטים, תמונה והגדרות התראות.",
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -268,6 +276,13 @@ export const soldierDetailTourSteps: DriveStep[] = [
     popover: {
       title: "פרטי חייל",
       description: "כאן תראו את הפרטים האישיים של החייל — שם, דרגה, סטטוס ופרטי קשר.",
+    },
+  },
+  {
+    element: "[data-tour='soldier-avatar']",
+    popover: {
+      title: "תמונת חייל",
+      description: "לחצו על התמונה כדי להגדיל ולראות את הפנים בבירור.",
     },
   },
   {

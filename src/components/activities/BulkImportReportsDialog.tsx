@@ -21,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { Upload } from "lucide-react";
 import type { SoldierReport, GradeKey } from "./ActivityDetail";
 import type { ActivityResult } from "@/types";
@@ -541,11 +542,11 @@ export function BulkImportReportsDialog({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">
-                  {parsedRows.length} שורות
+                  {hebrewCount(parsedRows.length, "שורה", "שורות")}
                   {errorRows.length > 0 && (
                     <span className="text-destructive me-1">
                       {" "}
-                      ({errorRows.length} שגיאות)
+                      ({hebrewCount(errorRows.length, "שגיאה", "שגיאות")})
                     </span>
                   )}
                 </p>
@@ -625,7 +626,7 @@ export function BulkImportReportsDialog({
                     </p>
                   ))}
                   {errorRows.length > 5 && (
-                    <p>ועוד {errorRows.length - 5} שגיאות נוספות...</p>
+                    <p>ועוד {hebrewCount(errorRows.length - 5, "שגיאה נוספת", "שגיאות נוספות")}...</p>
                   )}
                   <p className="font-medium mt-1">שורות עם שגיאות לא יוובאו.</p>
                 </div>
@@ -660,7 +661,7 @@ export function BulkImportReportsDialog({
           >
             {importing
               ? "מייבא..."
-              : `ייבא ${validRows.length > 0 ? validRows.length : ""} דיווחים`}
+              : `ייבא ${validRows.length > 0 ? hebrewCount(validRows.length, "דיווח", "דיווחים") : ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>

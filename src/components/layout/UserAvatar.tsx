@@ -48,7 +48,7 @@ export function UserAvatar({ size = 36 }: { size?: number }) {
   const showImage = profileImage && !imgError;
 
   return (
-    <Link href="/profile" aria-label="פרופיל משתמש">
+    <Link href="/profile" aria-label="פרופיל משתמש" data-tour="user-avatar">
       <div
         className="flex items-center justify-center rounded-full bg-primary text-primary-foreground overflow-hidden"
         style={{ width: size, height: size }}

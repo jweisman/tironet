@@ -17,6 +17,8 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Admin panel** — Manage cycles, companies, platoons, squads, activity types, and users
 - **Push notifications** — Daily task reminders for squad commanders (missing activity reports) and real-time request assignment alerts; opt-out per notification type in the profile page
 - **Guided tour** — Interactive walkthrough (driver.js) on each main page; auto-starts on first visit, re-launchable via the help button in the header/sidebar
+- **Support & diagnostics** — In-app support page that collects device, browser, PowerSync sync status, table row counts, and JWT claims, then emails a formatted diagnostic report to the support team
+- **Company branding** — Upload a company logo (admin structure page) displayed on the dashboard; falls back to the IDF emblem
 - **Offline-first** — Activity reports can be recorded and bulk-updated without a network connection; changes sync automatically when connectivity is restored
 - **PWA** — Installable on iOS (Add to Home Screen) and Android; works as a standalone app with full offline support
 

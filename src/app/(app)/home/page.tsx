@@ -20,6 +20,7 @@ import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { homeTourSteps } from "@/lib/tour/steps";
 import { isRequestActive } from "@/lib/requests/active";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type { Role } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -56,12 +57,12 @@ function AggregateRow({ squads }: { squads: SquadSummary[] }) {
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs flex-wrap">
-      <span className="text-muted-foreground">{total.soldiers} חיילים</span>
+      <span className="text-muted-foreground">{hebrewCount(total.soldiers, "חייל", "חיילים")}</span>
       {total.withGaps > 0 && (
         <span className="text-amber-600 font-semibold">{total.withGaps} עם פערים</span>
       )}
       {total.inProgress > 0 && (
-        <span className="text-amber-600 font-semibold">{total.inProgress} בקשות ממתינות</span>
+        <span className="text-amber-600 font-semibold">{hebrewCount(total.inProgress, "בקשה ממתינה", "בקשות ממתינות")}</span>
       )}
       <span className="text-muted-foreground ms-auto">
         <span className="text-green-600 font-semibold">✓ {total.reported}</span>
@@ -98,6 +99,7 @@ const SQUADS_QUERY = `
     p.id    AS platoon_id,
     p.name  AS platoon_name,
     c.name  AS company_name,
+    c.logo  AS company_logo,
 
     (SELECT COUNT(*)
      FROM soldiers s
@@ -237,7 +239,7 @@ const REQUESTS_QUERY = `
 interface RawSquad {
   squad_id: string; squad_name: string;
   platoon_id: string; platoon_name: string;
-  company_name: string;
+  company_name: string; company_logo: string | null;
   soldier_count: number; soldiers_with_gaps: number;
   reported_activities: number; missing_report_activities: number;
 }
@@ -366,6 +368,8 @@ export default function HomePage() {
     return parts.join(" > ");
   }, [role, rawSquads]);
 
+  const companyLogo = rawSquads?.[0]?.company_logo ?? null;
+
   // Tour
   const { registerTour, unregisterTour } = useTourContext();
   const { startTour } = useTour({ page: "home", steps: homeTourSteps });
@@ -428,23 +432,32 @@ export default function HomePage() {
   return (
     <div className="space-y-5">
       {/* User context header */}
-      <div>
-        <h1 className="text-2xl font-bold">
-          {user?.rank ? `${user.rank} ` : ""}
-          {user?.givenName ?? ""}
-        </h1>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {rawRole && (
-            <span className="text-sm font-medium text-primary">
-              {ROLE_SHORT[rawRole] ?? rawRole}
-            </span>
-          )}
-          {rawRole && (unitPath || cycleName) && (
-            <span className="text-muted-foreground text-sm">·</span>
-          )}
-          {(unitPath || cycleName) && (
-            <span className="text-sm text-muted-foreground">{unitPath || cycleName}</span>
-          )}
+      <div className="flex items-center gap-4">
+        <div className="flex h-14 md:h-16 w-auto max-w-24 items-center justify-center rounded-lg bg-muted p-1.5 shrink-0">
+          <img
+            src={companyLogo ?? "/images/idf-logo.png"}
+            alt=""
+            className="h-full w-auto object-contain"
+          />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">
+            {user?.rank ? `${user.rank} ` : ""}
+            {user?.givenName ?? ""}
+          </h1>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {rawRole && (
+              <span className="text-sm font-medium text-primary">
+                {ROLE_SHORT[rawRole] ?? rawRole}
+              </span>
+            )}
+            {rawRole && (unitPath || cycleName) && (
+              <span className="text-muted-foreground text-sm">·</span>
+            )}
+            {(unitPath || cycleName) && (
+              <span className="text-sm text-muted-foreground">{unitPath || cycleName}</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -460,7 +473,7 @@ export default function HomePage() {
             <Bell size={18} />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">{requestBadge} בקשות ממתינות לטיפולך</p>
+            <p className="text-sm font-semibold">{hebrewCount(requestBadge, "בקשה ממתינה", "בקשות ממתינות")} לטיפולך</p>
             <p className="text-xs text-muted-foreground">לחץ כדי לצפות</p>
           </div>
         </button>

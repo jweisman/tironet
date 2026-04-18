@@ -13,6 +13,7 @@ import type {
 import { cn } from "@/lib/utils";
 import { formatGradeDisplay } from "@/lib/score-format";
 import { getResultLabels } from "@/types/display-config";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 export default function ActivitySummaryPage() {
   const router = useRouter();
@@ -106,7 +107,7 @@ export default function ActivitySummaryPage() {
         </div>
         {data && (
           <p className="text-xs text-muted-foreground mt-1">
-            מחזור {data.cycleName} — {data.activities.length} פעילויות
+            מחזור {data.cycleName} — {hebrewCount(data.activities.length, "פעילות", "פעילויות")}
             {dateRange === "week" && " · שבוע אחרון"}
             {dateRange === "month" && " · חודש אחרון"}
           </p>
@@ -160,7 +161,7 @@ export default function ActivitySummaryPage() {
                     resultLabels={getResultLabels(activity.displayConfiguration)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    סה&quot;כ {activity.totalSoldiers} חיילים
+                    סה&quot;כ {hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}
                   </p>
                 </div>
               </div>

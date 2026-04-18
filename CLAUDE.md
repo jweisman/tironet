@@ -820,3 +820,31 @@ This applies to all fire-and-forget work: push notifications, analytics, logging
 3. Call `sendPushToUsers()` with the new preference field name from the trigger point, wrapped in `after()`.
 4. If the trigger is a workflow action, add the call to **both** the online and connector code paths (see gotcha above).
 5. The push payload's `url` field determines where the notification click navigates.
+
+## Support / Diagnostics Page
+
+The `/support` page (`src/app/(app)/support/page.tsx`) is a client-side diagnostics tool accessible to all authenticated users via the sidebar/tab bar.
+
+### How it works
+
+1. **User submits a support report** — optional free-text description of the problem.
+2. **`collectDiagnostics()`** gathers device, browser, storage, session, PowerSync status, table row counts, sync bucket state, JWT sync claims, oplog summary, sample queries, service worker status, and PWA state — all client-side.
+3. **`POST /api/support`** (`src/app/api/support/route.ts`) sends the diagnostics as a formatted HTML email to `support@tironet.org.il` via the existing `sendEmail()` utility.
+
+### What diagnostics are collected
+
+- Device/browser info (user agent, screen size, standalone mode, online status)
+- Storage estimate (OPFS usage and quota)
+- Session info (user ID, email, isAdmin, selected cycle/role/unit) — **no soldier PII**
+- PowerSync connection status, last sync time, upload errors
+- Row counts for all synced tables (soldiers, squads, activities, etc.)
+- `ps_buckets` state (bucket names and row counts — useful for debugging sync stream issues)
+- JWT sync claims (cycle_ids, platoon_ids, squad_id, expiry)
+- `ps_oplog` operation summary (PUT/REMOVE counts — helps detect bucket keying mismatches)
+- Sample queries against the local DB to verify data availability
+- Service worker registration state
+- PWA install state and splash screen media query matches
+
+### Navigation
+
+The support page link appears in both `Sidebar.tsx` (desktop) and `AppShell.tsx` (mobile tab bar) for all roles. It is a standard `(app)` layout page — requires authentication, uses PowerSync context.

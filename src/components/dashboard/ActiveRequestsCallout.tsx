@@ -14,6 +14,7 @@ import {
   REQUEST_TYPE_LABELS,
   REQUEST_TYPE_ICONS,
 } from "@/lib/requests/constants";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type { RequestType } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -193,7 +194,7 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
           onClick={() => setExpanded(true)}
           className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
-          <span>עוד {hiddenCount} בקשות</span>
+          <span>עוד {hebrewCount(hiddenCount, "בקשה", "בקשות")}</span>
           <ChevronDown size={14} />
         </button>
       )}

@@ -3,6 +3,7 @@
 import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { SquadSummary } from "@/app/api/dashboard/route";
+import { hebrewCount, hebrewLabel } from "@/lib/utils/hebrew-count";
 
 export type VisibleSections = {
   soldiers?: boolean;
@@ -103,7 +104,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
       >
         <h3 className="font-semibold text-sm">{platoonName}</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {squads.length} כיתות
+          {hebrewCount(squads.length, "כיתה", "כיתות")}
         </p>
       </div>
 
@@ -139,14 +140,14 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
                 <span className="text-xl font-bold text-green-600">
                   {total.reportedActivities}
                 </span>
-                <span className="text-xs text-muted-foreground">דווחו</span>
+                <span className="text-xs text-muted-foreground">{hebrewLabel(total.reportedActivities, "דווח", "דווחו")}</span>
               </StatButton>
               {total.missingReportActivities > 0 ? (
                 <StatButton onClick={() => router.push("/activities?filter=gaps")}>
                   <span className="text-base font-bold text-amber-600">
                     {total.missingReportActivities}
                   </span>
-                  <span className="text-xs text-muted-foreground">חסרות דיווח</span>
+                  <span className="text-xs text-muted-foreground">{hebrewLabel(total.missingReportActivities, "חסרת דיווח", "חסרות דיווח")}</span>
                 </StatButton>
               ) : (
                 <p className="text-xs text-green-600 font-medium py-0.5">הכל דווח</p>
@@ -163,7 +164,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
                   <span className="text-xl font-bold text-green-600">
                     {total.approvedRequests}
                   </span>
-                  <span className="text-xs text-muted-foreground">פעילות</span>
+                  <span className="text-xs text-muted-foreground">{hebrewLabel(total.approvedRequests, "פעילה", "פעילות")}</span>
                 </StatButton>
               ) : (
                 <p className="text-xs text-muted-foreground py-0.5">—</p>
@@ -173,7 +174,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
                   <span className="text-base font-bold text-amber-600">
                     {total.inProgressRequests}
                   </span>
-                  <span className="text-xs text-muted-foreground">ממתינות</span>
+                  <span className="text-xs text-muted-foreground">{hebrewLabel(total.inProgressRequests, "ממתינה", "ממתינות")}</span>
                 </StatButton>
               ) : (
                 <p className="text-xs text-muted-foreground py-0.5">—</p>
@@ -200,7 +201,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
                 <span className="text-sm truncate flex-1">{a.name}</span>
                 <div className="flex items-center gap-1.5 shrink-0 ms-3">
                   <span className="text-xs text-amber-700 font-semibold">
-                    {a.gapCount} פערים
+                    {hebrewCount(a.gapCount, "פער", "פערים")}
                   </span>
                   <ChevronLeft size={12} className="text-muted-foreground/50" />
                 </div>

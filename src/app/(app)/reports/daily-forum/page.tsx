@@ -14,6 +14,7 @@ import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns"
 import { REQUEST_STATUS_LABELS, ASSIGNED_ROLE_LABELS } from "@/lib/requests/constants";
 import type { RequestStatus, Role } from "@/types";
 import { getResultLabels } from "@/types/display-config";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type {
   DailyForumData,
   PlatoonForumSection,
@@ -129,7 +130,7 @@ function TodayActivitySection({ activity }: { activity: TodayActivityItem }) {
             resultLabels={getResultLabels(activity.displayConfiguration)}
           />
           <p className="text-xs text-muted-foreground">
-            סה&quot;כ {activity.totalSoldiers} חיילים
+            סה&quot;כ {hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}
           </p>
         </div>
       </div>
@@ -190,7 +191,7 @@ function GapSection({ gap }: { gap: GapActivityItem }) {
           ({new Date(gap.date).toLocaleDateString("he-IL")})
         </span>
         <span className="text-xs font-semibold text-destructive">
-          {gap.soldiers.length} פערים
+          {hebrewCount(gap.soldiers.length, "פער", "פערים")}
         </span>
       </div>
       <div className="overflow-x-auto">
