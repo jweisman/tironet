@@ -28,6 +28,7 @@ import { AssignUserForm } from "./AssignUserForm";
 import { EditUserForm } from "./EditUserForm";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type { Role } from "@/types";
 
 type Assignment = {
@@ -189,7 +190,7 @@ export function UsersTable({
       {/* ── Users ── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">{users.length} משתמשים</p>
+          <p className="text-sm text-muted-foreground">{hebrewCount(users.length, "משתמש", "משתמשים")}</p>
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger
               render={

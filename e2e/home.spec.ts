@@ -117,6 +117,6 @@ test.describe("Dashboard — squad commander", () => {
     // Squad A has at least 1 active request (soldier1's seeded leave)
     // Exact count may vary due to parallel test data — just verify the label appears
     const squadCard = main.getByRole("heading", { name: "Squad A" }).locator("../..");
-    await expect(squadCard.getByRole("button", { name: /\d+.*פעילות/ })).toBeVisible();
+    await expect(squadCard.getByRole("button", { name: /\d+.*פעיל[הות]/ })).toBeVisible();
   });
 });

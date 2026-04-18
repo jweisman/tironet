@@ -58,6 +58,7 @@ import {
 import { cn } from "@/lib/utils";
 import { LogoCropDialog } from "@/components/LogoCropDialog";
 import { validateProfileImage } from "@/lib/api/validate-image";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 type Squad = { id: string; name: string };
 type Platoon = { id: string; name: string; squads: Squad[] };
@@ -613,7 +614,7 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
                   ) : (
                     <>
                       <span className="flex-1 font-semibold text-sm">{battalion.name}</span>
-                      <span className="text-xs text-muted-foreground">{battalionCompanies.length} פלוגות</span>
+                      <span className="text-xs text-muted-foreground">{hebrewCount(battalionCompanies.length, "פלוגה", "פלוגות")}</span>
                       <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setAddingCompanyBattalionId(battalion.id); setExpandedBattalions((prev) => new Set([...prev, battalion.id])); }}>
                         <PlusCircle className="w-3 h-3 ms-1" />
                         פלוגה

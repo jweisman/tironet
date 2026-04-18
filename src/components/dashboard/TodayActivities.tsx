@@ -6,6 +6,7 @@ import { ChevronLeft, CalendarDays, ChevronDown } from "lucide-react";
 import { useQuery } from "@powersync/react";
 import { ActivityTypeIcon } from "@/components/activities/ActivityTypeIcon";
 import { cn } from "@/lib/utils";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 const INITIAL_LIMIT = 4;
 
@@ -178,7 +179,7 @@ export function TodayActivities({ cycleId, squadId, showPlatoon = false }: Props
           onClick={() => setExpanded(true)}
           className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
-          <span>עוד {hiddenCount} פעילויות</span>
+          <span>עוד {hebrewCount(hiddenCount, "פעילות", "פעילויות")}</span>
           <ChevronDown size={14} />
         </button>
       )}

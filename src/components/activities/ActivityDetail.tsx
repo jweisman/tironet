@@ -33,6 +33,7 @@ import type { ActiveScore } from "@/types/score-config";
 import type { DisplayConfiguration } from "@/types/display-config";
 import { getResultLabels, getNoteOptions } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { activityDetailTourSteps } from "@/lib/tour/steps";
@@ -333,7 +334,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         }
         return next;
       });
-      toast.success(`${targets.length} דיווחים עודכנו`);
+      toast.success(hebrewCount(targets.length, "דיווח עודכן", "דיווחים עודכנו"));
     } catch {
       setSaveError("שגיאה בעדכון כללי");
     } finally {
@@ -373,7 +374,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     });
 
     setImportReportsOpen(false);
-    toast.success(`${updates.size} דיווחים יובאו בהצלחה`);
+    toast.success(`${hebrewCount(updates.size, "דיווח יובא", "דיווחים יובאו")} בהצלחה`);
   }
 
   async function handleMetadataSubmit(e: React.FormEvent) {
@@ -586,7 +587,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 {squad.name}
               </span>
               <span className="text-xs text-muted-foreground">
-                {visibleSoldiers.length} חיילים
+                {hebrewCount(visibleSoldiers.length, "חייל", "חיילים")}
               </span>
             </div>
 

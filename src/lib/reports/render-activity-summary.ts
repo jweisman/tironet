@@ -5,6 +5,7 @@ import type { DisplayConfiguration } from "@/types/display-config";
 import { getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 import { renderPieSvg } from "@/lib/reports/html-helpers";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -217,7 +218,7 @@ export function renderActivitySummaryHtml(
               <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).failed.label} (${activity.failedCount})</span>
               <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>
             </div>
-            <p class="total-line">סה״כ ${activity.totalSoldiers} חיילים</p>
+            <p class="total-line">סה״כ ${hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}</p>
           </div>
         </div>
         ${activity.rows.length > 0 ? `

@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronDown, FileUp, WifiOff } from "lucide-react";
 import { toast } from "sonner";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery, usePowerSync } from "@powersync/react";
 import { useSyncReady } from "@/hooks/useSyncReady";
@@ -251,7 +252,7 @@ export default function ActivitiesPage() {
   function handleCreateSuccess(_activityId: string, platoonCount: number) {
     setCreateOpen(false);
     if (platoonCount > 1) {
-      toast.success(`הפעילות נוצרה בהצלחה ב-${platoonCount} מחלקות`);
+      toast.success(`הפעילות נוצרה בהצלחה ב-${hebrewCount(platoonCount, "מחלקה", "מחלקות")}`);
     } else {
       toast.success("הפעילות נוצרה בהצלחה");
     }
@@ -259,7 +260,7 @@ export default function ActivitiesPage() {
 
   function handleBulkSuccess(created: number, skipped: number) {
     setBulkOpen(false);
-    const parts = [`${created} פעילויות יובאו בהצלחה`];
+    const parts = [`${hebrewCount(created, "פעילות יובאה", "פעילויות יובאו")} בהצלחה`];
     if (skipped > 0) parts.push(`(${skipped} דולגו — כבר קיימות)`);
     toast.success(parts.join(" "));
   }

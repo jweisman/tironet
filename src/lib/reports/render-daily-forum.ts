@@ -22,6 +22,7 @@ import {
   renderDetailColumnsHtml,
   DETAIL_COLUMNS_CSS,
 } from "@/lib/reports/detail-columns";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -650,7 +651,7 @@ function renderTodayActivitiesHtml(activities: TodayActivityItem[]): string {
               <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).failed.label} (${activity.failedCount})</span>
               <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>
             </div>
-            <p class="total-line">סה״כ ${activity.totalSoldiers} חיילים</p>
+            <p class="total-line">סה״כ ${hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}</p>
           </div>
         </div>
         ${activity.rows.length > 0 ? `
@@ -700,7 +701,7 @@ function renderGapsHtml(gaps: GapActivityItem[]): string {
         <div class="gap-header">
           ${escapeHtml(gap.activityTypeName)} — ${escapeHtml(gap.name)}
           <span class="gap-date">(${dateStr})</span>
-          <span class="gap-count">${gap.soldiers.length} פערים</span>
+          <span class="gap-count">${hebrewCount(gap.soldiers.length, "פער", "פערים")}</span>
         </div>
         <table class="gap-table">
           <thead><tr><th>חייל</th><th>סטטוס</th></tr></thead>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { sendPushToUsers } from "@/lib/push/send";
 import { parseMedicalAppointments } from "@/lib/requests/medical-appointments";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 /**
  * GET /api/cron/daily-tasks
@@ -151,7 +152,7 @@ async function sendActivityGapNotifications(
         [userId],
         {
           title: "דיווחי פעילויות חסרים",
-          body: `יש ${gapCount} דיווחים חסרים לפעילויות של היום ואתמול`,
+          body: `יש ${hebrewCount(gapCount, "דיווח חסר", "דיווחים חסרים")} לפעילויות של היום ואתמול`,
           url: "/activities?filter=gaps",
         },
         "dailyTasksEnabled",

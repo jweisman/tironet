@@ -20,6 +20,7 @@ import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { homeTourSteps } from "@/lib/tour/steps";
 import { isRequestActive } from "@/lib/requests/active";
+import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type { Role } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -56,12 +57,12 @@ function AggregateRow({ squads }: { squads: SquadSummary[] }) {
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs flex-wrap">
-      <span className="text-muted-foreground">{total.soldiers} חיילים</span>
+      <span className="text-muted-foreground">{hebrewCount(total.soldiers, "חייל", "חיילים")}</span>
       {total.withGaps > 0 && (
         <span className="text-amber-600 font-semibold">{total.withGaps} עם פערים</span>
       )}
       {total.inProgress > 0 && (
-        <span className="text-amber-600 font-semibold">{total.inProgress} בקשות ממתינות</span>
+        <span className="text-amber-600 font-semibold">{hebrewCount(total.inProgress, "בקשה ממתינה", "בקשות ממתינות")}</span>
       )}
       <span className="text-muted-foreground ms-auto">
         <span className="text-green-600 font-semibold">✓ {total.reported}</span>
@@ -472,7 +473,7 @@ export default function HomePage() {
             <Bell size={18} />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">{requestBadge} בקשות ממתינות לטיפולך</p>
+            <p className="text-sm font-semibold">{hebrewCount(requestBadge, "בקשה ממתינה", "בקשות ממתינות")} לטיפולך</p>
             <p className="text-xs text-muted-foreground">לחץ כדי לצפות</p>
           </div>
         </button>
