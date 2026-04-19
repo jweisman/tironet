@@ -184,7 +184,8 @@ export default function ActivityPage() {
 
     const canEditMetadata =
       role === "platoon_commander" ||
-      role === "company_commander";
+      role === "company_commander" ||
+      role === "instructor";
     const canEditReports = role !== "";
 
     const scoreConfig = parseScoreConfig(activity.score_config);
