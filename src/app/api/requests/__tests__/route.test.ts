@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    request: { create: vi.fn(), findMany: vi.fn() },
+    request: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
   },
 }));
 

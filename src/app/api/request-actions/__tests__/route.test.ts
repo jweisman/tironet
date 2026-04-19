@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     request: { findUnique: vi.fn() },
-    requestAction: { create: vi.fn() },
+    requestAction: { create: vi.fn(), findUnique: vi.fn() },
   },
 }));
 

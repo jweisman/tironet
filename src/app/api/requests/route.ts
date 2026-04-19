@@ -84,28 +84,45 @@ export async function POST(request: NextRequest) {
 
   const sessionUser = user as SessionUser;
 
-  const req = await prisma.request.create({
-    data: {
-      ...(data.id ? { id: data.id } : {}),
-      cycleId: data.cycleId,
-      soldierId: data.soldierId,
-      type: data.type,
-      status: "open",
-      assignedRole,
-      createdByUserId: sessionUser.id,
-      description: data.description ?? null,
-      place: data.place ?? null,
-      departureAt: data.departureAt ? new Date(data.departureAt) : null,
-      returnAt: data.returnAt ? new Date(data.returnAt) : null,
-      transportation: data.transportation ?? null,
-      urgent: data.urgent ?? null,
-      paramedicDate: data.paramedicDate ? new Date(data.paramedicDate) : null,
-      medicalAppointments: data.medicalAppointments ?? Prisma.DbNull,
-      sickLeaveDays: data.sickLeaveDays ?? null,
-      specialConditions: data.specialConditions ?? null,
-    },
-    include: { soldier: { select: { familyName: true, givenName: true } } },
-  });
+  const requestData = {
+    ...(data.id ? { id: data.id } : {}),
+    cycleId: data.cycleId,
+    soldierId: data.soldierId,
+    type: data.type,
+    status: "open" as const,
+    assignedRole,
+    createdByUserId: sessionUser.id,
+    description: data.description ?? null,
+    place: data.place ?? null,
+    departureAt: data.departureAt ? new Date(data.departureAt) : null,
+    returnAt: data.returnAt ? new Date(data.returnAt) : null,
+    transportation: data.transportation ?? null,
+    urgent: data.urgent ?? null,
+    paramedicDate: data.paramedicDate ? new Date(data.paramedicDate) : null,
+    medicalAppointments: data.medicalAppointments ?? Prisma.DbNull,
+    sickLeaveDays: data.sickLeaveDays ?? null,
+    specialConditions: data.specialConditions ?? null,
+  };
+
+  let req;
+  try {
+    req = await prisma.request.create({
+      data: requestData,
+      include: { soldier: { select: { familyName: true, givenName: true } } },
+    });
+  } catch (err) {
+    // PowerSync connector retry: if the first upload succeeded but the transaction
+    // wasn't marked complete (e.g. network timeout), the same id arrives again.
+    // Treat the duplicate as a no-op — return the existing row.
+    if (data.id && err instanceof Error && "code" in err && (err as { code: string }).code === "P2002") {
+      const existing = await prisma.request.findUnique({
+        where: { id: data.id },
+        include: { soldier: { select: { familyName: true, givenName: true } } },
+      });
+      if (existing) return NextResponse.json({ request: existing }, { status: 201 });
+    }
+    throw err;
+  }
 
   // Notify users with the assigned role about the new request
   const soldierName = `${req.soldier.familyName} ${req.soldier.givenName}`;

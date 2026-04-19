@@ -470,8 +470,8 @@ export default function SoldiersPage() {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div data-tour="soldiers-status-filters" className="flex gap-1.5 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div data-tour="soldiers-status-filters" className="flex gap-1.5 flex-1 md:flex-none">
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f}
@@ -488,8 +488,8 @@ export default function SoldiersPage() {
               </button>
             ))}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
+          <div className="hidden md:flex-1 md:block" />
+          <div className="flex items-center gap-2">
           <button
             data-tour="soldiers-requests-filter"
             type="button"
@@ -531,6 +531,7 @@ export default function SoldiersPage() {
             <AlertCircle size={12} />
             <span>פערים</span>
           </button>
+          </div>
         </div>
       </div>
 

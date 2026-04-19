@@ -42,16 +42,26 @@ export async function POST(request: NextRequest) {
 
   const userName = data.userName || `${sessionUser.familyName} ${sessionUser.givenName}`;
 
-  const action = await prisma.requestAction.create({
-    data: {
-      ...(data.id ? { id: data.id } : {}),
-      requestId: data.requestId,
-      userId: sessionUser.id,
-      action: data.action,
-      note: data.note ?? null,
-      userName,
-    },
-  });
+  let action;
+  try {
+    action = await prisma.requestAction.create({
+      data: {
+        ...(data.id ? { id: data.id } : {}),
+        requestId: data.requestId,
+        userId: sessionUser.id,
+        action: data.action,
+        note: data.note ?? null,
+        userName,
+      },
+    });
+  } catch (err) {
+    // PowerSync connector retry: treat duplicate id as a no-op.
+    if (data.id && err instanceof Error && "code" in err && (err as { code: string }).code === "P2002") {
+      const existing = await prisma.requestAction.findUnique({ where: { id: data.id } });
+      if (existing) return NextResponse.json({ action: existing }, { status: 201 });
+    }
+    throw err;
+  }
 
   return NextResponse.json({ action }, { status: 201 });
 }
