@@ -343,15 +343,20 @@ The requests list page (`/requests`) has three tabs:
 - **Active** (`פעילות`): approved requests that are currently relevant, defined per type:
   - **Leave**: `departureAt >= today` OR `returnAt >= today` (upcoming or currently on leave)
   - **Medical**: any appointment in `medicalAppointments` JSON array has `date >= today`
-  - **Hardship**: always active (no date criterion)
-  - Sorted by soonest relevant date first (departure date for leave, next appointment for medical). Hardship sorts last (no activity date).
+  - Hardship requests are **not** included in "active" — they have no date criteria and are tracked separately on the soldiers page.
+  - Sorted by soonest relevant date first (departure date for leave, next appointment for medical).
 - **Requires my action** (`דורשות טיפולי`): requests where `assignedRole !== null && canActOnRequest(userRole, assignedRole)` — cross-cuts open and active statuses
 
 Denied requests pending acknowledgement (`status === "denied"`, `assignedRole !== null`) appear **only** in the "requires my action" tab — not in "pending" or "active". Completed denied requests (`assignedRole === null`) do not appear in any tab.
 
 ### Soldiers page "active requests" filter
 
-The soldiers page has a "בקשות פתוחות" filter pill that shows soldiers with any open request (in progress or active, per `docs/DEFINITIONS.md`). A soldier passes the filter if they have `openRequestCount > 0` (requests with `status = 'open'` — in progress) **or** `approvedRequests.length > 0` (active approved requests from `OPEN_REQUESTS_QUERY`). The `OPEN_REQUESTS_QUERY` returns both in-progress and active requests, with urgency fields for the red dot indicator.
+The soldiers page has two request-related filter pills:
+
+- **"בקשות פתוחות"** — soldiers with any open request (in progress or active leave/medical). A soldier passes if `openRequestCount > 0` (in-progress requests) **or** `approvedRequests.length > 0` (active approved leave/medical from `OPEN_REQUESTS_QUERY`).
+- **"ת״ש"** — soldiers with an approved hardship request. Uses a separate `HARDSHIP_REQUESTS_QUERY`. Shows the `RequestTypeIcon` with urgent overlay when `specialConditions` or `urgent` is set.
+
+Both filters add entries to the `approvedRequests` array on `SoldierSummary`, so hardship icons appear on soldier cards alongside leave/medical icons.
 
 ### Soldier detail page — full request history
 
@@ -361,8 +366,8 @@ The soldier detail page (`/soldiers/[id]`) shows **all** requests for the soldie
 
 `src/lib/requests/active.ts` exports three functions — do not duplicate this logic inline:
 
-- **`isRequestActive(r, today?)`** — approved + leave with future dates, medical with future appointments, or hardship (always)
-- **`isRequestOpen(r, today?)`** — in progress (`status === 'open'`) OR active. This is the umbrella "open" definition from `docs/DEFINITIONS.md`
+- **`isRequestActive(r, today?)`** — approved + leave with future dates or medical with future appointments. Hardship requests are **not** considered active (they have no date criteria and are tracked separately on the soldiers page).
+- **`isRequestOpen(r, today?)`** — in progress (`status === 'open'`) OR active. This is the umbrella "open" definition from `docs/DEFINITIONS.md`.
 - **`isRequestUrgent(r)`** — medical with `urgent` flag, or hardship with `specialConditions` or `urgent` flag. The urgent *indicator* (red dot on `RequestTypeIcon`) only shows when the request is also open: `isRequestOpen(r) && isRequestUrgent(r)`
 
 ### Badge count scoping (`useRequestBadge`)

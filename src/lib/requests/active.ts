@@ -4,7 +4,6 @@ import { parseMedicalAppointments, hasUpcomingAppointment } from "./medical-appo
  * Minimal fields needed to determine if a request is "active" per DEFINITIONS.md:
  * - leave: departure or return date is today or in the future
  * - medical: any appointment date is today or in the future
- * - hardship: always active once approved
  */
 interface ActiveCheckFields {
   status: string;
@@ -22,8 +21,6 @@ interface ActiveCheckFields {
 export function isRequestActive(r: ActiveCheckFields, today?: string): boolean {
   if (r.status !== "approved") return false;
   const todayStr = today ?? new Date().toISOString().split("T")[0];
-
-  if (r.type === "hardship") return true;
 
   if (r.type === "leave") {
     const dep = r.departureAt?.split("T")[0];

@@ -11,8 +11,8 @@ describe("isRequestActive", () => {
     expect(isRequestActive({ status: "denied", type: "leave" }, "2026-04-15")).toBe(false);
   });
 
-  it("returns true for approved hardship (always active)", () => {
-    expect(isRequestActive({ status: "approved", type: "hardship" }, "2026-04-15")).toBe(true);
+  it("returns false for approved hardship (not date-based)", () => {
+    expect(isRequestActive({ status: "approved", type: "hardship" }, "2026-04-15")).toBe(false);
   });
 
   // --- Leave ---
@@ -157,10 +157,16 @@ describe("isRequestOpen", () => {
     expect(isRequestOpen({ status: "open", type: "leave" }, "2026-04-15")).toBe(true);
   });
 
-  it("returns true for active approved request", () => {
+  it("returns true for active approved leave request", () => {
+    expect(
+      isRequestOpen({ status: "approved", type: "leave", departureAt: "2026-04-20T08:00:00Z" }, "2026-04-15"),
+    ).toBe(true);
+  });
+
+  it("returns false for approved hardship (not date-based active)", () => {
     expect(
       isRequestOpen({ status: "approved", type: "hardship" }, "2026-04-15"),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("returns false for denied request", () => {

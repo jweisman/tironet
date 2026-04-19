@@ -109,7 +109,6 @@ function activeRequestSortDate(r: RequestSummary): string {
     const next = appts.find((a) => a.date.split("T")[0] >= today);
     return next?.date.split("T")[0] ?? "9999";
   }
-  // Hardship: no activity date, sort last
   return "9999";
 }
 
@@ -156,7 +155,7 @@ function groupByDate(requests: RequestSummary[]): [string, RequestSummary[]][] {
 }
 
 function formatGroupDate(dateKey: string): string {
-  if (dateKey === "9999") return 'ת"ש';
+  if (dateKey === "9999") return "אחר";
   const d = new Date(dateKey.includes("T") ? dateKey : dateKey + "T00:00:00");
   return d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
 }

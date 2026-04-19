@@ -13,9 +13,9 @@ This document summarizes the up-to-date definitions for terms used throughout th
 * _Active (פעילה)_: Approved, with the following conditions:
   * leave requests where the departure or return date is today or in the future
   * medical requests with any appointment date in the future
-  * hardship requests (always active once approved)
 * _Approved (אושרה)_: Status is approved (terminal — workflow is complete)
 * _Open (פתוחות)_: In progress or active
+* _Hardship (ת״ש)_: Approved hardship requests are tracked separately from active requests (no date criteria). Shown on the soldiers page via a dedicated filter pill with urgent overlay when `specialConditions` or `urgent` is set.
 * _Action Required ("Mine")_: Requests where `assignedRole` matches the user's role. Includes denied requests pending acknowledgement.
 * _All_: All requests regardless of status, including denied and fully completed
 * _Urgent_: When request is open (active or in progress)

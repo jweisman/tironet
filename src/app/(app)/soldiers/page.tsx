@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, AlertCircle, FileUp, FileText, WifiOff } from "lucide-react";
+import { Plus, Search, AlertCircle, FileUp, FileText, WifiOff, HeartHandshake } from "lucide-react";
 import { toast } from "sonner";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useCycle } from "@/contexts/CycleContext";
@@ -102,7 +102,7 @@ const SOLDIERS_QUERY = `
 `;
 
 // Open requests = active (approved + date criteria) OR in-progress (status open)
-// Used for the active request icons on soldier cards and the "active requests" filter
+// Used for the active request icons on soldier cards and the "open requests" filter
 const OPEN_REQUESTS_QUERY = `
   SELECT r.soldier_id, r.type, r.status, r.urgent, r.special_conditions
   FROM requests r
@@ -114,16 +114,31 @@ const OPEN_REQUESTS_QUERY = `
           SELECT 1 FROM json_each(r.medical_appointments) AS a
           WHERE json_extract(a.value, '$.date') >= DATE('now')
         ))
-        OR r.type = 'hardship'
       ))
       OR r.status = 'open'
     )
+`;
+
+// Approved hardship requests — separate from "active" since they have no date criteria.
+// Used for the hardship filter pill and hardship icons on soldier cards.
+const HARDSHIP_REQUESTS_QUERY = `
+  SELECT r.soldier_id, r.urgent, r.special_conditions
+  FROM requests r
+  WHERE r.cycle_id = ?
+    AND r.status = 'approved'
+    AND r.type = 'hardship'
 `;
 
 interface RawOpenRequest {
   soldier_id: string;
   type: string;
   status: string;
+  urgent: number | null;
+  special_conditions: number | null;
+}
+
+interface RawHardshipRequest {
+  soldier_id: string;
   urgent: number | null;
   special_conditions: number | null;
 }
@@ -195,10 +210,18 @@ export default function SoldiersPage() {
   const { data: rawSoldiers, isLoading: soldiersLoading } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
   const { data: rawOpenRequests } = useQuery<RawOpenRequest>(OPEN_REQUESTS_QUERY, queryParams);
+  const { data: rawHardshipRequests } = useQuery<RawHardshipRequest>(HARDSHIP_REQUESTS_QUERY, queryParams);
   const { showLoading, showConnectionError } = useSyncReady(
     (rawSoldiers ?? []).length > 0,
     soldiersLoading
   );
+
+  // Build soldier → hardship set (for the hardship filter)
+  const hardshipSoldierIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const hr of rawHardshipRequests ?? []) set.add(hr.soldier_id);
+    return set;
+  }, [rawHardshipRequests]);
 
   const allSquads: SquadData[] = useMemo(() => {
     // Build soldier → approved requests map (with urgency info)
@@ -207,11 +230,21 @@ export default function SoldiersPage() {
     for (const ar of rawOpenRequests ?? []) {
       const entry: ApprovedReq = {
         type: ar.type as RequestType,
-        urgent: (ar.type === "medical" && ar.urgent === 1) || (ar.type === "hardship" && (ar.special_conditions === 1 || ar.urgent === 1)),
+        urgent: ar.type === "medical" && ar.urgent === 1,
       };
       const list = approvedMap.get(ar.soldier_id);
       if (list) list.push(entry);
       else approvedMap.set(ar.soldier_id, [entry]);
+    }
+    // Add hardship entries from the separate query
+    for (const hr of rawHardshipRequests ?? []) {
+      const entry: ApprovedReq = {
+        type: "hardship" as RequestType,
+        urgent: (hr.special_conditions === 1 || hr.urgent === 1),
+      };
+      const list = approvedMap.get(hr.soldier_id);
+      if (list) list.push(entry);
+      else approvedMap.set(hr.soldier_id, [entry]);
     }
 
     const squadMap = new Map<string, SquadData>();
@@ -234,7 +267,7 @@ export default function SoldiersPage() {
       squads = squads.filter((sq) => sq.id === selectedAssignment.unitId);
     }
     return squads;
-  }, [rawSoldiers, rawSquads, rawOpenRequests, role, selectedAssignment?.unitId]);
+  }, [rawSoldiers, rawSquads, rawOpenRequests, rawHardshipRequests, role, selectedAssignment?.unitId]);
 
   const existingIdNumbers = useMemo(() => {
     const set = new Set<string>();
@@ -274,6 +307,7 @@ export default function SoldiersPage() {
     searchParams.get("filter") === "gaps"
   );
   const [showRequestsOnly, setShowRequestsOnly] = useState(false);
+  const [showHardshipOnly, setShowHardshipOnly] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -291,7 +325,8 @@ export default function SoldiersPage() {
         soldiers: squad.soldiers.filter((s) => {
           if (statusFilter !== "all" && s.status !== statusFilter) return false;
           if (showGapsOnly && s.gapCount === 0) return false;
-          if (showRequestsOnly && s.openRequestCount === 0 && s.approvedRequests.length === 0) return false;
+          if (showRequestsOnly && s.openRequestCount === 0 && !s.approvedRequests.some((r) => r.type !== "hardship")) return false;
+          if (showHardshipOnly && !hardshipSoldierIds.has(s.id)) return false;
           if (search.trim()) {
             const q = search.trim().toLowerCase();
             const fullName = `${s.familyName} ${s.givenName}`.toLowerCase();
@@ -305,7 +340,7 @@ export default function SoldiersPage() {
         }),
       }))
       .filter((sq) => sq.soldiers.length > 0);
-  }, [allSquads, statusFilter, showGapsOnly, showRequestsOnly, search]);
+  }, [allSquads, statusFilter, showGapsOnly, showRequestsOnly, showHardshipOnly, hardshipSoldierIds, search]);
 
   const totalSoldiers = filteredSquads.reduce(
     (sum, sq) => sum + sq.soldiers.length,
@@ -468,6 +503,19 @@ export default function SoldiersPage() {
             <span>בקשות פתוחות</span>
           </button>
           <button
+            type="button"
+            onClick={() => setShowHardshipOnly((v) => !v)}
+            className={cn(
+              "shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              showHardshipOnly
+                ? "bg-purple-100 text-purple-800"
+                : "bg-muted text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <HeartHandshake size={12} />
+            <span>ת״ש</span>
+          </button>
+          <button
             data-tour="soldiers-gaps-filter"
             type="button"
             onClick={() => setShowGapsOnly((v) => !v)}
@@ -486,7 +534,7 @@ export default function SoldiersPage() {
 
       {/* Content */}
       <div className="pb-32">
-        {totalSoldiers === 0 && showLoading && !search && (statusFilter === "all" || statusFilter === "active") && !showGapsOnly && !showRequestsOnly && (
+        {totalSoldiers === 0 && showLoading && !search && (statusFilter === "all" || statusFilter === "active") && !showGapsOnly && !showRequestsOnly && !showHardshipOnly && (
           <div className="divide-y divide-border">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -499,7 +547,7 @@ export default function SoldiersPage() {
             ))}
           </div>
         )}
-        {totalSoldiers === 0 && showConnectionError && !search && (statusFilter === "all" || statusFilter === "active") && !showGapsOnly && !showRequestsOnly && (
+        {totalSoldiers === 0 && showConnectionError && !search && (statusFilter === "all" || statusFilter === "active") && !showGapsOnly && !showRequestsOnly && !showHardshipOnly && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <WifiOff size={28} className="text-muted-foreground mx-auto mb-1" />
             <p className="font-medium">לא ניתן לטעון נתונים</p>
@@ -509,7 +557,7 @@ export default function SoldiersPage() {
         {totalSoldiers === 0 && !showLoading && !showConnectionError && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
             <p className="font-medium">אין חיילים</p>
-            {(search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly) && (
+            {(search || (statusFilter !== "all" && statusFilter !== "active") || showGapsOnly || showRequestsOnly || showHardshipOnly) && (
               <p className="text-sm text-muted-foreground">נסה לשנות את הסינון</p>
             )}
           </div>
