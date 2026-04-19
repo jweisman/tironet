@@ -62,7 +62,9 @@ async function collectDiagnostics(
       lastSyncedAt: status?.lastSyncedAt?.toISOString() ?? "never",
       downloading: String(status?.dataFlowStatus?.downloading ?? "unknown"),
       uploading: String(status?.dataFlowStatus?.uploading ?? "unknown"),
-      uploadError: status?.dataFlowStatus?.uploadError ?? false,
+      uploadError: status?.dataFlowStatus?.uploadError
+        ? JSON.stringify(status.dataFlowStatus.uploadError, Object.getOwnPropertyNames(status.dataFlowStatus.uploadError))
+        : false,
     };
   } catch (e) {
     diagnostics["PowerSync"] = { error: String(e) };
@@ -70,7 +72,7 @@ async function collectDiagnostics(
 
   // Table row counts
   try {
-    const tables = ["soldiers", "squads", "platoons", "activities", "activity_reports", "requests", "request_actions"];
+    const tables = ["soldiers", "squads", "platoons", "companies", "cycles", "activity_types", "activities", "activity_reports", "requests", "request_actions"];
     const counts: Record<string, number> = {};
     for (const table of tables) {
       try {
@@ -109,8 +111,9 @@ async function collectDiagnostics(
       const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
       diagnostics["Sync Claims"] = {
         cycle_ids: payload.cycle_ids,
+        squad_ids: payload.squad_ids,
         platoon_ids: payload.platoon_ids,
-        squad_id: payload.squad_id,
+        company_ids: payload.company_ids,
         exp: new Date(payload.exp * 1000).toISOString(),
       };
     }
@@ -120,13 +123,20 @@ async function collectDiagnostics(
 
   // ps_oplog sample — check if rows arrived but were processed as REMOVEs
   try {
-    const oplog = await db.execute(
-      "SELECT op, COUNT(*) as cnt FROM ps_oplog GROUP BY op LIMIT 10"
-    );
-    const rows = oplog.rows?._array ?? [];
-    diagnostics["Oplog Summary"] = rows.length > 0
-      ? Object.fromEntries(rows.map((r: Record<string, unknown>) => [String(r.op), r.cnt]))
-      : "empty";
+    const oplogCount = await db.execute("SELECT COUNT(*) as cnt FROM ps_oplog");
+    const total = Number(oplogCount.rows?._array?.[0]?.cnt ?? 0);
+    if (total > 0) {
+      // Try to get a sample of recent ops
+      const sample = await db.execute("SELECT * FROM ps_oplog LIMIT 5");
+      const sampleRows = sample.rows?._array ?? [];
+      diagnostics["Oplog Summary"] = {
+        totalOps: total,
+        sampleColumns: sampleRows.length > 0 ? Object.keys(sampleRows[0]) : [],
+        sample: sampleRows,
+      };
+    } else {
+      diagnostics["Oplog Summary"] = "empty (0 ops)";
+    }
   } catch (e) {
     diagnostics["Oplog Summary"] = { error: String(e) };
   }
@@ -144,11 +154,16 @@ async function collectDiagnostics(
     );
     const allSquads = await db.execute("SELECT COUNT(*) as cnt FROM squads");
     const allPlatoons = await db.execute("SELECT COUNT(*) as cnt FROM platoons");
+    // Show what cycle_ids soldiers actually have — helps diagnose stale data
+    const soldierCycles = await db.execute(
+      "SELECT cycle_id, COUNT(*) as cnt FROM soldiers GROUP BY cycle_id LIMIT 10"
+    );
 
     diagnostics["Sample Queries"] = {
       selectedCycleId: cycleId || "none",
       squadsForCycle: squads.rows?._array?.map((r: Record<string, unknown>) => `${r.platoon_name} > ${r.name}`) ?? [],
       soldiersForCycle: Number(soldiers.rows?._array?.[0]?.cnt ?? 0),
+      soldiersByCycleId: soldierCycles.rows?._array?.map((r: Record<string, unknown>) => `${r.cycle_id}: ${r.cnt}`) ?? [],
       totalSquads: Number(allSquads.rows?._array?.[0]?.cnt ?? 0),
       totalPlatoons: Number(allPlatoons.rows?._array?.[0]?.cnt ?? 0),
     };
@@ -213,6 +228,23 @@ async function collectDiagnostics(
     };
   } catch (e) {
     diagnostics["PWA"] = { error: String(e) };
+  }
+
+  // Shell cache status — check if the current page's shell exists in the SW cache
+  try {
+    const shellCaches = await caches.keys();
+    const shellCacheNames = shellCaches.filter((n) => n.startsWith("app-shells-"));
+    const shellInfo: Record<string, unknown> = {
+      shellCaches: shellCacheNames,
+    };
+    if (shellCacheNames.length > 0) {
+      const cache = await caches.open(shellCacheNames[0]);
+      const keys = await cache.keys();
+      shellInfo.cachedShells = keys.map((r) => new URL(r.url).pathname);
+    }
+    diagnostics["Shell Cache"] = shellInfo;
+  } catch (e) {
+    diagnostics["Shell Cache"] = { error: String(e) };
   }
 
   // Startup timeline — performance marks set by layout.tsx and AppShell

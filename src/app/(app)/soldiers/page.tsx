@@ -471,7 +471,7 @@ export default function SoldiersPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div data-tour="soldiers-status-filters" className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
+          <div data-tour="soldiers-status-filters" className="flex gap-1.5 flex-1">
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f}
@@ -488,6 +488,8 @@ export default function SoldiersPage() {
               </button>
             ))}
           </div>
+        </div>
+        <div className="flex items-center gap-2">
           <button
             data-tour="soldiers-requests-filter"
             type="button"

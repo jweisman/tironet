@@ -674,15 +674,24 @@ const { showLoading, showEmpty, showConnectionError } = useSyncReady(
 );
 ```
 
-**Decision tree (no timers, no flags — driven entirely by PowerSync signals):**
+**Decision tree:**
 - `isLoading` is true → show spinner/skeleton (query hasn't returned first results yet)
 - `hasData` is true → render data
-- `hasSynced` is true → show "no data" / "not found" (sync completed, DB is genuinely empty)
-- 15 seconds elapsed without sync → show connection error (only edge case with a timer: first-time user, fully offline, no cached data — without it they'd see a spinner forever)
+- `hasSynced` is true AND `downloading` is true → **stale sync detection** (see below) — show loading for 30s, then connection error
+- `hasSynced` is true AND `downloading` is false → show "no data" / "not found" (sync completed, DB is genuinely empty)
+- 15 seconds elapsed without sync → show connection error (first-time user, fully offline, no cached data)
+
+### Stale sync detection (#137)
+
+`hasSynced` persists from previous sync generations. When a sync resets (config change, new JWT claims, deployment), `hasSynced` remains true but the local DB has stale data from the old generation. On slow networks (e.g. military base cellular), the new sync may never complete its initial download — PowerSync requires ALL buckets to finish before checkpointing any data.
+
+Without stale sync detection, `useSyncReady` sees `hasSynced: true` + no data → immediately shows "no data", which is misleading. The fix: when `hasSynced` is true AND `downloading` is true (sync actively receiving data) AND there's no data, show loading for 30s then connection error ("check your network"). The `downloading` guard prevents false positives on healthy networks — when a sync checkpoint completes quickly, `downloading` goes false and the hook falls through to the correct "genuinely empty" state.
 
 ### Stability principles — no timers for state decisions
 
 **Do NOT** use `setTimeout` to decide between loading and empty states. Timers are guesses — they fire too early on slow networks (showing "no data" while still loading) and too late on fast ones (unnecessary delay). Always use signals from PowerSync (`isLoading`, `hasSynced`) or the browser (`navigator.onLine`).
+
+The two timer exceptions in `useSyncReady` are **last-resort fallbacks** (15s for first-ever sync, 30s for stale sync) — they only fire when no signal-based resolution is possible and the alternative is an infinite spinner.
 
 Similarly, **do not** add custom boolean flags to track loading/connected/bootstrapping state when a library signal already exists. Prior bugs came from maintaining `timedOut`, `grace`, `hasConnectedRef`, `wasOffline`, `reconnectGrace` etc. — all removed in favor of direct signals.
 

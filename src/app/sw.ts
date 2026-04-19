@@ -233,6 +233,14 @@ function resolveShellRoute(pathname: string, origin: string): {
     // are NOT cached because they are version-specific.
     if (event.request.mode !== "navigate") return;
 
+    // PWA start_url "/" redirects to /home server-side. Handle it locally
+    // in the SW to avoid a network round-trip (Vercel cold start + auth check).
+    if (url.pathname === "/") {
+      swLog("fetch / → redirecting to /home locally");
+      event.respondWith(Promise.resolve(Response.redirect(new URL("/home", url.origin), 302)));
+      return;
+    }
+
     const shell = resolveShellRoute(url.pathname, url.origin);
     if (shell) {
       swLog("fetch", url.pathname, "navigate (shell)");
