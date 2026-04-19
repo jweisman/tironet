@@ -146,7 +146,7 @@ export async function PATCH(
     // Send push notification to users with the newly assigned role
     if (transition.newAssignedRole) {
       after(() =>
-        notifyAssignedRole(req.cycleId, transition.newAssignedRole!, req.type, transition.newStatus, `${req.soldier.familyName} ${req.soldier.givenName}`, id).catch((err) =>
+        notifyAssignedRole(req.cycleId, transition.newAssignedRole!, req.type, transition.newStatus, `${req.soldier.familyName} ${req.soldier.givenName}`, id, req.soldierId).catch((err) =>
           console.warn("[push] request assignment notification failed:", err),
         ),
       );
@@ -197,7 +197,7 @@ export async function PATCH(
     if (data.assignedRole && data.assignedRole !== req.assignedRole) {
       const status = data.status ?? req.status;
       after(() =>
-        notifyAssignedRole(req.cycleId, data.assignedRole!, req.type, status, `${req.soldier.familyName} ${req.soldier.givenName}`, id).catch((err) =>
+        notifyAssignedRole(req.cycleId, data.assignedRole!, req.type, status, `${req.soldier.familyName} ${req.soldier.givenName}`, id, req.soldierId).catch((err) =>
           console.warn("[push] request assignment notification failed:", err),
         ),
       );
@@ -290,16 +290,32 @@ const TYPE_LABELS: Record<string, string> = { leave: "יציאה", medical: "ר�
 const STATUS_TITLES: Record<string, string> = { open: "בקשה חדשה", approved: "בקשה אושרה", denied: "בקשה נדחתה" };
 const STATUS_LABELS: Record<string, string> = { open: "חדשה", approved: "שאושרה", denied: "שנדחתה" };
 
-async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, requestStatus: string, soldierName: string, requestId: string): Promise<void> {
+async function notifyAssignedRole(cycleId: string, assignedRole: string, requestType: string, requestStatus: string, soldierName: string, requestId: string, soldierId: string): Promise<void> {
+  // Look up soldier's unit hierarchy to scope notifications
+  const soldier = await prisma.soldier.findUnique({
+    where: { id: soldierId },
+    select: { squadId: true, squad: { select: { platoonId: true, platoon: { select: { companyId: true } } } } },
+  });
+  if (!soldier) return;
+
   // For company_commander assignments, also include deputy_company_commander
   const roles: Role[] = assignedRole === "company_commander"
     ? ["company_commander", "deputy_company_commander"]
     : [assignedRole as Role];
 
+  // Build unit filter based on assigned role
+  const unitFilter =
+    assignedRole === "squad_commander"
+      ? { unitId: soldier.squadId }
+      : assignedRole === "platoon_commander"
+        ? { unitId: soldier.squad.platoonId }
+        : { unitId: soldier.squad.platoon.companyId };
+
   const assignments = await prisma.userCycleAssignment.findMany({
     where: {
       cycleId,
       role: { in: roles },
+      ...unitFilter,
     },
     select: { userId: true },
   });

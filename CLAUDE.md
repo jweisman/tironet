@@ -769,6 +769,13 @@ Generated once with `npx web-push generate-vapid-keys`. Stored as environment va
 
 ### Notification types
 
+| Notification | Trigger | Audience | Preference |
+|---|---|---|---|
+| Missing activity reports | Cron (20:00 Israel) | Squad commanders — own squad only | `dailyTasksEnabled` |
+| Request requiring action | Event (create/workflow) | Squad/platoon/company commanders — own unit only | `requestAssignmentEnabled` |
+| Active requests daily | Cron (20:00 Israel) | Squad + platoon commanders — own unit only | `activeRequestsEnabled` |
+| New appointment added | Event (medical edit) | Squad + platoon commanders — own unit only | `newAppointmentEnabled` |
+
 1. **Daily Tasks** (scheduled) — Vercel Cron at 20:00 Israel time (17:00 UTC) via `vercel.json`. Counts missing activity reports for today/yesterday per squad commander. Opt-out via `dailyTasksEnabled`.
 
 2. **Request Assignment** (event-driven) — fires from three places:
@@ -776,9 +783,13 @@ Generated once with `npx web-push generate-vapid-keys`. Stored as environment va
    - `PATCH /api/requests/[id]` (online path) — when a workflow action (`data.action`) sets a new `assignedRole`
    - `PATCH /api/requests/[id]` (connector path) — when the PowerSync connector uploads a status/assignedRole change
 
-   The notification title and body vary by request status: "בקשה חדשה" (open), "בקשה אושרה" (approved), "בקשה נדחתה" (denied). Both `notifyAssignedRole()` functions (in `route.ts` and `[id]/route.ts`) accept a `requestStatus` parameter.
+   The notification title and body vary by request status: "בקשה חדשה" (open), "בקשה אושרה" (approved), "בקשה נדחתה" (denied). Both `notifyAssignedRole()` functions (in `route.ts` and `[id]/route.ts`) accept a `requestStatus` parameter. Notifications are scoped to the soldier's chain of command via `unitId` on `UserCycleAssignment`.
 
    Opt-out via `requestAssignmentEnabled`.
+
+3. **Active Requests Daily** (scheduled) — same cron as daily tasks. Notifies squad and platoon commanders about approved requests (leave/medical) active on the target date. Scoped by the commander's assigned squads/platoons. Opt-out via `activeRequestsEnabled`.
+
+4. **New Appointment Added** (event-driven) — fires from `PATCH /api/requests/[id]` when new medical appointments are detected (comparing old vs new `medical_appointments` JSON). Notifies the soldier's squad commander and platoon commander/sergeant. Opt-out via `newAppointmentEnabled`.
 
 ### iOS limitations
 
