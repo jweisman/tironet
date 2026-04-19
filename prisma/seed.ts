@@ -8,7 +8,11 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 const ACTIVITY_TYPES = [
-  { name: "אימונים", icon: "dumbbell", sortOrder: 1 },
+  { name: "אימונים", icon: "dumbbell", sortOrder: 1, 
+    displayConfiguration: {
+      results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
+    },
+  },
   {
     name: "כש״ג", icon: "shield", sortOrder: 2,
     scoreConfig: {
@@ -53,6 +57,11 @@ const ACTIVITY_TYPES = [
       note: { type: "list", options: ["קיר", "חבל", "זמן", "אחר"] },
     },
   },
+  { name: "מסע", icon: "route", sortOrder: 9,
+    displayConfiguration: {
+      results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
+    },
+  },    
 ];
 
 async function main() {
