@@ -441,3 +441,11 @@ cd infra
 terraform plan
 terraform apply
 ```
+
+## Credits
+
+### Coding
+The coding in this app was performed by Claude Code.
+
+### Logos
+The [app logo](https://www.svgrepo.com/svg/212751/soldier) and [splash page logo]((https://www.svgrepo.com/svg/212774/running-exercise)) are from SVG Repo.

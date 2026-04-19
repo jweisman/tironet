@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Generates apple-touch-startup-image PNGs for iOS PWA splash screens.
- * Uses the app icon (public/icon.svg) centered on the brand green background.
+ * Uses the running soldiers icon (public/splash-icon.svg) centered on the
+ * brand green background.
  *
  * Usage: node scripts/generate-splash.mjs
  * Output: public/splash/*.png
@@ -46,22 +47,23 @@ const devices = [
 // Brand green — works as a neutral splash in both light and dark mode
 const bg = "#273617";
 
-const iconSvg = readFileSync(join(root, "public", "icon.svg"));
+const iconSvg = readFileSync(join(root, "public", "splash-icon.svg"));
 
 async function generateSplash(width, height, ratio, name) {
   const pw = width * ratio;
   const ph = height * ratio;
 
-  // Icon size: ~20% of the shorter dimension
-  const iconSize = Math.round(Math.min(pw, ph) * 0.2);
+  // Icon width: ~40% of screen width (the SVG is landscape — two runners)
+  const iconWidth = Math.round(pw * 0.4);
+  const iconHeight = iconWidth; // SVG viewBox is square (512x512)
 
   const iconPng = await sharp(iconSvg)
-    .resize(iconSize, iconSize)
+    .resize(iconWidth, iconHeight)
     .png()
     .toBuffer();
 
-  const left = Math.round((pw - iconSize) / 2);
-  const top = Math.round((ph - iconSize) / 2);
+  const left = Math.round((pw - iconWidth) / 2);
+  const top = Math.round((ph - iconHeight) / 2);
 
   await sharp({
     create: {
