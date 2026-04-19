@@ -140,28 +140,42 @@ export async function POST(request: NextRequest) {
     return getActiveScores(a.activityType.scoreConfig as ScoreConfig | null);
   }
 
-  // Build sheet titles and data (shared between create and update flows)
-  const sheetTitles = squads.map(
-    (squad) => `${squad.platoon.name} - ${squad.name}`
-  );
+  // Group squads by platoon → one sheet per platoon
+  const platoonMap = new Map<string, { platoonName: string; squads: typeof squads }>();
+  for (const squad of squads) {
+    const pid = squad.platoon.id;
+    if (!platoonMap.has(pid)) {
+      platoonMap.set(pid, { platoonName: squad.platoon.name, squads: [] });
+    }
+    platoonMap.get(pid)!.squads.push(squad);
+  }
+  const platoonEntries = [...platoonMap.values()];
 
-  const squadSheetData = squads.map((squad, index) => {
-    const sheetTitle = sheetTitles[index];
-    const squadActivities = activities.filter((a) => a.platoonId === squad.platoon.id);
-    const scoresPerActivity = squadActivities.map((a) => getActivityScores(a));
-    const colCounts = scoresPerActivity.map((scores) => Math.max(scores.length, 1));
+  const sheetTitles = platoonEntries.map((p) => p.platoonName);
+
+  const squadSheetData = platoonEntries.map((platoonEntry) => {
+    const sheetTitle = platoonEntry.platoonName;
+    const platoonActivities = activities.filter((a) =>
+      platoonEntry.squads.some((sq) => sq.platoon.id === a.platoonId)
+    );
+    const scoresPerActivity = platoonActivities.map((a) => getActivityScores(a));
+    // +1 for result column per activity
+    const colCounts = scoresPerActivity.map((scores) => Math.max(scores.length, 1) + 1);
     const totalCols = colCounts.reduce((a, b) => a + b, 0);
 
-    const activityNameRow: string[] = [""];
-    for (let ai = 0; ai < squadActivities.length; ai++) {
-      const a = squadActivities[ai];
+    // Row 1: merged activity name headers (extra col for "כיתה")
+    const activityNameRow: string[] = ["", ""];
+    for (let ai = 0; ai < platoonActivities.length; ai++) {
+      const a = platoonActivities[ai];
       activityNameRow.push(`${a.activityType.name} - ${a.name}`);
       for (let c = 1; c < colCounts[ai]; c++) activityNameRow.push("");
     }
 
-    const scoreLabelRow: string[] = ["חייל"];
-    for (let ai = 0; ai < squadActivities.length; ai++) {
+    // Row 2: score labels
+    const scoreLabelRow: string[] = ["חייל", "כיתה"];
+    for (let ai = 0; ai < platoonActivities.length; ai++) {
       const scores = scoresPerActivity[ai];
+      scoreLabelRow.push("תוצאה");
       if (scores.length <= 1) {
         scoreLabelRow.push(scores[0]?.label ?? "ציון");
       } else {
@@ -169,34 +183,63 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const dataRows = squad.soldiers.map((soldier) => {
-      const row = [`${soldier.familyName} ${soldier.givenName}`];
-      for (let ai = 0; ai < squadActivities.length; ai++) {
-        const report = soldier.activityReports.find(
-          (r) => r.activityId === squadActivities[ai].id
-        );
-        const scores = scoresPerActivity[ai];
-        const colCount = colCounts[ai];
-        if (!report) {
-          for (let c = 0; c < colCount; c++) row.push("");
-        } else {
-          for (let c = 0; c < colCount; c++) {
-            const gradeKey = scores[c]?.gradeKey ?? (`grade${c + 1}` as keyof typeof report);
-            const g = report[gradeKey];
-            row.push(g != null ? formatGradeDisplay(Number(g), scores[c]?.format) : "");
+    // Data rows: all soldiers across all squads in this platoon
+    type SoldierRow = { values: string[]; failedActivities: number[] };
+    const soldierRows: SoldierRow[] = [];
+    const passCountPerActivity = new Array(platoonActivities.length).fill(0);
+    const failCountPerActivity = new Array(platoonActivities.length).fill(0);
+
+    for (const squad of platoonEntry.squads) {
+      for (const soldier of squad.soldiers) {
+        const row: string[] = [`${soldier.familyName} ${soldier.givenName}`, squad.name];
+        const failedActivities: number[] = [];
+        for (let ai = 0; ai < platoonActivities.length; ai++) {
+          const report = soldier.activityReports.find(
+            (r) => r.activityId === platoonActivities[ai].id
+          );
+          const scores = scoresPerActivity[ai];
+          const scoreColCount = Math.max(scores.length, 1);
+          if (!report) {
+            row.push("");
+            for (let c = 0; c < scoreColCount; c++) row.push("");
+          } else {
+            const resultLabel = report.result === "passed" ? "עבר" : report.result === "failed" ? "נכשל" : report.result === "na" ? "לא רלוונטי" : "";
+            row.push(resultLabel);
+            if (report.result === "failed") {
+              failedActivities.push(ai);
+              failCountPerActivity[ai]++;
+            } else if (report.result === "passed") {
+              passCountPerActivity[ai]++;
+            }
+            for (let c = 0; c < scoreColCount; c++) {
+              const gradeKey = scores[c]?.gradeKey ?? (`grade${c + 1}` as keyof typeof report);
+              const g = report[gradeKey];
+              row.push(g != null ? formatGradeDisplay(Number(g), scores[c]?.format) : "");
+            }
           }
         }
+        soldierRows.push({ values: row, failedActivities });
       }
-      return row;
-    });
+    }
+
+    // Summary row
+    const summaryRow: string[] = ["סיכום", ""];
+    for (let ai = 0; ai < platoonActivities.length; ai++) {
+      const scores = scoresPerActivity[ai];
+      const scoreColCount = Math.max(scores.length, 1);
+      summaryRow.push(`${passCountPerActivity[ai]}/${failCountPerActivity[ai]}`);
+      for (let c = 0; c < scoreColCount; c++) summaryRow.push("");
+    }
 
     return {
       sheetTitle,
       colCounts,
       totalCols,
+      soldierRows,
+      summaryRowIndex: soldierRows.length + 2, // 0-indexed: row 0=names, row 1=labels, then soldiers
       valueRange: {
         range: `'${sheetTitle}'!A1`,
-        values: [activityNameRow, scoreLabelRow, ...dataRows],
+        values: [activityNameRow, scoreLabelRow, ...soldierRows.map((r) => r.values), summaryRow],
       },
     };
   });
@@ -299,6 +342,8 @@ interface SheetData {
   sheetTitle: string;
   colCounts: number[];
   totalCols: number;
+  soldierRows: { values: string[]; failedActivities: number[] }[];
+  summaryRowIndex: number;
   valueRange: { range: string; values: string[][] };
 }
 
@@ -476,8 +521,9 @@ function buildFormatRequests(
   return squadSheetData.flatMap((sd) => {
     const sheetId = sheetIdMap.get(sd.sheetTitle) ?? 0;
 
+    // Merge activity name cells in row 1 (offset by 2 for name + squad columns)
     const mergeRequests: object[] = [];
-    let colOffset = 1;
+    let colOffset = 2;
     for (const colCount of sd.colCounts) {
       if (colCount > 1) {
         mergeRequests.push({
@@ -496,8 +542,37 @@ function buildFormatRequests(
       colOffset += colCount;
     }
 
+    // Red font for score cells of failed soldiers
+    const redFontRequests: object[] = [];
+    for (let ri = 0; ri < sd.soldierRows.length; ri++) {
+      const sr = sd.soldierRows[ri];
+      for (const ai of sr.failedActivities) {
+        // Calculate column range for this activity's cells
+        let startCol = 2;
+        for (let j = 0; j < ai; j++) startCol += sd.colCounts[j];
+        redFontRequests.push({
+          repeatCell: {
+            range: {
+              sheetId,
+              startRowIndex: ri + 2, // skip 2 header rows
+              endRowIndex: ri + 3,
+              startColumnIndex: startCol,
+              endColumnIndex: startCol + sd.colCounts[ai],
+            },
+            cell: {
+              userEnteredFormat: {
+                textFormat: { foregroundColorStyle: { rgbColor: { red: 0.8, green: 0.1, blue: 0.1 } } },
+              },
+            },
+            fields: "userEnteredFormat.textFormat.foregroundColorStyle",
+          },
+        });
+      }
+    }
+
     return [
       ...mergeRequests,
+      // Header rows formatting
       {
         repeatCell: {
           range: { sheetId, startRowIndex: 0, endRowIndex: 2 },
@@ -511,25 +586,41 @@ function buildFormatRequests(
           fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment)",
         },
       },
+      // Summary row formatting
+      {
+        repeatCell: {
+          range: { sheetId, startRowIndex: sd.summaryRowIndex, endRowIndex: sd.summaryRowIndex + 1 },
+          cell: {
+            userEnteredFormat: {
+              textFormat: { bold: true },
+              backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 },
+            },
+          },
+          fields: "userEnteredFormat(textFormat,backgroundColor)",
+        },
+      },
+      // Freeze 2 header rows + 2 columns (name + squad)
       {
         updateSheetProperties: {
           properties: {
             sheetId,
-            gridProperties: { frozenRowCount: 2, frozenColumnCount: 1 },
+            gridProperties: { frozenRowCount: 2, frozenColumnCount: 2 },
           },
           fields: "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
         },
       },
+      // Auto-resize columns
       {
         autoResizeDimensions: {
           dimensions: {
             sheetId,
             dimension: "COLUMNS",
             startIndex: 0,
-            endIndex: sd.totalCols + 1,
+            endIndex: sd.totalCols + 2,
           },
         },
       },
+      ...redFontRequests,
     ];
   });
 }

@@ -19,6 +19,13 @@ export interface ActivitySummaryRow {
   level: "squad" | "platoon" | "company";
 }
 
+export interface ActivitySummarySoldier {
+  name: string;
+  squad: string;
+  result: string;
+  note: string | null;
+}
+
 export interface ActivitySummaryItem {
   id: string;
   name: string;
@@ -31,6 +38,7 @@ export interface ActivitySummaryItem {
   naCount: number;
   totalSoldiers: number;
   rows: ActivitySummaryRow[];
+  failedSoldiers: ActivitySummarySoldier[];
   displayConfiguration?: DisplayConfiguration | null;
 }
 
@@ -68,6 +76,8 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
         include: {
           soldier: {
             select: {
+              givenName: true,
+              familyName: true,
               status: true,
               squad: {
                 select: {
@@ -161,6 +171,16 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       }
     }
 
+    const failedSoldiers: ActivitySummarySoldier[] = activeReports
+      .filter((r) => r.result === "failed" || r.result === "na")
+      .map((r) => ({
+        name: `${r.soldier.familyName} ${r.soldier.givenName}`,
+        squad: r.soldier.squad.name,
+        result: r.result ?? "",
+        note: r.note,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     return {
       id: activity.id,
       name: activity.name,
@@ -171,6 +191,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       passedCount, failedCount, naCount,
       totalSoldiers: activeReports.length,
       rows: mergedRows,
+      failedSoldiers,
       displayConfiguration: at.displayConfiguration as DisplayConfiguration | null,
     };
   });
@@ -194,6 +215,7 @@ export function renderActivitySummaryHtml(
     const pieSvg = renderPieSvg(activity.passedCount, activity.failedCount, activity.naCount);
     const labels = activity.scoreLabels;
 
+    const resultLabels = getResultLabels(activity.displayConfiguration);
     const scoreHeaders = labels.map((l) => `<th>${l}</th>`).join("");
 
     const tableRows = activity.rows.map((row) => {
@@ -227,6 +249,16 @@ export function renderActivitySummaryHtml(
           <tbody>${tableRows}</tbody>
         </table>
         ` : '<p class="no-data">אין נתונים</p>'}
+        ${activity.failedSoldiers.length > 0 ? `
+        <h3 style="font-size:12px;font-weight:700;margin:12px 0 6px 0;">${resultLabels.failed.label} / ${resultLabels.na.label}</h3>
+        <table>
+          <thead><tr><th>חייל</th><th>כיתה</th><th>תוצאה</th><th>הערה</th></tr></thead>
+          <tbody>${activity.failedSoldiers.map((s) => {
+            const rl = s.result === "failed" ? resultLabels.failed.label : resultLabels.na.label;
+            return `<tr><td>${s.name}</td><td>${s.squad}</td><td${s.result === "failed" ? ' style="color:#ef4444"' : ""}>${rl}</td><td>${s.note ?? "—"}</td></tr>`;
+          }).join("\n")}</tbody>
+        </table>
+        ` : ""}
       </div>
     `;
   }).join("\n");

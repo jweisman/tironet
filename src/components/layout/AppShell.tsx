@@ -19,9 +19,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // painted. This avoids the blank/black gap between splash hide and app
   // render that occurred when SplashDismiss hid it immediately on hydration.
   useEffect(() => {
+    performance.mark("appshell-mount");
     requestAnimationFrame(() => {
       const el = document.getElementById("app-splash");
       if (el) el.style.display = "none";
+      performance.mark("splash-dismissed");
     });
   }, []);
 

@@ -177,6 +177,29 @@ async function collectDiagnostics(
       const media = link.getAttribute("media");
       return media ? window.matchMedia(media).matches : false;
     });
+
+    // Test if the matching splash image actually loads
+    let splashImageTest: string = "no matching link";
+    if (matchingSplash.length > 0) {
+      const href = matchingSplash[0].getAttribute("href");
+      if (href) {
+        try {
+          const start = performance.now();
+          const imgRes = await fetch(href, { cache: "no-store" });
+          const elapsed = Math.round(performance.now() - start);
+          if (imgRes.ok) {
+            const contentType = imgRes.headers.get("content-type");
+            const contentLength = imgRes.headers.get("content-length");
+            splashImageTest = `OK ${imgRes.status} (${contentType}, ${contentLength ? Math.round(Number(contentLength) / 1024) + "KB" : "unknown size"}, ${elapsed}ms)`;
+          } else {
+            splashImageTest = `FAILED ${imgRes.status} ${imgRes.statusText}`;
+          }
+        } catch (fetchErr) {
+          splashImageTest = `FETCH ERROR: ${String(fetchErr)}`;
+        }
+      }
+    }
+
     diagnostics["PWA"] = {
       isIOS,
       standalone: window.matchMedia("(display-mode: standalone)").matches
@@ -185,9 +208,69 @@ async function collectDiagnostics(
       matchingSplashMedia: matchingSplash.length > 0
         ? matchingSplash.map((l) => l.getAttribute("media"))
         : `none matching (device: ${screen.width}×${screen.height} @${window.devicePixelRatio}x)`,
+      matchingSplashHref: matchingSplash[0]?.getAttribute("href") ?? "none",
+      splashImageTest,
     };
   } catch (e) {
     diagnostics["PWA"] = { error: String(e) };
+  }
+
+  // Startup timeline — performance marks set by layout.tsx and AppShell
+  try {
+    const marks = ["theme-init", "appshell-mount", "splash-dismissed"];
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const timeline: Record<string, string> = {};
+    if (nav) {
+      timeline["navigationStart"] = "0ms";
+      timeline["domContentLoaded"] = `${Math.round(nav.domContentLoadedEventStart)}ms`;
+      timeline["loadEvent"] = `${Math.round(nav.loadEventStart)}ms`;
+    }
+    for (const name of marks) {
+      const entries = performance.getEntriesByName(name, "mark");
+      if (entries.length > 0) {
+        timeline[name] = `${Math.round(entries[0].startTime)}ms`;
+      } else {
+        timeline[name] = "not recorded";
+      }
+    }
+    diagnostics["Startup Timeline"] = timeline;
+  } catch (e) {
+    diagnostics["Startup Timeline"] = { error: String(e) };
+  }
+
+  // Boot-time state — captured by inline script in layout.tsx at earliest paint
+  try {
+    const bootRaw = sessionStorage.getItem("tironet:boot");
+    if (bootRaw) {
+      const boot = JSON.parse(bootRaw);
+      diagnostics["Boot State"] = {
+        themePref: boot.theme,
+        darkModeApplied: boot.dark,
+        screenAtBoot: `${boot.w}×${boot.h} @${boot.dpr}x`,
+        bootTimestamp: new Date(boot.t).toISOString(),
+      };
+    } else {
+      diagnostics["Boot State"] = "not captured (sessionStorage empty)";
+    }
+  } catch (e) {
+    diagnostics["Boot State"] = { error: String(e) };
+  }
+
+  // Computed styles — what colors are actually rendered right now
+  try {
+    const bodyStyles = getComputedStyle(document.body);
+    const htmlStyles = getComputedStyle(document.documentElement);
+    const splashEl = document.getElementById("app-splash");
+    diagnostics["Computed Styles"] = {
+      htmlBackground: htmlStyles.backgroundColor,
+      bodyBackground: bodyStyles.backgroundColor,
+      bodyColor: bodyStyles.color,
+      darkClassPresent: document.documentElement.classList.contains("dark"),
+      splashDisplay: splashEl?.style.display ?? "element not found",
+      splashComputedBg: splashEl ? getComputedStyle(splashEl).backgroundColor : "element not found",
+    };
+  } catch (e) {
+    diagnostics["Computed Styles"] = { error: String(e) };
   }
 
   return diagnostics;

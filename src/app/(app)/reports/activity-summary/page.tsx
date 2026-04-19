@@ -215,6 +215,39 @@ export default function ActivitySummaryPage() {
                 </div>
               )}
 
+              {/* Failed / NA soldiers table */}
+              {activity.failedSoldiers && activity.failedSoldiers.length > 0 && (
+                <div className="overflow-x-auto">
+                  <h3 className="text-sm font-semibold mb-2">
+                    {getResultLabels(activity.displayConfiguration).failed.label} / {getResultLabels(activity.displayConfiguration).na.label}
+                  </h3>
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-border">
+                        <th className="text-start px-3 py-2 font-semibold">חייל</th>
+                        <th className="text-start px-3 py-2 font-semibold">כיתה</th>
+                        <th className="text-start px-3 py-2 font-semibold">תוצאה</th>
+                        <th className="text-start px-3 py-2 font-semibold">הערה</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activity.failedSoldiers.map((s, i) => {
+                        const labels = getResultLabels(activity.displayConfiguration);
+                        const resultLabel = s.result === "failed" ? labels.failed.label : labels.na.label;
+                        return (
+                          <tr key={i} className="border-b border-border">
+                            <td className="px-3 py-2">{s.name}</td>
+                            <td className="px-3 py-2">{s.squad}</td>
+                            <td className={cn("px-3 py-2", s.result === "failed" && "text-destructive")}>{resultLabel}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{s.note ?? "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
               {activity.rows.length === 0 && (
                 <p className="text-sm text-muted-foreground">אין נתונים</p>
               )}
