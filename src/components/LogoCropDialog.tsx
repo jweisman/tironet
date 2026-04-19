@@ -39,7 +39,10 @@ export function LogoCropDialog({ file, onConfirm, onCancel }: Props) {
         useWebWorker: true,
       });
       const reader = new FileReader();
-      reader.onload = () => onConfirm(reader.result as string);
+      reader.onload = () => {
+        setProcessing(false);
+        onConfirm(reader.result as string);
+      };
       reader.readAsDataURL(compressed);
     } catch {
       setProcessing(false);

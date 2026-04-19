@@ -61,7 +61,7 @@ import { validateProfileImage } from "@/lib/api/validate-image";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 type Squad = { id: string; name: string };
-type Platoon = { id: string; name: string; squads: Squad[] };
+type Platoon = { id: string; name: string; logo?: string | null; squads: Squad[] };
 type Company = { id: string; name: string; logo?: string | null; battalionId: string | null; platoons: Platoon[] };
 type Battalion = { id: string; name: string; sortOrder: number };
 type Cycle = { id: string; name: string; isActive: boolean };
@@ -253,6 +253,7 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
   const [editingSquadId, setEditingSquadId] = useState<string | null>(null);
   const [logoCropFile, setLogoCropFile] = useState<File | null>(null);
   const [logoCropCompanyId, setLogoCropCompanyId] = useState<string | null>(null);
+  const [logoCropPlatoon, setLogoCropPlatoon] = useState<{ companyId: string; platoonId: string } | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
@@ -407,6 +408,25 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
     await mutate(`/api/admin/structure/${companyId}`, "PATCH", { type: "company", name: company.name, logo });
     updateStructure(selectedCycleId, (prev) =>
       prev.map((c) => (c.id === companyId ? { ...c, logo } : c))
+    );
+    toast.success(logo ? "הלוגו עודכן" : "הלוגו הוסר");
+  }
+
+  async function updatePlatoonLogo(companyId: string, platoonId: string, logo: string | null) {
+    const company = companies.find((c) => c.id === companyId);
+    const platoon = company?.platoons.find((p) => p.id === platoonId);
+    if (!platoon) return;
+    if (logo) {
+      const err = validateProfileImage(logo);
+      if (err) { toast.error(err); return; }
+    }
+    await mutate(`/api/admin/structure/${platoonId}`, "PATCH", { type: "platoon", name: platoon.name, logo });
+    updateStructure(selectedCycleId, (prev) =>
+      prev.map((c) =>
+        c.id === companyId
+          ? { ...c, platoons: c.platoons.map((p) => (p.id === platoonId ? { ...p, logo } : p)) }
+          : c
+      )
     );
     toast.success(logo ? "הלוגו עודכן" : "הלוגו הוסר");
   }
@@ -784,6 +804,7 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
                               className="h-7 text-xs"
                               onClick={() => {
                                 setLogoCropCompanyId(company.id);
+                                setLogoCropPlatoon(null);
                                 logoInputRef.current?.click();
                               }}
                             >
@@ -907,6 +928,43 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
                                               </>
                                             )}
                                           </div>
+
+                                          {/* Platoon logo upload — visible when editing */}
+                                          {editingPlatoonId === platoon.id && (
+                                            <div className="flex items-center gap-3 px-3 pb-2 ps-10 bg-muted/30">
+                                              {platoon.logo ? (
+                                                <img src={platoon.logo} alt="" className="h-10 w-10 rounded object-contain bg-background border" />
+                                              ) : (
+                                                <div className="h-10 w-10 rounded bg-background border flex items-center justify-center">
+                                                  <ImagePlus className="w-4 h-4 text-muted-foreground" />
+                                                </div>
+                                              )}
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-xs"
+                                                onClick={() => {
+                                                  setLogoCropPlatoon({ companyId: company.id, platoonId: platoon.id });
+                                                  setLogoCropCompanyId(null);
+                                                  logoInputRef.current?.click();
+                                                }}
+                                              >
+                                                <ImagePlus className="w-3 h-3 ms-1" />
+                                                {platoon.logo ? "החלף לוגו" : "העלה לוגו"}
+                                              </Button>
+                                              {platoon.logo && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  className="h-7 text-xs text-destructive hover:text-destructive"
+                                                  onClick={() => updatePlatoonLogo(company.id, platoon.id, null)}
+                                                >
+                                                  <Trash2 className="w-3 h-3 ms-1" />
+                                                  הסר
+                                                </Button>
+                                              )}
+                                            </div>
+                                          )}
 
                                           {/* Squads */}
                                           {platoonExpanded && (
@@ -1169,7 +1227,7 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
         </div>
       )}
 
-      {/* Hidden file input + crop dialog for company logo */}
+      {/* Hidden file input + crop dialog for company/platoon logo */}
       <input
         ref={logoInputRef}
         type="file"
@@ -1185,12 +1243,15 @@ export default function StructureTree({ cycles, battalions: initialBattalions, i
         file={logoCropFile}
         onConfirm={(base64) => {
           if (logoCropCompanyId) updateCompanyLogo(logoCropCompanyId, base64);
+          if (logoCropPlatoon) updatePlatoonLogo(logoCropPlatoon.companyId, logoCropPlatoon.platoonId, base64);
           setLogoCropFile(null);
           setLogoCropCompanyId(null);
+          setLogoCropPlatoon(null);
         }}
         onCancel={() => {
           setLogoCropFile(null);
           setLogoCropCompanyId(null);
+          setLogoCropPlatoon(null);
         }}
       />
     </div>

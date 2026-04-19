@@ -61,7 +61,7 @@ streams:
   platoons:
     auto_subscribe: true
     query: >
-      SELECT id, company_id, name, sort_order
+      SELECT id, company_id, name, logo, sort_order
       FROM platoons
       WHERE id IN visible_platoon_ids
 

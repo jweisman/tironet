@@ -100,6 +100,7 @@ const SQUADS_QUERY = `
     p.name  AS platoon_name,
     c.name  AS company_name,
     c.logo  AS company_logo,
+    p.logo  AS platoon_logo,
 
     (SELECT COUNT(*)
      FROM soldiers s
@@ -239,7 +240,7 @@ const REQUESTS_QUERY = `
 interface RawSquad {
   squad_id: string; squad_name: string;
   platoon_id: string; platoon_name: string;
-  company_name: string; company_logo: string | null;
+  company_name: string; company_logo: string | null; platoon_logo: string | null;
   soldier_count: number; soldiers_with_gaps: number;
   reported_activities: number; missing_report_activities: number;
 }
@@ -368,7 +369,15 @@ export default function HomePage() {
     return parts.join(" > ");
   }, [role, rawSquads]);
 
-  const companyLogo = rawSquads?.[0]?.company_logo ?? null;
+  // Platoon logo overrides company logo for platoon-level roles and below
+  const logo = useMemo(() => {
+    const first = rawSquads?.[0];
+    if (!first) return null;
+    if (role === "squad_commander" || role === "platoon_commander") {
+      return first.platoon_logo ?? first.company_logo;
+    }
+    return first.company_logo;
+  }, [rawSquads, role]);
 
   // Tour
   const { registerTour, unregisterTour } = useTourContext();
@@ -435,7 +444,7 @@ export default function HomePage() {
       <div className="flex items-center gap-4">
         <div className="flex h-14 md:h-16 w-auto max-w-24 items-center justify-center rounded-lg bg-muted p-1.5 shrink-0">
           <img
-            src={companyLogo ?? "/images/idf-logo.png"}
+            src={logo ?? "/images/idf-logo.png"}
             alt=""
             className="h-full w-auto object-contain"
           />

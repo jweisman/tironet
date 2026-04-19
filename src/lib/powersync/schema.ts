@@ -19,6 +19,7 @@ const companies = new Table({
 const platoons = new Table({
   company_id: column.text,
   name: column.text,
+  logo: column.text,
   sort_order: column.integer,
 });
 

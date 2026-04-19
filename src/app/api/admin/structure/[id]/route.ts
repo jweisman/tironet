@@ -51,7 +51,17 @@ export async function PATCH(
     return NextResponse.json(company);
   }
   if (type === "platoon") {
-    const platoon = await prisma.platoon.update({ where: { id }, data: { name } });
+    const data: Record<string, unknown> = { name };
+    if (logo !== undefined) {
+      if (logo !== null) {
+        const imageError = validateProfileImage(logo);
+        if (imageError) {
+          return NextResponse.json({ error: imageError }, { status: 400 });
+        }
+      }
+      data.logo = logo;
+    }
+    const platoon = await prisma.platoon.update({ where: { id }, data });
     return NextResponse.json(platoon);
   }
   const squad = await prisma.squad.update({ where: { id }, data: { name } });
