@@ -62,6 +62,11 @@ const ACTIVITY_TYPES = [
       results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
     },
   },    
+  { name: "קרב מגע", icon: "hand", sortOrder: 10,
+    displayConfiguration: {
+      results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
+    },
+  },    
 ];
 
 async function main() {

@@ -56,15 +56,19 @@ async function collectDiagnostics(
   // PowerSync status
   try {
     const status = db.currentStatus;
+    const serializeError = (err: unknown) => {
+      if (!err) return false;
+      if (err instanceof Error) return { name: err.name, message: err.message };
+      return JSON.stringify(err, Object.getOwnPropertyNames(err as object));
+    };
     diagnostics["PowerSync"] = {
       connected: status?.connected ?? false,
       hasSynced: status?.hasSynced ?? false,
       lastSyncedAt: status?.lastSyncedAt?.toISOString() ?? "never",
       downloading: String(status?.dataFlowStatus?.downloading ?? "unknown"),
       uploading: String(status?.dataFlowStatus?.uploading ?? "unknown"),
-      uploadError: status?.dataFlowStatus?.uploadError
-        ? JSON.stringify(status.dataFlowStatus.uploadError, Object.getOwnPropertyNames(status.dataFlowStatus.uploadError))
-        : false,
+      downloadError: serializeError(status?.dataFlowStatus?.downloadError),
+      uploadError: serializeError(status?.dataFlowStatus?.uploadError),
     };
   } catch (e) {
     diagnostics["PowerSync"] = { error: String(e) };
@@ -132,7 +136,10 @@ async function collectDiagnostics(
       diagnostics["Oplog Summary"] = {
         totalOps: total,
         sampleColumns: sampleRows.length > 0 ? Object.keys(sampleRows[0]) : [],
-        sample: sampleRows,
+        sample: sampleRows.map((r: Record<string, unknown>) => {
+          const { data, ...rest } = r;
+          return JSON.stringify({ ...rest, data: typeof data === "string" ? `${data.slice(0, 80)}…` : data });
+        }),
       };
     } else {
       diagnostics["Oplog Summary"] = "empty (0 ops)";
