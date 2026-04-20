@@ -31,16 +31,20 @@ export function TironetPowerSyncProvider({
     // init() opens the local DB and creates tables from the schema.
     // This is fast and works offline — no network needed.
     console.log("[PowerSync] calling init()...");
+    performance.mark("powersync-init-start");
     localDb
       .init()
       .then(() => {
+        performance.mark("powersync-init-end");
         console.log("[PowerSync] init() resolved — DB open, local queries ready");
         setInitFailed(false);
         // Start sync — may fail offline, PowerSync retries automatically.
         console.log("[PowerSync] calling connect()...");
+        performance.mark("powersync-connect-start");
         return localDb.connect(connector);
       })
       .then(() => {
+        performance.mark("powersync-connect-end");
         console.log("[PowerSync] connect() resolved — sync started");
       })
       .catch((err: unknown) => {

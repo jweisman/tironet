@@ -249,7 +249,11 @@ async function collectDiagnostics(
 
   // Startup timeline — performance marks set by layout.tsx and AppShell
   try {
-    const marks = ["theme-init", "appshell-mount", "splash-dismissed"];
+    const marks = [
+      "theme-init", "appshell-mount", "splash-dismissed",
+      "powersync-init-start", "powersync-init-end",
+      "powersync-connect-start", "powersync-connect-end",
+    ];
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     const timeline: Record<string, string> = {};
     if (nav) {
