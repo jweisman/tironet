@@ -174,11 +174,17 @@ async function collectDiagnostics(
   // Service worker
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
+    const controller = navigator.serviceWorker?.controller;
     diagnostics["Service Worker"] = {
       registered: !!reg,
       active: !!reg?.active,
       scope: reg?.scope ?? "—",
       updateFound: !!reg?.installing || !!reg?.waiting,
+      waiting: !!reg?.waiting,
+      controllerState: controller?.state ?? "no controller",
+      controllerScriptURL: controller?.scriptURL
+        ? new URL(controller.scriptURL).pathname
+        : "none",
     };
   } catch {
     diagnostics["Service Worker"] = { registered: false };
@@ -258,6 +264,7 @@ async function collectDiagnostics(
     const timeline: Record<string, string> = {};
     if (nav) {
       timeline["navigationStart"] = "0ms";
+      timeline["navigationType"] = nav.type; // navigate, reload, back_forward, prerender
       timeline["domContentLoaded"] = `${Math.round(nav.domContentLoadedEventStart)}ms`;
       timeline["loadEvent"] = `${Math.round(nav.loadEventStart)}ms`;
     }
