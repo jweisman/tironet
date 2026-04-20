@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle, WifiOff, ZoomIn } from "lucide-react";
+import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle, Navigation, WifiOff, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
@@ -457,6 +457,15 @@ export default function SoldierDetailPage() {
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">כתובת:</span>
                 <span>{[raw.street, raw.apt ? `דירה ${raw.apt}` : null, raw.city].filter(Boolean).join(", ")}</span>
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent([raw.street, raw.city].filter(Boolean).join(", "))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-600 transition-colors"
+                  aria-label="נווט לכתובת"
+                >
+                  <Navigation size={16} />
+                </a>
               </div>
             )}
             {raw.notes && (
