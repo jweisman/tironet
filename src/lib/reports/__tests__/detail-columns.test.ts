@@ -17,6 +17,7 @@ const identity: DetailFormatters = {
   dateTime: (s) => `DT:${s}`,
   date: (s) => `D:${s}`,
   appointment: (a) => `${a.date} ${a.place} ${a.type}`,
+  sickDay: (d) => `SD:${d.date}`,
   transportationLabels: { bus: "אוטובוס", train: "רכבת" },
 };
 
@@ -30,7 +31,7 @@ function makeReq(overrides: Partial<RequestDetailInput>): RequestDetailInput {
     transportation: null,
     paramedicDate: null,
     medicalAppointments: null,
-    sickLeaveDays: null,
+    sickDays: null,
     specialConditions: null,
     ...overrides,
   };
@@ -92,18 +93,20 @@ describe("extractRequestFields", () => {
 
   // --- Medical type ---
 
-  it("extracts medical fields (paramedicDate, sickLeaveDays)", () => {
+  it("extracts medical fields (paramedicDate, sickDays)", () => {
     const req = makeReq({
       type: "medical",
       paramedicDate: "2026-04-15",
-      sickLeaveDays: 3,
+      sickDays: [{ id: "d1", date: "2026-04-16" }, { id: "d2", date: "2026-04-17" }],
     });
     const result = extractRequestFields(req, identity);
 
     expect(result.fields).toEqual([
       { label: 'בדיקת חופ"ל', value: "D:2026-04-15" },
-      { label: "ימי גימלים", value: "3" },
     ]);
+    expect(result.sickDays).toHaveLength(2);
+    expect(result.sickDays[0].text).toBe("SD:2026-04-16");
+    expect(result.sickDays[1].text).toBe("SD:2026-04-17");
   });
 
   it("extracts medical appointments", () => {
@@ -151,10 +154,10 @@ describe("extractRequestFields", () => {
     expect(result.appointments).toEqual([]);
   });
 
-  it("handles sickLeaveDays of 0", () => {
-    const req = makeReq({ type: "medical", sickLeaveDays: 0 });
+  it("handles empty sickDays array", () => {
+    const req = makeReq({ type: "medical", sickDays: [] });
     const result = extractRequestFields(req, identity);
-    expect(result.fields).toEqual([{ label: "ימי גימלים", value: "0" }]);
+    expect(result.sickDays).toEqual([]);
   });
 
   // --- Hardship type ---
@@ -234,7 +237,7 @@ describe("formatNotes", () => {
 
 describe("renderDetailColumnsHtml", () => {
   it("returns empty string when all arrays are empty", () => {
-    const data: DetailColumnsData = { fields: [], appointments: [], notes: [] };
+    const data: DetailColumnsData = { fields: [], appointments: [], sickDays: [], notes: [] };
     expect(renderDetailColumnsHtml(data)).toBe("");
   });
 
@@ -242,6 +245,7 @@ describe("renderDetailColumnsHtml", () => {
     const data: DetailColumnsData = {
       fields: [{ label: "מקום", value: "Tel Aviv" }],
       appointments: [],
+      sickDays: [],
       notes: [],
     };
     const html = renderDetailColumnsHtml(data);
@@ -255,6 +259,7 @@ describe("renderDetailColumnsHtml", () => {
     const data: DetailColumnsData = {
       fields: [{ label: "יציאה", value: "2026-04-10", highlight: true }],
       appointments: [],
+      sickDays: [],
       notes: [],
     };
     const html = renderDetailColumnsHtml(data);
@@ -268,6 +273,7 @@ describe("renderDetailColumnsHtml", () => {
         { text: "10/04 Hospital Xray" },
         { text: "20/04 Clinic Checkup", highlight: true },
       ],
+      sickDays: [],
       notes: [],
     };
     const html = renderDetailColumnsHtml(data);
@@ -280,6 +286,7 @@ describe("renderDetailColumnsHtml", () => {
     const data: DetailColumnsData = {
       fields: [],
       appointments: [],
+      sickDays: [],
       notes: [{ label: "Cohen (יצירה)", value: "New request" }],
     };
     const html = renderDetailColumnsHtml(data);
@@ -292,6 +299,7 @@ describe("renderDetailColumnsHtml", () => {
     const data: DetailColumnsData = {
       fields: [{ label: "L", value: "V" }],
       appointments: [{ text: "appt" }],
+      sickDays: [],
       notes: [{ label: "N", value: "note" }],
     };
     const html = renderDetailColumnsHtml(data);

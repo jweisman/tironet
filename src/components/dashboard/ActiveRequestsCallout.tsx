@@ -10,6 +10,7 @@ import {
   parseMedicalAppointments,
   formatAppointment,
 } from "@/lib/requests/medical-appointments";
+import { parseSickDays, formatSickDay } from "@/lib/requests/sick-days";
 import {
   REQUEST_TYPE_LABELS,
   REQUEST_TYPE_ICONS,
@@ -31,7 +32,8 @@ function isActiveToday(r: RawActiveRequest, today: string): boolean {
   }
   if (r.type === "medical") {
     const appts = parseMedicalAppointments(r.medical_appointments);
-    return appts.some((a) => a.date.split("T")[0] === today);
+    const days = parseSickDays(r.sick_days);
+    return appts.some((a) => a.date.split("T")[0] === today) || days.some((d) => d.date === today);
   }
   return false;
 }
@@ -44,7 +46,7 @@ function isActiveToday(r: RawActiveRequest, today: string): boolean {
 const ACTIVE_REQUESTS_QUERY = `
   SELECT
     r.id, r.type, r.status,
-    r.departure_at, r.return_at, r.medical_appointments,
+    r.departure_at, r.return_at, r.medical_appointments, r.sick_days,
     s.family_name || ' ' || s.given_name AS soldier_name,
     sq.name AS squad_name
   FROM requests r
@@ -65,6 +67,7 @@ interface RawActiveRequest {
   departure_at: string | null;
   return_at: string | null;
   medical_appointments: string | null;
+  sick_days: string | null;
   soldier_name: string;
   squad_name: string;
 }
@@ -97,6 +100,9 @@ function getTodayDetail(type: string, raw: RawActiveRequest, today: string): str
     const appts = parseMedicalAppointments(raw.medical_appointments);
     const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
     if (todayAppt) return `תור: ${formatAppointment(todayAppt)}`;
+    const days = parseSickDays(raw.sick_days);
+    const todayDay = days.find((d) => d.date === today);
+    if (todayDay) return `יום מחלה: ${formatSickDay(todayDay)}`;
     return null;
   }
   return null;

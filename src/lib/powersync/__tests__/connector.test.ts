@@ -482,7 +482,7 @@ describe("TironetConnector", () => {
             urgent: null,
             paramedic_date: null,
             medical_appointments: null,
-            sick_leave_days: null,
+            sick_days: null,
             special_conditions: null,
           },
         },
@@ -502,13 +502,14 @@ describe("TironetConnector", () => {
       expect(body.departureAt).toBe("2026-04-10T08:00:00Z");
       expect(body.returnAt).toBe("2026-04-12T18:00:00Z");
       expect(body.transportation).toBe("bus");
-      expect(body.sickLeaveDays).toBeNull();
+      expect(body.sickDays).toBeUndefined();
     });
 
     it("uploads requests PUT with medical_appointments JSON parsing", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
       const appts = JSON.stringify([{ id: "a1", date: "2026-04-20", place: "Hospital", type: "Checkup" }]);
+      const sickDays = JSON.stringify([{ id: "d1", date: "2026-04-15" }, { id: "d2", date: "2026-04-16" }]);
       const db = mockDatabase([
         {
           table: "requests",
@@ -526,7 +527,7 @@ describe("TironetConnector", () => {
             urgent: 1,
             paramedic_date: "2026-04-18",
             medical_appointments: appts,
-            sick_leave_days: 3,
+            sick_days: sickDays,
             special_conditions: null,
           },
         },
@@ -540,7 +541,7 @@ describe("TironetConnector", () => {
       expect(body.medicalAppointments).toEqual([{ id: "a1", date: "2026-04-20", place: "Hospital", type: "Checkup" }]);
       expect(body.urgent).toBe(true);
       expect(body.paramedicDate).toBe("2026-04-18");
-      expect(body.sickLeaveDays).toBe(3);
+      expect(body.sickDays).toEqual([{ id: "d1", date: "2026-04-15" }, { id: "d2", date: "2026-04-16" }]);
     });
 
     it("uploads requests PATCH with snake_case to camelCase mapping", async () => {

@@ -171,7 +171,7 @@
     "appointmentDate": "תאריך תור",
     "appointmentPlace": "מקום התור",
     "appointmentType": "סוג התור",
-    "sickLeaveDays": "ימי גימלים",
+    "sickDays": "ימי מחלה",
     "specialConditions": "אוכלוסיות מיוחדות",
     "specialConditionsIndicator": "ת\"ש מיוחד",
     "approve": "אשר",

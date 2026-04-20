@@ -32,6 +32,7 @@ export interface RequestSummary {
   departureAt?: string | null;
   returnAt?: string | null;
   medicalAppointments?: string | null;
+  sickDays?: string | null;
 }
 
 interface Props {

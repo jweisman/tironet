@@ -27,7 +27,10 @@ const createSchema = z.object({
     place: z.string(),
     type: z.string(),
   })).nullable().optional(),
-  sickLeaveDays: z.number().int().min(0).nullable().optional(),
+  sickDays: z.array(z.object({
+    id: z.string(),
+    date: z.string(),
+  })).nullable().optional(),
   // Hardship fields
   specialConditions: z.boolean().nullable().optional(),
 });
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
     urgent: data.urgent ?? null,
     paramedicDate: data.paramedicDate ? new Date(data.paramedicDate) : null,
     medicalAppointments: data.medicalAppointments ?? Prisma.DbNull,
-    sickLeaveDays: data.sickLeaveDays ?? null,
+    sickDays: data.sickDays ?? Prisma.DbNull,
     specialConditions: data.specialConditions ?? null,
   };
 

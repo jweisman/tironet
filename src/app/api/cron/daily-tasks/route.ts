@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { sendPushToUsers } from "@/lib/push/send";
 import { parseMedicalAppointments } from "@/lib/requests/medical-appointments";
+import { parseSickDays } from "@/lib/requests/sick-days";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 /**
@@ -243,6 +244,7 @@ async function sendActiveRequestNotifications(
       departureAt: true,
       returnAt: true,
       medicalAppointments: true,
+      sickDays: true,
       soldier: { select: { squadId: true } },
     },
   });
@@ -257,7 +259,8 @@ async function sendActiveRequestNotifications(
     }
     if (r.type === "medical") {
       const appts = parseMedicalAppointments(r.medicalAppointments as string | null);
-      return appts.some((a) => a.date === targetDate);
+      const days = parseSickDays(r.sickDays as string | null);
+      return appts.some((a) => a.date === targetDate) || days.some((d) => d.date === targetDate);
     }
     return false;
   });

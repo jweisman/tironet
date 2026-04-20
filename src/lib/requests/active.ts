@@ -1,9 +1,10 @@
 import { parseMedicalAppointments, hasUpcomingAppointment } from "./medical-appointments";
+import { parseSickDays, hasUpcomingSickDay } from "./sick-days";
 
 /**
  * Minimal fields needed to determine if a request is "active" per DEFINITIONS.md:
  * - leave: departure or return date is today or in the future
- * - medical: any appointment date is today or in the future
+ * - medical: any appointment date or sick day is today or in the future
  */
 interface ActiveCheckFields {
   status: string;
@@ -11,6 +12,7 @@ interface ActiveCheckFields {
   departureAt?: string | null;
   returnAt?: string | null;
   medicalAppointments?: string | unknown[] | null;
+  sickDays?: string | unknown[] | null;
 }
 
 /**
@@ -30,7 +32,8 @@ export function isRequestActive(r: ActiveCheckFields, today?: string): boolean {
 
   if (r.type === "medical") {
     const appts = parseMedicalAppointments(r.medicalAppointments);
-    return hasUpcomingAppointment(appts);
+    const days = parseSickDays(r.sickDays);
+    return hasUpcomingAppointment(appts) || hasUpcomingSickDay(days);
   }
 
   return false;

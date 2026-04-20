@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
+import type { SickDay } from "@/lib/requests/sick-days";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,6 +14,7 @@ import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 export interface DetailColumnsData {
   fields: { label: string; value: string; highlight?: boolean }[];
   appointments: { text: string; highlight?: boolean }[];
+  sickDays: { text: string; highlight?: boolean }[];
   notes: { label: string; value: string }[];
 }
 
@@ -26,7 +28,7 @@ export interface RequestDetailInput {
   transportation: string | null;
   paramedicDate: string | null;
   medicalAppointments: MedicalAppointment[] | null;
-  sickLeaveDays: number | null;
+  sickDays: SickDay[] | null;
   specialConditions: boolean | null;
 }
 
@@ -36,6 +38,7 @@ export interface DetailFormatters {
   dateTime: (s: string) => string;
   date: (s: string) => string;
   appointment: (a: MedicalAppointment) => string;
+  sickDay: (d: SickDay) => string;
   transportationLabels: Record<string, string>;
 }
 
@@ -47,9 +50,10 @@ export function extractRequestFields(
   req: RequestDetailInput,
   fmt: DetailFormatters,
   options?: { highlightDates?: boolean },
-): { fields: { label: string; value: string; highlight?: boolean }[]; appointments: { text: string; highlight?: boolean }[] } {
+): { fields: { label: string; value: string; highlight?: boolean }[]; appointments: { text: string; highlight?: boolean }[]; sickDays: { text: string; highlight?: boolean }[] } {
   const fields: { label: string; value: string; highlight?: boolean }[] = [];
   const appointments: { text: string; highlight?: boolean }[] = [];
+  const sickDays: { text: string; highlight?: boolean }[] = [];
   const hl = options?.highlightDates ?? false;
 
   if (req.description) {
@@ -79,7 +83,15 @@ export function extractRequestFields(
         appointments.push({ text: fmt.text(fmt.appointment(appt)), highlight: isNext || undefined });
       }
     }
-    if (req.sickLeaveDays != null) fields.push({ label: "ימי גימלים", value: String(req.sickLeaveDays) });
+    if (req.sickDays && req.sickDays.length > 0) {
+      const today = new Date().toISOString().split("T")[0];
+      let nextHighlighted = false;
+      for (const day of req.sickDays) {
+        const isNext = hl && !nextHighlighted && day.date >= today;
+        if (isNext) nextHighlighted = true;
+        sickDays.push({ text: fmt.sickDay(day), highlight: isNext || undefined });
+      }
+    }
   }
 
   if (req.type === "hardship") {
@@ -88,7 +100,7 @@ export function extractRequestFields(
     }
   }
 
-  return { fields, appointments };
+  return { fields, appointments, sickDays };
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +136,7 @@ export function formatNotes(
 // ---------------------------------------------------------------------------
 
 export function renderDetailColumnsHtml(data: DetailColumnsData): string {
-  if (data.fields.length === 0 && data.appointments.length === 0 && data.notes.length === 0) return "";
+  if (data.fields.length === 0 && data.appointments.length === 0 && data.sickDays.length === 0 && data.notes.length === 0) return "";
 
   const columns: string[] = [];
 
@@ -143,6 +155,13 @@ export function renderDetailColumnsHtml(data: DetailColumnsData): string {
       a.highlight ? `<li><strong class="detail-highlight">${a.text}</strong></li>` : `<li>${a.text}</li>`
     ).join("");
     columns.push(`<div class="detail-appointments"><span class="detail-label">תורים</span><ul>${items}</ul></div>`);
+  }
+
+  if (data.sickDays.length > 0) {
+    const items = data.sickDays.map((d) =>
+      d.highlight ? `<li><strong class="detail-highlight">${d.text}</strong></li>` : `<li>${d.text}</li>`
+    ).join("");
+    columns.push(`<div class="detail-appointments"><span class="detail-label">ימי מחלה</span><ul>${items}</ul></div>`);
   }
 
   if (data.notes.length > 0) {

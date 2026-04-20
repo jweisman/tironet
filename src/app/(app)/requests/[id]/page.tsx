@@ -35,6 +35,8 @@ import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/reques
 import { effectiveRole } from "@/lib/auth/permissions";
 import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
+import { parseSickDays, formatSickDay, expandSickDayRange } from "@/lib/requests/sick-days";
+import type { SickDay } from "@/lib/requests/sick-days";
 import type { RequestType, RequestStatus, Role, Transportation, RequestActionType } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -80,7 +82,7 @@ interface RawRequest {
   urgent: number | null;
   paramedic_date: string | null;
   medical_appointments: string | null;
-  sick_leave_days: number | null;
+  sick_days: string | null;
   special_conditions: number | null;
   created_at: string;
   updated_at: string;
@@ -207,6 +209,12 @@ export default function RequestDetailPage() {
   // Appointment editing
   const [editingAppointments, setEditingAppointments] = useState(false);
   const [editAppointmentsList, setEditAppointmentsList] = useState<MedicalAppointment[]>([]);
+
+  // Sick days editing
+  const [editingSickDays, setEditingSickDays] = useState(false);
+  const [editSickDaysList, setEditSickDaysList] = useState<SickDay[]>([]);
+  const [sickDayFrom, setSickDayFrom] = useState("");
+  const [sickDayTo, setSickDayTo] = useState("");
 
   // Field editing (description, specialConditions)
   const [editingDescription, setEditingDescription] = useState(false);
@@ -660,10 +668,140 @@ export default function RequestDetailPage() {
                 </div>
               );
             })()}
-            <DetailRow
-              label="ימי גימלים"
-              value={raw.sick_leave_days != null ? String(raw.sick_leave_days) : null}
-            />
+            {/* Sick days section */}
+            {(() => {
+              const days = parseSickDays(raw.sick_days);
+              const today = new Date().toISOString().split("T")[0];
+              return (
+                <div className="py-2 border-b border-border">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-muted-foreground">ימי מחלה</span>
+                    {canEditFields && !editingSickDays && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditSickDaysList(days.length > 0 ? days : []);
+                          setEditingSickDays(true);
+                          setSickDayFrom("");
+                          setSickDayTo("");
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <Pencil size={14} />
+                        ערוך ימי מחלה
+                      </button>
+                    )}
+                  </div>
+                  {!editingSickDays ? (
+                    days.length > 0 ? (
+                      <ul className="space-y-1">
+                        {days.map((d) => (
+                          <li key={d.id} className={cn("text-sm font-medium", d.date >= today && "font-bold")}>
+                            {formatSickDay(d)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">אין ימי מחלה</p>
+                    )
+                  ) : (
+                    <div className="space-y-2 mt-2">
+                      {editSickDaysList.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {editSickDaysList.map((d) => (
+                            <span
+                              key={d.id}
+                              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs"
+                            >
+                              {new Date(d.date + "T00:00:00").toLocaleDateString("he-IL")}
+                              <button
+                                type="button"
+                                onClick={() => setEditSickDaysList((prev) => prev.filter((s) => s.id !== d.id))}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-xs">מתאריך</Label>
+                          <Input
+                            type="date"
+                            value={sickDayFrom}
+                            onChange={(e) => setSickDayFrom(e.target.value)}
+                            dir="ltr"
+                            lang="he"
+                            style={sickDayFrom ? undefined : { color: "transparent" }}
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-xs">עד תאריך</Label>
+                          <Input
+                            type="date"
+                            value={sickDayTo}
+                            onChange={(e) => setSickDayTo(e.target.value)}
+                            min={sickDayFrom || undefined}
+                            dir="ltr"
+                            lang="he"
+                            style={sickDayTo ? undefined : { color: "transparent" }}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!sickDayFrom}
+                        onClick={() => {
+                          const newDays = expandSickDayRange(sickDayFrom, sickDayTo || null);
+                          setEditSickDaysList((prev) => {
+                            const existing = new Set(prev.map((d) => d.date));
+                            return [...prev, ...newDays.filter((d) => !existing.has(d.date))].sort((a, b) => a.date.localeCompare(b.date));
+                          });
+                          setSickDayFrom("");
+                          setSickDayTo("");
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center disabled:opacity-50"
+                      >
+                        <Plus size={14} />
+                        הוסף ימי מחלה
+                      </button>
+                      <div className="flex gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await db.execute(
+                                `UPDATE requests SET sick_days = ?, updated_at = ? WHERE id = ?`,
+                                [editSickDaysList.length > 0 ? JSON.stringify(editSickDaysList) : null, new Date().toISOString(), raw.id],
+                              );
+                              toast.success("ימי מחלה עודכנו");
+                              setEditingSickDays(false);
+                            } catch {
+                              toast.error("שגיאה בעדכון ימי מחלה");
+                            }
+                          }}
+                          disabled={acting}
+                          className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          <Check size={12} />
+                          שמור
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingSickDays(false)}
+                          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
+                        >
+                          <X size={12} />
+                          ביטול
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
 

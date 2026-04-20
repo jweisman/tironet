@@ -10,6 +10,7 @@ import {
   TRANSPORTATION_LABELS,
 } from "@/lib/requests/constants";
 import { formatAppointment } from "@/lib/requests/medical-appointments";
+import { formatSickDay } from "@/lib/requests/sick-days";
 import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns";
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import type { RequestSummaryData, RequestSummaryItem, RequestStatusFilter } from "@/app/api/reports/request-summary/route";
@@ -53,15 +54,16 @@ const clientFormatters = {
   dateTime: formatDateTime,
   date: formatDate,
   appointment: formatAppointment,
+  sickDay: formatSickDay,
   transportationLabels: TRANSPORTATION_LABELS as Record<string, string>,
 };
 
 function RequestDetails({ req }: { req: RequestSummaryItem }) {
-  const { fields, appointments } = extractRequestFields(req, clientFormatters);
+  const { fields, appointments, sickDays } = extractRequestFields(req, clientFormatters);
 
   const notes = formatNotes(req.notes ?? []);
 
-  return <RequestDetailColumns data={{ fields, appointments, notes }} />;
+  return <RequestDetailColumns data={{ fields, appointments, sickDays, notes }} />;
 }
 
 // ---------------------------------------------------------------------------
