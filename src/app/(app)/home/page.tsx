@@ -482,7 +482,7 @@ export default function HomePage() {
             <Bell size={18} />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">{hebrewCount(requestBadge, "בקשה ממתינה", "בקשות ממתינות")} לטיפולך</p>
+            <p className="text-sm font-semibold">{requestBadge === 1 ? "בקשה 1 ממתינה לטיפולך" : `${requestBadge} בקשות ממתינות לטיפולך`}</p>
             <p className="text-xs text-muted-foreground">לחץ כדי לצפות</p>
           </div>
         </button>
