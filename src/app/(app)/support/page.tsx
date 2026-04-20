@@ -138,7 +138,7 @@ async function collectDiagnostics(
         sampleColumns: sampleRows.length > 0 ? Object.keys(sampleRows[0]) : [],
         sample: sampleRows.map((r: Record<string, unknown>) => {
           const { data, ...rest } = r;
-          return { ...rest, data: typeof data === "string" ? `${data.slice(0, 80)}…` : data };
+          return JSON.stringify({ ...rest, data: typeof data === "string" ? `${data.slice(0, 80)}…` : data });
         }),
       };
     } else {

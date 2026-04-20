@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { SoldierLogo } from "@/components/SoldierLogo";
 import { toE164 } from "@/lib/phone";
 
-type SmsStep = "idle" | "phone" | "code" | "sent";
+type SmsStep = "idle" | "phone" | "sent";
 
 function LoginForm() {
   const t = useTranslations("auth");
@@ -173,61 +173,11 @@ function LoginForm() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Google */}
-            <Button
-              className="w-full"
-              variant="outline"
-              onClick={() => signIn("google", { callbackUrl })}
-            >
-              {t("signInWithGoogle")}
-            </Button>
-
-            <div className="flex items-center gap-3">
-              <Separator className="flex-1" />
-              <span className="text-sm text-muted-foreground">או</span>
-              <Separator className="flex-1" />
-            </div>
-
-            {/* Magic link */}
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">{t("signInWithEmail")}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder={t("emailPlaceholder")}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  dir="ltr"
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={sending}>
-                {sending ? "שולח..." : t("sendMagicLink")}
-              </Button>
-            </form>
-
-            <div className="flex items-center gap-3">
-              <Separator className="flex-1" />
-              <span className="text-sm text-muted-foreground">או</span>
-              <Separator className="flex-1" />
-            </div>
-
-            {/* SMS OTP */}
-            {smsStep === "idle" && (
-              <Button
-                className="w-full"
-                variant="outline"
-                onClick={() => { setSmsStep("phone"); setSmsError(null); }}
-              >
-                כניסה עם קוד SMS
-              </Button>
-            )}
-
-            {smsStep === "phone" && (
+            {/* SMS OTP — primary login method */}
+            {(smsStep === "idle" || smsStep === "phone") && (
               <form onSubmit={handlePhoneSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="sms-phone">מספר טלפון</Label>
+                  <Label htmlFor="sms-phone">כניסה עם קוד SMS</Label>
                   <Input
                     id="sms-phone"
                     type="tel"
@@ -236,23 +186,12 @@ function LoginForm() {
                     onChange={(e) => setPhone(e.target.value)}
                     required
                     dir="ltr"
-                    autoFocus
                   />
                 </div>
                 {smsError && <p className="text-sm text-destructive">{smsError}</p>}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => { setSmsStep("idle"); setPhone(""); setSmsError(null); }}
-                  >
-                    ביטול
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={smsSending}>
-                    {smsSending ? "שולח..." : "שלח קוד"}
-                  </Button>
-                </div>
+                <Button type="submit" className="w-full" disabled={smsSending}>
+                  {smsSending ? "שולח..." : "שלח קוד"}
+                </Button>
               </form>
             )}
 
@@ -292,6 +231,46 @@ function LoginForm() {
                 </div>
               </form>
             )}
+
+            <div className="flex items-center gap-3">
+              <Separator className="flex-1" />
+              <span className="text-sm text-muted-foreground">או</span>
+              <Separator className="flex-1" />
+            </div>
+
+            {/* Google */}
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={() => signIn("google", { callbackUrl })}
+            >
+              {t("signInWithGoogle")}
+            </Button>
+
+            <div className="flex items-center gap-3">
+              <Separator className="flex-1" />
+              <span className="text-sm text-muted-foreground">או</span>
+              <Separator className="flex-1" />
+            </div>
+
+            {/* Magic link */}
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">{t("signInWithEmail")}</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder={t("emailPlaceholder")}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  dir="ltr"
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={sending}>
+                {sending ? "שולח..." : t("sendMagicLink")}
+              </Button>
+            </form>
           </div>
         )}
       </div>
