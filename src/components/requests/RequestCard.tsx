@@ -23,6 +23,7 @@ export interface RequestSummary {
   squadId: string;
   squadName: string;
   platoonId: string;
+  platoonName?: string;
   createdAt: string;
   description: string | null;
   urgent: boolean | null;

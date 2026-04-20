@@ -48,10 +48,12 @@ const REQUESTS_QUERY = `
     s.family_name || ' ' || s.given_name AS soldier_name,
     s.squad_id,
     sq.name AS squad_name,
-    sq.platoon_id
+    sq.platoon_id,
+    p.name AS platoon_name
   FROM requests r
   JOIN soldiers s ON s.id = r.soldier_id
   JOIN squads sq ON sq.id = s.squad_id
+  JOIN platoons p ON p.id = sq.platoon_id
   WHERE r.cycle_id = ?
   ORDER BY r.created_at DESC
 `;
@@ -72,6 +74,7 @@ interface RawRequest {
   squad_id: string;
   squad_name: string;
   platoon_id: string;
+  platoon_name: string;
 }
 
 function mapRequest(raw: RawRequest): RequestSummary {
@@ -84,6 +87,7 @@ function mapRequest(raw: RawRequest): RequestSummary {
     squadId: raw.squad_id,
     squadName: raw.squad_name,
     platoonId: raw.platoon_id,
+    platoonName: raw.platoon_name,
     createdAt: raw.created_at,
     description: raw.description,
     urgent: raw.urgent != null ? Boolean(raw.urgent) : null,
@@ -160,6 +164,16 @@ function formatGroupDate(dateKey: string): string {
   return d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
 }
 
+function groupByPlatoon(requests: RequestSummary[]): { platoonName: string; requests: RequestSummary[] }[] {
+  const map = new Map<string, { platoonName: string; requests: RequestSummary[] }>();
+  for (const r of requests) {
+    const key = r.platoonId;
+    if (!map.has(key)) map.set(key, { platoonName: r.platoonName ?? "", requests: [] });
+    map.get(key)!.requests.push(r);
+  }
+  return [...map.values()];
+}
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
@@ -179,6 +193,7 @@ export default function RequestsPage() {
   const rawRole = (selectedAssignment?.role ?? "") as Role | "";
   const role = rawRole ? effectiveRole(rawRole) : "";
   const canCreate = role === "squad_commander" || role === "platoon_commander" || rawRole === "company_medic" || rawRole === "hardship_coordinator";
+  const isCompanyScope = role === "company_commander" || rawRole === "company_medic" || rawRole === "hardship_coordinator";
 
   // -------- Sticky header offsets --------
   // AppShell publishes --app-header-height as a CSS variable.
@@ -524,7 +539,23 @@ export default function RequestsPage() {
                 )}
               </div>
             )}
-            {sortedOpen.length > 0 && (
+            {sortedOpen.length > 0 && isCompanyScope && (
+              <div>
+                {groupByPlatoon(sortedOpen).map((g) => (
+                  <div key={g.platoonName}>
+                    <div className="sticky z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground" style={{ top: `calc(var(--app-header-height, 0px) + ${pageHeaderH}px)` }}>
+                      {g.platoonName}
+                    </div>
+                    <div className="divide-y divide-border">
+                      {g.requests.map((r, i) => (
+                        <RequestCard key={r.id} request={r} userRole={rawRole as Role} onClick={() => router.push(`/requests/${r.id}`)} onLongPress={(pos) => handleLongPress(r, pos)} dataTour={i === 0 ? "requests-card" : undefined} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {sortedOpen.length > 0 && !isCompanyScope && (
               <div className="divide-y divide-border">
                 {sortedOpen.map((r, i) => (
                   <RequestCard
@@ -549,7 +580,23 @@ export default function RequestsPage() {
                 <p className="font-medium">אין בקשות הדורשות טיפולך</p>
               </div>
             )}
-            {mineRequests.length > 0 && (
+            {mineRequests.length > 0 && isCompanyScope && (
+              <div>
+                {groupByPlatoon(mineRequests).map((g) => (
+                  <div key={g.platoonName}>
+                    <div className="sticky z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground" style={{ top: `calc(var(--app-header-height, 0px) + ${pageHeaderH}px)` }}>
+                      {g.platoonName}
+                    </div>
+                    <div className="divide-y divide-border">
+                      {g.requests.map((r) => (
+                        <RequestCard key={r.id} request={r} userRole={rawRole as Role} onClick={() => router.push(`/requests/${r.id}`)} onLongPress={(pos) => handleLongPress(r, pos)} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {mineRequests.length > 0 && !isCompanyScope && (
               <div className="divide-y divide-border">
                 {mineRequests.map((r) => (
                   <RequestCard
@@ -573,7 +620,23 @@ export default function RequestsPage() {
                 <p className="font-medium">אין בקשות שאושרו</p>
               </div>
             )}
-            {approvedRequests.length > 0 && (
+            {approvedRequests.length > 0 && isCompanyScope && (
+              <div>
+                {groupByPlatoon(approvedRequests).map((g) => (
+                  <div key={g.platoonName}>
+                    <div className="sticky z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground" style={{ top: `calc(var(--app-header-height, 0px) + ${pageHeaderH}px)` }}>
+                      {g.platoonName}
+                    </div>
+                    <div className="divide-y divide-border">
+                      {g.requests.map((r) => (
+                        <RequestCard key={r.id} request={r} userRole={rawRole as Role} onClick={() => router.push(`/requests/${r.id}`)} onLongPress={(pos) => handleLongPress(r, pos)} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {approvedRequests.length > 0 && !isCompanyScope && (
               <div className="divide-y divide-border">
                 {approvedRequests.map((r) => (
                   <RequestCard

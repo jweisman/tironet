@@ -401,7 +401,7 @@ export default function RequestDetailPage() {
             <div>
               <h1 className="text-lg font-bold">{REQUEST_TYPE_LABELS[requestType]}</h1>
               <p className="text-sm text-muted-foreground">
-                {raw.soldier_family_name} {raw.soldier_given_name} · {raw.squad_name}
+                {raw.soldier_family_name} {raw.soldier_given_name} · {raw.platoon_name} / {raw.squad_name}
               </p>
               {(raw.soldier_id_number || raw.soldier_civilian_id) && (
                 <p className="text-xs text-muted-foreground">
