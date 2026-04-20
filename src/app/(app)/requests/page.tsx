@@ -35,7 +35,7 @@ import { isRequestActive } from "@/lib/requests/active";
 // Types
 // ---------------------------------------------------------------------------
 
-type ViewTab = "open" | "active" | "mine";
+type ViewTab = "open" | "active" | "approved" | "mine";
 
 // ---------------------------------------------------------------------------
 // SQL queries (PowerSync local SQLite)
@@ -250,6 +250,14 @@ export default function RequestsPage() {
     [allRequests, filterType, today],
   );
 
+  const approvedRequests = useMemo(
+    () =>
+      allRequests
+        .filter((r) => r.status === "approved" && (filterType === "all" || r.type === filterType))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [allRequests, filterType],
+  );
+
   // Sort open: assigned to me first
   const sortedOpen = useMemo(() => {
     if (!rawRole) return openRequests;
@@ -420,6 +428,20 @@ export default function RequestsPage() {
             {activeRequests.length > 0 && <span className="mr-1">({activeRequests.length})</span>}
           </button>
 
+          <button
+            type="button"
+            onClick={() => setViewTab("approved")}
+            className={cn(
+              "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              viewTab === "approved"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+          >
+            אושרו
+            {approvedRequests.length > 0 && <span className="mr-1">({approvedRequests.length})</span>}
+          </button>
+
           {role && !isTypeRestricted && (
             <button
               data-tour="requests-tab-mine"
@@ -544,6 +566,29 @@ export default function RequestsPage() {
         )}
 
         {/* Active requests */}
+        {viewTab === "approved" && (
+          <>
+            {approvedRequests.length === 0 && !showLoading && (
+              <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
+                <p className="font-medium">אין בקשות שאושרו</p>
+              </div>
+            )}
+            {approvedRequests.length > 0 && (
+              <div className="divide-y divide-border">
+                {approvedRequests.map((r) => (
+                  <RequestCard
+                    key={r.id}
+                    request={r}
+                    userRole={rawRole as Role}
+                    onClick={() => router.push(`/requests/${r.id}`)}
+                    onLongPress={(pos) => handleLongPress(r, pos)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
         {viewTab === "active" && (
           <>
             {activeRequests.length === 0 && !showLoading && (

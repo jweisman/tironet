@@ -13,6 +13,7 @@ import { useSyncReady } from "@/hooks/useSyncReady";
 import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { requestDetailTourSteps } from "@/lib/tour/steps";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -206,6 +207,11 @@ export default function RequestDetailPage() {
   // Appointment editing
   const [editingAppointments, setEditingAppointments] = useState(false);
   const [editAppointmentsList, setEditAppointmentsList] = useState<MedicalAppointment[]>([]);
+
+  // Field editing (description, specialConditions)
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [editDescriptionText, setEditDescriptionText] = useState("");
+  const [editingSpecialConditions, setEditingSpecialConditions] = useState(false);
 
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!raw, requestLoading);
 
@@ -447,12 +453,45 @@ export default function RequestDetailPage() {
       <div data-tour="request-details" className="rounded-xl border border-border bg-card p-4 space-y-1">
         <h2 className="text-sm font-semibold text-muted-foreground mb-2">פרטי הבקשה</h2>
 
-        {raw.description && (
-          <div className="py-2 border-b border-border">
-            <p className="text-sm text-muted-foreground mb-1">תיאור</p>
-            <p className="text-sm whitespace-pre-wrap">{raw.description}</p>
+        <div className="py-2 border-b border-border">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm text-muted-foreground">תיאור</p>
+            {canEditFields && !editingDescription && (
+              <button
+                type="button"
+                onClick={() => { setEditDescriptionText(raw.description ?? ""); setEditingDescription(true); }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Pencil size={12} />
+              </button>
+            )}
           </div>
-        )}
+          {editingDescription ? (
+            <div className="space-y-2">
+              <textarea
+                value={editDescriptionText}
+                onChange={(e) => setEditDescriptionText(e.target.value)}
+                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                rows={3}
+              />
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setEditingDescription(false)} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const val = editDescriptionText.trim() || null;
+                    await db.execute("UPDATE requests SET description = ?, updated_at = ? WHERE id = ?", [val, new Date().toISOString(), raw.id]);
+                    toast.success("תיאור עודכן");
+                    setEditingDescription(false);
+                  }}
+                  className="text-primary hover:text-primary/80"
+                ><Check size={16} /></button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm whitespace-pre-wrap">{raw.description || "—"}</p>
+          )}
+        </div>
 
         <DetailRow label="מחלקה" value={raw.platoon_name} />
         <DetailRow
@@ -630,12 +669,24 @@ export default function RequestDetailPage() {
 
         {/* Hardship-specific */}
         {requestType === "hardship" && (
-          <>
-            <DetailRow
-              label="אוכלוסיות מיוחדות"
-              value={raw.special_conditions ? "כן" : "לא"}
-            />
-          </>
+          <div className="py-2 border-b border-border flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">אוכלוסיות מיוחדות</p>
+            {canEditFields ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  const newVal = raw.special_conditions ? 0 : 1;
+                  await db.execute("UPDATE requests SET special_conditions = ?, updated_at = ? WHERE id = ?", [newVal, new Date().toISOString(), raw.id]);
+                  toast.success(newVal ? "סומן כאוכלוסיות מיוחדות" : "הוסר סימון אוכלוסיות מיוחדות");
+                }}
+                className={cn("text-sm font-medium px-2 py-0.5 rounded", raw.special_conditions ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground")}
+              >
+                {raw.special_conditions ? "כן" : "לא"}
+              </button>
+            ) : (
+              <p className="text-sm">{raw.special_conditions ? "כן" : "לא"}</p>
+            )}
+          </div>
         )}
       </div>
 

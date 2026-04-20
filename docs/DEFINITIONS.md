@@ -15,12 +15,20 @@ This document summarizes the up-to-date definitions for terms used throughout th
   * medical requests with any appointment date in the future
 * _Approved (אושרה)_: Status is approved (terminal — workflow is complete)
 * _Open (פתוחות)_: In progress or active
-* _Hardship (ת״ש)_: Approved hardship requests are tracked separately from active requests (no date criteria). Shown on the soldiers page via a dedicated filter pill with urgent overlay when `specialConditions` or `urgent` is set.
 * _Action Required ("Mine")_: Requests where `assignedRole` matches the user's role. Includes denied requests pending acknowledgement.
 * _All_: All requests regardless of status, including denied and fully completed
 * _Urgent_: When request is open (active or in progress)
   * Medical - `urgent` flag
   * Hardship - `specialConditions` flag OR `urgent` flag
+
+### Hardship (ת״ש)
+Approved hardship requests are tracked separately from active requests (no date criteria). Shown on the soldiers page via a dedicated filter pill with urgent overlay when `specialConditions` or `urgent` is set.  
+
+### Edit permissions
+* Any assigned role
+  * Medical requests  can be edited by platoon commanders regardless of assignment
+* Hardship coordinators, company medic can edit their requests types always
+
 
 ## Roles
 * _Squad commander_:
