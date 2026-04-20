@@ -411,7 +411,7 @@ export default function RequestsPage() {
     <div className="-mx-4 -my-6">
       {/* Sticky header */}
       <div ref={headerRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: "var(--app-header-height, 0px)" }}>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {/* View tabs */}
           <button
             data-tour="requests-tab-open"
@@ -443,20 +443,6 @@ export default function RequestsPage() {
             {activeRequests.length > 0 && <span className="mr-1">({activeRequests.length})</span>}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setViewTab("approved")}
-            className={cn(
-              "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-              viewTab === "approved"
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:text-foreground",
-            )}
-          >
-            אושרו
-            {approvedRequests.length > 0 && <span className="mr-1">({approvedRequests.length})</span>}
-          </button>
-
           {role && !isTypeRestricted && (
             <button
               data-tour="requests-tab-mine"
@@ -474,6 +460,20 @@ export default function RequestsPage() {
               {mineRequests.length > 0 && <span className="mr-1">({mineRequests.length})</span>}
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setViewTab("approved")}
+            className={cn(
+              "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              viewTab === "approved"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+          >
+            אושרו
+            {approvedRequests.length > 0 && <span className="mr-1">({approvedRequests.length})</span>}
+          </button>
 
           {canCreate && (
             <button
