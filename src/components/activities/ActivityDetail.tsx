@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePowerSync } from "@powersync/react";
 import { toast } from "sonner";
+import { Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -478,6 +479,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             <h1 className="text-lg font-bold leading-tight">{data.name}</h1>
             <div className="text-sm text-muted-foreground mt-0.5">
               {data.activityType.name} · {formatDate(data.date)}
+              {data.isRequired && <Badge variant="secondary" className="ms-2 text-[10px] px-1.5 py-0">חובה</Badge>}
             </div>
             <div className="text-xs text-muted-foreground">
               {data.platoon.companyName} / {data.platoon.name}
@@ -485,19 +487,30 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {data.isRequired && (
-            <Badge variant="secondary">חובה</Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          {gapsCount > 0 && (
+            <button
+              data-tour="activity-gaps-filter"
+              type="button"
+              onClick={() => setShowGapsOnly((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                showGapsOnly
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                  : "bg-muted text-muted-foreground hover:bg-amber-100 hover:text-amber-800"
+              }`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${showGapsOnly ? "bg-amber-500" : "bg-muted-foreground"}`} />
+              פערים ({gapsCount})
+            </button>
           )}
           <div className="flex-1" />
-
-          <div className="flex items-center gap-2 flex-wrap justify-end">
             {data.canEditMetadata && (
               <>
                 <Button
                   data-tour="activity-edit-meta"
-                  size="sm"
+                  size="icon"
                   variant="outline"
+                  className="h-8 w-8"
                   onClick={() => {
                     setMetaName(data.name);
                     setMetaDate(data.date.split("T")[0]);
@@ -505,16 +518,18 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                     setMetaIsRequired(data.isRequired);
                     setEditingMetadata(true);
                   }}
+                  aria-label="ערוך פרטים"
                 >
-                  ערוך פרטים
+                  <Pencil size={14} />
                 </Button>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="outline"
-                  className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                  className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
                   onClick={() => setConfirmDelete(true)}
+                  aria-label="מחק"
                 >
-                  מחק
+                  <Trash2 size={14} />
                 </Button>
               </>
             )}
@@ -539,24 +554,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 </Button>
               </>
             )}
-          </div>
         </div>
-
-        {gapsCount > 0 && (
-          <button
-            data-tour="activity-gaps-filter"
-            type="button"
-            onClick={() => setShowGapsOnly((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              showGapsOnly
-                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                : "bg-muted text-muted-foreground hover:bg-amber-100 hover:text-amber-800"
-            }`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${showGapsOnly ? "bg-amber-500" : "bg-muted-foreground"}`} />
-            פערים ({gapsCount})
-          </button>
-        )}
 
         {saveError && (
           <p className="text-xs text-destructive">{saveError}</p>
