@@ -226,47 +226,60 @@ function GapSection({ gap }: { gap: GapActivityItem }) {
 // Platoon section
 // ---------------------------------------------------------------------------
 
-function PlatoonSection({ platoon, multiPlatoon }: { platoon: PlatoonForumSection; multiPlatoon: boolean }) {
-  const totalOpen = platoon.openRequests.medical.length + platoon.openRequests.hardship.length + platoon.openRequests.leave.length;
-  const totalActive = platoon.activeRequests.medical.length + platoon.activeRequests.leave.length;
+// ---------------------------------------------------------------------------
+// Topic-first rendering helpers
+// ---------------------------------------------------------------------------
+
+function PlatoonLabel({ platoon }: { platoon: PlatoonForumSection }) {
+  return (
+    <div className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-1 mt-2">
+      {platoon.companyName} — {platoon.platoonName}
+    </div>
+  );
+}
+
+function ForumContent({ data }: { data: DailyForumData }) {
+  const platoons = data.platoons;
+  const multi = platoons.length > 1;
+  const totalOpen = platoons.reduce((s, p) => s + p.openRequests.medical.length + p.openRequests.hardship.length + p.openRequests.leave.length, 0);
+  const totalActive = platoons.reduce((s, p) => s + p.activeRequests.medical.length + p.activeRequests.leave.length, 0);
 
   return (
-    <div className="mb-8">
-      {multiPlatoon && (
-        <div className="bg-foreground text-background px-3 py-2 rounded-lg mb-4 font-bold text-sm">
-          {platoon.companyName} — {platoon.platoonName}
+    <>
+      {/* בקשות */}
+      <div className="mb-6">
+        <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
+          בקשות
+        </h2>
+
+        <div className="mb-5">
+          <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
+            ממתינות ({totalOpen})
+          </h3>
+          {totalOpen === 0 ? (
+            <p className="text-xs text-muted-foreground">אין בקשות ממתינות</p>
+          ) : (
+            <>
+              <RequestTypePlatoons title="רפואה" platoons={platoons} getRequests={(p) => p.openRequests.medical} multi={multi} />
+              <RequestTypePlatoons title='ת"ש' platoons={platoons} getRequests={(p) => p.openRequests.hardship} multi={multi} />
+              <RequestTypePlatoons title="יציאה" platoons={platoons} getRequests={(p) => p.openRequests.leave} multi={multi} />
+            </>
+          )}
         </div>
-      )}
 
-      {/* Open requests */}
-      <div className="mb-6">
-        <h2 className="text-sm font-bold border-b border-border pb-1 mb-3">
-          בקשות ממתינות ({totalOpen})
-        </h2>
-        {totalOpen === 0 ? (
-          <p className="text-xs text-muted-foreground">אין בקשות ממתינות</p>
-        ) : (
-          <>
-            <RequestTypeSection title="רפואה" requests={platoon.openRequests.medical} />
-            <RequestTypeSection title='ת"ש' requests={platoon.openRequests.hardship} />
-            <RequestTypeSection title="יציאה" requests={platoon.openRequests.leave} />
-          </>
-        )}
-      </div>
-
-      {/* Active requests */}
-      <div className="mb-6">
-        <h2 className="text-sm font-bold border-b border-border pb-1 mb-3">
-          בקשות פעילות ({totalActive})
-        </h2>
-        {totalActive === 0 ? (
-          <p className="text-xs text-muted-foreground">אין בקשות פעילות</p>
-        ) : (
-          <>
-            <RequestTypeSection title="רפואה" requests={platoon.activeRequests.medical} highlightDates />
-            <RequestTypeSection title="יציאה" requests={platoon.activeRequests.leave} highlightDates />
-          </>
-        )}
+        <div className="mb-5">
+          <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
+            פעילות ({totalActive})
+          </h3>
+          {totalActive === 0 ? (
+            <p className="text-xs text-muted-foreground">אין בקשות פעילות</p>
+          ) : (
+            <>
+              <RequestTypePlatoons title="רפואה" platoons={platoons} getRequests={(p) => p.activeRequests.medical} multi={multi} highlightDates />
+              <RequestTypePlatoons title="יציאה" platoons={platoons} getRequests={(p) => p.activeRequests.leave} multi={multi} highlightDates />
+            </>
+          )}
+        </div>
       </div>
 
       {/* הספקים */}
@@ -275,54 +288,68 @@ function PlatoonSection({ platoon, multiPlatoon }: { platoon: PlatoonForumSectio
           הספקים
         </h2>
 
-        {/* Today's activities */}
         <div className="mb-5">
           <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
             פעילויות היום
           </h3>
-          {platoon.todayActivities.length === 0 ? (
+          {platoons.every((p) => p.todayActivities.length === 0) ? (
             <p className="text-xs text-muted-foreground">אין פעילויות להיום</p>
           ) : (
-            platoon.todayActivities.map((a) => (
-              <TodayActivitySection key={a.id} activity={a} />
-            ))
+            platoons.map((p) => {
+              if (p.todayActivities.length === 0) return null;
+              return (
+                <div key={p.platoonId}>
+                  {multi && <PlatoonLabel platoon={p} />}
+                  {p.todayActivities.map((a) => (
+                    <TodayActivitySection key={a.id} activity={a} />
+                  ))}
+                </div>
+              );
+            })
           )}
         </div>
 
-        {/* Tomorrow's activities */}
         <div>
           <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
             פעילויות מחר
           </h3>
-          {platoon.tomorrowActivities.length === 0 ? (
+          {platoons.every((p) => p.tomorrowActivities.length === 0) ? (
             <p className="text-xs text-muted-foreground">אין פעילויות למחר</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-border">
-                    <th className="text-start px-2 py-1.5 font-semibold">סוג</th>
-                    <th className="text-start px-2 py-1.5 font-semibold">שם</th>
-                    <th className="text-start px-2 py-1.5 font-semibold">חובה</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {platoon.tomorrowActivities.map((a) => (
-                    <tr key={a.id} className="border-b border-border">
-                      <td className="px-2 py-1.5">{a.activityTypeName}</td>
-                      <td className="px-2 py-1.5">{a.name}</td>
-                      <td className="px-2 py-1.5">
-                        {a.isRequired ? (
-                          <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">חובה</span>
-                        ) : (
-                          <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">רשות</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            platoons.map((p) => {
+              if (p.tomorrowActivities.length === 0) return null;
+              return (
+                <div key={p.platoonId}>
+                  {multi && <PlatoonLabel platoon={p} />}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b-2 border-border">
+                          <th className="text-start px-2 py-1.5 font-semibold">סוג</th>
+                          <th className="text-start px-2 py-1.5 font-semibold">שם</th>
+                          <th className="text-start px-2 py-1.5 font-semibold">חובה</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {p.tomorrowActivities.map((a) => (
+                          <tr key={a.id} className="border-b border-border">
+                            <td className="px-2 py-1.5">{a.activityTypeName}</td>
+                            <td className="px-2 py-1.5">{a.name}</td>
+                            <td className="px-2 py-1.5">
+                              {a.isRequired ? (
+                                <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">חובה</span>
+                              ) : (
+                                <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">רשות</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -336,13 +363,55 @@ function PlatoonSection({ platoon, multiPlatoon }: { platoon: PlatoonForumSectio
           <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
             פערים
           </h3>
-          {platoon.gaps.length === 0 ? (
+          {platoons.every((p) => p.gaps.length === 0) ? (
             <p className="text-xs text-muted-foreground">אין פערים</p>
           ) : (
-            platoon.gaps.map((g) => <GapSection key={g.id} gap={g} />)
+            platoons.map((p) => {
+              if (p.gaps.length === 0) return null;
+              return (
+                <div key={p.platoonId}>
+                  {multi && <PlatoonLabel platoon={p} />}
+                  {p.gaps.map((g) => <GapSection key={g.id} gap={g} />)}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
+    </>
+  );
+}
+
+/** Renders a request type across all platoons (topic → platoon grouping). */
+function RequestTypePlatoons({
+  title, platoons, getRequests, multi, highlightDates,
+}: {
+  title: string;
+  platoons: PlatoonForumSection[];
+  getRequests: (p: PlatoonForumSection) => OpenRequestItem[];
+  multi: boolean;
+  highlightDates?: boolean;
+}) {
+  const all = platoons.flatMap((p) => getRequests(p));
+  if (all.length === 0) return null;
+
+  return (
+    <div className="mb-3">
+      <div className="text-xs font-semibold bg-muted px-2 py-1 rounded mb-1">
+        {title} ({all.length})
+      </div>
+      {platoons.map((p) => {
+        const reqs = getRequests(p);
+        if (reqs.length === 0) return null;
+        return (
+          <div key={p.platoonId}>
+            {multi && <PlatoonLabel platoon={p} />}
+            {reqs.map((r) => (
+              <RequestCard key={r.id} req={r} highlightDates={highlightDates} />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -461,14 +530,9 @@ export default function DailyForumPage() {
           </div>
         )}
 
-        {!loading &&
-          data?.platoons.map((platoon) => (
-            <PlatoonSection
-              key={platoon.platoonId}
-              platoon={platoon}
-              multiPlatoon={data.platoons.length > 1}
-            />
-          ))}
+        {!loading && data && data.platoons.length > 0 && (
+          <ForumContent data={data} />
+        )}
       </div>
     </div>
   );

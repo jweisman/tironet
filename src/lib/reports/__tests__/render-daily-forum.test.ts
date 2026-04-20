@@ -418,25 +418,29 @@ describe("renderDailyForumHtml", () => {
     expect(html).toContain('lang="he"');
   });
 
-  it("includes page-break CSS for multi-platoon data", () => {
+  it("includes platoon subheaders for multi-platoon data", () => {
     const multiPlatoonData = {
       ...emptyData,
       platoons: [
-        emptyData.platoons[0],
+        {
+          ...emptyData.platoons[0],
+          gaps: [{ id: "g1", name: "Activity 1", activityTypeName: "Type", date: "2026-04-20", soldiers: [{ name: "Soldier", result: "missing" as const }] }],
+        },
         {
           ...emptyData.platoons[0],
           platoonId: "p2",
           platoonName: "Platoon 2",
+          gaps: [{ id: "g2", name: "Activity 2", activityTypeName: "Type", date: "2026-04-20", soldiers: [{ name: "Soldier 2", result: "failed" as const }] }],
         },
       ],
     };
     const html = renderDailyForumHtml(multiPlatoonData);
-    expect(html).toContain("page-break-before: always");
+    expect(html).toContain('class="platoon-subheader"');
   });
 
-  it("does not include page-break for single platoon", () => {
+  it("does not include platoon subheaders for single platoon", () => {
     const html = renderDailyForumHtml(emptyData);
-    expect(html).not.toContain("page-break-before: always");
+    expect(html).not.toContain('class="platoon-subheader"');
   });
 
   it("renders gap soldier names", () => {

@@ -729,66 +729,95 @@ export function renderDailyForumHtml(data: DailyForumData): string {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 
-  const multiPlatoon = data.platoons.length > 1;
+  const multi = data.platoons.length > 1;
 
-  const platoonsHtml = data.platoons.map((platoon, i) => {
-    const pageBreak = multiPlatoon && i > 0 ? ' style="page-break-before: always;"' : "";
-    const totalOpen = platoon.openRequests.medical.length + platoon.openRequests.hardship.length + platoon.openRequests.leave.length;
+  function platoonHeader(p: PlatoonForumSection): string {
+    return multi ? `<div class="platoon-subheader">${escapeHtml(p.companyName)} — ${escapeHtml(p.platoonName)}</div>` : "";
+  }
 
-    const openHtml = totalOpen > 0
-      ? [
-          renderRequestTypeSection("רפואה", platoon.openRequests.medical),
-          renderRequestTypeSection('ת"ש', platoon.openRequests.hardship),
-          renderRequestTypeSection("יציאה", platoon.openRequests.leave),
-        ].join("\n")
-      : '<p class="no-data">אין בקשות ממתינות</p>';
+  function renderTypePlatoons(title: string, getReqs: (p: PlatoonForumSection) => OpenRequestItem[], options?: { highlightDates?: boolean }): string {
+    const all = data.platoons.flatMap(getReqs);
+    if (all.length === 0) return "";
+    const perPlatoon = data.platoons
+      .filter((p) => getReqs(p).length > 0)
+      .map((p) => `${platoonHeader(p)}${renderRequestTypeSection(title, getReqs(p), options)}`)
+      .join("\n");
+    return perPlatoon;
+  }
 
-    const totalActive = platoon.activeRequests.medical.length + platoon.activeRequests.leave.length;
+  const totalOpen = data.platoons.reduce((s, p) => s + p.openRequests.medical.length + p.openRequests.hardship.length + p.openRequests.leave.length, 0);
+  const openHtml = totalOpen > 0
+    ? [
+        renderTypePlatoons("רפואה", (p) => p.openRequests.medical),
+        renderTypePlatoons('ת"ש', (p) => p.openRequests.hardship),
+        renderTypePlatoons("יציאה", (p) => p.openRequests.leave),
+      ].join("\n")
+    : '<p class="no-data">אין בקשות ממתינות</p>';
 
-    const activeHtml = totalActive > 0
-      ? [
-          renderRequestTypeSection("רפואה", platoon.activeRequests.medical, { highlightDates: true }),
-          renderRequestTypeSection("יציאה", platoon.activeRequests.leave, { highlightDates: true }),
-        ].join("\n")
-      : '<p class="no-data">אין בקשות פעילות</p>';
+  const totalActive = data.platoons.reduce((s, p) => s + p.activeRequests.medical.length + p.activeRequests.leave.length, 0);
+  const activeHtml = totalActive > 0
+    ? [
+        renderTypePlatoons("רפואה", (p) => p.activeRequests.medical, { highlightDates: true }),
+        renderTypePlatoons("יציאה", (p) => p.activeRequests.leave, { highlightDates: true }),
+      ].join("\n")
+    : '<p class="no-data">אין בקשות פעילות</p>';
 
-    return `
-      <div class="platoon-section"${pageBreak}>
-        ${multiPlatoon ? `<div class="platoon-header">${escapeHtml(platoon.companyName)} — ${escapeHtml(platoon.platoonName)}</div>` : ""}
+  const todayHtml = data.platoons.every((p) => p.todayActivities.length === 0)
+    ? '<p class="no-data">אין פעילויות להיום</p>'
+    : data.platoons
+        .filter((p) => p.todayActivities.length > 0)
+        .map((p) => `${platoonHeader(p)}${renderTodayActivitiesHtml(p.todayActivities)}`)
+        .join("\n");
 
-        <div class="section-block">
-          <h2 class="section-title">בקשות ממתינות (${totalOpen})</h2>
-          ${openHtml}
-        </div>
+  const tomorrowHtml = data.platoons.every((p) => p.tomorrowActivities.length === 0)
+    ? '<p class="no-data">אין פעילויות למחר</p>'
+    : data.platoons
+        .filter((p) => p.tomorrowActivities.length > 0)
+        .map((p) => `${platoonHeader(p)}${renderTomorrowActivitiesHtml(p.tomorrowActivities)}`)
+        .join("\n");
 
-        <div class="section-block">
-          <h2 class="section-title">בקשות פעילות (${totalActive})</h2>
-          ${activeHtml}
-        </div>
+  const gapsHtml = data.platoons.every((p) => p.gaps.length === 0)
+    ? '<p class="no-data">אין פערים</p>'
+    : data.platoons
+        .filter((p) => p.gaps.length > 0)
+        .map((p) => `${platoonHeader(p)}${renderGapsHtml(p.gaps)}`)
+        .join("\n");
 
-        <div class="group-block">
-          <h2 class="group-title">הספקים</h2>
-          <div class="section-block">
-            <h3 class="section-title">פעילויות היום — ${escapeHtml(dateDisplay)}</h3>
-            ${renderTodayActivitiesHtml(platoon.todayActivities)}
-          </div>
-
-          <div class="section-block">
-            <h3 class="section-title">פעילויות מחר — ${escapeHtml(tomorrowDisplay)}</h3>
-            ${renderTomorrowActivitiesHtml(platoon.tomorrowActivities)}
-          </div>
-        </div>
-
-        <div class="group-block">
-          <h2 class="group-title">תכנון מול ביצוע</h2>
-          <div class="section-block">
-            <h3 class="section-title">פערים</h3>
-            ${renderGapsHtml(platoon.gaps)}
-          </div>
-        </div>
+  const platoonsHtml = `
+    <div class="group-block">
+      <h2 class="group-title">בקשות</h2>
+      <div class="section-block">
+        <h3 class="section-title">ממתינות (${totalOpen})</h3>
+        ${openHtml}
       </div>
-    `;
-  }).join("\n");
+
+      <div class="section-block">
+        <h3 class="section-title">פעילות (${totalActive})</h3>
+        ${activeHtml}
+      </div>
+    </div>
+
+    <div class="group-block">
+      <h2 class="group-title">הספקים</h2>
+      <div class="section-block">
+        <h3 class="section-title">פעילויות היום — ${escapeHtml(dateDisplay)}</h3>
+        ${todayHtml}
+      </div>
+
+      <div class="section-block">
+        <h3 class="section-title">פעילויות מחר — ${escapeHtml(tomorrowDisplay)}</h3>
+        ${tomorrowHtml}
+      </div>
+    </div>
+
+    <div class="group-block">
+      <h2 class="group-title">תכנון מול ביצוע</h2>
+      <div class="section-block">
+        <h3 class="section-title">פערים</h3>
+        ${gapsHtml}
+      </div>
+    </div>
+  `;
 
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -824,6 +853,14 @@ export function renderDailyForumHtml(data: DailyForumData): string {
       margin-bottom: 16px;
     }
     .platoon-section { margin-bottom: 32px; }
+    .platoon-subheader {
+      font-size: 11px;
+      font-weight: 600;
+      background: #f5f5f5;
+      padding: 3px 8px;
+      margin: 8px 0 4px 0;
+      border-right: 3px solid #666;
+    }
     .group-block { margin-bottom: 28px; }
     .group-title {
       font-size: 15px;
