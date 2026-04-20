@@ -330,10 +330,10 @@ export default function SoldierDetailPage() {
       <button
         type="button"
         onClick={() => router.push("/soldiers")}
-        className="flex items-center gap-1.5 text-sm text-foreground/70 hover:text-foreground transition-colors"
+        className="flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground hover:bg-muted rounded-md px-1.5 py-0.5 -ms-1.5 transition-colors"
       >
-        <ArrowRight size={16} />
-        <span>חזרה</span>
+        <ArrowRight size={18} />
+        <span>חזרה לחיילים</span>
       </button>
 
       {/* Header card */}

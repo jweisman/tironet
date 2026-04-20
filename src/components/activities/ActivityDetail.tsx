@@ -466,7 +466,8 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   return (
     <div className="-mx-4 -my-6">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-border space-y-3">
+      <div className="px-4 pt-4 pb-3 space-y-3">
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <div data-tour="activity-header" className="flex items-start gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-base font-bold text-muted-foreground">
             <ActivityTypeIcon
@@ -485,6 +486,35 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
               {data.platoon.companyName} / {data.platoon.name}
             </div>
           </div>
+          {data.canEditMetadata && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                data-tour="activity-edit-meta"
+                size="icon"
+                variant="outline"
+                className="h-8 w-8"
+                onClick={() => {
+                  setMetaName(data.name);
+                  setMetaDate(data.date.split("T")[0]);
+                  setMetaActivityTypeId(data.activityType.id);
+                  setMetaIsRequired(data.isRequired);
+                  setEditingMetadata(true);
+                }}
+                aria-label="ערוך פרטים"
+              >
+                <Pencil size={14} />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setConfirmDelete(true)}
+                aria-label="מחק"
+              >
+                <Trash2 size={14} />
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -504,36 +534,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             </button>
           )}
           <div className="flex-1" />
-            {data.canEditMetadata && (
-              <>
-                <Button
-                  data-tour="activity-edit-meta"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  onClick={() => {
-                    setMetaName(data.name);
-                    setMetaDate(data.date.split("T")[0]);
-                    setMetaActivityTypeId(data.activityType.id);
-                    setMetaIsRequired(data.isRequired);
-                    setEditingMetadata(true);
-                  }}
-                  aria-label="ערוך פרטים"
-                >
-                  <Pencil size={14} />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
-                  onClick={() => setConfirmDelete(true)}
-                  aria-label="מחק"
-                >
-                  <Trash2 size={14} />
-                </Button>
-              </>
-            )}
-
             {data.canEditReports && (
               <>
                 <Button
@@ -559,6 +559,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         {saveError && (
           <p className="text-xs text-destructive">{saveError}</p>
         )}
+      </div>
       </div>
 
       {/* Bulk update bar */}

@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, WifiOff } from "lucide-react";
+import { ArrowRight, WifiOff } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
@@ -220,12 +220,12 @@ export default function ActivityPage() {
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-2">
         <Link
           href="/activities"
-          className="inline-flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground hover:bg-muted rounded-md px-1.5 py-0.5 -ms-1.5 transition-colors"
         >
-          <ChevronRight size={16} />
+          <ArrowRight size={18} />
           חזרה לפעילויות
         </Link>
       </div>
