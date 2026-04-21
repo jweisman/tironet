@@ -83,10 +83,11 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
 
   if (isCorrupt) {
     state = "error";
-  } else if (!graceOver) {
-    // During the 5s grace period, show initializing (grey) if no data yet,
-    // or synced (green) if cached data exists — never yellow/stale during
-    // startup while PowerSync is still establishing its WebSocket.
+  } else if (!graceOver && !connected) {
+    // During the grace period, if PowerSync hasn't connected yet,
+    // show initializing (grey) or synced (green) based on cached data —
+    // never yellow/stale during startup while the WebSocket is establishing.
+    // Once connected, skip the grace and show the real state immediately.
     state = hasSynced ? "synced" : "initializing";
   } else if (debouncedConnected && downloading) {
     state = "syncing";
