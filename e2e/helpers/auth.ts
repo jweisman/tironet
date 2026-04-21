@@ -22,9 +22,12 @@ export async function loginAndSaveState(
   // Navigate to login
   await page.goto("/login");
 
-  // Fill in the email field and submit the magic link form
-  await page.fill('input#email', email);
-  await page.click('form button[type="submit"]');
+  // Fill in the email field and submit the magic link form.
+  // The login page has multiple forms (SMS, Google, email) — scope to the
+  // form that contains the email input so we click the right submit button.
+  const emailInput = page.locator('input#email');
+  await emailInput.fill(email);
+  await emailInput.locator('xpath=ancestor::form').locator('button[type="submit"]').click();
 
   // Fetch the verification email from Mailhog (retries internally until delivery)
   const message = await getLatestEmail(email);

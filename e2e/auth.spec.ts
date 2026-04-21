@@ -12,8 +12,8 @@ test.describe("Authentication", () => {
     // Email magic link form
     await expect(page.locator("input#email")).toBeVisible();
 
-    // SMS OTP button
-    await expect(page.getByRole("button", { name: /SMS/ })).toBeVisible();
+    // SMS OTP form
+    await expect(page.locator("input#sms-phone")).toBeVisible();
   });
 
   test("unauthenticated user visiting /home is redirected to /login", async ({
@@ -34,9 +34,10 @@ test.describe("Authentication", () => {
     await clearMailhog();
     await page.goto("/login");
 
-    // Enter email and submit
-    await page.fill("input#email", EMAILS.admin);
-    await page.click('form button[type="submit"]');
+    // Enter email and submit (scope to the email form — multiple forms on page)
+    const emailInput = page.locator("input#email");
+    await emailInput.fill(EMAILS.admin);
+    await emailInput.locator("xpath=ancestor::form").locator('button[type="submit"]').click();
 
     // Should show "check your email" confirmation — actual translated text
     await expect(page.getByText("בדוק את תיבת הדואר שלך")).toBeVisible({
