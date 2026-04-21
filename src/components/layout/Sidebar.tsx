@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Users, Activity, Settings, LogOut, UserCog, FileText, BarChart3, HelpCircle, LifeBuoy } from "lucide-react";
+import { SyncStatusDot } from "./SyncStatusDot";
 import { useTranslations } from "next-intl";
 import { signOutAndClearCaches } from "@/lib/auth/sign-out";
 import { useSession } from "next-auth/react";
@@ -162,6 +163,9 @@ export function Sidebar() {
             >
               <HelpCircle size={16} />
             </button>
+            <Link href="/support" aria-hidden="true" tabIndex={-1} className="p-1">
+              <SyncStatusDot size={7} />
+            </Link>
             <Link
               href="/support"
               className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

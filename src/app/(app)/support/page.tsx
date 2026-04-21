@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Send, CheckCircle, Loader2, RefreshCw } from "lucide-react";
 import { clearLocalDatabase } from "@/lib/powersync/clear-local-db";
+import { useSyncStatus, type SyncState } from "@/hooks/useSyncStatus";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { usePowerSync } from "@powersync/react";
@@ -416,66 +417,129 @@ export default function SupportPage() {
         הדיווח כולל מידע טכני על המכשיר, הדפדפן, ומצב הסנכרון — ללא מידע אישי על חיילים.
       </p>
 
-      <ClearAndResyncSection />
+      <SyncStatusSection />
     </div>
   );
 }
 
-function ClearAndResyncSection() {
+const STATE_LABELS: Record<SyncState, { label: string; color: string }> = {
+  synced: { label: "מסונכרן", color: "text-emerald-600" },
+  syncing: { label: "מסנכרן...", color: "text-blue-600" },
+  stale: { label: "לא מחובר", color: "text-amber-600" },
+  error: { label: "שגיאה", color: "text-red-600" },
+  initializing: { label: "מאתחל...", color: "text-muted-foreground" },
+};
+
+function SyncStatusSection() {
+  const { state, lastSyncedAt } = useSyncStatus();
+  const { label, color } = STATE_LABELS[state];
+  const isError = state === "error";
+
   const [clearing, setClearing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [resetExpanded, setResetExpanded] = useState(false);
 
   const handleClear = useCallback(async () => {
     setClearing(true);
     await clearLocalDatabase();
   }, []);
 
+  const lastSyncLabel = lastSyncedAt
+    ? lastSyncedAt.toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })
+    : "לא סונכרן";
+
   return (
-    <div className="border-t pt-6 mt-6 space-y-2">
-      <h2 className="text-sm font-medium">איפוס נתונים מקומיים</h2>
-      <p className="text-xs text-muted-foreground">
-        אם הנתונים לא מתעדכנים או שיש תקלות חוזרות, ניתן לאפס את הנתונים המקומיים ולסנכרן מחדש. פעולה זו לא מוחקת נתונים מהשרת.
-      </p>
-      {!confirmOpen ? (
-        <Button
-          variant="outline"
-          onClick={() => setConfirmOpen(true)}
-          className="w-full"
-        >
-          <RefreshCw size={16} className="me-2" />
-          איפוס וסנכרון מחדש
-        </Button>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-xs text-amber-600 font-medium">
-            האפליקציה תיטען מחדש והנתונים יסונכרנו מהשרת. להמשיך?
+    <div className="border-t pt-6 mt-6 space-y-3">
+      <h2 className="text-sm font-medium">מצב סנכרון</h2>
+
+      <div className="rounded-lg border border-border p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">סטטוס</span>
+          <span className={`text-xs font-medium ${color}`}>{label}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">סנכרון אחרון</span>
+          <span className="text-xs">{lastSyncLabel}</span>
+        </div>
+      </div>
+
+      {/* Reset option — expanded by default on error, collapsible otherwise */}
+      {isError && !resetExpanded && (
+        <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3 space-y-2">
+          <p className="text-xs text-red-700 dark:text-red-400">
+            אותרה שגיאה בנתונים המקומיים. מומלץ לאפס ולסנכרן מחדש.
           </p>
-          <div className="flex gap-2">
+          {!confirmOpen ? (
             <Button
               variant="destructive"
-              onClick={handleClear}
-              disabled={clearing}
-              className="flex-1"
+              onClick={() => setConfirmOpen(true)}
+              className="w-full"
+              size="sm"
             >
-              {clearing ? (
-                <>
-                  <Loader2 size={16} className="animate-spin me-2" />
-                  מאפס...
-                </>
-              ) : (
-                "אישור"
-              )}
+              <RefreshCw size={14} className="me-2" />
+              איפוס וסנכרון מחדש
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmOpen(false)}
-              disabled={clearing}
-              className="flex-1"
-            >
-              ביטול
-            </Button>
-          </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-red-600 font-medium">
+                האפליקציה תיטען מחדש והנתונים יסונכרנו מהשרת. להמשיך?
+              </p>
+              <div className="flex gap-2">
+                <Button variant="destructive" onClick={handleClear} disabled={clearing} className="flex-1" size="sm">
+                  {clearing ? <><Loader2 size={14} className="animate-spin me-2" />מאפס...</> : "אישור"}
+                </Button>
+                <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={clearing} className="flex-1" size="sm">
+                  ביטול
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
+      )}
+
+      {!isError && (
+        <>
+          {!resetExpanded ? (
+            <button
+              type="button"
+              onClick={() => setResetExpanded(true)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              איפוס נתונים מקומיים...
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                אם הנתונים לא מתעדכנים או שיש תקלות חוזרות, ניתן לאפס את הנתונים המקומיים ולסנכרן מחדש. פעולה זו לא מוחקת נתונים מהשרת.
+              </p>
+              {!confirmOpen ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmOpen(true)}
+                  className="w-full"
+                  size="sm"
+                >
+                  <RefreshCw size={14} className="me-2" />
+                  איפוס וסנכרון מחדש
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-amber-600 font-medium">
+                    האפליקציה תיטען מחדש והנתונים יסונכרנו מהשרת. להמשיך?
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="destructive" onClick={handleClear} disabled={clearing} className="flex-1" size="sm">
+                      {clearing ? <><Loader2 size={14} className="animate-spin me-2" />מאפס...</> : "אישור"}
+                    </Button>
+                    <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={clearing} className="flex-1" size="sm">
+                      ביטול
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

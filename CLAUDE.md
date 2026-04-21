@@ -267,6 +267,30 @@ PowerSync retries `fetchCredentials()` rapidly when the sync stream drops. Witho
 
 **Do not** add PowerSync `status.connected` checks to the banner logic — this was tried previously and caused the banner to flash during hydration (#81) because PowerSync takes seconds to establish its WebSocket, during which `status.connected` is false even though the device is online. Page-level `useSyncReady()` handles the "can't load data" case separately.
 
+### Sync status indicator (#150)
+
+A colored dot next to the support icon (LifeBuoy) in both AppShell (mobile) and Sidebar (desktop) shows PowerSync sync health. Tapping the dot or the icon navigates to `/support` where a detailed sync status section shows the current state and last sync time.
+
+**States (`useSyncStatus` hook in `src/hooks/useSyncStatus.ts`):**
+
+| State | Color | Condition |
+|---|---|---|
+| `initializing` | Grey | Grace period (<5s after mount) with no cached data |
+| `synced` | Green | Connected and not downloading, OR during grace period with cached data |
+| `syncing` | Blue (pulse) | Connected and actively downloading |
+| `stale` | Yellow | Not connected after grace period (device online or offline) |
+| `error` | Red | `downloadError` contains "CORRUPT" (database corruption only) |
+
+**Debouncing — critical for avoiding false alarms:**
+- **5s mount grace:** PowerSync takes 1-3s to establish its WebSocket. Without the grace period, every app open would briefly show yellow. During grace, returning users (with `hasSynced: true`) see green; first-time users see grey.
+- **2s connected → disconnected debounce:** Brief WebSocket drops during reconnection don't flash yellow. Only disconnects lasting >2s are shown.
+
+**Error vs stale distinction:** Connection failures (server unreachable, network issues) are **stale** (yellow), not error. **Error** (red) is reserved for OPFS database corruption, which triggers the auto-recovery flow. This distinction is important — yellow means "check your connection", red means "data is broken and being reset".
+
+**SSR safety:** Uses `useSafeStatus()` (not `useStatus()`) and `navigator.onLine` directly (not `useOnlineStatus()` which internally calls the SSR-unsafe `useStatus()`). `SyncStatusDot` is a `"use client"` component.
+
+**Support page sync section:** `SyncStatusSection` on the support page shows status label + last synced time. When state is error (corruption), a red callout recommends reset. Otherwise, reset is collapsed behind a text link to reduce visual noise.
+
 ### NextAuth JWT maxAge
 
 The JWT `maxAge` is set to **1 day** (86400 seconds) so that `cycleAssignments` and PowerSync sync claims are refreshed from the database daily. The NextAuth default is 30 days, which means role changes (e.g. promotion to platoon commander) wouldn't take effect in the sync scope for up to a month.

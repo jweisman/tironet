@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { HelpCircle, LifeBuoy } from "lucide-react";
+import { SyncStatusDot } from "./SyncStatusDot";
 import Link from "next/link";
 import { TabBar } from "./TabBar";
 import { Sidebar } from "./Sidebar";
@@ -60,6 +61,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-lg font-bold">טירונט</span>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/support" aria-hidden="true" tabIndex={-1}>
+              <SyncStatusDot size={9} />
+            </Link>
             <Link
               href="/support"
               className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
