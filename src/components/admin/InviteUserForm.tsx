@@ -290,7 +290,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
       </div>
 
       <div className="space-y-1.5">
-        <Label>מחזור</Label>
+        <Label required>מחזור</Label>
         <Select value={cycleId} onValueChange={(v) => { setCycleId(v ?? ""); setUnitId(""); }}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="בחר מחזור">
@@ -306,7 +306,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
       </div>
 
       <div className="space-y-1.5">
-        <Label>תפקיד</Label>
+        <Label required>תפקיד</Label>
         <Select value={role} onValueChange={(v) => { setRole(v as Role); setUnitId(""); }}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="בחר תפקיד">
@@ -322,7 +322,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
       </div>
 
       <div className="space-y-1.5">
-        <Label>יחידה</Label>
+        <Label required>יחידה</Label>
         <Select value={unitId} onValueChange={(v) => setUnitId(v ?? "")}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="בחר יחידה">

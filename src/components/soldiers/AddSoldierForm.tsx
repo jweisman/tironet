@@ -116,23 +116,21 @@ export function AddSoldierForm({
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="soldier-given">שם פרטי *</Label>
+          <Label htmlFor="soldier-given" required>שם פרטי</Label>
           <Input
             id="soldier-given"
             value={givenName}
             onChange={(e) => setGivenName(e.target.value)}
             placeholder="שם פרטי"
-            required
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="soldier-family">שם משפחה *</Label>
+          <Label htmlFor="soldier-family" required>שם משפחה</Label>
           <Input
             id="soldier-family"
             value={familyName}
             onChange={(e) => setFamilyName(e.target.value)}
             placeholder="שם משפחה"
-            required
           />
         </div>
       </div>

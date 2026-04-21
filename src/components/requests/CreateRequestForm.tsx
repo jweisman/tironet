@@ -269,7 +269,7 @@ export function CreateRequestForm({
       {/* Squad selector (medic only) */}
       {isCompanyRole && !preselectedSoldierId && (
         <div className="space-y-1.5">
-          <Label>כיתה</Label>
+          <Label required>כיתה</Label>
           <Select value={selectedSquadId} onValueChange={(v) => { if (v !== null) { setSelectedSquadId(v); setSoldierId(""); } }}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="בחר כיתה">
@@ -292,7 +292,7 @@ export function CreateRequestForm({
       {/* Soldier selector */}
       {!preselectedSoldierId && (!isCompanyRole || selectedSquadId) && (
         <div className="space-y-1.5">
-          <Label>חייל</Label>
+          <Label required>חייל</Label>
           <Select value={soldierId} onValueChange={(v) => { if (v !== null) setSoldierId(v); }}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="בחר חייל">

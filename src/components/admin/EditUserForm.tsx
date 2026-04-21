@@ -99,21 +99,19 @@ export function EditUserForm({ user, onSuccess, onCancel, showAdminToggle = true
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="edit-given">שם פרטי</Label>
+          <Label htmlFor="edit-given" required>שם פרטי</Label>
           <Input
             id="edit-given"
             value={givenName}
             onChange={(e) => setGivenName(e.target.value)}
-            required
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="edit-family">שם משפחה</Label>
+          <Label htmlFor="edit-family" required>שם משפחה</Label>
           <Input
             id="edit-family"
             value={familyName}
             onChange={(e) => setFamilyName(e.target.value)}
-            required
           />
         </div>
       </div>

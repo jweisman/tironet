@@ -161,21 +161,19 @@ export default function ProfilePage() {
       <form onSubmit={saveProfile} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="given-name">שם פרטי</Label>
+            <Label htmlFor="given-name" required>שם פרטי</Label>
             <Input
               id="given-name"
               value={givenName}
               onChange={(e) => setGivenName(e.target.value)}
-              required
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="family-name">שם משפחה</Label>
+            <Label htmlFor="family-name" required>שם משפחה</Label>
             <Input
               id="family-name"
               value={familyName}
               onChange={(e) => setFamilyName(e.target.value)}
-              required
             />
           </div>
         </div>

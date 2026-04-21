@@ -75,7 +75,7 @@ export function AssignUserForm({ userId, cycles, structureByCycle, onSuccess, on
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-1.5">
-        <Label>מחזור</Label>
+        <Label required>מחזור</Label>
         <Select value={cycleId} onValueChange={(v) => { setCycleId(v ?? ""); setUnitId(""); }}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="בחר מחזור">
@@ -91,7 +91,7 @@ export function AssignUserForm({ userId, cycles, structureByCycle, onSuccess, on
       </div>
 
       <div className="space-y-1.5">
-        <Label>תפקיד</Label>
+        <Label required>תפקיד</Label>
         <Select value={role} onValueChange={(v) => { setRole((v ?? "squad_commander") as Role); setUnitId(""); }}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="בחר תפקיד">
@@ -107,7 +107,7 @@ export function AssignUserForm({ userId, cycles, structureByCycle, onSuccess, on
       </div>
 
       <div className="space-y-1.5">
-        <Label>יחידה</Label>
+        <Label required>יחידה</Label>
         <Select value={unitId} onValueChange={(v) => setUnitId(v ?? "")}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="בחר יחידה">

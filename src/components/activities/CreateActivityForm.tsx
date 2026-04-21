@@ -122,7 +122,7 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
       {/* Platoon selector (only if multiple) */}
       {platoonOptions.length > 1 && (
         <div className="space-y-1.5">
-          <Label>מחלקה</Label>
+          <Label required>מחלקה</Label>
           <Select value={platoonId} onValueChange={(v) => { if (v !== null) setPlatoonId(v); }}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="בחר מחלקה">
@@ -145,7 +145,7 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
 
       {/* Activity type */}
       <div className="space-y-1.5">
-        <Label>סוג פעילות</Label>
+        <Label required>סוג פעילות</Label>
         {loadingTypes ? (
           <div className="text-sm text-muted-foreground">טוען...</div>
         ) : (
@@ -168,7 +168,7 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
 
       {/* Name */}
       <div className="space-y-1.5">
-        <Label htmlFor="activity-name">שם הפעילות</Label>
+        <Label htmlFor="activity-name" required>שם הפעילות</Label>
         <Input
           id="activity-name"
           value={name}
@@ -179,7 +179,7 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
 
       {/* Date */}
       <div className="space-y-1.5">
-        <Label htmlFor="activity-date">תאריך</Label>
+        <Label htmlFor="activity-date" required>תאריך</Label>
         <Input
           id="activity-date"
           type="date"
