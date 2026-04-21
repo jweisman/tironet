@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Table2, ClipboardList, Calendar } from "lucide-react";
+import { FileText, Table2, ClipboardList, Calendar, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSession } from "next-auth/react";
@@ -125,6 +125,14 @@ export default function ReportsPage() {
     router.push("/reports/daily-forum");
   }
 
+  function handleAttendance() {
+    if (!navigator.onLine) {
+      toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
+      return;
+    }
+    router.push("/reports/attendance");
+  }
+
   function handleRequestSummary() {
     if (!navigator.onLine) {
       toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
@@ -168,6 +176,26 @@ export default function ReportsPage() {
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 סיכום יומי של בקשות פתוחות, פעילויות היום והמחר, ופערים
+              </p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={handleAttendance}
+            className="flex w-full items-start gap-4 rounded-xl border border-border bg-background p-4 text-start hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Users size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold">דוח נוכחות</p>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  PDF
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                סטטוס נוכחות חיילים — יציאות, תורים רפואיים, ימי מחלה
               </p>
             </div>
           </button>
