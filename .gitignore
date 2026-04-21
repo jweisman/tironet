@@ -56,12 +56,12 @@ next-env.d.ts
 /public/splash
 
 # Terraform
-infra/.terraform/
-infra/*.tfstate
-infra/*.tfstate.*
-infra/crash.log
-infra/.terraform.lock.hcl
-infra/lambda.zip
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/crash.log
+infra/**/.terraform.lock.hcl
+infra/**/lambda.zip
 
 # Local vars
-infra/terraform.tfvars
+infra/**/terraform.tfvars
