@@ -89,13 +89,61 @@ describe("isRequestActive", () => {
     vi.useRealTimers();
   });
 
-  it("returns false for medical with null appointments", () => {
+  it("returns false for medical with null appointments and no sick days", () => {
     expect(
       isRequestActive(
-        { status: "approved", type: "medical", medicalAppointments: null },
+        { status: "approved", type: "medical", medicalAppointments: null, sickDays: null },
         "2026-04-15",
       ),
     ).toBe(false);
+  });
+
+  it("returns true for medical with upcoming sick day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T12:00:00Z"));
+
+    expect(
+      isRequestActive({
+        status: "approved",
+        type: "medical",
+        medicalAppointments: null,
+        sickDays: JSON.stringify([{ id: "d1", date: "2026-04-18" }]),
+      }),
+    ).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it("returns false for medical with only past sick days", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T12:00:00Z"));
+
+    expect(
+      isRequestActive({
+        status: "approved",
+        type: "medical",
+        medicalAppointments: null,
+        sickDays: JSON.stringify([{ id: "d1", date: "2026-04-01" }]),
+      }),
+    ).toBe(false);
+
+    vi.useRealTimers();
+  });
+
+  it("returns true for medical with past appointments but upcoming sick day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T12:00:00Z"));
+
+    expect(
+      isRequestActive({
+        status: "approved",
+        type: "medical",
+        medicalAppointments: JSON.stringify([{ id: "a1", date: "2026-04-01", place: "X", type: "Y" }]),
+        sickDays: JSON.stringify([{ id: "d1", date: "2026-04-20" }]),
+      }),
+    ).toBe(true);
+
+    vi.useRealTimers();
   });
 
   it("accepts medicalAppointments as an array (Prisma JSON)", () => {

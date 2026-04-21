@@ -35,6 +35,8 @@ import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/reques
 import { effectiveRole } from "@/lib/auth/permissions";
 import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
+import { parseSickDays, expandSickDayRange } from "@/lib/requests/sick-days";
+import type { SickDay } from "@/lib/requests/sick-days";
 import type { RequestType, RequestStatus, Role, Transportation, RequestActionType } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -80,7 +82,7 @@ interface RawRequest {
   urgent: number | null;
   paramedic_date: string | null;
   medical_appointments: string | null;
-  sick_leave_days: number | null;
+  sick_days: string | null;
   special_conditions: number | null;
   created_at: string;
   updated_at: string;
@@ -207,6 +209,10 @@ export default function RequestDetailPage() {
   // Appointment editing
   const [editingAppointments, setEditingAppointments] = useState(false);
   const [editAppointmentsList, setEditAppointmentsList] = useState<MedicalAppointment[]>([]);
+
+  // Sick days editing — each entry is a from/to range row
+  const [editingSickDays, setEditingSickDays] = useState(false);
+  const [editSickDayRanges, setEditSickDayRanges] = useState<{ id: string; from: string; to: string }[]>([]);
 
   // Field editing (description, specialConditions)
   const [editingDescription, setEditingDescription] = useState(false);
@@ -660,10 +666,173 @@ export default function RequestDetailPage() {
                 </div>
               );
             })()}
-            <DetailRow
-              label="ימי גימלים"
-              value={raw.sick_leave_days != null ? String(raw.sick_leave_days) : null}
-            />
+            {/* Sick days section */}
+            {(() => {
+              const days = parseSickDays(raw.sick_days);
+              const today = new Date().toISOString().split("T")[0];
+
+              async function saveDays(updated: SickDay[]) {
+                const sorted = [...updated].sort((a, b) => a.date.localeCompare(b.date));
+                try {
+                  await db.execute(
+                    `UPDATE requests SET sick_days = ?, updated_at = ? WHERE id = ?`,
+                    [sorted.length > 0 ? JSON.stringify(sorted) : null, new Date().toISOString(), raw.id],
+                  );
+                } catch {
+                  toast.error("שגיאה בעדכון ימי מחלה");
+                }
+              }
+
+              return (
+                <div className="py-2 border-b border-border">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-muted-foreground">ימי מחלה</span>
+                    {canEditFields && !editingSickDays && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditSickDayRanges([]);
+                          setEditingSickDays(true);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <Pencil size={14} />
+                        ערוך ימי מחלה
+                      </button>
+                    )}
+                  </div>
+                  {/* Existing days as chips — always visible, deletable in edit mode */}
+                  {days.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {days.map((d) => (
+                        <span
+                          key={d.id}
+                          className={cn("inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs", d.date >= today && "font-bold")}
+                        >
+                          {new Date(d.date + "T00:00:00").toLocaleDateString("he-IL")}
+                          {editingSickDays && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const updated = days.filter((s) => s.id !== d.id);
+                                await saveDays(updated);
+                              }}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {days.length === 0 && !editingSickDays && (
+                    <p className="text-sm text-muted-foreground">אין ימי מחלה</p>
+                  )}
+                  {/* Add mode: range rows + save/cancel */}
+                  {editingSickDays && (
+                    <div className="space-y-2 mt-1">
+                      {editSickDayRanges.map((range) => (
+                        <div key={range.id} className="rounded-lg border border-border p-2 space-y-1.5">
+                          <div className="flex items-center justify-end">
+                            <button
+                              type="button"
+                              onClick={() => setEditSickDayRanges((prev) => prev.filter((r) => r.id !== range.id))}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-0.5">
+                              <Label className="text-xs">מתאריך</Label>
+                              <Input
+                                type="date"
+                                value={range.from}
+                                onChange={(e) =>
+                                  setEditSickDayRanges((prev) =>
+                                    prev.map((r) => (r.id === range.id ? { ...r, from: e.target.value } : r)),
+                                  )
+                                }
+                                dir="ltr"
+                                lang="he"
+                                style={range.from ? undefined : { color: "transparent" }}
+                              />
+                            </div>
+                            <div className="space-y-0.5">
+                              <Label className="text-xs">עד תאריך</Label>
+                              <Input
+                                type="date"
+                                value={range.to}
+                                onChange={(e) =>
+                                  setEditSickDayRanges((prev) =>
+                                    prev.map((r) => (r.id === range.id ? { ...r, to: e.target.value } : r)),
+                                  )
+                                }
+                                min={range.from || undefined}
+                                dir="ltr"
+                                lang="he"
+                                style={range.to ? undefined : { color: "transparent" }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditSickDayRanges((prev) => [
+                            ...prev,
+                            { id: crypto.randomUUID(), from: "", to: "" },
+                          ])
+                        }
+                        className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center"
+                      >
+                        <Plus size={14} />
+                        הוסף ימי מחלה
+                      </button>
+                      <div className="flex gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            // Expand new ranges into individual days, merge with existing
+                            const existing = new Set(days.map((d) => d.date));
+                            const newDays: SickDay[] = [];
+                            for (const range of editSickDayRanges) {
+                              if (!range.from) continue;
+                              for (const d of expandSickDayRange(range.from, range.to || null)) {
+                                if (!existing.has(d.date)) {
+                                  existing.add(d.date);
+                                  newDays.push(d);
+                                }
+                              }
+                            }
+                            if (newDays.length > 0) {
+                              await saveDays([...days, ...newDays]);
+                              toast.success("ימי מחלה עודכנו");
+                            }
+                            setEditingSickDays(false);
+                          }}
+                          disabled={acting || editSickDayRanges.length === 0}
+                          className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          <Check size={12} />
+                          שמור
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingSickDays(false)}
+                          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
+                        >
+                          <X size={12} />
+                          ביטול
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
 

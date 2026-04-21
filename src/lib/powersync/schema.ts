@@ -96,7 +96,7 @@ const requests = new Table({
   urgent: column.integer,
   paramedic_date: column.text,
   medical_appointments: column.text,
-  sick_leave_days: column.integer,
+  sick_days: column.text,
   // Hardship fields
   special_conditions: column.integer,
   created_at: column.text,

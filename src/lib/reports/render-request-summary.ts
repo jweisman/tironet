@@ -9,6 +9,8 @@ import {
 } from "@/lib/reports/html-helpers";
 import { parseMedicalAppointments, hasUpcomingAppointment, formatAppointment } from "@/lib/requests/medical-appointments";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
+import { parseSickDays, formatSickDay } from "@/lib/requests/sick-days";
+import type { SickDay } from "@/lib/requests/sick-days";
 import {
   extractRequestFields,
   formatNotes,
@@ -39,7 +41,7 @@ export interface RequestSummaryItem {
   // Medical fields
   paramedicDate: string | null;
   medicalAppointments: MedicalAppointment[] | null;
-  sickLeaveDays: number | null;
+  sickDays: SickDay[] | null;
   // Hardship fields
   specialConditions: boolean | null;
   // Audit trail notes (from approve/deny actions)
@@ -172,7 +174,7 @@ export async function fetchRequestSummary(
     transportation: r.transportation,
     paramedicDate: r.paramedicDate?.toISOString().split("T")[0] ?? null,
     medicalAppointments: parseMedicalAppointments(r.medicalAppointments as string | null),
-    sickLeaveDays: r.sickLeaveDays,
+    sickDays: parseSickDays(r.sickDays as string | null),
     specialConditions: r.specialConditions,
     notes: (r.actions ?? [])
       .filter((a): a is typeof a & { note: string } => a.note != null)
@@ -231,15 +233,16 @@ const htmlFormatters = {
   dateTime: formatDateTime,
   date: formatDate,
   appointment: formatAppointment,
+  sickDay: formatSickDay,
   transportationLabels: TRANSPORTATION_LABELS,
 };
 
 function renderRequestDetails(req: RequestSummaryItem): string {
-  const { fields, appointments } = extractRequestFields(req, htmlFormatters);
+  const { fields, appointments, sickDays } = extractRequestFields(req, htmlFormatters);
 
   const notes = formatNotes(req.notes, escapeHtml);
 
-  return renderDetailColumnsHtml({ fields, appointments, notes });
+  return renderDetailColumnsHtml({ fields, appointments, sickDays, notes });
 }
 
 // ---------------------------------------------------------------------------

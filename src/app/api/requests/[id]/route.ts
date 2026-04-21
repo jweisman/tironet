@@ -30,7 +30,10 @@ const patchSchema = z.object({
     place: z.string(),
     type: z.string(),
   })).nullable().optional(),
-  sickLeaveDays: z.number().int().min(0).nullable().optional(),
+  sickDays: z.array(z.object({
+    id: z.string(),
+    date: z.string(),
+  })).nullable().optional(),
   specialConditions: z.boolean().nullable().optional(),
   // Status/assignment override from connector (offline sync)
   status: z.enum(["open", "approved", "denied"]).optional(),
@@ -188,7 +191,7 @@ export async function PATCH(
         ...(data.urgent !== undefined ? { urgent: data.urgent } : {}),
         ...(data.paramedicDate !== undefined ? { paramedicDate: data.paramedicDate ? new Date(data.paramedicDate) : null } : {}),
         ...(data.medicalAppointments !== undefined ? { medicalAppointments: data.medicalAppointments ?? Prisma.DbNull } : {}),
-        ...(data.sickLeaveDays !== undefined ? { sickLeaveDays: data.sickLeaveDays } : {}),
+        ...(data.sickDays !== undefined ? { sickDays: data.sickDays ?? Prisma.DbNull } : {}),
         ...(data.specialConditions !== undefined ? { specialConditions: data.specialConditions } : {}),
       },
     });
@@ -228,7 +231,7 @@ export async function PATCH(
   if (data.urgent !== undefined) updateData.urgent = data.urgent;
   if (data.paramedicDate !== undefined) updateData.paramedicDate = data.paramedicDate ? new Date(data.paramedicDate) : null;
   if (data.medicalAppointments !== undefined) updateData.medicalAppointments = data.medicalAppointments ?? Prisma.DbNull;
-  if (data.sickLeaveDays !== undefined) updateData.sickLeaveDays = data.sickLeaveDays;
+  if (data.sickDays !== undefined) updateData.sickDays = data.sickDays ?? Prisma.DbNull;
   if (data.specialConditions !== undefined) updateData.specialConditions = data.specialConditions;
 
   if (Object.keys(updateData).length === 0) {

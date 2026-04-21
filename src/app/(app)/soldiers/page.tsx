@@ -110,9 +110,15 @@ const OPEN_REQUESTS_QUERY = `
     AND (
       (r.status = 'approved' AND (
         (r.type = 'leave' AND (r.departure_at >= DATE('now') OR r.return_at >= DATE('now')))
-        OR (r.type = 'medical' AND r.medical_appointments IS NOT NULL AND EXISTS (
-          SELECT 1 FROM json_each(r.medical_appointments) AS a
-          WHERE json_extract(a.value, '$.date') >= DATE('now')
+        OR (r.type = 'medical' AND (
+          (r.medical_appointments IS NOT NULL AND EXISTS (
+            SELECT 1 FROM json_each(r.medical_appointments) AS a
+            WHERE json_extract(a.value, '$.date') >= DATE('now')
+          ))
+          OR (r.sick_days IS NOT NULL AND EXISTS (
+            SELECT 1 FROM json_each(r.sick_days) AS d
+            WHERE json_extract(d.value, '$.date') >= DATE('now')
+          ))
         ))
       ))
       OR r.status = 'open'

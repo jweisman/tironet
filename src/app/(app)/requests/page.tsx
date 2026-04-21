@@ -29,6 +29,7 @@ import { useTourContext } from "@/contexts/TourContext";
 import { requestsTourSteps } from "@/lib/tour/steps";
 import { canActOnRequest, getAvailableActions, getNextState } from "@/lib/requests/workflow";
 import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import { parseSickDays, formatSickDay } from "@/lib/requests/sick-days";
 import { isRequestActive } from "@/lib/requests/active";
 
 // ---------------------------------------------------------------------------
@@ -44,7 +45,7 @@ type ViewTab = "open" | "active" | "approved" | "mine";
 const REQUESTS_QUERY = `
   SELECT
     r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.special_conditions,
-    r.created_at, r.departure_at, r.return_at, r.medical_appointments,
+    r.created_at, r.departure_at, r.return_at, r.medical_appointments, r.sick_days,
     s.family_name || ' ' || s.given_name AS soldier_name,
     s.squad_id,
     sq.name AS squad_name,
@@ -70,6 +71,7 @@ interface RawRequest {
   departure_at: string | null;
   return_at: string | null;
   medical_appointments: string | null;
+  sick_days: string | null;
   soldier_name: string;
   squad_id: string;
   squad_name: string;
@@ -95,6 +97,7 @@ function mapRequest(raw: RawRequest): RequestSummary {
     departureAt: raw.departure_at,
     returnAt: raw.return_at,
     medicalAppointments: raw.medical_appointments,
+    sickDays: raw.sick_days,
   };
 }
 
@@ -110,8 +113,12 @@ function activeRequestSortDate(r: RequestSummary): string {
   if (r.type === "medical") {
     const today = new Date().toISOString().split("T")[0];
     const appts = parseMedicalAppointments(r.medicalAppointments);
-    const next = appts.find((a) => a.date.split("T")[0] >= today);
-    return next?.date.split("T")[0] ?? "9999";
+    const days = parseSickDays(r.sickDays);
+    const nextAppt = appts.find((a) => a.date.split("T")[0] >= today)?.date.split("T")[0];
+    const nextDay = days.find((d) => d.date >= today)?.date;
+    // Return the earlier of the two
+    if (nextAppt && nextDay) return nextAppt < nextDay ? nextAppt : nextDay;
+    return nextAppt ?? nextDay ?? "9999";
   }
   return "9999";
 }
@@ -140,8 +147,17 @@ function activeRequestDetail(r: RequestSummary): string | null {
   if (r.type === "medical") {
     const today = new Date().toISOString().split("T")[0];
     const appts = parseMedicalAppointments(r.medicalAppointments);
-    const next = appts.find((a) => a.date >= today);
-    if (next) return `תור: ${formatAppointment(next)}`;
+    const nextAppt = appts.find((a) => a.date >= today);
+    const days = parseSickDays(r.sickDays);
+    const nextDay = days.find((d) => d.date >= today);
+    // Show whichever is sooner, or both if they exist
+    if (nextAppt && nextDay) {
+      const apptDate = nextAppt.date.split("T")[0];
+      if (apptDate <= nextDay.date) return `תור: ${formatAppointment(nextAppt)}`;
+      return `יום מחלה: ${formatSickDay(nextDay)}`;
+    }
+    if (nextAppt) return `תור: ${formatAppointment(nextAppt)}`;
+    if (nextDay) return `יום מחלה: ${formatSickDay(nextDay)}`;
     return null;
   }
   return null;

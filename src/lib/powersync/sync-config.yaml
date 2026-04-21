@@ -96,7 +96,7 @@ streams:
              created_by_user_id, description,
              place, departure_at, return_at, transportation,
              urgent, paramedic_date, medical_appointments,
-             sick_leave_days,
+             sick_days,
              special_conditions, created_at, updated_at
       FROM requests
       WHERE cycle_id IN auth.parameter('cycle_ids')

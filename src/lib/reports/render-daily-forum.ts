@@ -6,8 +6,10 @@ import { getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 import type { ActivitySummaryRow } from "@/lib/reports/render-activity-summary";
 import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
-import { isRequestActive } from "@/lib/requests/active";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
+import { parseSickDays, formatSickDay } from "@/lib/requests/sick-days";
+import type { SickDay } from "@/lib/requests/sick-days";
+import { isRequestActive } from "@/lib/requests/active";
 import {
   escapeHtml,
   renderPieSvg,
@@ -46,7 +48,7 @@ export interface OpenRequestItem {
   // Medical fields
   paramedicDate: string | null;
   medicalAppointments: MedicalAppointment[] | null;
-  sickLeaveDays: number | null;
+  sickDays: SickDay[] | null;
   // Hardship fields
   specialConditions: boolean | null;
   // Audit trail notes
@@ -251,7 +253,7 @@ export async function fetchDailyForum(
       transportation: r.transportation,
       paramedicDate: r.paramedicDate?.toISOString().split("T")[0] ?? null,
       medicalAppointments: parseMedicalAppointments(r.medicalAppointments as string | null),
-      sickLeaveDays: r.sickLeaveDays,
+      sickDays: parseSickDays(r.sickDays as string | null),
       specialConditions: r.specialConditions,
       notes: (r.actions ?? [])
         .filter((a): a is typeof a & { note: string } => a.note != null)
@@ -312,7 +314,7 @@ export async function fetchDailyForum(
       transportation: r.transportation,
       paramedicDate: r.paramedicDate?.toISOString().split("T")[0] ?? null,
       medicalAppointments: parseMedicalAppointments(r.medicalAppointments as string | null),
-      sickLeaveDays: r.sickLeaveDays,
+      sickDays: parseSickDays(r.sickDays as string | null),
       specialConditions: r.specialConditions,
       notes: (r.actions ?? [])
         .filter((a): a is typeof a & { note: string } => a.note != null)
@@ -326,6 +328,7 @@ export async function fetchDailyForum(
       departureAt: r.departureAt?.toISOString(),
       returnAt: r.returnAt?.toISOString(),
       medicalAppointments: item.medicalAppointments,
+      sickDays: item.sickDays,
     }, today)) continue;
 
     if (!activeByPlatoon.has(platoonId)) {
@@ -576,15 +579,16 @@ const htmlFormatters = {
   dateTime: formatDateTime,
   date: formatDate,
   appointment: formatAppointment,
+  sickDay: formatSickDay,
   transportationLabels: TRANSPORTATION_LABELS,
 };
 
 function renderRequestDetailsHtml(req: OpenRequestItem, options?: { highlightDates?: boolean }): string {
-  const { fields, appointments } = extractRequestFields(req, htmlFormatters, options);
+  const { fields, appointments, sickDays } = extractRequestFields(req, htmlFormatters, options);
 
   const notes = formatNotes(req.notes, escapeHtml);
 
-  return renderDetailColumnsHtml({ fields, appointments, notes });
+  return renderDetailColumnsHtml({ fields, appointments, sickDays, notes });
 }
 
 const STATUS_LABELS: Record<string, string> = { open: "ממתינה", approved: "אושר", denied: "נדחה" };

@@ -9,6 +9,7 @@ import { PieChart, PieChartLegend } from "@/components/reports/PieChart";
 import { cn } from "@/lib/utils";
 import { formatGradeDisplay } from "@/lib/score-format";
 import { formatAppointment } from "@/lib/requests/medical-appointments";
+import { formatSickDay } from "@/lib/requests/sick-days";
 import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns";
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import { REQUEST_STATUS_LABELS, ASSIGNED_ROLE_LABELS } from "@/lib/requests/constants";
@@ -49,11 +50,12 @@ const clientFormatters = {
   dateTime: formatDateTime,
   date: formatDate,
   appointment: formatAppointment,
+  sickDay: formatSickDay,
   transportationLabels: TRANSPORTATION_LABELS,
 };
 
 function RequestCard({ req, highlightDates }: { req: OpenRequestItem; highlightDates?: boolean }) {
-  const { fields, appointments } = extractRequestFields(req, clientFormatters, { highlightDates });
+  const { fields, appointments, sickDays } = extractRequestFields(req, clientFormatters, { highlightDates });
 
   const notes = formatNotes(req.notes);
 
@@ -76,7 +78,7 @@ function RequestCard({ req, highlightDates }: { req: OpenRequestItem; highlightD
           )}
         </span>
       </div>
-      <RequestDetailColumns data={{ fields, appointments, notes }} />
+      <RequestDetailColumns data={{ fields, appointments, sickDays, notes }} />
     </div>
   );
 }

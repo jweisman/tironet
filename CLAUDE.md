@@ -305,7 +305,16 @@ Medical requests store appointments as a JSON array in `medical_appointments` (P
 - **Soldiers page "active" query:** Uses SQLite `json_each()` + `json_extract()` to check if any appointment date is in the future.
 - **Shared utilities:** `src/lib/requests/medical-appointments.ts` exports `parseMedicalAppointments()`, `hasUpcomingAppointment()`, and `formatAppointment()`. Use these everywhere instead of inline parsing.
 - **Detail page editing:** Appointments can be added/edited/removed on the request detail page by users with the assigned role. Edits are written directly to local SQLite via `db.execute()`.
-- **"Open" logic:** A medical request is considered active (soldiers page badge) if **any** appointment is in the future.
+- **"Open" logic:** A medical request is considered active (soldiers page badge) if **any** appointment date or sick day date is in the future.
+
+### Sick days — JSON column
+
+Medical requests store sick days as a JSON array in `sick_days` (Prisma `Json?`, PowerSync `column.text`, SQLite text). Each entry has `{ id, date }` where `date` is `YYYY-MM-DD`. The `id` is a client-generated UUID for stable React keys.
+
+- **Shared utilities:** `src/lib/requests/sick-days.ts` exports `parseSickDays()`, `hasUpcomingSickDay()`, `formatSickDay()`, and `expandSickDayRange()`. Use these everywhere instead of inline parsing.
+- **Range input:** The create and detail page UIs let users enter a from/to date range, which `expandSickDayRange()` expands into individual `SickDay` entries. An empty "to" field means a single day.
+- **Active logic:** `isRequestActive()` checks both appointments and sick days — a medical request is active if either has a future date.
+- **All patterns** (Prisma `DbNull`, connector JSON parsing, `json_each()` in SQLite queries, detail page editing) follow the same patterns as medical appointments above.
 
 ### Workflow state machine
 

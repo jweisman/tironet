@@ -398,7 +398,7 @@ model Request {
   urgent              Boolean?
   paramedicDate       DateTime?     @map("paramedic_date") @db.Date
   medicalAppointments Json?         @map("medical_appointments")
-  sickLeaveDays       Int?          @map("sick_leave_days")
+  sickDays            Json?         @map("sick_days")
 
   // Hardship fields
   specialConditions Boolean?    @map("special_conditions")

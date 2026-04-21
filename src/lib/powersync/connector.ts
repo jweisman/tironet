@@ -147,7 +147,7 @@ export class TironetConnector implements PowerSyncBackendConnector {
               urgent: d.urgent != null ? Boolean(d.urgent) : undefined,
               paramedicDate: d.paramedic_date,
               medicalAppointments: d.medical_appointments ? JSON.parse(d.medical_appointments as string) : undefined,
-              sickLeaveDays: d.sick_leave_days,
+              sickDays: d.sick_days ? JSON.parse(d.sick_days as string) : undefined,
               specialConditions: d.special_conditions != null ? Boolean(d.special_conditions) : undefined,
             });
           } else if (opType === UpdateType.PATCH) {
@@ -159,7 +159,7 @@ export class TironetConnector implements PowerSyncBackendConnector {
               assigned_role: "assignedRole", created_by_user_id: "createdByUserId",
               departure_at: "departureAt", return_at: "returnAt",
               paramedic_date: "paramedicDate", medical_appointments: "medicalAppointments",
-              sick_leave_days: "sickLeaveDays", special_conditions: "specialConditions",
+              sick_days: "sickDays", special_conditions: "specialConditions",
             };
             for (const [key, value] of Object.entries(d)) {
               body[mapping[key] ?? key] = value;
@@ -170,6 +170,9 @@ export class TironetConnector implements PowerSyncBackendConnector {
             // Parse JSON string fields
             if ("medicalAppointments" in body && typeof body.medicalAppointments === "string") {
               try { body.medicalAppointments = JSON.parse(body.medicalAppointments as string); } catch { /* keep as-is */ }
+            }
+            if ("sickDays" in body && typeof body.sickDays === "string") {
+              try { body.sickDays = JSON.parse(body.sickDays as string); } catch { /* keep as-is */ }
             }
             await apiRequest(`/api/requests/${id}`, "PATCH", body);
           } else if (opType === UpdateType.DELETE) {

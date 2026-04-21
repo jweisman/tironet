@@ -17,6 +17,8 @@ import {
 import { Trash2, Plus } from "lucide-react";
 import { TRANSPORTATION_LABELS } from "@/lib/requests/constants";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
+import { expandSickDayRange } from "@/lib/requests/sick-days";
+import type { SickDay } from "@/lib/requests/sick-days";
 import type { RequestType, Transportation, Role } from "@/types";
 
 /** Format a Date as a `datetime-local` input value (YYYY-MM-DDTHH:MM). */
@@ -148,7 +150,9 @@ export function CreateRequestForm({
   const [urgent, setUrgent] = useState(false);
   const [paramedicDate, setParamedicDate] = useState("");
   const [appointments, setAppointments] = useState<MedicalAppointment[]>([]);
-  const [sickLeaveDays, setSickLeaveDays] = useState<number | "">("");
+  const [sickDays, setSickDays] = useState<SickDay[]>([]);
+  const [sickDayFrom, setSickDayFrom] = useState("");
+  const [sickDayTo, setSickDayTo] = useState("");
 
   function addAppointment() {
     setAppointments((prev) => [
@@ -220,14 +224,14 @@ export function CreateRequestForm({
 
       if (requestType === "medical") {
         columns.push(
-          "urgent", "paramedic_date", "medical_appointments", "sick_leave_days",
+          "urgent", "paramedic_date", "medical_appointments", "sick_days",
         );
         const validAppointments = appointments.filter((a) => a.date);
         values.push(
           urgent ? 1 : 0,
           paramedicDate || null,
           validAppointments.length > 0 ? JSON.stringify(validAppointments) : null,
-          sickLeaveDays === "" ? null : sickLeaveDays,
+          sickDays.length > 0 ? JSON.stringify(sickDays) : null,
         );
       }
 
@@ -460,17 +464,69 @@ export function CreateRequestForm({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="req-sick-days">ימי גימלים</Label>
-            <Input
-              id="req-sick-days"
-              type="number"
-              min={0}
-              value={sickLeaveDays}
-              onChange={(e) =>
-                setSickLeaveDays(e.target.value === "" ? "" : Number(e.target.value))
-              }
-              dir="ltr"
-            />
+            <Label>ימי מחלה</Label>
+            {sickDays.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {sickDays.map((d) => (
+                  <span
+                    key={d.id}
+                    className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs"
+                  >
+                    {new Date(d.date + "T00:00:00").toLocaleDateString("he-IL")}
+                    <button
+                      type="button"
+                      onClick={() => setSickDays((prev) => prev.filter((s) => s.id !== d.id))}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-0.5">
+                <Label className="text-xs">מתאריך</Label>
+                <Input
+                  type="date"
+                  value={sickDayFrom}
+                  onChange={(e) => setSickDayFrom(e.target.value)}
+                  dir="ltr"
+                  lang="he"
+                  style={sickDayFrom ? undefined : { color: "transparent" }}
+                />
+              </div>
+              <div className="space-y-0.5">
+                <Label className="text-xs">עד תאריך</Label>
+                <Input
+                  type="date"
+                  value={sickDayTo}
+                  onChange={(e) => setSickDayTo(e.target.value)}
+                  min={sickDayFrom || undefined}
+                  dir="ltr"
+                  lang="he"
+                  style={sickDayTo ? undefined : { color: "transparent" }}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={!sickDayFrom}
+              onClick={() => {
+                const newDays = expandSickDayRange(sickDayFrom, sickDayTo || null);
+                // Filter out duplicates
+                setSickDays((prev) => {
+                  const existing = new Set(prev.map((d) => d.date));
+                  return [...prev, ...newDays.filter((d) => !existing.has(d.date))];
+                });
+                setSickDayFrom("");
+                setSickDayTo("");
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center disabled:opacity-50"
+            >
+              <Plus size={14} />
+              הוסף ימי מחלה
+            </button>
           </div>
         </>
       )}

@@ -115,7 +115,7 @@ describe("fetchDailyForum", () => {
         transportation: null,
         paramedicDate: null,
         medicalAppointments: null,
-        sickLeaveDays: null,
+        sickDays: null,
         specialConditions: null,
         soldier: {
           givenName: "Avi",
@@ -137,7 +137,7 @@ describe("fetchDailyForum", () => {
         transportation: "shuttle",
         paramedicDate: null,
         medicalAppointments: null,
-        sickLeaveDays: null,
+        sickDays: null,
         specialConditions: null,
         soldier: {
           givenName: "Dan",
@@ -176,7 +176,7 @@ describe("fetchDailyForum", () => {
         transportation: "private",
         paramedicDate: null,
         medicalAppointments: null,
-        sickLeaveDays: null,
+        sickDays: null,
         specialConditions: null,
         soldier: {
           givenName: "Avi",
@@ -198,7 +198,7 @@ describe("fetchDailyForum", () => {
         transportation: null,
         paramedicDate: null,
         medicalAppointments: JSON.stringify([{ id: "a1", date: "2026-12-01", place: "Hospital", type: "Checkup" }]),
-        sickLeaveDays: null,
+        sickDays: null,
         specialConditions: null,
         soldier: {
           givenName: "Dan",
@@ -220,7 +220,7 @@ describe("fetchDailyForum", () => {
         transportation: "private",
         paramedicDate: null,
         medicalAppointments: null,
-        sickLeaveDays: null,
+        sickDays: null,
         specialConditions: null,
         soldier: {
           givenName: "Avi",
