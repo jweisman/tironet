@@ -44,7 +44,7 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
   // to let PowerSync establish its WebSocket connection.
   const [graceOver, setGraceOver] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setGraceOver(true), 5_000);
+    const t = setTimeout(() => setGraceOver(true), 10_000);
     return () => clearTimeout(t);
   }, []);
 
