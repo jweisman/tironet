@@ -109,6 +109,23 @@ The default wa-sqlite VFS (`IDBBatchAtomicVFS`) causes iOS Safari to crash with 
 
 **Caveat:** OPFS is not available in Safari Private Browsing mode. If incognito support is needed, add a runtime check and fall back to IDBBatchAtomicVFS.
 
+### OPFS corruption auto-recovery (#148)
+
+OPFS SQLite databases can become corrupted when iOS kills the PWA's WebContent process mid-write (JetSam, memory pressure). The error is `CORRUPT: database disk image is malformed` in PowerSync's `downloadError`. When this happens, sync cannot complete — reads from uncorrupted parts still work, but no new data arrives and `connected` stays false.
+
+**Auto-recovery:** `PowerSyncProvider` watches for corruption via `registerListener({ statusChanged })`. When detected:
+1. Sets `dbCorrupt` state → shows a fullscreen spinner overlay ("מאפס נתונים מקומיים וטוען מחדש...")
+2. `clearLocalDatabase()` disconnects PowerSync, deletes the OPFS files (`tironet.db`, `-journal`, `-wal`) directly via `navigator.storage.getDirectory()`, and reloads the page
+3. On reload, PowerSync creates a fresh DB and syncs from scratch
+
+`disconnectAndClear()` (PowerSync's built-in) cannot be used because it executes SQL internally, which fails on the corrupt DB. The OPFS files must be deleted directly.
+
+**Manual fallback:** The support page has a "clear and resync" button (`ClearAndResyncSection`) that calls the same `clearLocalDatabase()` utility. This is available regardless of whether corruption is detected — useful for any sync issue.
+
+**Key files:**
+- `src/lib/powersync/clear-local-db.ts` — OPFS delete + reload utility
+- `src/components/providers/PowerSyncProvider.tsx` — `isCorruptError()` detection + auto-recovery effect
+
 ### UMD worker setup for Next.js + Turbopack
 
 Both PowerSync workers must be pointed at the pre-built UMD files. Without this, Turbopack tries to bundle them from source and hangs:

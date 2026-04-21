@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Send, CheckCircle, Loader2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Send, CheckCircle, Loader2, RefreshCw } from "lucide-react";
+import { clearLocalDatabase } from "@/lib/powersync/clear-local-db";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { usePowerSync } from "@powersync/react";
@@ -414,6 +415,68 @@ export default function SupportPage() {
       <p className="text-xs text-muted-foreground text-center">
         הדיווח כולל מידע טכני על המכשיר, הדפדפן, ומצב הסנכרון — ללא מידע אישי על חיילים.
       </p>
+
+      <ClearAndResyncSection />
+    </div>
+  );
+}
+
+function ClearAndResyncSection() {
+  const [clearing, setClearing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const handleClear = useCallback(async () => {
+    setClearing(true);
+    await clearLocalDatabase();
+  }, []);
+
+  return (
+    <div className="border-t pt-6 mt-6 space-y-2">
+      <h2 className="text-sm font-medium">איפוס נתונים מקומיים</h2>
+      <p className="text-xs text-muted-foreground">
+        אם הנתונים לא מתעדכנים או שיש תקלות חוזרות, ניתן לאפס את הנתונים המקומיים ולסנכרן מחדש. פעולה זו לא מוחקת נתונים מהשרת.
+      </p>
+      {!confirmOpen ? (
+        <Button
+          variant="outline"
+          onClick={() => setConfirmOpen(true)}
+          className="w-full"
+        >
+          <RefreshCw size={16} className="me-2" />
+          איפוס וסנכרון מחדש
+        </Button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-amber-600 font-medium">
+            האפליקציה תיטען מחדש והנתונים יסונכרנו מהשרת. להמשיך?
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              onClick={handleClear}
+              disabled={clearing}
+              className="flex-1"
+            >
+              {clearing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin me-2" />
+                  מאפס...
+                </>
+              ) : (
+                "אישור"
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              disabled={clearing}
+              className="flex-1"
+            >
+              ביטול
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
