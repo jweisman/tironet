@@ -418,9 +418,31 @@ export default function RequestDetailPage() {
               )}
             </div>
           </div>
-          <Badge variant={REQUEST_STATUS_VARIANT[requestStatus]}>
-            {REQUEST_STATUS_LABELS[requestStatus]}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={REQUEST_STATUS_VARIANT[requestStatus]}>
+              {REQUEST_STATUS_LABELS[requestStatus]}
+            </Badge>
+            {canEditFields ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  const newVal = raw.urgent ? 0 : 1;
+                  await db.execute("UPDATE requests SET urgent = ?, updated_at = ? WHERE id = ?", [newVal, new Date().toISOString(), raw.id]);
+                  toast.success(newVal ? "סומן כדחוף" : "הוסר סימון דחוף");
+                }}
+                className={cn(
+                  "rounded-full px-2.5 py-0.5 text-[10px] font-semibold border transition-colors",
+                  raw.urgent
+                    ? "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20"
+                    : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                )}
+              >
+                {raw.urgent ? "דחוף ✕" : "+ דחוף"}
+              </button>
+            ) : raw.urgent ? (
+              <Badge variant="destructive">דחוף</Badge>
+            ) : null}
+          </div>
         </div>
 
         {/* Assignment indicator */}
@@ -449,10 +471,6 @@ export default function RequestDetailPage() {
             הטיפול בבקשה הושלם
           </div>
         )}
-
-        {raw.urgent ? (
-          <Badge variant="destructive">דחוף</Badge>
-        ) : null}
       </div>
 
       {/* Details card */}
