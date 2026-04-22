@@ -138,7 +138,7 @@ export function Sidebar() {
       </nav>
 
       {/* User section */}
-      <div className="border-t border-border px-4 py-3">
+      <div className="border-t border-border px-4 py-3 space-y-2">
         <div className="flex items-center gap-3">
           <UserAvatar size={40} />
           <div className="min-w-0 flex-1">
@@ -153,31 +153,31 @@ export function Sidebar() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-0.5 shrink-0">
-            <button
-              type="button"
-              onClick={startCurrentTour}
-              className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="עזרה"
-            >
-              <HelpCircle size={16} />
-            </button>
-            <Link
-              href="/support"
-              className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="תמיכה"
-            >
-              <LifeBuoy size={16} />
-            </Link>
-            <button
-              type="button"
-              onClick={() => signOutAndClearCaches()}
-              className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title={t("logout")}
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={startCurrentTour}
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title="עזרה"
+          >
+            <HelpCircle size={16} />
+          </button>
+          <Link
+            href="/support"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title="תמיכה"
+          >
+            <LifeBuoy size={16} />
+          </Link>
+          <button
+            type="button"
+            onClick={() => signOutAndClearCaches()}
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title={t("logout")}
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </div>
     </aside>
