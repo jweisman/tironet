@@ -189,10 +189,9 @@ describe("mine tab classification", () => {
     });
   });
 
-  describe("deputy_company_commander can act on company_commander assignments", () => {
+  describe("deputy_company_commander cannot act on any assignments (not in workflow)", () => {
     it.each(STATES.map((s) => [s.label, s.state] as const))("%s", (_label, state) => {
-      const expected = state.assignedRole === "company_commander";
-      expect(isInMineTab(state, "deputy_company_commander")).toBe(expected);
+      expect(isInMineTab(state, "deputy_company_commander")).toBe(false);
     });
   });
 

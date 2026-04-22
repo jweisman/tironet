@@ -6,17 +6,17 @@ import { getNextState, canActOnRequest, getAvailableActions } from "../workflow"
 // ---------------------------------------------------------------------------
 describe("getNextState", () => {
   describe("platoon_commander actions", () => {
-    it("approve leave → advances to company_commander", () => {
+    it("approve leave → approved, sent to squad_commander", () => {
       const result = getNextState("open", "platoon_commander", "approve", "leave");
-      expect(result).toEqual({ newStatus: "open", newAssignedRole: "company_commander" });
+      expect(result).toEqual({ newStatus: "approved", newAssignedRole: "squad_commander" });
     });
 
-    it("approve medical → advances to company_commander", () => {
+    it("approve medical → approved, sent to squad_commander", () => {
       const result = getNextState("open", "platoon_commander", "approve", "medical");
-      expect(result).toEqual({ newStatus: "open", newAssignedRole: "company_commander" });
+      expect(result).toEqual({ newStatus: "approved", newAssignedRole: "squad_commander" });
     });
 
-    it("approve hardship → approved directly (skips company)", () => {
+    it("approve hardship → approved, sent to squad_commander", () => {
       const result = getNextState("open", "platoon_commander", "approve", "hardship");
       expect(result).toEqual({ newStatus: "approved", newAssignedRole: "squad_commander" });
     });
@@ -26,35 +26,13 @@ describe("getNextState", () => {
       expect(result).toEqual({ newStatus: "denied", newAssignedRole: "squad_commander" });
     });
 
-    it("acknowledge approved → passes down to squad_commander", () => {
-      const result = getNextState("approved", "platoon_commander", "acknowledge", "leave");
-      expect(result).toEqual({ newStatus: "approved", newAssignedRole: "squad_commander" });
-    });
-
-    it("acknowledge denied → passes down to squad_commander", () => {
-      const result = getNextState("denied", "platoon_commander", "acknowledge", "leave");
-      expect(result).toEqual({ newStatus: "denied", newAssignedRole: "squad_commander" });
-    });
-
     it("approve non-open → returns null", () => {
       const result = getNextState("approved", "platoon_commander", "approve", "leave");
       expect(result).toBeNull();
     });
-  });
 
-  describe("company_commander actions", () => {
-    it("approve open → approved, sent to platoon_commander", () => {
-      const result = getNextState("open", "company_commander", "approve", "leave");
-      expect(result).toEqual({ newStatus: "approved", newAssignedRole: "platoon_commander" });
-    });
-
-    it("deny open → denied, sent to platoon_commander", () => {
-      const result = getNextState("open", "company_commander", "deny", "leave");
-      expect(result).toEqual({ newStatus: "denied", newAssignedRole: "platoon_commander" });
-    });
-
-    it("approve non-open → returns null", () => {
-      const result = getNextState("approved", "company_commander", "approve", "leave");
+    it("acknowledge → returns null (platoon_commander no longer acknowledges)", () => {
+      const result = getNextState("approved", "platoon_commander", "acknowledge", "leave");
       expect(result).toBeNull();
     });
   });
@@ -72,6 +50,18 @@ describe("getNextState", () => {
 
     it("approve open → returns null (squad commander cannot approve)", () => {
       const result = getNextState("open", "squad_commander", "approve", "leave");
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("company_commander — no longer in workflow", () => {
+    it("approve open → returns null", () => {
+      const result = getNextState("open", "company_commander", "approve", "leave");
+      expect(result).toBeNull();
+    });
+
+    it("deny open → returns null", () => {
+      const result = getNextState("open", "company_commander", "deny", "leave");
       expect(result).toBeNull();
     });
   });
@@ -96,8 +86,8 @@ describe("canActOnRequest", () => {
     expect(canActOnRequest("squad_commander", "platoon_commander")).toBe(false);
   });
 
-  it("deputy_company_commander can act on company_commander assignments", () => {
-    expect(canActOnRequest("deputy_company_commander", "company_commander")).toBe(true);
+  it("deputy_company_commander cannot act on company_commander assignments", () => {
+    expect(canActOnRequest("deputy_company_commander", "company_commander")).toBe(false);
   });
 
   it("platoon_sergeant cannot act on platoon_commander assignments", () => {
@@ -116,20 +106,19 @@ describe("getAvailableActions", () => {
     expect(actions).not.toContain("acknowledge");
   });
 
-  it("returns approve+deny for company_commander on open request", () => {
+  it("returns empty for company_commander on open request (no longer in workflow)", () => {
     const actions = getAvailableActions("open", "company_commander", "company_commander", "leave");
-    expect(actions).toContain("approve");
-    expect(actions).toContain("deny");
-  });
-
-  it("returns acknowledge for platoon_commander on approved request", () => {
-    const actions = getAvailableActions("approved", "platoon_commander", "platoon_commander", "leave");
-    expect(actions).toEqual(["acknowledge"]);
+    expect(actions).toEqual([]);
   });
 
   it("returns acknowledge for squad_commander on approved request", () => {
     const actions = getAvailableActions("approved", "squad_commander", "squad_commander", "leave");
     expect(actions).toEqual(["acknowledge"]);
+  });
+
+  it("returns empty for platoon_commander on approved request (no longer acknowledges)", () => {
+    const actions = getAvailableActions("approved", "platoon_commander", "platoon_commander", "leave");
+    expect(actions).toEqual([]);
   });
 
   it("returns empty array when user role does not match assigned role", () => {
@@ -145,12 +134,6 @@ describe("getAvailableActions", () => {
   it("returns empty array for squad_commander on open request (cannot approve)", () => {
     const actions = getAvailableActions("open", "squad_commander", "squad_commander", "leave");
     expect(actions).toEqual([]);
-  });
-
-  it("deputy_company_commander gets approve+deny for company_commander assignment", () => {
-    const actions = getAvailableActions("open", "company_commander", "deputy_company_commander", "leave");
-    expect(actions).toContain("approve");
-    expect(actions).toContain("deny");
   });
 
   it("platoon_sergeant gets no actions for platoon_commander assignment", () => {

@@ -131,7 +131,7 @@ describe("POST /api/requests", () => {
     expect(createCall.data.createdByUserId).toBe("user-1");
   });
 
-  it("creates request as platoon_commander → assigns to company_commander", async () => {
+  it("creates request as platoon_commander → self-assigns to platoon_commander", async () => {
     mockGetScope.mockResolvedValue({
       scope: {
         role: "platoon_commander",
@@ -151,7 +151,7 @@ describe("POST /api/requests", () => {
     expect(res.status).toBe(201);
 
     const createCall = mockRequestCreate.mock.calls[0][0] as { data: Record<string, unknown> };
-    expect(createCall.data.assignedRole).toBe("company_commander");
+    expect(createCall.data.assignedRole).toBe("platoon_commander");
   });
 
   it("uses client-provided id when present", async () => {

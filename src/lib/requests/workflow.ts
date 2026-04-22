@@ -4,12 +4,10 @@ export type WorkflowAction = "approve" | "deny" | "acknowledge";
 
 /**
  * Whether a user's role can act on a request assigned to the given role.
- * Deputy company commander can act on company_commander assignments.
  * Platoon sergeant CANNOT act on platoon_commander assignments.
  */
 function matchesAssignment(userRole: Role, assignedRole: Role): boolean {
   if (userRole === assignedRole) return true;
-  if (userRole === "deputy_company_commander" && assignedRole === "company_commander") return true;
   return false;
 }
 
@@ -33,33 +31,15 @@ export function getNextState(
     if (currentStatus !== "open" && action === "approve") return null;
   }
 
-  // Squad commander opens → assigned to platoon commander
-  // Platoon commander opens → assigned to company commander (skip platoon approval)
+  // Squad commander creates → assigned to platoon commander
+  // Platoon commander approves/denies → assigned to squad commander for acknowledgment
 
   if (currentAssignedRole === "platoon_commander") {
     if (action === "approve" && currentStatus === "open") {
-      // Hardship skips company commander
-      if (requestType === "hardship") {
-        return { newStatus: "approved", newAssignedRole: "squad_commander" };
-      }
-      // Normal: advance to company commander
-      return { newStatus: "open", newAssignedRole: "company_commander" };
+      return { newStatus: "approved", newAssignedRole: "squad_commander" };
     }
     if (action === "deny" && currentStatus === "open") {
       return { newStatus: "denied", newAssignedRole: "squad_commander" };
-    }
-    // Acknowledge approved/denied from company commander
-    if (action === "acknowledge" && (currentStatus === "approved" || currentStatus === "denied")) {
-      return { newStatus: currentStatus, newAssignedRole: "squad_commander" };
-    }
-  }
-
-  if (currentAssignedRole === "company_commander") {
-    if (action === "approve" && currentStatus === "open") {
-      return { newStatus: "approved", newAssignedRole: "platoon_commander" };
-    }
-    if (action === "deny" && currentStatus === "open") {
-      return { newStatus: "denied", newAssignedRole: "platoon_commander" };
     }
   }
 
@@ -136,19 +116,13 @@ export function getAvailableActions(
   const actions: WorkflowAction[] = [];
 
   if (currentStatus === "open") {
-    if (
-      currentAssignedRole === "platoon_commander" ||
-      currentAssignedRole === "company_commander"
-    ) {
+    if (currentAssignedRole === "platoon_commander") {
       actions.push("approve", "deny");
     }
   }
 
   if (currentStatus === "approved" || currentStatus === "denied") {
-    if (
-      currentAssignedRole === "platoon_commander" ||
-      currentAssignedRole === "squad_commander"
-    ) {
+    if (currentAssignedRole === "squad_commander") {
       actions.push("acknowledge");
     }
   }

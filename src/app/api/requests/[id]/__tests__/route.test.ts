@@ -376,22 +376,22 @@ describe("PATCH /api/requests/[id] — field edits", () => {
     // isValidTransition calls getNextState for each action — make "approve" return the target state
     mockGetNextState.mockImplementation((status, role, action) => {
       if (status === "open" && role === "platoon_commander" && action === "approve") {
-        return { newStatus: "open", newAssignedRole: "company_commander" };
+        return { newStatus: "approved", newAssignedRole: "squad_commander" };
       }
       return null;
     });
-    mockRequestUpdate.mockResolvedValue({ ...baseRequest, status: "open", assignedRole: "company_commander" } as never);
+    mockRequestUpdate.mockResolvedValue({ ...baseRequest, status: "approved", assignedRole: "squad_commander" } as never);
 
     const req = createMockRequest("PATCH", "/api/requests/req-1", {
-      status: "open",
-      assignedRole: "company_commander",
+      status: "approved",
+      assignedRole: "squad_commander",
     });
     const res = await PATCH(req, makeParams("req-1"));
     expect(res.status).toBe(200);
 
     const updateCall = mockRequestUpdate.mock.calls[0][0] as { data: Record<string, unknown> };
-    expect(updateCall.data.status).toBe("open");
-    expect(updateCall.data.assignedRole).toBe("company_commander");
+    expect(updateCall.data.status).toBe("approved");
+    expect(updateCall.data.assignedRole).toBe("squad_commander");
   });
 
   it("rejects invalid connector sync transition", async () => {

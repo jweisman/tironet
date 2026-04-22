@@ -79,8 +79,8 @@ export async function POST(request: NextRequest) {
     // Coordinator creates hardship request → goes through regular approval chain
     assignedRole = "platoon_commander";
   } else if (scope.role === "platoon_commander") {
-    // Platoon commander creates → goes directly to company commander
-    assignedRole = "company_commander";
+    // Platoon commander creates → self-assigned for own approval
+    assignedRole = "platoon_commander";
   } else {
     return NextResponse.json({ error: "Cannot determine assignment" }, { status: 400 });
   }

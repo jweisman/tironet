@@ -346,19 +346,17 @@ Requests use a `status` + `assignedRole` pair to track progress. `assignedRole` 
 
 **Creation routing:**
 - Squad commander creates → assigned to `platoon_commander`
-- Platoon commander creates → assigned to `company_commander` (skips platoon approval)
+- Platoon commander creates → assigned to `platoon_commander` (self-assigned)
 - Admin creates → assigned to `platoon_commander`
 
-**Approval chain (leave & medical):**
+**Approval chain (all request types):**
 ```
 squad_commander creates → platoon_commander (approve/deny)
-  → if approved: company_commander (approve/deny)
-    → if approved: platoon_commander (acknowledge) → squad_commander (acknowledge) → done (assignedRole = null)
-    → if denied: platoon_commander (acknowledge) → squad_commander (acknowledge) → done
+  → if approved: squad_commander (acknowledge) → done (assignedRole = null)
   → if denied: squad_commander (acknowledge) → done
 ```
 
-**Hardship requests** skip company commander — platoon commander approval goes directly to squad commander acknowledge.
+The company commander is **not** part of the approval workflow. The platoon commander is the final approver for all request types.
 
 **Key implementation detail:** the `acknowledge` action passes the decision down the chain without changing the status. Only approve/deny change the status.
 

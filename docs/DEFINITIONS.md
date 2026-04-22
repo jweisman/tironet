@@ -45,7 +45,6 @@ Approved hardship requests are tracked separately from active requests (no date 
   * for requests: treated like squad commander — creates requests routed to platoon commander, cannot act on requests assigned to platoon commander
 * _Company commander_:
   * access to all soldiers in all platoons in their company
-  * approves/denies medical and leave requests (second level after platoon commander)
   * manages squad commanders
   * access to reports
 * _Deputy company commander_:
