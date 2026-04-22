@@ -739,7 +739,7 @@ export default function RequestsPage() {
 
       {/* Create request dialog */}
       <Dialog open={!!createType} onOpenChange={(open) => { if (!open) setCreateType(null); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {createType && (

@@ -431,7 +431,7 @@ export function CreateRequestForm({
                     <Trash2 size={14} />
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
                   <div className="space-y-1">
                     <Label className="text-xs">תאריך ושעה</Label>
                     <Input
