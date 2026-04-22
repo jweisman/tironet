@@ -151,8 +151,7 @@ export function CreateRequestForm({
   const [paramedicDate, setParamedicDate] = useState("");
   const [appointments, setAppointments] = useState<MedicalAppointment[]>([]);
   const [sickDays, setSickDays] = useState<SickDay[]>([]);
-  const [sickDayFrom, setSickDayFrom] = useState("");
-  const [sickDayTo, setSickDayTo] = useState("");
+  const [sickDayRanges, setSickDayRanges] = useState<{ id: string; from: string; to: string }[]>([]);
 
   function addAppointment() {
     setAppointments((prev) => [
@@ -227,11 +226,23 @@ export function CreateRequestForm({
           "urgent", "paramedic_date", "medical_appointments", "sick_days",
         );
         const validAppointments = appointments.filter((a) => a.date);
+        // Expand all sick day ranges into individual days
+        const existing = new Set(sickDays.map((d) => d.date));
+        let allSickDays = [...sickDays];
+        for (const range of sickDayRanges) {
+          if (!range.from) continue;
+          for (const d of expandSickDayRange(range.from, range.to || null)) {
+            if (!existing.has(d.date)) {
+              allSickDays.push(d);
+              existing.add(d.date);
+            }
+          }
+        }
         values.push(
           urgent ? 1 : 0,
           paramedicDate || null,
           validAppointments.length > 0 ? JSON.stringify(validAppointments) : null,
-          sickDays.length > 0 ? JSON.stringify(sickDays) : null,
+          allSickDays.length > 0 ? JSON.stringify(allSickDays) : null,
         );
       }
 
@@ -420,7 +431,7 @@ export function CreateRequestForm({
               <p className="text-xs text-muted-foreground">אין תורים. לחץ &quot;הוסף תור&quot; כדי להוסיף.</p>
             )}
             {appointments.map((appt) => (
-              <div key={appt.id} className="rounded-lg border border-border p-3 space-y-2">
+              <div key={appt.id} className="rounded-lg border border-border p-3 space-y-2 overflow-hidden">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground">תור</span>
                   <button
@@ -440,6 +451,7 @@ export function CreateRequestForm({
                       onChange={(e) => updateAppointment(appt.id, "date", e.target.value)}
                       dir="ltr"
                       lang="he"
+                      className="w-full min-w-0"
                       style={appt.date ? undefined : { color: "transparent" }}
                     />
                   </div>
@@ -484,45 +496,50 @@ export function CreateRequestForm({
                 ))}
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="space-y-0.5">
-                <Label className="text-xs">מתאריך</Label>
-                <Input
-                  type="date"
-                  value={sickDayFrom}
-                  onChange={(e) => setSickDayFrom(e.target.value)}
-                  dir="ltr"
-                  lang="he"
-                  style={sickDayFrom ? undefined : { color: "transparent" }}
-                />
+            {sickDayRanges.map((range) => (
+              <div key={range.id} className="rounded-lg border border-border p-2 space-y-1.5 overflow-hidden">
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setSickDayRanges((prev) => prev.filter((r) => r.id !== range.id))}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs">מתאריך</Label>
+                    <Input
+                      type="date"
+                      value={range.from}
+                      onChange={(e) => setSickDayRanges((prev) => prev.map((r) => (r.id === range.id ? { ...r, from: e.target.value } : r)))}
+                      dir="ltr"
+                      lang="he"
+                      className="w-full min-w-0"
+                      style={range.from ? undefined : { color: "transparent" }}
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <Label className="text-xs">עד תאריך</Label>
+                    <Input
+                      type="date"
+                      value={range.to}
+                      onChange={(e) => setSickDayRanges((prev) => prev.map((r) => (r.id === range.id ? { ...r, to: e.target.value } : r)))}
+                      min={range.from || undefined}
+                      dir="ltr"
+                      lang="he"
+                      className="w-full min-w-0"
+                      style={range.to ? undefined : { color: "transparent" }}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-0.5">
-                <Label className="text-xs">עד תאריך</Label>
-                <Input
-                  type="date"
-                  value={sickDayTo}
-                  onChange={(e) => setSickDayTo(e.target.value)}
-                  min={sickDayFrom || undefined}
-                  dir="ltr"
-                  lang="he"
-                  style={sickDayTo ? undefined : { color: "transparent" }}
-                />
-              </div>
-            </div>
+            ))}
             <button
               type="button"
-              disabled={!sickDayFrom}
-              onClick={() => {
-                const newDays = expandSickDayRange(sickDayFrom, sickDayTo || null);
-                // Filter out duplicates
-                setSickDays((prev) => {
-                  const existing = new Set(prev.map((d) => d.date));
-                  return [...prev, ...newDays.filter((d) => !existing.has(d.date))];
-                });
-                setSickDayFrom("");
-                setSickDayTo("");
-              }}
-              className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center disabled:opacity-50"
+              onClick={() => setSickDayRanges((prev) => [...prev, { id: crypto.randomUUID(), from: "", to: "" }])}
+              className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center"
             >
               <Plus size={14} />
               הוסף ימי מחלה
