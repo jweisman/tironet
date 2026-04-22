@@ -45,9 +45,14 @@ export function TironetPowerSyncProvider({
       statusChanged: (status) => {
         if (isCorruptError(status.dataFlowStatus?.downloadError)) {
           console.error("[PowerSync] DB corruption detected via status change");
-          Sentry.captureException(status.dataFlowStatus!.downloadError, {
-            tags: { component: "powersync", phase: "sync", corrupt: true },
-          });
+          const dlErr = status.dataFlowStatus!.downloadError;
+          Sentry.captureMessage(
+            `DB corruption detected: ${(dlErr as { message?: string }).message ?? String(dlErr)}`,
+            {
+              level: "error",
+              tags: { component: "powersync", phase: "sync", corrupt: true },
+            },
+          );
           setDbCorrupt(true);
         }
       },
@@ -75,9 +80,13 @@ export function TironetPowerSyncProvider({
       .catch((err: unknown) => {
         if (isCorruptError(err)) {
           console.error("[PowerSync] DB corrupt during init/connect:", err);
-          Sentry.captureException(err, {
-            tags: { component: "powersync", phase: "init", corrupt: true },
-          });
+          Sentry.captureMessage(
+            `DB corruption during init/connect: ${(err as { message?: string }).message ?? String(err)}`,
+            {
+              level: "error",
+              tags: { component: "powersync", phase: "init", corrupt: true },
+            },
+          );
           setDbCorrupt(true);
           return;
         }
