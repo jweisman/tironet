@@ -12,7 +12,9 @@ const connector = new TironetConnector();
 
 function isCorruptError(err: unknown): boolean {
   if (!err) return false;
-  const msg = err instanceof Error ? err.message : String(err);
+  // Error may be a plain object from the web worker (Comlink can't
+  // transfer Error instances). Check .message first, fall back to String().
+  const msg = (err as { message?: string }).message ?? String(err);
   return msg.includes("CORRUPT") || msg.includes("database disk image is malformed");
 }
 

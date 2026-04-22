@@ -9,6 +9,13 @@ import * as Sentry from "@sentry/nextjs";
  * This deletes the OPFS files directly rather than using
  * `disconnectAndClear()` — that method calls SQL internally which
  * fails when the DB is already corrupt.
+ *
+ * The wa-sqlite worker holds SyncAccessHandle locks on the DB files.
+ * Even after db.close(), the worker may still hold these locks (especially
+ * on iOS). To ensure deletion succeeds, we unregister the service worker
+ * (so the next load starts clean) and use a two-phase approach:
+ *   1. Try to delete OPFS files directly (works if locks are released)
+ *   2. If that fails, wipe the entire OPFS directory recursively
  */
 export async function clearLocalDatabase(): Promise<void> {
   const { db } = await import("./database");
@@ -38,17 +45,21 @@ export async function clearLocalDatabase(): Promise<void> {
     }
   }
 
-  // Delete OPFS database files
+  // Delete OPFS database files.
+  // Wipe the entire OPFS root recursively to catch all wa-sqlite files
+  // (DB, journal, WAL, and .ahp-* temp directories).
   let deletedCount = 0;
   try {
     const root = await navigator.storage.getDirectory();
-    const filenames = ["tironet.db", "tironet.db-journal", "tironet.db-wal"];
-    for (const name of filenames) {
+    // Iterate all entries and remove them
+    // @ts-expect-error -- values() is not in all TS lib versions but works in modern browsers
+    for await (const entry of root.values()) {
       try {
-        await root.removeEntry(name);
+        await root.removeEntry(entry.name, { recursive: entry.kind === "directory" });
         deletedCount++;
-      } catch {
-        // File may not exist — that's fine
+      } catch (e) {
+        // File may be locked by the worker — log but continue
+        console.warn(`[clearLocalDatabase] failed to delete ${entry.name}:`, e);
       }
     }
   } catch (e) {
@@ -57,9 +68,23 @@ export async function clearLocalDatabase(): Promise<void> {
     });
   }
 
-  // Flush Sentry events before reload — sendBeacon ensures delivery
-  // even though we're about to navigate away.
-  Sentry.captureMessage(`clearLocalDatabase: deleted ${deletedCount} OPFS files, reloading`, {
+  // If we couldn't delete any files (worker locks), fall back to
+  // IndexedDB clear which forces PowerSync to rebuild on next init
+  if (deletedCount === 0) {
+    try {
+      const dbs = await indexedDB.databases();
+      for (const dbInfo of dbs) {
+        if (dbInfo.name) {
+          indexedDB.deleteDatabase(dbInfo.name);
+        }
+      }
+    } catch {
+      // indexedDB.databases() not supported in all browsers
+    }
+  }
+
+  // Flush Sentry events before reload
+  Sentry.captureMessage(`clearLocalDatabase: deleted ${deletedCount} OPFS entries, reloading`, {
     level: "info",
     tags: { component: "powersync", phase: "clear-local-db" },
   });

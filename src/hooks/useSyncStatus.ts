@@ -74,9 +74,14 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
 
   // Only treat corruption as a true error (red). Connection failures
   // are expected when the server is unreachable — those are "stale" (yellow).
-  const isCorrupt = downloadError
-    && (downloadError instanceof Error ? downloadError.message : String(downloadError))
-      .includes("CORRUPT");
+  // downloadError may be a real Error or a plain object from the web worker
+  // (Comlink can't transfer Error instances across the worker boundary).
+  // Check .message first (works for both), fall back to String().
+  const errorMessage = downloadError
+    ? ((downloadError as { message?: string }).message ?? String(downloadError))
+    : "";
+  const isCorrupt = errorMessage.includes("CORRUPT")
+    || errorMessage.includes("malformed");
 
   // Compute state
   let state: SyncState;
