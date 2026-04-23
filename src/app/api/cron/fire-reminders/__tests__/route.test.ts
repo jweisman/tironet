@@ -4,7 +4,7 @@ process.env.CRON_SECRET = "test-secret";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    scheduledReminder: { findMany: vi.fn(), update: vi.fn() },
+    scheduledReminder: { findMany: vi.fn(), update: vi.fn(), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     request: { findUnique: vi.fn() },
   },
 }));
@@ -47,7 +47,7 @@ describe("GET /api/cron/fire-reminders", () => {
     mockFindMany.mockResolvedValue([]);
     const res = await GET(createCronRequest());
     const body = await res.json();
-    expect(body).toEqual({ fired: 0, total: 0 });
+    expect(body).toEqual({ fired: 0, total: 0, cleaned: 0 });
   });
 
   it("fires pending reminders and skips denied requests", async () => {
@@ -84,7 +84,7 @@ describe("GET /api/cron/fire-reminders", () => {
     const res = await GET(createCronRequest());
     const body = await res.json();
 
-    expect(body).toEqual({ fired: 1, total: 2 });
+    expect(body).toEqual({ fired: 1, total: 2, cleaned: 0 });
     expect(mockUpdate).toHaveBeenCalledTimes(2); // Both marked as fired
     expect(mockSendPush).toHaveBeenCalledTimes(1); // Only first gets push
   });
