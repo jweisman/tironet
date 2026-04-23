@@ -5,6 +5,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     request: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
     requestAction: { create: vi.fn() },
+    scheduledReminder: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     $transaction: vi.fn(),
   },
 }));
@@ -33,6 +34,11 @@ vi.mock("@/lib/auth/permissions", () => ({
 vi.mock("@/lib/push/send", () => ({
   sendPushToUsers: vi.fn().mockResolvedValue(undefined),
   notifyAssignedRole: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/reminders/schedule", () => ({
+  scheduleRemindersForRequest: vi.fn().mockResolvedValue(undefined),
+  cancelAllRemindersForRequest: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("next/server", async (importOriginal) => {

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { getRequestScope } from "@/lib/api/request-scope";
 import { sendPushToUsers } from "@/lib/push/send";
+import { scheduleRemindersForRequest } from "@/lib/reminders/schedule";
 import { z } from "zod";
 import type { SessionUser, Role } from "@/types";
 
@@ -132,6 +133,13 @@ export async function POST(request: NextRequest) {
   after(() =>
     notifyAssignedRole(data.cycleId, assignedRole, data.type, "open", soldierName, req.id, data.soldierId).catch((err) =>
       console.warn("[push] request creation notification failed:", err),
+    ),
+  );
+
+  // Schedule reminders for time-bearing events (medical appointments with time, leave departures)
+  after(() =>
+    scheduleRemindersForRequest(req.id).catch((err) =>
+      console.warn("[reminders] scheduling failed:", err),
     ),
   );
 

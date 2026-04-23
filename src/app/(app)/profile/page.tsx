@@ -42,6 +42,7 @@ export default function ProfilePage() {
   const [requestAssignmentEnabled, setRequestAssignmentEnabled] = useState(true);
   const [activeRequestsEnabled, setActiveRequestsEnabled] = useState(true);
   const [newAppointmentEnabled, setNewAppointmentEnabled] = useState(true);
+  const [reminderLeadMinutes, setReminderLeadMinutes] = useState<number | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   // Load notification preferences from server
@@ -54,6 +55,7 @@ export default function ProfilePage() {
           setRequestAssignmentEnabled(data.requestAssignmentEnabled);
           setActiveRequestsEnabled(data.activeRequestsEnabled);
           setNewAppointmentEnabled(data.newAppointmentEnabled);
+          setReminderLeadMinutes(data.reminderLeadMinutes ?? null);
         }
         setPrefsLoaded(true);
       })
@@ -61,7 +63,7 @@ export default function ProfilePage() {
   }, []);
 
   const updatePreference = useCallback(
-    async (field: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled" | "newAppointmentEnabled", value: boolean) => {
+    async (field: string, value: boolean | number | null) => {
       const res = await fetch("/api/push/preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -69,11 +71,12 @@ export default function ProfilePage() {
       });
       if (!res.ok) {
         toast.error("שגיאה בשמירת העדפות התראות");
-        // Revert
+        // Revert boolean toggles
         if (field === "dailyTasksEnabled") setDailyTasksEnabled(!value);
         else if (field === "requestAssignmentEnabled") setRequestAssignmentEnabled(!value);
         else if (field === "activeRequestsEnabled") setActiveRequestsEnabled(!value);
-        else setNewAppointmentEnabled(!value);
+        else if (field === "newAppointmentEnabled") setNewAppointmentEnabled(!value);
+        // reminderLeadMinutes revert is handled at the call site
       }
     },
     [],
@@ -315,6 +318,32 @@ export default function ProfilePage() {
                   updatePreference("newAppointmentEnabled", v);
                 }}
               />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">תזכורת לפני תור / יציאה</p>
+                <p className="text-xs text-muted-foreground">התראה מוקדמת לפני תור רפואי או שעת יציאה</p>
+              </div>
+              <select
+                className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                disabled={!prefsLoaded}
+                value={reminderLeadMinutes ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value === "" ? null : Number(e.target.value);
+                  const prev = reminderLeadMinutes;
+                  setReminderLeadMinutes(val);
+                  updatePreference("reminderLeadMinutes", val).then(undefined, () => {
+                    setReminderLeadMinutes(prev);
+                  });
+                }}
+              >
+                <option value="">ללא</option>
+                <option value="15">15 דקות</option>
+                <option value="30">30 דקות</option>
+                <option value="60">שעה</option>
+                <option value="120">שעתיים</option>
+                <option value="180">3 שעות</option>
+              </select>
             </div>
             <Button
               variant="ghost"

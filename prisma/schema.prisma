@@ -410,6 +410,7 @@ model Request {
   soldier         Soldier       @relation(fields: [soldierId], references: [id], onDelete: Cascade)
   createdBy       User          @relation(fields: [createdByUserId], references: [id])
   actions         RequestAction[]
+  scheduledReminders ScheduledReminder[]
 
   @@index([cycleId, status], name: "idx_requests_cycle_status")
   @@index([soldierId], name: "idx_requests_soldier")
@@ -457,6 +458,7 @@ model NotificationPreference {
   requestAssignmentEnabled Boolean @default(true) @map("request_assignment_enabled")
   activeRequestsEnabled    Boolean @default(true) @map("active_requests_enabled")
   newAppointmentEnabled    Boolean @default(true) @map("new_appointment_enabled")
+  reminderLeadMinutes      Int?    @map("reminder_lead_minutes")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -495,4 +497,34 @@ model ReportExportDefault {
 
   @@unique([userId, reportType])
   @@map("report_export_defaults")
+}
+
+// ---------------------------------------------------------------------------
+// Scheduled reminders (QStash-backed)
+// ---------------------------------------------------------------------------
+
+model ScheduledReminder {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId       String   @map("request_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  /// For medical: the appointment id from the JSON array. Null for departure reminders.
+  appointmentId   String?  @map("appointment_id")
+  /// "medical" or "departure"
+  reminderType    String   @map("reminder_type")
+  /// The QStash message ID, used to cancel scheduled messages
+  qstashMessageId String?  @map("qstash_message_id")
+  /// When the reminder should fire (event time minus lead time)
+  scheduledFor    DateTime @map("scheduled_for") @db.Timestamptz()
+  /// The actual event time (appointment or departure)
+  eventAt         DateTime @map("event_at") @db.Timestamptz()
+  fired           Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, userId, appointmentId, reminderType], name: "uq_scheduled_reminder")
+  @@index([scheduledFor, fired], name: "idx_scheduled_reminders_pending")
+  @@index([requestId], name: "idx_scheduled_reminders_request")
+  @@index([userId], name: "idx_scheduled_reminders_user")
+  @@map("scheduled_reminders")
 }

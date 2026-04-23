@@ -6,6 +6,7 @@ import { getRequestScope } from "@/lib/api/request-scope";
 import { getNextState, isValidTransition } from "@/lib/requests/workflow";
 import { canActOnRequest } from "@/lib/requests/workflow";
 import { sendPushToUsers } from "@/lib/push/send";
+import { scheduleRemindersForRequest, cancelAllRemindersForRequest } from "@/lib/reminders/schedule";
 import { parseMedicalAppointments } from "@/lib/requests/medical-appointments";
 import { z } from "zod";
 import { effectiveRole } from "@/lib/auth/permissions";
@@ -155,6 +156,13 @@ export async function PATCH(
       );
     }
 
+    // Reconcile reminders (status may have changed to denied, or request approved)
+    after(() =>
+      scheduleRemindersForRequest(id).catch((err) =>
+        console.warn("[reminders] scheduling failed:", err),
+      ),
+    );
+
     return NextResponse.json({ request: updated });
   }
 
@@ -218,6 +226,13 @@ export async function PATCH(
       }
     }
 
+    // Reconcile reminders (status/assignedRole/appointments/departure may have changed)
+    after(() =>
+      scheduleRemindersForRequest(id).catch((err) =>
+        console.warn("[reminders] scheduling failed:", err),
+      ),
+    );
+
     return NextResponse.json({ request: updated });
   }
 
@@ -255,6 +270,13 @@ export async function PATCH(
     }
   }
 
+  // Reconcile reminders (appointments or departure may have changed)
+  after(() =>
+    scheduleRemindersForRequest(id).catch((err) =>
+      console.warn("[reminders] scheduling failed:", err),
+    ),
+  );
+
   return NextResponse.json({ request: updated });
 }
 
@@ -280,7 +302,16 @@ export async function DELETE(
     return NextResponse.json({ error: "Can only delete open requests" }, { status: 400 });
   }
 
+  // Cancel QStash messages before cascade-deleting the reminder rows
+  const qstashMessageIds = await cancelAllRemindersForRequest(id);
+
   await prisma.request.delete({ where: { id } });
+
+  // Log for debugging if any QStash messages were cancelled
+  if (qstashMessageIds.length > 0) {
+    console.info(`[reminders] cancelled ${qstashMessageIds.length} reminders for deleted request ${id}`);
+  }
+
   return NextResponse.json({ success: true });
 }
 

@@ -20,6 +20,10 @@ vi.mock("@/lib/push/send", () => ({
   sendPushToUsers: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/lib/reminders/schedule", () => ({
+  scheduleRemindersForRequest: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { GET, POST } from "../route";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestScope } from "@/lib/api/request-scope";
