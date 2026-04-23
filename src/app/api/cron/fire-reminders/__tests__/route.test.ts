@@ -9,6 +9,10 @@ vi.mock("@/lib/db/prisma", () => ({
   },
 }));
 
+vi.mock("@/lib/reminders/qstash", () => ({
+  publishReminder: vi.fn().mockResolvedValue("msg-1"),
+}));
+
 vi.mock("@/lib/push/send", () => ({
   sendPushToUser: vi.fn(),
 }));
@@ -47,11 +51,11 @@ describe("GET /api/cron/fire-reminders", () => {
     mockFindMany.mockResolvedValue([]);
     const res = await GET(createCronRequest());
     const body = await res.json();
-    expect(body).toEqual({ fired: 0, total: 0, cleaned: 0 });
+    expect(body).toEqual({ fired: 0, total: 0, scheduled: 0, cleaned: 0 });
   });
 
   it("fires pending reminders and skips denied requests", async () => {
-    mockFindMany.mockResolvedValue([
+    mockFindMany.mockResolvedValueOnce([
       {
         id: "rem-1",
         requestId: "req-1",
@@ -66,7 +70,8 @@ describe("GET /api/cron/fire-reminders", () => {
         reminderType: "departure",
         eventAt: new Date("2026-05-01T14:00:00Z"),
       },
-    ] as never);
+    ] as never)
+      .mockResolvedValueOnce([] as never); // unscheduled query
 
     // First request is approved, second is denied
     mockFindRequest
@@ -84,7 +89,7 @@ describe("GET /api/cron/fire-reminders", () => {
     const res = await GET(createCronRequest());
     const body = await res.json();
 
-    expect(body).toEqual({ fired: 1, total: 2, cleaned: 0 });
+    expect(body).toEqual({ fired: 1, total: 2, scheduled: 0, cleaned: 0 });
     expect(mockUpdate).toHaveBeenCalledTimes(2); // Both marked as fired
     expect(mockSendPush).toHaveBeenCalledTimes(1); // Only first gets push
   });

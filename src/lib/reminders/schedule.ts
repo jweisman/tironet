@@ -313,24 +313,28 @@ export async function rescheduleRemindersForUser(
       const scheduledFor = new Date(event.eventAt.getTime() - leadMs);
       if (scheduledFor <= now) continue;
 
-      const reminder = await prisma.scheduledReminder.create({
-        data: {
-          requestId: req.id,
-          userId,
-          appointmentId: event.appointmentId,
-          reminderType: event.reminderType,
-          scheduledFor,
-          eventAt: event.eventAt,
-        },
-      });
-
-      const notBefore = Math.floor(scheduledFor.getTime() / 1000);
-      const messageId = await publishReminder(reminder.id, notBefore);
-      if (messageId) {
-        await prisma.scheduledReminder.update({
-          where: { id: reminder.id },
-          data: { qstashMessageId: messageId },
+      try {
+        const reminder = await prisma.scheduledReminder.create({
+          data: {
+            requestId: req.id,
+            userId,
+            appointmentId: event.appointmentId,
+            reminderType: event.reminderType,
+            scheduledFor,
+            eventAt: event.eventAt,
+          },
         });
+
+        const notBefore = Math.floor(scheduledFor.getTime() / 1000);
+        const messageId = await publishReminder(reminder.id, notBefore);
+        if (messageId) {
+          await prisma.scheduledReminder.update({
+            where: { id: reminder.id },
+            data: { qstashMessageId: messageId },
+          });
+        }
+      } catch (err) {
+        console.warn(`[reminders] failed to schedule reminder for request ${req.id}:`, err);
       }
     }
   }

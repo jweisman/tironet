@@ -16,9 +16,15 @@ function getClient(): Client | null {
   return client;
 }
 
+/** QStash maximum delay is 7 days (604800 seconds) */
+const MAX_DELAY_SECONDS = 7 * 24 * 60 * 60;
+
 /**
  * Schedule a reminder via QStash. Returns the QStash messageId, or null if
- * QStash is not configured.
+ * QStash is not configured or the reminder is too far in the future.
+ *
+ * QStash has a max delay of 7 days. Reminders beyond that are stored in the DB
+ * with no messageId and scheduled by the cron poller once they're within range.
  *
  * @param reminderId  The ScheduledReminder row id (sent in the callback body)
  * @param notBefore   Unix timestamp in seconds when the message should fire
@@ -33,6 +39,13 @@ export async function publishReminder(
   const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL;
   if (!appUrl) {
     console.warn("[reminders] APP_URL / NEXT_PUBLIC_APP_URL not configured — cannot schedule reminder");
+    return null;
+  }
+
+  // Skip QStash if the reminder is more than 7 days out — the cron poller
+  // will schedule it once it's within range.
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (notBefore - nowSeconds > MAX_DELAY_SECONDS) {
     return null;
   }
 
