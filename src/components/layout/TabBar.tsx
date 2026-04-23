@@ -56,6 +56,14 @@ export function TabBar() {
     overflowItems.push({ href: "/admin", icon: Settings, label: t("admin") });
   }
 
+  // ≤5 total items → show all directly
+  // >5 total items → show first 4 + "more" menu
+  const totalItems = staticTabs.length + overflowItems.length;
+  const maxDirect = totalItems <= 5 ? 5 : 4;
+  const availableSlots = Math.max(0, maxDirect - staticTabs.length);
+  const promotedItems = overflowItems.slice(0, availableSlots);
+  const remainingOverflow = overflowItems.slice(availableSlots);
+
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background md:hidden">
       <div className="flex">
@@ -86,8 +94,27 @@ export function TabBar() {
           );
         })}
 
-        {overflowItems.length > 0 && (
-          <OverflowMenu items={overflowItems} />
+        {promotedItems.map(({ href, icon: Icon, label }) => {
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex flex-1 flex-col items-center justify-center gap-1 py-3 text-xs transition-colors min-h-[60px]",
+                active
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+
+        {remainingOverflow.length > 0 && (
+          <OverflowMenu items={remainingOverflow} />
         )}
       </div>
     </nav>
