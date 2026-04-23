@@ -45,7 +45,6 @@ type ActivityType = {
   name: string;
   icon: string;
   isActive: boolean;
-  sortOrder: number;
   scoreConfig: ScoreConfig | null;
   displayConfiguration: DisplayConfiguration | null;
   exportCategory: ExportCategory | null;

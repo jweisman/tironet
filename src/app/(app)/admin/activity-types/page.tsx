@@ -5,7 +5,7 @@ import type { DisplayConfiguration } from "@/types/display-config";
 
 export default async function ActivityTypesPage() {
   const types = await prisma.activityType.findMany({
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    orderBy: { name: "asc" },
   });
   return (
     <ActivityTypeList
@@ -14,7 +14,6 @@ export default async function ActivityTypesPage() {
         name: t.name,
         icon: t.icon,
         isActive: t.isActive,
-        sortOrder: t.sortOrder,
         scoreConfig: (t.scoreConfig as ScoreConfig) ?? null,
         displayConfiguration: (t.displayConfiguration as DisplayConfiguration) ?? null,
         exportCategory: t.exportCategory as "physical" | "test" | "military" | "navigation" | null,

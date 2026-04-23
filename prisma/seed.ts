@@ -8,14 +8,12 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 const ACTIVITY_TYPES = [
-  { name: "אימונים", icon: "dumbbell", sortOrder: 1, 
-    displayConfiguration: {
+  { name: "אימונים", icon: "dumbbell",     displayConfiguration: {
       results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
     },
   },
   {
-    name: "כש״ג", icon: "shield", sortOrder: 2,
-    scoreConfig: {
+    name: "כש״ג", icon: "shield",    scoreConfig: {
       score1: { label: "ציון סופי", format: "number" },
       score2: { label: "מתח", format: "number" },
       score3: { label: "בנץ׳", format: "number" },
@@ -24,46 +22,38 @@ const ACTIVITY_TYPES = [
       score6: { label: "ספרינט", format: "time" },
     },
   },
-  { name: "ירי", icon: "crosshair", sortOrder: 3,
-    scoreConfig: {
+  { name: "ירי", icon: "crosshair",    scoreConfig: {
       score1: { label: "ציון", format: "number" }
     }
   },
-  { name: "שיעורים", icon: "book-open", sortOrder: 4,
-    displayConfiguration: {
+  { name: "שיעורים", icon: "book-open",    displayConfiguration: {
       results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
     },
   },
-  { name: "בוחנים", icon: "clipboard-check", sortOrder: 5,
-    scoreConfig: {
+  { name: "בוחנים", icon: "clipboard-check",    scoreConfig: {
       score1: { label: "ציון", format: "number" }
     }
   },
-  { name: "הסמכות", icon: "award", sortOrder: 6,
-    scoreConfig: {
+  { name: "הסמכות", icon: "award",    scoreConfig: {
       score1: { label: "ציון", format: "number" }
     }
   },
-  { name: "שיחות מפקד", icon: "message-circle", sortOrder: 7,
-    displayConfiguration: {
+  { name: "שיחות מפקד", icon: "message-circle",    displayConfiguration: {
       results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
     },
   },
-  { name: "בחמ״ס", icon: "timer", sortOrder: 8,
-    scoreConfig: {
+  { name: "בחמ״ס", icon: "timer",    scoreConfig: {
       score1: { label: "זמן", format: "time" }
     },
     displayConfiguration: {
       note: { type: "list", options: ["קיר", "חבל", "זמן", "אחר"] },
     },
   },
-  { name: "מסע", icon: "route", sortOrder: 9,
-    displayConfiguration: {
+  { name: "מסע", icon: "route",    displayConfiguration: {
       results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
     },
   },    
-  { name: "קרב מגע", icon: "hand", sortOrder: 10,
-    displayConfiguration: {
+  { name: "קרב מגע", icon: "hand",    displayConfiguration: {
       results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
     },
   },    
