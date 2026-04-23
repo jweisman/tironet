@@ -138,10 +138,10 @@ async function seed() {
 
   await prisma.activityType.createMany({
     data: [
-      { id: IDS.activityTypeShooting, name: "Shooting", icon: "Target", sortOrder: 0 },
-      { id: IDS.activityTypeNav, name: "Navigation", icon: "Compass", sortOrder: 1 },
+      { id: IDS.activityTypeShooting, name: "Shooting", icon: "Target" },
+      { id: IDS.activityTypeNav, name: "Navigation", icon: "Compass" },
       {
-        id: IDS.activityTypeLessons, name: "Lessons", icon: "BookOpen", sortOrder: 2,
+        id: IDS.activityTypeLessons, name: "Lessons", icon: "BookOpen",
         displayConfiguration: {
           results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
         },

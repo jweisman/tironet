@@ -292,7 +292,6 @@ model ActivityType {
   name        String
   icon        String
   isActive    Boolean  @default(true) @map("is_active")
-  sortOrder   Int      @default(0) @map("sort_order")
   scoreConfig          Json?    @map("score_config") @db.JsonB
   displayConfiguration Json?    @map("display_configuration") @db.JsonB
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz()

@@ -44,7 +44,7 @@ export async function GET() {
   if (error) return error;
 
   const types = await prisma.activityType.findMany({
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    orderBy: { name: "asc" },
   });
   return NextResponse.json(types);
 }
@@ -59,14 +59,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const maxSort = await prisma.activityType.aggregate({ _max: { sortOrder: true } });
-  const sortOrder = (maxSort._max.sortOrder ?? 0) + 1;
-
   const { displayConfiguration, ...rest } = parsed.data;
   const type = await prisma.activityType.create({
     data: {
       ...rest,
-      sortOrder,
       ...(displayConfiguration !== undefined && {
         displayConfiguration: displayConfiguration ?? Prisma.DbNull,
       }),

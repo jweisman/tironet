@@ -11,7 +11,7 @@ export async function GET() {
   const types = await prisma.activityType.findMany({
     where: { isActive: true },
     select: { id: true, name: true, icon: true },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    orderBy: { name: "asc" },
   });
 
   return NextResponse.json(types);

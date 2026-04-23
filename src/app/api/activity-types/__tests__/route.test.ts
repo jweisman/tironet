@@ -51,7 +51,7 @@ describe("GET /api/activity-types", () => {
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { isActive: true },
       select: { id: true, name: true, icon: true },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      orderBy: { name: "asc" },
     });
   });
 
