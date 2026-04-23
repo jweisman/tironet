@@ -22,17 +22,13 @@ const MAX_SOLDIERS = 50; // rows 11-60
 // Day names for row 5-6 headers
 const DAY_NAMES = ["יום א'", "יום ב'", "יום ג'", "יום ד'", "יום ה'", "יום ו'", "שבת"];
 
-// Footer labels (rows 61-69, hardcoded for now)
+// Footer labels (rows 61-65)
 const FOOTER_LABELS = [
   "מצבה פעילה:",
   'סה"כ משתתפים מלא+חלקי+תוכנית חזרה לאימונים:',
   "לא ביצעו מתוך מצבה פעילה",
   'סה"כ משתתפים מלא:',
   "אחוז משתתפים מלא:",
-  "לא ביצע מתוך מצבה פעילה",
-  "מצבה פעילה",
-  "ביצע מלא+חלקי+תוכנית חזרה לאימונים",
-  "ביצע מלא",
 ];
 
 // ---------------------------------------------------------------------------
@@ -93,6 +89,13 @@ export async function POST(request: NextRequest) {
   if (!cycle) {
     return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
   }
+
+  // Get company name for the spreadsheet title
+  const firstPlatoon = await prisma.platoon.findFirst({
+    where: { id: { in: scope!.platoonIds } },
+    select: { company: { select: { name: true } } },
+  });
+  const companyName = firstPlatoon?.company?.name ?? "";
 
   const activities = await prisma.activity.findMany({
     where: {
@@ -178,7 +181,7 @@ export async function POST(request: NextRequest) {
       );
       if (result.notFound) {
         fileFallback = true;
-        const fb = await createNewSpreadsheet(accessToken, sheetTitles, cycle.name);
+        const fb = await createNewSpreadsheet(accessToken, sheetTitles, companyName, cycle.name);
         if (fb.needsAuth) {
           await prisma.googleExportToken.delete({ where: { userId: sessionUser.id } });
           return NextResponse.json({ needsAuth: true, authUrl: `/api/reports/google/auth?cycleId=${cycleId}` });
@@ -195,7 +198,7 @@ export async function POST(request: NextRequest) {
         sheetIdMap = result.sheetIdMap!;
       }
     } else {
-      const result = await createNewSpreadsheet(accessToken, sheetTitles, cycle.name);
+      const result = await createNewSpreadsheet(accessToken, sheetTitles, companyName, cycle.name);
       if (result.needsAuth) {
         await prisma.googleExportToken.delete({ where: { userId: sessionUser.id } });
         return NextResponse.json({ needsAuth: true, authUrl: `/api/reports/google/auth?cycleId=${cycleId}` });
@@ -422,6 +425,12 @@ function buildPlatoonSheet(
 
   const coloredCells: [number, number, "green" | "yellow"][] = [];
 
+  // Per-column stats for summary: keyed by column index
+  const colStats = new Map<number, { withReport: number; passed: number; failed: number }>();
+  for (const { col } of activitySlots) {
+    colStats.set(col, { withReport: 0, passed: 0, failed: 0 });
+  }
+
   for (let i = 0; i < MAX_SOLDIERS; i++) {
     const row = makeRow();
     row[0] = String(i + 1); // מס״ד
@@ -438,12 +447,17 @@ function buildPlatoonSheet(
         const report = soldier.activityReports.find((r) => r.activityId === activity.id);
         if (!report || !report.result) continue;
 
+        const stats = colStats.get(col)!;
+        stats.withReport++;
+
         const rowIdx = HEADER_ROWS + i;
         if (report.result === "passed") {
           passedCount++;
+          stats.passed++;
           row[col] = "ביצע מלא";
           coloredCells.push([rowIdx, col, "green"]);
         } else {
+          stats.failed++;
           // failed or na — use note if available, otherwise blank
           row[col] = report.note ?? "";
           if (row[col]) {
@@ -461,11 +475,41 @@ function buildPlatoonSheet(
     rows.push(row);
   }
 
-  // --- Footer rows (61-69, hardcoded labels) ---
+  // --- Footer / summary rows (rows 61-69) ---
+  // Row 1: מצבה פעילה (soldiers with a report = active roster for that activity)
+  // Row 2: participated (passed, option A: same as row 4)
+  // Row 3: did not participate (failed)
+  // Row 4: ביצע מלא (passed)
+  // Row 5: percentage (row 4 / row 1)
+  // Rows 6-9: duplicates of rows 3,1,2,4 (matches original sheet)
   for (let f = 0; f < FOOTER_LABELS.length; f++) {
     const row = makeRow();
     if (f === 0) row[0] = "סיכום מחלקתי"; // merged A61:A65
     row[1] = FOOTER_LABELS[f]; // merged B:D
+
+    for (const { col } of activitySlots) {
+      const s = colStats.get(col)!;
+      switch (f) {
+        case 0: // מצבה פעילה
+          row[col] = s.withReport > 0 ? String(s.withReport) : "";
+          break;
+        case 1: // participated (= passed, option A)
+          row[col] = s.withReport > 0 ? String(s.passed) : "";
+          break;
+        case 2: // לא ביצעו
+          row[col] = s.withReport > 0 ? String(s.failed) : "";
+          break;
+        case 3: // ביצע מלא
+          row[col] = s.withReport > 0 ? String(s.passed) : "";
+          break;
+        case 4: // אחוז משתתפים מלא
+          if (s.withReport > 0) {
+            row[col] = `${Math.round((s.passed / s.withReport) * 100)}%`;
+          }
+          break;
+      }
+    }
+
     rows.push(row);
   }
 
@@ -536,33 +580,52 @@ function buildFormatRequests(sd: PlatoonSheetData, sheetId: number): object[] {
 
   // --- Formatting ---
 
-  // Title: bold, centered, large font
+  // Title: bold, centered, wrapped
   requests.push({
     repeatCell: {
       range: { sheetId, startRowIndex: 0, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 4 },
       cell: {
         userEnteredFormat: {
-          textFormat: { bold: true, fontSize: 14 },
+          textFormat: { bold: true, fontSize: 10 },
           horizontalAlignment: "CENTER",
           verticalAlignment: "MIDDLE",
+          wrapStrategy: "WRAP",
         },
       },
-      fields: "userEnteredFormat(textFormat,horizontalAlignment,verticalAlignment)",
+      fields: "userEnteredFormat(textFormat,horizontalAlignment,verticalAlignment,wrapStrategy)",
     },
   });
 
-  // Header rows 3-10: bold, centered, grey background
   const headerBg = { red: 0.93, green: 0.93, blue: 0.93 };
+
+  // Header label cells (A-D, rows 3-10): wrap text so labels aren't clipped
   requests.push({
     repeatCell: {
-      range: { sheetId, startRowIndex: 2, endRowIndex: HEADER_ROWS, startColumnIndex: 0, endColumnIndex: totalCols },
+      range: { sheetId, startRowIndex: 2, endRowIndex: HEADER_ROWS, startColumnIndex: 0, endColumnIndex: FIXED_COLS },
       cell: {
         userEnteredFormat: {
-          textFormat: { bold: true, fontSize: 9 },
+          textFormat: { bold: true, fontSize: 7 },
           backgroundColor: headerBg,
           horizontalAlignment: "CENTER",
           verticalAlignment: "MIDDLE",
           wrapStrategy: "WRAP",
+        },
+      },
+      fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)",
+    },
+  });
+
+  // Header activity columns (E+ rows 3-10): clip to keep compact
+  requests.push({
+    repeatCell: {
+      range: { sheetId, startRowIndex: 2, endRowIndex: HEADER_ROWS, startColumnIndex: FIXED_COLS, endColumnIndex: totalCols },
+      cell: {
+        userEnteredFormat: {
+          textFormat: { bold: true, fontSize: 7 },
+          backgroundColor: headerBg,
+          horizontalAlignment: "CENTER",
+          verticalAlignment: "MIDDLE",
+          wrapStrategy: "CLIP",
         },
       },
       fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)",
@@ -581,11 +644,14 @@ function buildFormatRequests(sd: PlatoonSheetData, sheetId: number): object[] {
       },
       cell: {
         userEnteredFormat: {
-          textFormat: { bold: true, fontSize: 9 },
+          textFormat: { bold: true, fontSize: 7 },
           backgroundColor: headerBg,
+          horizontalAlignment: "CENTER",
+          verticalAlignment: "MIDDLE",
+          wrapStrategy: "WRAP",
         },
       },
-      fields: "userEnteredFormat(textFormat,backgroundColor)",
+      fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)",
     },
   });
 
@@ -601,10 +667,10 @@ function buildFormatRequests(sd: PlatoonSheetData, sheetId: number): object[] {
       },
       cell: {
         userEnteredFormat: {
-          textFormat: { fontSize: 9 },
+          textFormat: { fontSize: 7 },
           horizontalAlignment: "CENTER",
           verticalAlignment: "MIDDLE",
-          wrapStrategy: "WRAP",
+          wrapStrategy: "CLIP",
         },
       },
       fields: "userEnteredFormat(textFormat,horizontalAlignment,verticalAlignment,wrapStrategy)",
@@ -659,29 +725,74 @@ function buildFormatRequests(sd: PlatoonSheetData, sheetId: number): object[] {
     },
   });
 
-  // Auto-resize fixed columns (A-D)
+  // Column A (מס״ד): narrow
   requests.push({
-    autoResizeDimensions: {
-      dimensions: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: FIXED_COLS },
+    updateDimensionProperties: {
+      range: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: 1 },
+      properties: { pixelSize: 30 },
+      fields: "pixelSize",
     },
   });
 
-  // Activity columns: fixed 65px width
+  // Column B (אחוז): narrow
+  requests.push({
+    updateDimensionProperties: {
+      range: { sheetId, dimension: "COLUMNS", startIndex: 1, endIndex: 2 },
+      properties: { pixelSize: 45 },
+      fields: "pixelSize",
+    },
+  });
+
+  // Columns C-D (name): auto-resize
+  requests.push({
+    autoResizeDimensions: {
+      dimensions: { sheetId, dimension: "COLUMNS", startIndex: 2, endIndex: FIXED_COLS },
+    },
+  });
+
+  // Activity columns: tight 50px width
   if (totalCols > FIXED_COLS) {
     requests.push({
       updateDimensionProperties: {
         range: { sheetId, dimension: "COLUMNS", startIndex: FIXED_COLS, endIndex: totalCols },
-        properties: { pixelSize: 65 },
+        properties: { pixelSize: 50 },
         fields: "pixelSize",
       },
     });
   }
 
-  // Row heights: header rows taller
+  // Title rows height
   requests.push({
     updateDimensionProperties: {
       range: { sheetId, dimension: "ROWS", startIndex: 0, endIndex: 2 },
-      properties: { pixelSize: 30 },
+      properties: { pixelSize: 20 },
+      fields: "pixelSize",
+    },
+  });
+
+  // Header rows 3-10: compact
+  requests.push({
+    updateDimensionProperties: {
+      range: { sheetId, dimension: "ROWS", startIndex: 2, endIndex: HEADER_ROWS },
+      properties: { pixelSize: 18 },
+      fields: "pixelSize",
+    },
+  });
+
+  // Data rows: compact
+  requests.push({
+    updateDimensionProperties: {
+      range: { sheetId, dimension: "ROWS", startIndex: HEADER_ROWS, endIndex: HEADER_ROWS + MAX_SOLDIERS },
+      properties: { pixelSize: 18 },
+      fields: "pixelSize",
+    },
+  });
+
+  // Footer rows: compact
+  requests.push({
+    updateDimensionProperties: {
+      range: { sheetId, dimension: "ROWS", startIndex: footerStart, endIndex: footerStart + FOOTER_LABELS.length },
+      properties: { pixelSize: 18 },
       fields: "pixelSize",
     },
   });
@@ -736,6 +847,7 @@ async function sheetsApiFetch(accessToken: string, url: string, body: unknown) {
 async function createNewSpreadsheet(
   accessToken: string,
   sheetTitles: string[],
+  companyName: string,
   cycleName: string
 ): Promise<SpreadsheetResult> {
   const sheetProperties = sheetTitles.map((title, index) => ({
@@ -749,7 +861,7 @@ async function createNewSpreadsheet(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      properties: { title: `דוח מדא"גיות — ${cycleName}`, locale: "iw" },
+      properties: { title: `מעקב כשירות גופנית - ${companyName} - ${cycleName}`, locale: "iw" },
       sheets: sheetProperties,
     }),
   });
