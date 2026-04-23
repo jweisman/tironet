@@ -439,11 +439,15 @@ function buildPlatoonSheet(
       row[2] = soldier.givenName;
       row[3] = soldier.familyName;
 
-      let totalActivities = 0;
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      let pastActivities = 0;
       let passedCount = 0;
 
       for (const { activity, col } of activitySlots) {
-        totalActivities++;
+        const isPast = activity.date <= today;
+        if (isPast) pastActivities++;
+
         const report = soldier.activityReports.find((r) => r.activityId === activity.id);
         if (!report || !report.result) continue;
 
@@ -466,9 +470,9 @@ function buildPlatoonSheet(
         }
       }
 
-      // Column B: participation percentage
-      if (totalActivities > 0) {
-        const pct = Math.round((passedCount / totalActivities) * 100);
+      // Column B: participation percentage (only past/today activities)
+      if (pastActivities > 0) {
+        const pct = Math.round((passedCount / pastActivities) * 100);
         row[1] = `${pct}%`;
       }
     }
