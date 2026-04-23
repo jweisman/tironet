@@ -30,9 +30,9 @@ export async function publishReminder(
   const c = getClient();
   if (!c) return null;
 
-  const appUrl = process.env.APP_URL;
+  const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL;
   if (!appUrl) {
-    console.warn("[reminders] APP_URL not configured — cannot schedule reminder");
+    console.warn("[reminders] APP_URL / NEXT_PUBLIC_APP_URL not configured — cannot schedule reminder");
     return null;
   }
 
