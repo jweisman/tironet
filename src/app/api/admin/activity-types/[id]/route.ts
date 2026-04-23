@@ -32,12 +32,15 @@ const displayConfigSchema = z.object({
   }).optional(),
 }).nullable();
 
+const EXPORT_CATEGORIES = ["physical", "test", "military", "navigation"] as const;
+
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   icon: z.string().min(1).optional(),
   isActive: z.boolean().optional(),
   scoreConfig: scoreConfigSchema.optional(),
   displayConfiguration: displayConfigSchema.optional(),
+  exportCategory: z.enum(EXPORT_CATEGORIES).nullable().optional(),
 });
 
 export async function PATCH(
@@ -54,13 +57,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { displayConfiguration, ...rest } = parsed.data;
+  const { displayConfiguration, exportCategory, ...rest } = parsed.data;
   const type = await prisma.activityType.update({
     where: { id },
     data: {
       ...rest,
       ...(displayConfiguration !== undefined && {
         displayConfiguration: displayConfiguration ?? Prisma.DbNull,
+      }),
+      ...(exportCategory !== undefined && {
+        exportCategory: exportCategory,
       }),
     },
   });

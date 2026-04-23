@@ -531,6 +531,38 @@ PowerSync sync streams scope soldiers by `visible_squad_ids` (the global CTE), s
 - **Tokens are never exposed in API responses.** All endpoints return `inviteUrl` (the full `/invite/{token}` URL) instead of the raw `token`. This applies to the admin list, admin refresh, hierarchy, and pending invitations endpoints.
 - **Phone-only invitation acceptance** requires the accepting user to have a matching phone number. Users without a phone set are rejected with `phone_mismatch` (403).
 
+## Physical Training Report (דוח מדא"גיות)
+
+A Google Sheets export that produces a weekly training attendance grid per platoon, designed for the מדא"גיות officer. Available from the reports page under "דוח מדא"גיות".
+
+### Export category
+
+`ActivityType.exportCategory` (nullable string) maps activity types to one of four training categories: `physical` (אימון גופני), `test` (בוחן), `military` (אימון צבאי), `navigation` (ניווט). Only activities whose type has an `exportCategory` are included in this report. Configured in the admin activity types page.
+
+### Sheet structure
+
+One sheet per platoon. Layout:
+- **Fixed columns** (4): serial number, participation score, first name, family name
+- **Activity columns**: grouped by week (30 weeks starting from the first activity in the cycle). At least 1 column per week (empty if no activities), additional columns for multiple activities in the same week.
+- **Header rows** (5): title, week numbers (merged), dates, categories, activity names
+- **Soldier rows**: cell text is the report `note` (attendance reason from dropdown) or a default label ("ביצע מלא" for passed, "לא ביצע" for failed, "לא רלוונטי" for na). Cell background color reflects `result`: green (passed), red (failed), grey (na).
+- **Summary row**: pass count / total with percentage per activity column
+- **Participation score** (column B): fraction of activities where the soldier passed
+
+### How note options work for this report
+
+Activity types used for physical training should have their `displayConfiguration.note.options` configured with relevant attendance reasons (e.g., "כאבי גב", "חופשה מיוחדת", "צום"). Platoon commanders select from this dropdown when filing reports. The export uses the note text as the cell value, providing the detailed attendance reason the מדא"גיות officer needs.
+
+### Key files
+- API route: `src/app/api/reports/physical-training/sheets/route.ts`
+- Reports page card: `src/app/(app)/reports/page.tsx`
+- Reusable dialog: `src/components/reports/SheetsExportDialog.tsx` (accepts `apiEndpoint` + `reportType` props)
+- Admin UI: `src/components/admin/ActivityTypeList.tsx` (export category dropdown)
+
+### SheetsExportDialog is reusable
+
+`SheetsExportDialog` accepts optional `apiEndpoint` (default: `/api/reports/all-activity/sheets`) and `reportType` (default: `"all-activity"`) props. Each report type stores its own default spreadsheet via `ReportExportDefault`. When adding a new Sheets-based report, create a new API route and pass the endpoint/type to the dialog.
+
 ## Bulk Import Pattern (Spreadsheet Upload)
 
 Both soldiers and activities support bulk import from Excel/CSV spreadsheets. The pattern is the same:

@@ -31,6 +31,15 @@ import { SCORE_KEYS, getActiveScores } from "@/types/score-config";
 import type { DisplayConfiguration } from "@/types/display-config";
 import { DEFAULT_RESULT_LABELS, getResultLabels, getNoteOptions } from "@/types/display-config";
 
+type ExportCategory = "physical" | "test" | "military" | "navigation";
+
+const EXPORT_CATEGORY_LABELS: Record<ExportCategory, string> = {
+  physical: "אימון גופני",
+  test: "בוחן",
+  military: "אימון צבאי",
+  navigation: "ניווט",
+};
+
 type ActivityType = {
   id: string;
   name: string;
@@ -39,6 +48,7 @@ type ActivityType = {
   sortOrder: number;
   scoreConfig: ScoreConfig | null;
   displayConfiguration: DisplayConfiguration | null;
+  exportCategory: ExportCategory | null;
 };
 
 type Props = {
@@ -84,6 +94,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
   const [scoresExpandedId, setScoresExpandedId] = useState<string | null>(null);
   const [editResultLabels, setEditResultLabels] = useState({ passed: "", failed: "", na: "" });
   const [editNoteOptions, setEditNoteOptions] = useState<string[]>([]);
+  const [editExportCategory, setEditExportCategory] = useState<ExportCategory | "">("");
   const [loading, setLoading] = useState(false);
 
   function startEdit(type: ActivityType) {
@@ -105,6 +116,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
     });
     const noteOpts = getNoteOptions(type.displayConfiguration);
     setEditNoteOptions(noteOpts ?? []);
+    setEditExportCategory(type.exportCategory ?? "");
     setScoresExpandedId(type.id);
   }
 
@@ -182,6 +194,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
         icon: editIcon.trim(),
         scoreConfig: buildScoreConfig(editScores),
         displayConfiguration: buildDisplayConfig(),
+        exportCategory: editExportCategory || null,
       }),
     });
     if (res.ok) {
@@ -501,6 +514,34 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                         );
                       })()}
                     </div>
+                  )}
+                </div>
+
+                {/* Export category section */}
+                <div className="border-t pt-3 space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground">קטגוריית ייצוא (דוח מדא&quot;גיות)</p>
+                  {editingId === type.id ? (
+                    <div className="space-y-1">
+                      <select
+                        value={editExportCategory}
+                        onChange={(e) => setEditExportCategory(e.target.value as ExportCategory | "")}
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground"
+                      >
+                        <option value="">ללא</option>
+                        {(Object.entries(EXPORT_CATEGORY_LABELS) as [ExportCategory, string][]).map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-muted-foreground">
+                        פעילויות עם קטגוריה ייכללו בדוח מדא&quot;גיות בגיליון המתאים.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/50">
+                      {type.exportCategory
+                        ? EXPORT_CATEGORY_LABELS[type.exportCategory]
+                        : "לא מוגדר"}
+                    </p>
                   )}
                 </div>
               </div>

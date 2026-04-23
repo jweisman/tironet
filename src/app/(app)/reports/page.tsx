@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Table2, ClipboardList, Calendar, Users } from "lucide-react";
+import { FileText, Table2, ClipboardList, Calendar, Users, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSession } from "next-auth/react";
@@ -29,6 +29,7 @@ export default function ReportsPage() {
   const { selectedCycleId, isLoading: cycleLoading } = useCycle();
   const { data: session } = useSession();
   const [sheetsDialogOpen, setSheetsDialogOpen] = useState(false);
+  const [physicalDialogOpen, setPhysicalDialogOpen] = useState(false);
 
   // Activity type filter state — "" means all types
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
@@ -103,6 +104,14 @@ export default function ReportsPage() {
       return;
     }
     setSheetsDialogOpen(true);
+  }
+
+  function handlePhysicalTrainingExport() {
+    if (!navigator.onLine) {
+      toast.error("הפקת דוחות דורשת חיבור לאינטרנט");
+      return;
+    }
+    setPhysicalDialogOpen(true);
   }
 
   function handleActivitySummary() {
@@ -279,18 +288,49 @@ export default function ReportsPage() {
               </div>
             </button>
           </div>
+
+          {/* Physical training (מדא"גיות) report card */}
+          <button
+            type="button"
+            onClick={handlePhysicalTrainingExport}
+            className="flex w-full items-start gap-4 rounded-xl border border-border bg-background p-4 text-start hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Dumbbell size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold">דוח כשירות גופנית</p>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  Sheets
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                מעקב השתתפות באימונים — גיליון שבועי לכל מחלקה
+              </p>
+            </div>
+          </button>
         </section>
         )}
 
-        {/* Sheets export dialog */}
+        {/* Sheets export dialogs */}
         {selectedCycleId && (
-          <SheetsExportDialog
-            open={sheetsDialogOpen}
-            onOpenChange={setSheetsDialogOpen}
-            cycleId={selectedCycleId}
-            activityTypeIds={typesParam || undefined}
-            dateRange={activityDateRange || undefined}
-          />
+          <>
+            <SheetsExportDialog
+              open={sheetsDialogOpen}
+              onOpenChange={setSheetsDialogOpen}
+              cycleId={selectedCycleId}
+              activityTypeIds={typesParam || undefined}
+              dateRange={activityDateRange || undefined}
+            />
+            <SheetsExportDialog
+              open={physicalDialogOpen}
+              onOpenChange={setPhysicalDialogOpen}
+              cycleId={selectedCycleId}
+              apiEndpoint="/api/reports/physical-training/sheets"
+              reportType="physical-training"
+            />
+          </>
         )}
 
         {/* Request reports section */}

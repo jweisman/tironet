@@ -17,6 +17,7 @@ export default async function ActivityTypesPage() {
         sortOrder: t.sortOrder,
         scoreConfig: (t.scoreConfig as ScoreConfig) ?? null,
         displayConfiguration: (t.displayConfiguration as DisplayConfiguration) ?? null,
+        exportCategory: t.exportCategory as "physical" | "test" | "military" | "navigation" | null,
       }))}
     />
   );

@@ -295,6 +295,7 @@ model ActivityType {
   sortOrder   Int      @default(0) @map("sort_order")
   scoreConfig          Json?    @map("score_config") @db.JsonB
   displayConfiguration Json?    @map("display_configuration") @db.JsonB
+  exportCategory       String?  @map("export_category")
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 

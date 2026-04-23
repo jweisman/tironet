@@ -21,6 +21,10 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cycleId: string;
+  /** API endpoint path, e.g. "/api/reports/all-activity/sheets" */
+  apiEndpoint?: string;
+  /** Report type key for storing user's default spreadsheet */
+  reportType?: string;
   activityTypeIds?: string;
   dateRange?: string;
 }
@@ -36,6 +40,8 @@ export function SheetsExportDialog({
   open,
   onOpenChange,
   cycleId,
+  apiEndpoint = "/api/reports/all-activity/sheets",
+  reportType = "all-activity",
   activityTypeIds,
   dateRange,
 }: Props) {
@@ -62,7 +68,7 @@ export function SheetsExportDialog({
     setPickedFile(null);
     setShowPicker(false);
 
-    fetch("/api/reports/google/export-default?reportType=all-activity")
+    fetch(`/api/reports/google/export-default?reportType=${reportType}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.spreadsheetId) {
@@ -116,7 +122,7 @@ export function SheetsExportDialog({
       }
       if (targetId) params.set("spreadsheetId", targetId);
 
-      const res = await fetch(`/api/reports/all-activity/sheets?${params}`, {
+      const res = await fetch(`${apiEndpoint}?${params}`, {
         method: "POST",
       });
       const data = await res.json();
