@@ -69,5 +69,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ fired, total: pending.length });
+  // Clean up fired reminders older than 30 days
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const { count: cleaned } = await prisma.scheduledReminder.deleteMany({
+    where: { fired: true, scheduledFor: { lt: thirtyDaysAgo } },
+  });
+
+  return NextResponse.json({ fired, total: pending.length, cleaned });
 }
