@@ -551,27 +551,55 @@ PowerSync sync streams scope soldiers by `visible_squad_ids` (the global CTE), s
 - **Tokens are never exposed in API responses.** All endpoints return `inviteUrl` (the full `/invite/{token}` URL) instead of the raw `token`. This applies to the admin list, admin refresh, hierarchy, and pending invitations endpoints.
 - **Phone-only invitation acceptance** requires the accepting user to have a matching phone number. Users without a phone set are rejected with `phone_mismatch` (403).
 
-## Physical Training Report (דוח מדא"גיות)
+## Physical Training Report (מעקב כשירות גופנית)
 
-A Google Sheets export that produces a weekly training attendance grid per platoon, designed for the מדא"גיות officer. Available from the reports page under "דוח מדא"גיות".
+A Google Sheets export that produces a weekly training attendance grid per platoon, matching the IDF מדא"גיות spreadsheet format. Available from the reports page under "מעקב כשירות גופנית". File is named `מעקב כשירות גופנית - {company} - {cycle}`.
 
 ### Export category
 
 `ActivityType.exportCategory` (nullable string) maps activity types to one of four training categories: `physical` (אימון גופני), `test` (בוחן), `military` (אימון צבאי), `navigation` (ניווט). Only activities whose type has an `exportCategory` are included in this report. Configured in the admin activity types page.
 
-### Sheet structure
+### Sheet structure (matches IDF format)
 
-One sheet per platoon. Layout:
-- **Fixed columns** (4): serial number, participation score, first name, family name
-- **Activity columns**: grouped by week (30 weeks starting from the first activity in the cycle). At least 1 column per week (empty if no activities), additional columns for multiple activities in the same week.
-- **Header rows** (5): title, week numbers (merged), dates, categories, activity names
-- **Soldier rows**: cell text is the report `note` (attendance reason from dropdown) or a default label ("ביצע מלא" for passed, "לא ביצע" for failed, "לא רלוונטי" for na). Cell background color reflects `result`: green (passed), red (failed), grey (na).
-- **Summary row**: pass count / total with percentage per activity column
-- **Participation score** (column B): fraction of activities where the soldier passed
+One sheet per platoon. 13 columns per week (Sun-Fri = 6 days × 2 slots + Sat = 1), 30 weeks, 10 header rows, 50 soldier rows, 5 summary rows.
+
+**Header rows (1-10):**
+- Rows 1-2: Title ("מעקב השתתפות אחר חיילים באימונים"), merged A1:D2
+- Row 3: Week numbers with ISO week ("שבוע X שבוע Y חיל האוויר"), each merged across 13 cols
+- Row 4: Weekly topic (blank)
+- Rows 5-6: Day names (Sun-Sat), merged 2 cols × 2 rows per weekday, 1 col × 2 rows for Sat
+- Row 7: Dates (dd/mm), merged 2 cols per weekday
+- Row 8: Training category per activity slot (NOT merged — each slot is independent)
+- Row 9: Activity name per slot
+- Row 10: Actual training (blank)
+
+**Fixed columns (A-D):**
+- A: מס״ד (serial number, 1-50)
+- B: Participation percentage (passed / past activities with `date <= today`)
+- C: Given name
+- D: Family name
+
+**Activity columns (E+):** Each activity maps to a day slot (2 per weekday, 1 for Sat). Activities are assigned to slots in date order.
+
+**Cell value mapping:**
+- `result=passed` → "ביצע מלא" (green background)
+- `result=failed` with note → note text (yellow background)
+- `result=failed` without note → "ביצע חלקי" (yellow background)
+- `result=na` → "חייל לא פעיל" (yellow background)
+- No report → empty cell
+
+**Summary rows (5 rows after soldiers):**
+1. מצבה פעילה — soldiers with any report for that activity
+2. סה"כ משתתפים — passed count (option A: same as row 4)
+3. לא ביצעו — failed count
+4. סה"כ משתתפים מלא — passed count
+5. אחוז משתתפים מלא — passed / active roster as percentage
+
+**Formatting:** Frozen panes (10 rows + 4 cols), thin borders, grey header/footer background, 7pt font, 50px activity columns, compact 18px row heights.
 
 ### How note options work for this report
 
-Activity types used for physical training should have their `displayConfiguration.note.options` configured with relevant attendance reasons (e.g., "כאבי גב", "חופשה מיוחדת", "צום"). Platoon commanders select from this dropdown when filing reports. The export uses the note text as the cell value, providing the detailed attendance reason the מדא"גיות officer needs.
+Activity types used for physical training should have their `displayConfiguration.note.options` configured with relevant attendance reasons (e.g., "רפואי גב", "חופשה מיוחדת", "צום"). Platoon commanders select from this dropdown when filing reports. The export uses the note text as the cell value, providing the detailed attendance reason the מדא"גיות officer needs.
 
 ### Key files
 - API route: `src/app/api/reports/physical-training/sheets/route.ts`
