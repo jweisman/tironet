@@ -10,6 +10,15 @@
   color-scheme: dark;
 }
 
+/* Native date/datetime-local inputs have an intrinsic minimum width
+   that overflows containers on mobile (especially iOS Safari).
+   Force them to respect their parent's width. */
+input[type="date"],
+input[type="datetime-local"] {
+  max-width: 100%;
+  min-width: 0;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

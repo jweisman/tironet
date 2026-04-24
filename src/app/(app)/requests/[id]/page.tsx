@@ -440,14 +440,14 @@ export default function RequestDetailPage() {
             {raw.urgent ? (
               <Badge variant="destructive">דחוף</Badge>
             ) : null}
-            {canEdit && (
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditDialogOpen(true)} aria-label="ערוך בקשה">
-                <Pencil size={14} />
-              </Button>
-            )}
             {canDelete && (
               <Button variant="outline" size="icon" className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDeleteOpen(true)} aria-label="מחק בקשה">
                 <Trash2 size={14} />
+              </Button>
+            )}
+            {canEdit && (
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditDialogOpen(true)} aria-label="ערוך בקשה">
+                <Pencil size={14} />
               </Button>
             )}
           </div>

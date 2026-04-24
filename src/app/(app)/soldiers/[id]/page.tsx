@@ -382,16 +382,6 @@ export default function SoldierDetailPage() {
                 )}
               </div>
               <div className="flex items-center gap-1.5">
-                <Button
-                  data-tour="soldier-edit-btn"
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setEditOpen(true)}
-                  aria-label="ערוך פרטי חייל"
-                >
-                  <Pencil size={14} />
-                </Button>
                 {canDelete && (
                   <Button
                     variant="outline"
@@ -403,6 +393,16 @@ export default function SoldierDetailPage() {
                     <Trash2 size={14} />
                   </Button>
                 )}
+                <Button
+                  data-tour="soldier-edit-btn"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setEditOpen(true)}
+                  aria-label="ערוך פרטי חייל"
+                >
+                  <Pencil size={14} />
+                </Button>
               </div>
             </div>
 

@@ -489,6 +489,15 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           {data.canEditMetadata && (
             <div className="flex items-center gap-1.5 shrink-0">
               <Button
+                size="icon"
+                variant="outline"
+                className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setConfirmDelete(true)}
+                aria-label="מחק"
+              >
+                <Trash2 size={14} />
+              </Button>
+              <Button
                 data-tour="activity-edit-meta"
                 size="icon"
                 variant="outline"
@@ -503,15 +512,6 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 aria-label="ערוך פרטים"
               >
                 <Pencil size={14} />
-              </Button>
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => setConfirmDelete(true)}
-                aria-label="מחק"
-              >
-                <Trash2 size={14} />
               </Button>
             </div>
           )}
