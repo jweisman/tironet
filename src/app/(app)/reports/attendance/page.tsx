@@ -5,27 +5,10 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
-import { cn } from "@/lib/utils";
+import { AttendanceTable } from "@/components/reports/AttendanceTable";
 import type {
   AttendanceData,
-  AttendanceStatus,
 } from "@/app/api/reports/attendance/route";
-
-const STATUS_LABELS: Record<AttendanceStatus, string> = {
-  present: "נוכח",
-  leave: "יציאה",
-  medical_appointment: "תור רפואי",
-  sick_day: "יום מחלה",
-  inactive: "לא פעיל",
-};
-
-const STATUS_COLORS: Record<AttendanceStatus, string> = {
-  present: "bg-green-100 text-green-800",
-  leave: "bg-amber-100 text-amber-800",
-  medical_appointment: "bg-blue-100 text-blue-800",
-  sick_day: "bg-pink-100 text-pink-800",
-  inactive: "bg-muted text-muted-foreground",
-};
 
 export default function AttendancePage() {
   const router = useRouter();
@@ -152,30 +135,7 @@ export default function AttendancePage() {
                     <div className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-1">
                       {squad.name}
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm border-collapse">
-                        <thead>
-                          <tr className="border-b-2 border-border">
-                            <th className="text-start px-2 py-1.5 font-semibold">חייל</th>
-                            <th className="text-start px-2 py-1.5 font-semibold">סטטוס</th>
-                            <th className="text-start px-2 py-1.5 font-semibold">סיבה</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {squad.soldiers.map((s) => (
-                            <tr key={s.id} className="border-b border-border">
-                              <td className="px-2 py-1.5">{s.name}</td>
-                              <td className="px-2 py-1.5">
-                                <span className={cn("inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded", STATUS_COLORS[s.status])}>
-                                  {STATUS_LABELS[s.status]}
-                                </span>
-                              </td>
-                              <td className="px-2 py-1.5 text-xs text-muted-foreground">{s.reason ?? ""}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <AttendanceTable rows={squad.soldiers} showSquad={false} />
                   </div>
                 ))}
               </div>

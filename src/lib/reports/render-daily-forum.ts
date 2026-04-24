@@ -114,7 +114,7 @@ export interface AttendanceSummaryPlatoon {
   platoonName: string;
   presentCount: number;
   totalCount: number;
-  absent: { name: string; squad: string; reason: string }[];
+  absent: { name: string; squad: string; status: string; reason: string | null }[];
 }
 
 export interface DailyForumData {
@@ -578,12 +578,12 @@ export async function fetchDailyForum(
     presentCount: p.presentCount,
     totalCount: p.totalCount,
     absent: p.squads
-      .flatMap((sq) => sq.soldiers.filter((s) => s.status !== "present"))
-      .map((s) => ({
+      .flatMap((sq) => sq.soldiers.filter((s) => s.status !== "present").map((s) => ({
         name: s.name,
-        squad: p.squads.find((sq) => sq.soldiers.includes(s))?.name ?? "",
-        reason: s.reason ?? ATTENDANCE_STATUS_LABELS[s.status],
-      })),
+        squad: sq.name,
+        status: s.status,
+        reason: s.reason,
+      }))),
   }));
 
   return {
@@ -814,6 +814,21 @@ export function renderDailyForumHtml(data: DailyForumData): string {
 
   const platoonsHtml = `
     <div class="group-block">
+      <h2 class="group-title">סיכום נוכחות</h2>
+      ${data.attendance.length === 0 ? '<p class="no-data">אין נתונים</p>' : data.attendance.map((p) => {
+        const absentRows = p.absent.length > 0
+          ? `<table><thead><tr><th>חייל</th><th>כיתה</th><th>סטטוס</th><th>סיבה</th></tr></thead><tbody>${
+              p.absent.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.squad)}</td><td>${escapeHtml(ATTENDANCE_STATUS_LABELS[s.status as keyof typeof ATTENDANCE_STATUS_LABELS] ?? s.status)}</td><td>${s.reason ? escapeHtml(s.reason) : ""}</td></tr>`).join("\n")
+            }</tbody></table>`
+          : '<p class="no-data">כולם נוכחים</p>';
+        return `
+          ${multi ? `<div class="platoon-subheader">${escapeHtml(p.platoonName)} <span style="font-weight:400;color:#666">(${p.presentCount}/${p.totalCount})</span></div>` : `<p style="font-size:12px;font-weight:600;margin-bottom:6px;">נוכחים: ${p.presentCount}/${p.totalCount}</p>`}
+          ${absentRows}
+        `;
+      }).join("\n")}
+    </div>
+
+    <div class="group-block">
       <h2 class="group-title">בקשות</h2>
       <div class="section-block">
         <h3 class="section-title">ממתינות (${totalOpen})</h3>
@@ -837,21 +852,6 @@ export function renderDailyForumHtml(data: DailyForumData): string {
         <h3 class="section-title">פעילויות מחר — ${escapeHtml(tomorrowDisplay)}</h3>
         ${tomorrowHtml}
       </div>
-    </div>
-
-    <div class="group-block">
-      <h2 class="group-title">סיכום נוכחות</h2>
-      ${data.attendance.length === 0 ? '<p class="no-data">אין נתונים</p>' : data.attendance.map((p) => {
-        const absentRows = p.absent.length > 0
-          ? `<table><thead><tr><th>חייל</th><th>כיתה</th><th>סיבה</th></tr></thead><tbody>${
-              p.absent.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.squad)}</td><td>${escapeHtml(s.reason)}</td></tr>`).join("\n")
-            }</tbody></table>`
-          : '<p class="no-data">כולם נוכחים</p>';
-        return `
-          ${multi ? `<div class="platoon-subheader">${escapeHtml(p.platoonName)} <span style="font-weight:400;color:#666">(${p.presentCount}/${p.totalCount})</span></div>` : `<p style="font-size:12px;font-weight:600;margin-bottom:6px;">נוכחים: ${p.presentCount}/${p.totalCount}</p>`}
-          ${absentRows}
-        `;
-      }).join("\n")}
     </div>
 
     <div class="group-block">
