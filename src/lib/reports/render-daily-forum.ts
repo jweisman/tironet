@@ -10,6 +10,7 @@ import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import { parseSickDays, formatSickDay } from "@/lib/requests/sick-days";
 import type { SickDay } from "@/lib/requests/sick-days";
 import { isRequestActive } from "@/lib/requests/active";
+import { fetchAttendance, STATUS_LABELS as ATTENDANCE_STATUS_LABELS } from "@/lib/reports/render-attendance";
 import {
   escapeHtml,
   renderPieSvg,
@@ -109,11 +110,19 @@ export interface PlatoonForumSection {
   gaps: GapActivityItem[];
 }
 
+export interface AttendanceSummaryPlatoon {
+  platoonName: string;
+  presentCount: number;
+  totalCount: number;
+  absent: { name: string; squad: string; reason: string }[];
+}
+
 export interface DailyForumData {
   cycleName: string;
   date: string;
   tomorrowDate: string;
   platoons: PlatoonForumSection[];
+  attendance: AttendanceSummaryPlatoon[];
 }
 
 // ---------------------------------------------------------------------------
@@ -562,11 +571,27 @@ export async function fetchDailyForum(
     gaps: gapsByPlatoon.get(platoon.id) ?? [],
   }));
 
+  // Fetch attendance summary (absent soldiers only for forum)
+  const attendanceData = await fetchAttendance(cycleId, platoonIds, today);
+  const attendance: AttendanceSummaryPlatoon[] = (attendanceData?.platoons ?? []).map((p) => ({
+    platoonName: p.platoonName,
+    presentCount: p.presentCount,
+    totalCount: p.totalCount,
+    absent: p.squads
+      .flatMap((sq) => sq.soldiers.filter((s) => s.status !== "present"))
+      .map((s) => ({
+        name: s.name,
+        squad: p.squads.find((sq) => sq.soldiers.includes(s))?.name ?? "",
+        reason: s.reason ?? ATTENDANCE_STATUS_LABELS[s.status],
+      })),
+  }));
+
   return {
     cycleName: cycle.name,
     date: today,
     tomorrowDate: tomorrow,
     platoons: platoonSections,
+    attendance,
   };
 }
 
@@ -812,6 +837,21 @@ export function renderDailyForumHtml(data: DailyForumData): string {
         <h3 class="section-title">פעילויות מחר — ${escapeHtml(tomorrowDisplay)}</h3>
         ${tomorrowHtml}
       </div>
+    </div>
+
+    <div class="group-block">
+      <h2 class="group-title">סיכום נוכחות</h2>
+      ${data.attendance.length === 0 ? '<p class="no-data">אין נתונים</p>' : data.attendance.map((p) => {
+        const absentRows = p.absent.length > 0
+          ? `<table><thead><tr><th>חייל</th><th>כיתה</th><th>סיבה</th></tr></thead><tbody>${
+              p.absent.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.squad)}</td><td>${escapeHtml(s.reason)}</td></tr>`).join("\n")
+            }</tbody></table>`
+          : '<p class="no-data">כולם נוכחים</p>';
+        return `
+          ${multi ? `<div class="platoon-subheader">${escapeHtml(p.platoonName)} <span style="font-weight:400;color:#666">(${p.presentCount}/${p.totalCount})</span></div>` : `<p style="font-size:12px;font-weight:600;margin-bottom:6px;">נוכחים: ${p.presentCount}/${p.totalCount}</p>`}
+          ${absentRows}
+        `;
+      }).join("\n")}
     </div>
 
     <div class="group-block">

@@ -15,7 +15,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Invitation system** — Admins invite users by email or SMS; each invitation scopes the user to a specific unit and role
 - **Authentication** — Google OAuth, email magic link (Nodemailer), and SMS OTP (Twilio Verify)
 - **Admin panel** — Manage cycles, companies, platoons, squads, activity types, and users
-- **Push notifications** — Daily task reminders for squad commanders (missing activity reports) and real-time request assignment alerts; opt-out per notification type in the profile page
+- **Push notifications** — Daily task reminders for squad commanders (missing activity reports), real-time request assignment alerts, and scheduled reminders before medical appointments and leave departures (via QStash); opt-out per notification type and configurable reminder lead time in the profile page
 - **Guided tour** — Interactive walkthrough (driver.js) on each main page; auto-starts on first visit, re-launchable via the help button in the header/sidebar
 - **Support & diagnostics** — In-app support page that collects device, browser, PowerSync sync status, table row counts, and JWT claims, then emails a formatted diagnostic report to the support team
 - **Company branding** — Upload a company logo (admin structure page) displayed on the dashboard; falls back to the IDF emblem
@@ -120,6 +120,7 @@ This starts:
 - **MongoDB** on port `27017` (PowerSync storage, runs as a replica set)
 - **PowerSync** on port `8080` (offline sync service)
 - **Mailhog** SMTP on port `1026`, web UI at `http://localhost:8026`
+- **QStash** on port `8085` (scheduled reminder delivery — see logs for auth token and signing keys)
 
 ### 4. One-time infrastructure setup
 
@@ -280,6 +281,13 @@ CRON_SECRET="..."
 
 # Public app URL (used in invitation emails)
 NEXT_PUBLIC_APP_URL="http://localhost:3001"
+
+# QStash — scheduled reminders (values from `docker compose logs qstash`)
+QSTASH_TOKEN="<from QStash dev server logs>"
+QSTASH_URL="http://localhost:8085"
+QSTASH_CURRENT_SIGNING_KEY="<from QStash dev server logs>"
+QSTASH_NEXT_SIGNING_KEY="<from QStash dev server logs>"
+APP_URL="http://host.docker.internal:3001"
 ```
 
 ## Production Deployment (Vercel)
@@ -342,6 +350,9 @@ Set all of the following in your Vercel project settings (Settings → Environme
 | `VAPID_SUBJECT` | `mailto:admin@yourdomain.com` |
 | `CRON_SECRET` | Random secret for authenticating cron job requests |
 | `NEXT_PUBLIC_APP_URL` | `https://yourdomain.com` |
+| `QSTASH_TOKEN` | QStash API token (from [Upstash Console](https://console.upstash.com/qstash)) |
+| `QSTASH_CURRENT_SIGNING_KEY` | QStash current signing key (from Upstash Console) |
+| `QSTASH_NEXT_SIGNING_KEY` | QStash next signing key (from Upstash Console) |
 
 ### 7. Deploy
 
