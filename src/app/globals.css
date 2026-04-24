@@ -12,7 +12,8 @@
 
 /* Native date/datetime-local inputs have an intrinsic minimum width
    that overflows containers on mobile (especially iOS Safari).
-   Force them to respect their parent's width. */
+   Clipping their parent prevents layout blowout while preserving
+   the native picker UI. */
 input[type="date"],
 input[type="datetime-local"] {
   max-width: 100%;

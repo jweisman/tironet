@@ -31,7 +31,7 @@ export function AppointmentListEditor({ value, onChange }: Props) {
   return (
     <div className="space-y-2">
       {value.map((appt) => (
-        <div key={appt.id} className="rounded-lg border border-border p-2 space-y-1.5">
+        <div key={appt.id} className="rounded-lg border border-border p-2 space-y-1.5 overflow-hidden">
           <div className="flex items-center justify-end">
             <button
               type="button"
@@ -42,7 +42,7 @@ export function AppointmentListEditor({ value, onChange }: Props) {
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 min-w-0">
               <Label className="text-xs">תאריך ושעה</Label>
               <Input
                 type="datetime-local"

@@ -334,7 +334,7 @@ export function CreateRequestForm({
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label htmlFor="req-departure">שעת יציאה</Label>
               <Input
                 id="req-departure"
@@ -345,7 +345,7 @@ export function CreateRequestForm({
                 lang="he"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label htmlFor="req-return">שעת חזרה</Label>
               <Input
                 id="req-return"

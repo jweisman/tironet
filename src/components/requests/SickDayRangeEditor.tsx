@@ -58,7 +58,7 @@ export function SickDayRangeEditor({ days, onDeleteDay, ranges, onRangesChange }
 
       {/* Range inputs */}
       {ranges.map((range) => (
-        <div key={range.id} className="rounded-lg border border-border p-2 space-y-1.5">
+        <div key={range.id} className="rounded-lg border border-border p-2 space-y-1.5 overflow-hidden">
           <div className="flex items-center justify-end">
             <button
               type="button"
@@ -69,7 +69,7 @@ export function SickDayRangeEditor({ days, onDeleteDay, ranges, onRangesChange }
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 min-w-0">
               <Label className="text-xs">מתאריך</Label>
               <Input
                 type="date"
@@ -83,7 +83,7 @@ export function SickDayRangeEditor({ days, onDeleteDay, ranges, onRangesChange }
                 style={range.from ? undefined : { color: "transparent" }}
               />
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 min-w-0">
               <Label className="text-xs">עד תאריך</Label>
               <Input
                 type="date"

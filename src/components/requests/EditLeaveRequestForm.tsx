@@ -104,7 +104,7 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-0">
           <Label htmlFor="edit-departure">שעת יציאה</Label>
           <Input
             id="edit-departure"
@@ -115,7 +115,7 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
             lang="he"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-0">
           <Label htmlFor="edit-return">שעת חזרה</Label>
           <Input
             id="edit-return"
