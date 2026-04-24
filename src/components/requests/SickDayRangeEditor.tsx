@@ -58,7 +58,7 @@ export function SickDayRangeEditor({ days, onDeleteDay, ranges, onRangesChange }
 
       {/* Range inputs */}
       {ranges.map((range) => (
-        <div key={range.id} className="rounded-lg border border-border p-2 space-y-1.5 overflow-hidden">
+        <div key={range.id} className="rounded-lg border border-border p-2 space-y-1.5">
           <div className="flex items-center justify-end">
             <button
               type="button"

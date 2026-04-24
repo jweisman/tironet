@@ -31,7 +31,7 @@ export function AppointmentListEditor({ value, onChange }: Props) {
   return (
     <div className="space-y-2">
       {value.map((appt) => (
-        <div key={appt.id} className="rounded-lg border border-border p-2 space-y-1.5 overflow-hidden">
+        <div key={appt.id} className="rounded-lg border border-border p-2 space-y-1.5">
           <div className="flex items-center justify-end">
             <button
               type="button"

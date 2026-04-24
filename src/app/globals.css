@@ -10,15 +10,51 @@
   color-scheme: dark;
 }
 
-/* Native date/datetime-local inputs have an intrinsic minimum width
-   that overflows containers on mobile (especially iOS Safari).
-   Removing the default appearance lets the input respect width: 100%
-   while still triggering the native date picker on tap. */
+/* Native date/datetime-local inputs on iOS Safari have an intrinsic
+   minimum width from shadow DOM padding and picker indicator. Reset
+   appearance, zero out shadow DOM padding, and hide the invisible
+   indicator that reserves tap-target space. */
 input[type="date"],
 input[type="datetime-local"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
+  min-width: 0;
+}
+
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-year-field,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="datetime-local"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper,
+input[type="datetime-local"]::-webkit-datetime-edit-text,
+input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
+input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
+input[type="datetime-local"]::-webkit-datetime-edit-meridiem-field {
+  padding: 0;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-inner-spin-button,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-inner-spin-button {
+  display: none;
+  -webkit-appearance: none;
+}
+
+/* Flex/grid items default to min-width:auto (intrinsic content size),
+   which lets native date inputs blow out the layout through multiple
+   nested flex ancestors (Tailwind v4 space-y-* uses flex). Setting
+   min-width:0 on all descendants is safe — it's a no-op on non-flex/
+   grid items and only overrides the auto default on flex/grid items. */
+[data-slot="dialog-content"] *,
+[data-tour="request-details"] * {
   min-width: 0;
 }
 
