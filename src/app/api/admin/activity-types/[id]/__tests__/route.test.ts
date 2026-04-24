@@ -211,6 +211,50 @@ describe("PATCH /api/admin/activity-types/[id]", () => {
     expect(res.status).toBe(200);
   });
 
+  it("updates exportCategory", async () => {
+    adminSuccess();
+    mockUpdate.mockResolvedValue({ id: "type-1", exportCategory: "physical" } as never);
+
+    const req = createMockRequest("PATCH", "/api/admin/activity-types/type-1", {
+      exportCategory: "physical",
+    });
+
+    const res = await PATCH(req, idParams);
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: "type-1" },
+      data: { exportCategory: "physical" },
+    });
+  });
+
+  it("clears exportCategory with null", async () => {
+    adminSuccess();
+    mockUpdate.mockResolvedValue({ id: "type-1", exportCategory: null } as never);
+
+    const req = createMockRequest("PATCH", "/api/admin/activity-types/type-1", {
+      exportCategory: null,
+    });
+
+    const res = await PATCH(req, idParams);
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: "type-1" },
+      data: { exportCategory: null },
+    });
+  });
+
+  it("rejects invalid exportCategory value", async () => {
+    adminSuccess();
+
+    const req = createMockRequest("PATCH", "/api/admin/activity-types/type-1", {
+      exportCategory: "invalid",
+    });
+
+    const res = await PATCH(req, idParams);
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("returns 403 for non-admin", async () => {
     adminFailure();
 

@@ -16,6 +16,7 @@ export default async function ActivityTypesPage() {
         isActive: t.isActive,
         scoreConfig: (t.scoreConfig as ScoreConfig) ?? null,
         displayConfiguration: (t.displayConfiguration as DisplayConfiguration) ?? null,
+        exportCategory: t.exportCategory as "physical" | "test" | "military" | "navigation" | null,
       }))}
     />
   );
