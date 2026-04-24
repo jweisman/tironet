@@ -899,7 +899,11 @@ Reminders fire N minutes before medical appointments or leave departures, based 
 - **QStash** (Upstash) schedules future HTTP callbacks via `notBefore` timestamps
 - **`ScheduledReminder`** table tracks each scheduled message (requestId, userId, appointmentId, qstashMessageId, scheduledFor, eventAt, fired)
 - **`POST /api/reminders/fire`** — callback endpoint called by QStash when a reminder fires. Sends a push notification and marks the reminder as fired.
-- **`GET /api/cron/fire-reminders`** — Vercel Cron safety net (every 5 min) that fires any reminders QStash failed to deliver. The `fired` boolean prevents double-sends.
+- **`GET /api/cron/fire-reminders`** — Vercel Cron safety net (every 30 min) that fires any reminders QStash failed to deliver, promotes far-future reminders to QStash once they enter the 7-day window, and cleans up fired reminders older than 30 days. The `fired` boolean prevents double-sends.
+
+**QStash max delay (7 days):** QStash cannot schedule messages more than 7 days in the future. Reminders beyond this limit are stored in the DB with `qstashMessageId = null`. The cron poller promotes them to QStash once they enter the 7-day window. `publishReminder()` silently returns `null` for far-future reminders instead of throwing.
+
+**Error isolation:** `rescheduleRemindersForUser` wraps each reminder in a try/catch so one failure doesn't abort the entire batch.
 
 **Scope:** Medical appointments with a time component (date string contains `T`) and leave departures (`departureAt`). Date-only appointments are skipped. Recipients: squad commander + platoon commander/sergeant for the soldier. Both open (in-progress) and approved requests get reminders; denied requests cancel them.
 
@@ -916,13 +920,13 @@ Reminders fire N minutes before medical appointments or leave departures, based 
 
 **Preference changes:** When a user updates `reminderLeadMinutes` via `PATCH /api/push/preferences`, `rescheduleRemindersForUser(userId)` cancels all existing reminders and creates new ones based on the updated lead time.
 
-**Local development:** QStash local dev server runs in Docker Compose on port 8085 (`public.ecr.aws/upstash/qstash:latest`). Set `QSTASH_TOKEN=mock_token`, `QSTASH_URL=http://localhost:8085`, and `APP_URL=http://host.docker.internal:3000`.
+**Local development:** QStash local dev server runs in Docker Compose on port 8085 (`public.ecr.aws/upstash/qstash:latest`). The dev server prints its own token and signing keys on startup — use those values in `.env.local`. Set `QSTASH_URL=http://localhost:8085` and `APP_URL=http://host.docker.internal:3001` (3001 = Next.js dev port; the QStash container uses `host.docker.internal` to reach the host).
 
 **Environment variables:**
-- `QSTASH_TOKEN` — API token (`mock_token` for local dev)
-- `QSTASH_URL` — QStash server URL (`http://localhost:8085` for dev, `https://qstash.upstash.io` for prod)
-- `QSTASH_CURRENT_SIGNING_KEY` / `QSTASH_NEXT_SIGNING_KEY` — webhook signature verification (prod only)
-- `APP_URL` — app's public URL for QStash callbacks (`http://host.docker.internal:3000` for dev)
+- `QSTASH_TOKEN` — API token (from QStash dev server logs for local, from Upstash dashboard for prod)
+- `QSTASH_URL` — QStash server URL (`http://localhost:8085` for dev; omit in prod — the SDK defaults to `https://qstash.upstash.io`)
+- `QSTASH_CURRENT_SIGNING_KEY` / `QSTASH_NEXT_SIGNING_KEY` — webhook signature verification (from dev server logs or Upstash dashboard)
+- `APP_URL` — app URL for QStash callbacks (`http://host.docker.internal:3001` for dev; omit in prod — falls back to `NEXT_PUBLIC_APP_URL`)
 
 ### iOS limitations
 

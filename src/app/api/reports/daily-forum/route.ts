@@ -11,6 +11,7 @@ export type {
   TomorrowActivityItem,
   GapActivityItem,
   GapSoldier,
+  AttendanceSummaryPlatoon,
 } from "@/lib/reports/render-daily-forum";
 
 export async function GET(request: NextRequest) {

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
+vi.mock("@/lib/reports/render-attendance", () => ({
+  fetchAttendance: vi.fn().mockResolvedValue({ platoons: [] }),
+  STATUS_LABELS: { present: "נוכח", leave: "יציאה", medical_appointment: "תור רפואי", sick_day: "יום מחלה", inactive: "לא פעיל" },
+}));
+
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     cycle: { findUnique: vi.fn() },

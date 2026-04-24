@@ -22,6 +22,7 @@ import type {
   OpenRequestItem,
   TodayActivityItem,
   GapActivityItem,
+  AttendanceSummaryPlatoon,
 } from "@/app/api/reports/daily-forum/route";
 
 // ---------------------------------------------------------------------------
@@ -354,6 +355,56 @@ function ForumContent({ data }: { data: DailyForumData }) {
             })
           )}
         </div>
+      </div>
+
+      {/* סיכום נוכחות */}
+      <div className="mb-6">
+        <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
+          סיכום נוכחות
+        </h2>
+        {data.attendance.length === 0 ? (
+          <p className="text-xs text-muted-foreground">אין נתונים</p>
+        ) : (
+          data.attendance.map((p) => {
+            const hasAbsent = p.absent.length > 0;
+            return (
+              <div key={p.platoonName} className="mb-4">
+                {data.attendance.length > 1 && (
+                  <div className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-1 mt-2">
+                    {p.platoonName} ({p.presentCount}/{p.totalCount})
+                  </div>
+                )}
+                {data.attendance.length === 1 && (
+                  <p className="text-sm font-semibold mb-2">נוכחים: {p.presentCount}/{p.totalCount}</p>
+                )}
+                {hasAbsent ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b-2 border-border">
+                          <th className="text-start px-2 py-1.5 font-semibold">חייל</th>
+                          <th className="text-start px-2 py-1.5 font-semibold">כיתה</th>
+                          <th className="text-start px-2 py-1.5 font-semibold">סיבה</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {p.absent.map((s, i) => (
+                          <tr key={i} className="border-b border-border">
+                            <td className="px-2 py-1.5">{s.name}</td>
+                            <td className="px-2 py-1.5">{s.squad}</td>
+                            <td className="px-2 py-1.5 text-muted-foreground">{s.reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-xs text-green-600 font-medium">כולם נוכחים</p>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* תכנון מול ביצוע */}
