@@ -33,6 +33,7 @@ interface SoldierData {
   apt: string | null;
   city: string | null;
   notes: string | null;
+  dateOfBirth: string | null;
 }
 
 interface Props {
@@ -54,6 +55,7 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
   const [apt, setApt] = useState(soldier.apt ?? "");
   const [city, setCity] = useState(soldier.city ?? "");
   const [notes, setNotes] = useState(soldier.notes ?? "");
+  const [dateOfBirth, setDateOfBirth] = useState(soldier.dateOfBirth ?? "");
   const [imagePreview, setImagePreview] = useState<string | null>(
     soldier.profileImage
   );
@@ -88,6 +90,7 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
           apt: apt.trim() || null,
           city: city.trim() || null,
           notes: notes.trim() || null,
+          dateOfBirth: dateOfBirth || null,
         }),
       });
       if (!res.ok) {
@@ -195,6 +198,17 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="edit-dob">תאריך לידה</Label>
+        <Input
+          id="edit-dob"
+          type="date"
+          value={dateOfBirth}
+          onChange={(e) => setDateOfBirth(e.target.value)}
+          dir="ltr"
+        />
       </div>
 
       <div className="space-y-1.5">

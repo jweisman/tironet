@@ -21,6 +21,7 @@ const patchSchema = z.object({
   apt: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  dateOfBirth: z.string().nullable().optional(),
 });
 
 async function isSquadInScope(
@@ -266,6 +267,9 @@ export async function PATCH(
   if (parsed.data.apt !== undefined) updateData.apt = parsed.data.apt;
   if (parsed.data.city !== undefined) updateData.city = parsed.data.city;
   if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
+  if (parsed.data.dateOfBirth !== undefined) {
+    updateData.dateOfBirth = parsed.data.dateOfBirth ? new Date(parsed.data.dateOfBirth) : null;
+  }
 
   const soldier = await prisma.soldier.update({
     where: { id },

@@ -402,6 +402,27 @@ describe("TironetConnector", () => {
       });
     });
 
+    it("maps date_of_birth to dateOfBirth in soldiers PATCH", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const db = mockDatabase([
+        {
+          table: "soldiers",
+          op: UpdateType.PATCH,
+          id: "sol-1",
+          opData: { date_of_birth: "2007-05-15" },
+        },
+      ]);
+
+      await connector.uploadData(db as never);
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/soldiers/sol-1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateOfBirth: "2007-05-15" }),
+      });
+    });
+
     it("does not call transaction.complete() on network error", async () => {
       mockFetch.mockRejectedValue(new TypeError("Failed to fetch"));
 

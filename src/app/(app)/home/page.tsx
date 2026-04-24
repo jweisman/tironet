@@ -14,6 +14,7 @@ import { PlatoonSummaryCard } from "@/components/dashboard/PlatoonSummaryCard";
 import type { VisibleSections } from "@/components/dashboard/PlatoonSummaryCard";
 import { TodayActivities } from "@/components/dashboard/TodayActivities";
 import { ActiveRequestsCallout } from "@/components/dashboard/ActiveRequestsCallout";
+import { BirthdayCallout } from "@/components/dashboard/BirthdayCallout";
 import type { SquadSummary } from "@/app/api/dashboard/route";
 import { effectiveRole, ROLE_LABELS } from "@/lib/auth/permissions";
 import { useTour } from "@/hooks/useTour";
@@ -486,6 +487,11 @@ export default function HomePage() {
             <p className="text-xs text-muted-foreground">לחץ כדי לצפות</p>
           </div>
         </button>
+      )}
+
+      {/* Birthday callout */}
+      {selectedCycleId && rawRole !== "company_medic" && rawRole !== "hardship_coordinator" && (
+        <BirthdayCallout cycleId={selectedCycleId} squadId={squadId} />
       )}
 
       {/* Active requests callout (#108) — not for instructor or hardship coordinator */}

@@ -39,6 +39,7 @@ export function AddSoldierForm({
   const [civilianId, setCivilianId] = useState("");
   const [rank, setRank] = useState("");
   const [status, setStatus] = useState("active");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   // Platoon filter — only shown when there are multiple platoons (company commander / admin)
   const platoons = useMemo(() => {
     const map = new Map<string, string>();
@@ -95,6 +96,7 @@ export function AddSoldierForm({
           civilianId: civilianId.trim() || null,
           rank: rank || null,
           status,
+          dateOfBirth: dateOfBirth || null,
           profileImage: imageBase64 ?? null,
         }),
       });
@@ -200,6 +202,17 @@ export function AddSoldierForm({
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="soldier-dob">תאריך לידה</Label>
+        <Input
+          id="soldier-dob"
+          type="date"
+          value={dateOfBirth}
+          onChange={(e) => setDateOfBirth(e.target.value)}
+          dir="ltr"
+        />
       </div>
 
       {showPlatoonSelector && (

@@ -91,7 +91,7 @@ const SOLDIER_QUERY = `
   SELECT
     s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
     s.id_number, s.civilian_id, s.cycle_id, s.squad_id, s.phone, s.emergency_phone,
-    s.street, s.apt, s.city, s.notes,
+    s.street, s.apt, s.city, s.notes, s.date_of_birth,
     sq.name AS squad_name, sq.platoon_id,
     p.id AS platoon_id, p.name AS platoon_name
   FROM soldiers s
@@ -177,6 +177,7 @@ interface RawSoldier {
   id_number: string | null; civilian_id: string | null; rank: string | null; status: string; profile_image: string | null;
   phone: string | null; emergency_phone: string | null;
   street: string | null; apt: string | null; city: string | null; notes: string | null;
+  date_of_birth: string | null;
   cycle_id: string; squad_id: string;
   squad_name: string; platoon_id: string; platoon_name: string;
 }
@@ -308,6 +309,7 @@ export default function SoldierDetailPage() {
     apt: raw.apt,
     city: raw.city,
     notes: raw.notes,
+    dateOfBirth: raw.date_of_birth,
   };
 
   const todayStr = new Date().toISOString().split("T")[0];
@@ -324,6 +326,22 @@ export default function SoldierDetailPage() {
   const colorClass = getAvatarColor(raw.given_name + raw.family_name);
   const statusVariant = STATUS_VARIANT[raw.status as SoldierStatus];
 
+  // Birthday check
+  const isBirthday = (() => {
+    if (!raw.date_of_birth) return false;
+    const dob = new Date(raw.date_of_birth);
+    const now = new Date();
+    return dob.getMonth() === now.getMonth() && dob.getDate() === now.getDate();
+  })();
+  const birthdayAge = (() => {
+    if (!raw.date_of_birth || !isBirthday) return 0;
+    const dob = new Date(raw.date_of_birth);
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--;
+    return age;
+  })();
+
   return (
     <div className="space-y-4">
       {/* Back button */}
@@ -337,7 +355,14 @@ export default function SoldierDetailPage() {
       </button>
 
       {/* Header card */}
-      <div data-tour="soldier-header" className="rounded-xl border border-border bg-card p-4 space-y-4">
+      <div data-tour="soldier-header" className={`rounded-xl border bg-card p-4 space-y-4 ${isBirthday ? "border-pink-300 dark:border-pink-700" : "border-border"}`}>
+        {isBirthday && (
+          <div className="flex items-center gap-2 rounded-lg bg-pink-50 dark:bg-pink-950/30 px-3 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300">
+            <span>🎂</span>
+            <span>היום יום ההולדת ה-{birthdayAge} ל{raw.given_name}!</span>
+            <span>🎉</span>
+          </div>
+        )}
         <div className="flex items-start gap-4">
           {/* Avatar */}
           <button
@@ -379,6 +404,11 @@ export default function SoldierDetailPage() {
                 )}
                 {raw.civilian_id && (
                   <p className="text-sm text-muted-foreground">מ.ז. {raw.civilian_id}</p>
+                )}
+                {raw.date_of_birth && (
+                  <p className="text-sm text-muted-foreground">
+                    ת.לידה {new Date(raw.date_of_birth).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" })}
+                  </p>
                 )}
               </div>
               <div className="flex items-center gap-1.5">

@@ -53,6 +53,7 @@ const soldiers = new Table({
   apt: column.text,
   city: column.text,
   notes: column.text,
+  date_of_birth: column.text,
 });
 
 const activities = new Table({

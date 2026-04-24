@@ -23,6 +23,7 @@ const postSchema = z.object({
   apt: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  dateOfBirth: z.string().nullable().optional(),
 });
 
 async function getScopeSquadIds(
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { cycleId, squadId, givenName, familyName, idNumber, civilianId, rank, status, profileImage, phone, emergencyPhone, street, apt, city, notes } =
+  const { cycleId, squadId, givenName, familyName, idNumber, civilianId, rank, status, profileImage, phone, emergencyPhone, street, apt, city, notes, dateOfBirth } =
     parsed.data;
 
   const imageError = validateProfileImage(profileImage);
@@ -237,6 +238,7 @@ export async function POST(req: NextRequest) {
       apt: apt ?? null,
       city: city ?? null,
       notes: notes ?? null,
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
     },
   });
 

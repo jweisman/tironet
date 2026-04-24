@@ -259,6 +259,7 @@ model Soldier {
   apt            String?
   city           String?
   notes          String?
+  dateOfBirth    DateTime?     @map("date_of_birth") @db.Date
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
 

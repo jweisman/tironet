@@ -19,6 +19,7 @@ const soldierSchema = z.object({
   street: z.string().nullable().optional(),
   apt: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
+  dateOfBirth: z.string().nullable().optional(),
 });
 
 const bulkSchema = z.object({
@@ -165,6 +166,7 @@ export async function POST(req: NextRequest) {
           street: s.street ?? null,
           apt: s.apt ?? null,
           city: s.city ?? null,
+          dateOfBirth: s.dateOfBirth ? new Date(s.dateOfBirth) : null,
         },
         select: { id: true },
       })
@@ -183,6 +185,7 @@ export async function POST(req: NextRequest) {
           ...(s.street !== undefined ? { street: s.street ?? null } : {}),
           ...(s.apt !== undefined ? { apt: s.apt ?? null } : {}),
           ...(s.city !== undefined ? { city: s.city ?? null } : {}),
+          ...(s.dateOfBirth !== undefined ? { dateOfBirth: s.dateOfBirth ? new Date(s.dateOfBirth) : null } : {}),
         },
         select: { id: true },
       })

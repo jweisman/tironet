@@ -53,7 +53,7 @@ streams:
     query: >
       SELECT id, cycle_id, squad_id, given_name, family_name, id_number,
              civilian_id, rank, status, profile_image, phone, emergency_phone,
-             street, apt, city, notes
+             street, apt, city, notes, date_of_birth
       FROM soldiers
       WHERE cycle_id IN auth.parameter('cycle_ids')
       AND squad_id IN visible_squad_ids

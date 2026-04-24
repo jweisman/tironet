@@ -55,6 +55,7 @@ interface ParsedRow {
   street: string;
   apt: string;
   city: string;
+  dateOfBirth: string;
   platoonName: string;
   squadName: string;
   resolvedSquadId: string | null;
@@ -73,7 +74,7 @@ const VALID_STATUSES: Record<string, SoldierStatus> = {
   injured: "injured",
 };
 
-const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "מספר זהות", "מחלקה", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום", "רחוב", "דירה", "עיר"];
+const TEMPLATE_HEADERS = ["שם משפחה", "שם פרטי", "מספר אישי", "מספר זהות", "תאריך לידה", "מחלקה", "כיתה", "דרגה", "סטטוס", "טלפון", "טלפון חירום", "רחוב", "דירה", "עיר"];
 
 const FROM_FILE = "__from_file__";
 
@@ -81,10 +82,10 @@ function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    ["כהן", "דוד", "1234567", "123456789", "מחלקה א", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543", "הרצל 5", "3", "תל אביב"],
-    ["לוי", "רחל", "", "", "", "", "", "", "", "", "", "", ""],
+    ["כהן", "דוד", "1234567", "123456789", "2007-05-15", "מחלקה א", "כיתה א", "טוראי", "פעיל", "0501234567", "0509876543", "הרצל 5", "3", "תל אביב"],
+    ["לוי", "רחל", "", "", "", "", "", "", "", "", "", "", "", ""],
   ]);
-  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 8 }, { wch: 14 }];
+  ws["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 8 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, ws, "חיילים");
   XLSX.writeFile(wb, "תבנית-חיילים.xlsx");
 }
@@ -124,6 +125,7 @@ function parseSheet(
   const streetIdx = headers.findIndex((h) => h === "רחוב");
   const aptIdx = headers.findIndex((h) => h === "דירה");
   const cityIdx = headers.findIndex((h) => h === "עיר");
+  const dobIdx = headers.findIndex((h) => h === "תאריך לידה");
 
   // Build platoon name → id lookup (case-insensitive, trimmed)
   const platoonLookup = new Map<string, string>();
@@ -158,6 +160,26 @@ function parseSheet(
     const street = get(streetIdx);
     const apt = get(aptIdx);
     const city = get(cityIdx);
+    const rawDob = get(dobIdx);
+    // Handle Excel serial dates (e.g. 39218) or string dates
+    let dateOfBirth = "";
+    if (rawDob) {
+      const num = Number(rawDob);
+      if (!isNaN(num) && num > 10000) {
+        const parsed = XLSX.SSF.parse_date_code(num);
+        if (parsed) {
+          dateOfBirth = `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+        }
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(rawDob)) {
+        dateOfBirth = rawDob;
+      } else if (/^\d{1,2}[./]\d{1,2}[./]\d{2,4}$/.test(rawDob)) {
+        const parts = rawDob.split(/[./]/);
+        const day = parts[0].padStart(2, "0");
+        const month = parts[1].padStart(2, "0");
+        const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+        dateOfBirth = `${year}-${month}-${day}`;
+      }
+    }
 
     if (!familyName && !givenName && !rank && !status && !idNumber && !squadName && !platoonName && !phone && !emergencyPhone) return;
 
@@ -221,6 +243,7 @@ function parseSheet(
       street,
       apt,
       city,
+      dateOfBirth,
       platoonName,
       squadName,
       resolvedSquadId,
@@ -357,6 +380,7 @@ export function BulkImportDialog({
             street: r.street || null,
             apt: r.apt || null,
             city: r.city || null,
+            dateOfBirth: r.dateOfBirth || null,
           })),
         }),
       });

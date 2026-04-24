@@ -276,6 +276,65 @@ describe("POST /api/soldiers", () => {
     });
   });
 
+  it("creates a soldier with dateOfBirth", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({
+          cycleId: CYCLE, role: "platoon_commander", unitType: "platoon", unitId: PLATOON,
+        })],
+      }),
+    } as never);
+
+    mockSquadFindMany.mockResolvedValue([{ id: SQUAD }] as never);
+    mockSquadFindUnique.mockResolvedValue({
+      id: SQUAD, platoonId: PLATOON,
+      platoon: { companyId: COMP, company: { cycleId: CYCLE } },
+    } as never);
+
+    mockSoldierCreate.mockResolvedValue({ id: "soldier-new" } as never);
+    mockActivityCount.mockResolvedValue(0 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers", {
+      cycleId: CYCLE, squadId: SQUAD, givenName: "Jane", familyName: "Doe",
+      dateOfBirth: "2007-05-15",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+
+    expect(mockSoldierCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ dateOfBirth: new Date("2007-05-15") }),
+    });
+  });
+
+  it("creates a soldier with null dateOfBirth when not provided", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({
+          cycleId: CYCLE, role: "platoon_commander", unitType: "platoon", unitId: PLATOON,
+        })],
+      }),
+    } as never);
+
+    mockSquadFindMany.mockResolvedValue([{ id: SQUAD }] as never);
+    mockSquadFindUnique.mockResolvedValue({
+      id: SQUAD, platoonId: PLATOON,
+      platoon: { companyId: COMP, company: { cycleId: CYCLE } },
+    } as never);
+
+    mockSoldierCreate.mockResolvedValue({ id: "soldier-new" } as never);
+    mockActivityCount.mockResolvedValue(0 as never);
+
+    const req = createMockRequest("POST", "/api/soldiers", {
+      cycleId: CYCLE, squadId: SQUAD, givenName: "Jane", familyName: "Doe",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+
+    expect(mockSoldierCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ dateOfBirth: null }),
+    });
+  });
+
   it("creates a soldier for squad_commander within their squad", async () => {
     const assignment = mockAssignment({
       cycleId: CYCLE,
