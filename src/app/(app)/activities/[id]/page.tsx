@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, WifiOff } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSyncReady } from "@/hooks/useSyncReady";
+import { useGoBack } from "@/hooks/useGoBack";
 import {
   ActivityDetail,
   type ActivityDetailData,
@@ -83,7 +84,7 @@ interface RawReport {
 
 export default function ActivityPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
+  const goBack = useGoBack("/activities");
   const searchParams = useSearchParams();
 
   // The SW caches one HTML shell for all /activities/[id] pages (app shell pattern).
@@ -224,7 +225,7 @@ export default function ActivityPage() {
       <div className="mb-2">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={goBack}
           className="inline-flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground hover:bg-muted rounded-md px-1.5 py-0.5 -ms-1.5 transition-colors"
         >
           <ArrowRight size={18} />

@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSyncReady } from "@/hooks/useSyncReady";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { requestDetailTourSteps } from "@/lib/tour/steps";
@@ -175,6 +176,7 @@ function ActionIcon({ action }: { action: string }) {
 
 export default function RequestDetailPage() {
   const router = useRouter();
+  const goBack = useGoBack("/requests");
   const params = useParams<{ id: string }>();
   const db = usePowerSync();
   const { data: session } = useSession();
@@ -405,7 +407,7 @@ export default function RequestDetailPage() {
       {/* Back button */}
       <button
         type="button"
-        onClick={() => router.back()}
+        onClick={goBack}
         className="flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground hover:bg-muted rounded-md px-1.5 py-0.5 -ms-1.5 transition-colors"
       >
         <ArrowRight size={18} />
