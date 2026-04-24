@@ -12,11 +12,13 @@
 
 /* Native date/datetime-local inputs have an intrinsic minimum width
    that overflows containers on mobile (especially iOS Safari).
-   Clipping their parent prevents layout blowout while preserving
-   the native picker UI. */
+   Removing the default appearance lets the input respect width: 100%
+   while still triggering the native date picker on tap. */
 input[type="date"],
 input[type="datetime-local"] {
-  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
   min-width: 0;
 }
 
