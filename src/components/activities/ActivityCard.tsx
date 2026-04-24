@@ -26,6 +26,9 @@ interface Props {
   onClick: () => void;
   onLongPress?: (e: { x: number; y: number }) => void;
   dataTour?: string;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 function formatDate(isoString: string): string {
@@ -39,7 +42,7 @@ function formatDate(isoString: string): string {
   });
 }
 
-export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPress, dataTour }: Props) {
+export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPress, dataTour, selectable, selected, onToggleSelect }: Props) {
   const isPast = activity.date.split("T")[0] < new Date().toISOString().split("T")[0];
   const hasIssues = activity.isRequired && isPast && (activity.missingCount > 0 || activity.failedCount > 0);
 
@@ -81,6 +84,7 @@ export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPre
       type="button"
       onClick={() => {
         if (suppressClickRef.current) { suppressClickRef.current = false; return; }
+        if (selectable && onToggleSelect) { onToggleSelect(); return; }
         onClick();
       }}
       onContextMenu={handleContextMenu}
@@ -97,6 +101,14 @@ export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPre
     >
       {/* Main row */}
       <div className="flex items-center gap-3 w-full">
+        {selectable && (
+          <div className={cn(
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
+            selected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40"
+          )}>
+            {selected && <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-5" /></svg>}
+          </div>
+        )}
         {/* Activity type icon circle */}
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
           <ActivityTypeIcon

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, ChevronDown, FileUp, WifiOff } from "lucide-react";
+import { Plus, ChevronDown, FileUp, WifiOff, CheckSquare, X, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useCycle } from "@/contexts/CycleContext";
@@ -20,9 +20,25 @@ import { BulkImportActivitiesDialog } from "@/components/activities/BulkImportAc
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -30,16 +46,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Types
 // ---------------------------------------------------------------------------
 
-type FilterPill = "open" | "completed" | "gaps" | "future";
+type FilterPill = "open" | "completed" | "future";
 type SortMode = "date-desc" | "date-asc" | "name-asc" | "name-desc";
 
 const FILTER_LABELS: Record<FilterPill, string> = {
   open: "פתוחות",
   completed: "הושלמו",
-  gaps: "עם פערים",
   future: "עתידיות",
 };
-const FILTER_PILLS: FilterPill[] = ["open", "completed", "gaps", "future"];
+const FILTER_PILLS: FilterPill[] = ["open", "completed", "future"];
 
 const SORT_LABELS: Record<SortMode, string> = {
   "date-desc": "תאריך (חדש לישן)",
@@ -197,6 +212,93 @@ export default function ActivitiesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
 
+  // Multi-select
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [multiEditOpen, setMultiEditOpen] = useState(false);
+  const [multiDeleteOpen, setMultiDeleteOpen] = useState(false);
+  const [multiEditFields, setMultiEditFields] = useState<{ date?: boolean; isRequired?: boolean; name?: boolean }>({});
+  const [multiEditDate, setMultiEditDate] = useState("");
+  const [multiEditIsRequired, setMultiEditIsRequired] = useState(true);
+  const [multiEditName, setMultiEditName] = useState("");
+  const [multiSubmitting, setMultiSubmitting] = useState(false);
+
+  // Activity types for edit dialog
+  const [activityTypes, setActivityTypes] = useState<{ id: string; name: string; icon: string }[]>([]);
+  useEffect(() => {
+    if (multiEditOpen && activityTypes.length === 0) {
+      fetch("/api/activity-types").then((r) => r.json()).then(setActivityTypes).catch(() => {});
+    }
+  }, [multiEditOpen]);
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function exitMultiSelect() {
+    setMultiSelect(false);
+    setSelectedIds(new Set());
+  }
+
+  async function handleMultiEdit() {
+    if (selectedIds.size === 0) return;
+    setMultiSubmitting(true);
+    try {
+      const updates: string[] = [];
+      const values: unknown[] = [];
+      if (multiEditFields.date && multiEditDate) {
+        updates.push("date = ?");
+        values.push(multiEditDate);
+      }
+      if (multiEditFields.isRequired !== undefined && multiEditFields.isRequired) {
+        updates.push("is_required = ?");
+        values.push(multiEditIsRequired ? 1 : 0);
+      }
+      if (multiEditFields.name && multiEditName.trim()) {
+        updates.push("name = ?");
+        values.push(multiEditName.trim());
+      }
+      if (updates.length === 0) { toast.error("לא נבחרו שדות לעדכון"); setMultiSubmitting(false); return; }
+
+      await db.writeTransaction(async (tx) => {
+        for (const id of selectedIds) {
+          await tx.execute(`UPDATE activities SET ${updates.join(", ")} WHERE id = ?`, [...values, id]);
+        }
+      });
+      toast.success(`${hebrewCount(selectedIds.size, "פעילות עודכנה", "פעילויות עודכנו")}`);
+      setMultiEditOpen(false);
+      exitMultiSelect();
+    } catch (err) {
+      console.error("[multi-edit]", err);
+      toast.error("שגיאה בעדכון הפעילויות");
+    } finally {
+      setMultiSubmitting(false);
+    }
+  }
+
+  async function handleMultiDelete() {
+    setMultiSubmitting(true);
+    try {
+      await db.writeTransaction(async (tx) => {
+        for (const id of selectedIds) {
+          await tx.execute("DELETE FROM activity_reports WHERE activity_id = ?", [id]);
+          await tx.execute("DELETE FROM activities WHERE id = ?", [id]);
+        }
+      });
+      toast.success(`${hebrewCount(selectedIds.size, "פעילות נמחקה", "פעילויות נמחקו")}`);
+      setMultiDeleteOpen(false);
+      exitMultiSelect();
+    } catch {
+      toast.error("שגיאה במחיקת הפעילויות");
+    } finally {
+      setMultiSubmitting(false);
+    }
+  }
+
   const todayStr = new Date().toISOString().split("T")[0];
 
   // An activity is "completed" when its date is in the past and it has no gaps.
@@ -215,8 +317,6 @@ export default function ActivitiesPage() {
       list = list.filter((a) => a.date.split("T")[0] <= todayStr && !isCompleted(a));
     } else if (filter === "completed") {
       list = list.filter(isCompleted);
-    } else if (filter === "gaps") {
-      list = list.filter((a) => a.isRequired && a.date.split("T")[0] < todayStr && (a.missingCount > 0 || a.failedCount > 0));
     } else if (filter === "future") {
       list = list.filter((a) => a.date.split("T")[0] > todayStr);
     }
@@ -323,7 +423,7 @@ export default function ActivitiesPage() {
       {/* Sticky header */}
       <div ref={actHeaderRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: "var(--app-header-height, 0px)" }}>
         <div className="flex items-center gap-2">
-          <div data-tour="activities-filters" className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
+          <div data-tour="activities-filters" className="flex gap-1.5 overflow-x-auto pb-1 min-w-0 flex-1">
             {FILTER_PILLS.map((f) => (
               <button
                 key={f} type="button" onClick={() => setFilter(f)}
@@ -360,7 +460,27 @@ export default function ActivitiesPage() {
               </div>
             )}
           </div>
-          {canCreate && (
+          {canEdit && !multiSelect && (
+            <button
+              type="button"
+              onClick={() => setMultiSelect(true)}
+              className="shrink-0 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title="בחירה מרובה"
+            >
+              <CheckSquare size={16} />
+            </button>
+          )}
+          {multiSelect && (
+            <button
+              type="button"
+              onClick={exitMultiSelect}
+              className="shrink-0 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title="ביטול בחירה"
+            >
+              <X size={16} />
+            </button>
+          )}
+          {canCreate && !multiSelect && (
             <>
               <button
                 data-tour="activities-import-btn"
@@ -429,8 +549,11 @@ export default function ActivitiesPage() {
                     activity={activity}
                     showPlatoon={false}
                     onClick={() => router.push(`/activities/${activity.id}`)}
-                    onLongPress={canEdit ? (pos) => openContextMenu(activity, pos) : undefined}
+                    onLongPress={canEdit && !multiSelect ? (pos) => openContextMenu(activity, pos) : undefined}
                     dataTour={pi === 0 && ai === 0 ? "activities-card" : undefined}
+                    selectable={multiSelect}
+                    selected={selectedIds.has(activity.id)}
+                    onToggleSelect={() => toggleSelect(activity.id)}
                   />
                 ))}
               </div>
@@ -445,8 +568,11 @@ export default function ActivitiesPage() {
                 activity={activity}
                 showPlatoon={showPlatoon}
                 onClick={() => router.push(`/activities/${activity.id}`)}
-                onLongPress={canEdit ? (pos) => openContextMenu(activity, pos) : undefined}
+                onLongPress={canEdit && !multiSelect ? (pos) => openContextMenu(activity, pos) : undefined}
                 dataTour={i === 0 ? "activities-card" : undefined}
+                selectable={multiSelect}
+                selected={selectedIds.has(activity.id)}
+                onToggleSelect={() => toggleSelect(activity.id)}
               />
             ))}
           </div>
@@ -454,7 +580,7 @@ export default function ActivitiesPage() {
       </div>
 
       {/* Mobile FABs */}
-      {canCreate && (
+      {canCreate && !multiSelect && (
         <>
           <button
             data-tour="activities-import-btn"
@@ -501,6 +627,164 @@ export default function ActivitiesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Multi-select FABs — replace create/import FABs */}
+      {multiSelect && (
+        <>
+          <button
+            type="button"
+            disabled={selectedIds.size === 0}
+            onClick={() => setMultiDeleteOpen(true)}
+            className="fixed bottom-20 end-20 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-transform active:scale-95 disabled:opacity-40 md:hidden"
+            aria-label="מחק נבחרים"
+          >
+            <Trash2 size={20} />
+          </button>
+          <button
+            type="button"
+            disabled={selectedIds.size === 0}
+            onClick={() => {
+              setMultiEditFields({});
+              setMultiEditDate(new Date().toISOString().split("T")[0]);
+              setMultiEditIsRequired(true);
+              setMultiEditName("");
+              setMultiEditOpen(true);
+            }}
+            className="fixed bottom-20 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 disabled:opacity-40 md:hidden"
+            aria-label="ערוך נבחרים"
+          >
+            <Pencil size={24} />
+          </button>
+          {/* Desktop buttons in header area */}
+          <div className="hidden md:flex fixed bottom-4 end-4 z-30 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10 shadow-lg"
+              disabled={selectedIds.size === 0}
+              onClick={() => setMultiDeleteOpen(true)}
+            >
+              <Trash2 size={14} className="ms-1" />
+              מחק
+            </Button>
+            <Button
+              size="sm"
+              className="shadow-lg"
+              disabled={selectedIds.size === 0}
+              onClick={() => {
+                setMultiEditFields({});
+                setMultiEditDate(new Date().toISOString().split("T")[0]);
+                setMultiEditIsRequired(true);
+                setMultiEditName("");
+                setMultiEditOpen(true);
+              }}
+            >
+              <Pencil size={14} className="ms-1" />
+              ערוך
+            </Button>
+          </div>
+        </>
+      )}
+
+      {/* Multi-edit dialog */}
+      <Dialog open={multiEditOpen} onOpenChange={setMultiEditOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>עריכת {hebrewCount(selectedIds.size, "פעילות", "פעילויות")}</DialogTitle>
+            <DialogDescription>בחר את השדות לעדכון</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Date field */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!multiEditFields.date}
+                  onChange={(e) => setMultiEditFields((f) => ({ ...f, date: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label>תאריך</Label>
+              </div>
+              {multiEditFields.date && (
+                <Input
+                  type="date"
+                  value={multiEditDate}
+                  onChange={(e) => setMultiEditDate(e.target.value)}
+                  dir="ltr"
+                  lang="he"
+                />
+              )}
+            </div>
+
+            {/* Name field */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!multiEditFields.name}
+                  onChange={(e) => setMultiEditFields((f) => ({ ...f, name: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label>שם</Label>
+              </div>
+              {multiEditFields.name && (
+                <Input
+                  value={multiEditName}
+                  onChange={(e) => setMultiEditName(e.target.value)}
+                  placeholder="שם הפעילות"
+                />
+              )}
+            </div>
+
+            {/* Required toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!multiEditFields.isRequired}
+                  onChange={(e) => setMultiEditFields((f) => ({ ...f, isRequired: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label>חובה/רשות</Label>
+              </div>
+              {multiEditFields.isRequired && (
+                <div className="flex items-center gap-2">
+                  <Switch checked={multiEditIsRequired} onCheckedChange={setMultiEditIsRequired} />
+                  <span className="text-sm">{multiEditIsRequired ? "חובה" : "רשות"}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMultiEditOpen(false)}>ביטול</Button>
+            <Button onClick={handleMultiEdit} disabled={multiSubmitting}>
+              {multiSubmitting ? "מעדכן..." : "עדכן"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Multi-delete confirmation */}
+      <AlertDialog open={multiDeleteOpen} onOpenChange={setMultiDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>מחיקת פעילויות</AlertDialogTitle>
+            <AlertDialogDescription>
+              האם למחוק {hebrewCount(selectedIds.size, "פעילות", "פעילויות")}? פעולה זו תמחק גם את כל הדיווחים המשויכים.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleMultiDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={multiSubmitting}
+            >
+              {multiSubmitting ? "מוחק..." : "מחק"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Context menu */}
       {contextMenu && (
