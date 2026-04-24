@@ -83,7 +83,7 @@ export function Sidebar() {
               <Icon size={18} />
               <span className="flex-1">{t(labelKey)}</span>
               {href === "/requests" && requestBadge > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-bold text-destructive-foreground">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-bold text-white">
                   {requestBadge}
                 </span>
               )}

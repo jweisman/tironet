@@ -372,9 +372,29 @@ The `userName` column is denormalized from the user's `familyName givenName` at 
 
 ### Authorization on request mutations
 
-- **DELETE `/api/requests/[id]`** verifies `createdByUserId` matches the authenticated user — only the creator can delete their own open requests.
+- **DELETE `/api/requests/[id]`** — role-based: the request creator OR any role with edit permission (`canEditRequest()` from `src/lib/requests/permissions.ts`) can delete. Only open requests (`assignedRole !== null`) can be deleted.
 - **POST `/api/request-actions`** calls `getRequestScope()` and verifies the request's soldier is in the user's scope before creating an audit entry.
+- **PATCH `/api/requests/[id]` field edits** — role-based via `canEditRequest()`, OR the currently assigned role can edit. This replaces the previous inline permission checks.
 - **PATCH `/api/requests/[id]` (connector path)** validates that the `(status, assignedRole)` transition is reachable via a valid workflow action using `isValidTransition()` from `src/lib/requests/workflow.ts`. This prevents the PowerSync connector from bypassing the state machine (e.g. jumping directly from open to approved).
+
+### Request edit/delete permissions (`src/lib/requests/permissions.ts`)
+
+`canEditRequest(role, requestType)` determines who can edit request fields (role-based, not workflow-based):
+- **Platoon commanders, platoon sergeants, company commanders, deputy company commanders** — all request types
+- **Company medic** — medical requests only
+- **Hardship coordinator** — hardship requests only
+- **Squad commanders, instructors** — no edit access
+
+`canDeleteRequest(role, requestType, assignedRole)` uses the same role rules but additionally requires `assignedRole !== null` (open requests only).
+
+### Request detail page — modal edit + separate sections
+
+The request detail page uses three patterns for editing:
+1. **Modal edit dialog** — core fields per type (description, leave dates/place/transportation, medical urgent/paramedicDate, hardship urgent/specialConditions). Uses `EditLeaveRequestForm`, `EditMedicalRequestForm`, or `EditHardshipRequestForm` in a `Dialog`.
+2. **Inline section editing** — medical appointments (`MedicalAppointmentsSection`) and sick days (`SickDaysSection`) are extracted components with their own edit state, displayed inline on the detail page.
+3. **Action log** — note editing and adding notes remain inline on the detail page.
+
+The edit button appears in the header card alongside the status badge. The delete button (with confirmation dialog) also appears in the header for open requests.
 
 ### Offline writes
 

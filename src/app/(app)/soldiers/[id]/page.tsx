@@ -329,7 +329,7 @@ export default function SoldierDetailPage() {
       {/* Back button */}
       <button
         type="button"
-        onClick={() => router.push("/soldiers")}
+        onClick={() => router.back()}
         className="flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground hover:bg-muted rounded-md px-1.5 py-0.5 -ms-1.5 transition-colors"
       >
         <ArrowRight size={18} />
@@ -382,26 +382,27 @@ export default function SoldierDetailPage() {
                 )}
               </div>
               <div className="flex items-center gap-1.5">
+                <Button
+                  data-tour="soldier-edit-btn"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setEditOpen(true)}
+                  aria-label="ערוך פרטי חייל"
+                >
+                  <Pencil size={14} />
+                </Button>
                 {canDelete && (
                   <Button
                     variant="outline"
-                    size="icon-sm"
-                    className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
                     onClick={() => setConfirmDelete(true)}
                     aria-label="מחק חייל"
                   >
                     <Trash2 size={14} />
                   </Button>
                 )}
-                <Button
-                  data-tour="soldier-edit-btn"
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => setEditOpen(true)}
-                  aria-label="ערוך פרטי חייל"
-                >
-                  <Pencil size={14} />
-                </Button>
               </div>
             </div>
 

@@ -323,15 +323,15 @@ describe("PATCH /api/requests/[id] — workflow actions", () => {
 // PATCH /api/requests/[id] — field edits
 // ---------------------------------------------------------------------------
 describe("PATCH /api/requests/[id] — field edits", () => {
-  it("returns 403 when non-admin non-assigned role edits", async () => {
+  it("returns 403 when squad_commander tries to edit fields", async () => {
     mockCanActOnRequest.mockReturnValueOnce(false);
     mockRequestFindUnique.mockResolvedValue({
       ...baseRequest,
-      assignedRole: "company_commander",
+      assignedRole: "platoon_commander",
     } as never);
     mockGetScope.mockResolvedValue({
       scope: {
-        role: "platoon_commander",
+        role: "squad_commander",
         soldierIds: ["sol-1"],
         squadIds: ["sq-1"],
         platoonIds: ["pl-1"],
@@ -505,7 +505,7 @@ describe("PATCH /api/requests/[id] — field edits", () => {
     expect(res.status).toBe(200);
   });
 
-  it("blocks platoon_commander from editing non-medical request fields", async () => {
+  it("allows platoon_commander to edit non-medical request fields", async () => {
     mockCanActOnRequest.mockReturnValueOnce(false);
     mockRequestFindUnique.mockResolvedValue({
       ...baseRequest,
@@ -523,10 +523,15 @@ describe("PATCH /api/requests/[id] — field edits", () => {
       error: null,
       user: mockSessionUser(),
     });
+    mockRequestUpdate.mockResolvedValue({
+      ...baseRequest,
+      type: "leave",
+      description: "Updated",
+    } as never);
 
     const req = createMockRequest("PATCH", "/api/requests/req-1", { description: "Updated" });
     const res = await PATCH(req, makeParams("req-1"));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   it("blocks company_medic from editing non-medical request fields", async () => {
@@ -637,11 +642,11 @@ describe("DELETE /api/requests/[id]", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 400 when request is not open", async () => {
-    mockRequestFindUnique.mockResolvedValue({ ...baseRequest, status: "approved" } as never);
+  it("returns 400 when request is completed (assignedRole is null)", async () => {
+    mockRequestFindUnique.mockResolvedValue({ ...baseRequest, status: "approved", assignedRole: null } as never);
     mockGetScope.mockResolvedValue({
       scope: {
-        role: "squad_commander",
+        role: "platoon_commander",
         soldierIds: ["sol-1"],
         squadIds: ["sq-1"],
         platoonIds: ["pl-1"],
@@ -658,7 +663,7 @@ describe("DELETE /api/requests/[id]", () => {
     expect(body.error).toBe("Can only delete open requests");
   });
 
-  it("deletes open request successfully", async () => {
+  it("allows creator to delete open request", async () => {
     mockRequestFindUnique.mockResolvedValue(baseRequest as never);
     mockGetScope.mockResolvedValue({
       scope: {
@@ -680,5 +685,97 @@ describe("DELETE /api/requests/[id]", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(mockRequestDelete).toHaveBeenCalledWith({ where: { id: "req-1" } });
+  });
+
+  it("allows platoon_commander to delete request they did not create", async () => {
+    mockRequestFindUnique.mockResolvedValue({
+      ...baseRequest,
+      createdByUserId: "other-user",
+    } as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "platoon_commander",
+        soldierIds: ["sol-1"],
+        squadIds: ["sq-1"],
+        platoonIds: ["pl-1"],
+        canCreate: true,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+    mockRequestDelete.mockResolvedValue(baseRequest as never);
+
+    const req = createMockRequest("DELETE", "/api/requests/req-1");
+    const res = await DELETE(req, makeParams("req-1"));
+    expect(res.status).toBe(200);
+  });
+
+  it("blocks squad_commander from deleting request they did not create", async () => {
+    mockRequestFindUnique.mockResolvedValue({
+      ...baseRequest,
+      createdByUserId: "other-user",
+    } as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "squad_commander",
+        soldierIds: ["sol-1"],
+        squadIds: ["sq-1"],
+        platoonIds: ["pl-1"],
+        canCreate: true,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    const req = createMockRequest("DELETE", "/api/requests/req-1");
+    const res = await DELETE(req, makeParams("req-1"));
+    expect(res.status).toBe(403);
+  });
+
+  it("allows company_medic to delete medical request", async () => {
+    mockRequestFindUnique.mockResolvedValue({
+      ...baseRequest,
+      type: "medical",
+      createdByUserId: "other-user",
+    } as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "company_medic",
+        soldierIds: ["sol-1"],
+        squadIds: [],
+        platoonIds: ["pl-1"],
+        canCreate: false,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+    mockRequestDelete.mockResolvedValue(baseRequest as never);
+
+    const req = createMockRequest("DELETE", "/api/requests/req-1");
+    const res = await DELETE(req, makeParams("req-1"));
+    expect(res.status).toBe(200);
+  });
+
+  it("blocks company_medic from deleting non-medical request", async () => {
+    mockRequestFindUnique.mockResolvedValue({
+      ...baseRequest,
+      type: "leave",
+      createdByUserId: "other-user",
+    } as never);
+    mockGetScope.mockResolvedValue({
+      scope: {
+        role: "company_medic",
+        soldierIds: ["sol-1"],
+        squadIds: [],
+        platoonIds: ["pl-1"],
+        canCreate: false,
+      },
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    const req = createMockRequest("DELETE", "/api/requests/req-1");
+    const res = await DELETE(req, makeParams("req-1"));
+    expect(res.status).toBe(403);
   });
 });

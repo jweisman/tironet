@@ -261,6 +261,19 @@ export default function RequestsPage() {
     if (filter === "active" || tab === "active") return "active";
     return "open";
   });
+  // Sync viewTab to URL so browser back button preserves the filter
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const current = params.get("filter");
+    const target = viewTab === "open" ? null : viewTab;
+    if (current === target) return;
+    if (target) params.set("filter", target);
+    else params.delete("filter");
+    params.delete("tab"); // legacy param
+    const qs = params.toString();
+    router.replace(`/requests${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [viewTab]);
+
   const [filterType, setFilterType] = useState<RequestType | "all">("all");
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [createType, setCreateType] = useState<RequestType | null>(null);

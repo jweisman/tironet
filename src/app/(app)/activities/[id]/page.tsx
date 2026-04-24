@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, WifiOff } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -83,6 +83,7 @@ interface RawReport {
 
 export default function ActivityPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   // The SW caches one HTML shell for all /activities/[id] pages (app shell pattern).
@@ -221,13 +222,14 @@ export default function ActivityPage() {
   return (
     <div>
       <div className="mb-2">
-        <Link
-          href="/activities"
+        <button
+          type="button"
+          onClick={() => router.back()}
           className="inline-flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground hover:bg-muted rounded-md px-1.5 py-0.5 -ms-1.5 transition-colors"
         >
           <ArrowRight size={18} />
           חזרה לפעילויות
-        </Link>
+        </button>
       </div>
 
       {!data && showLoading && (

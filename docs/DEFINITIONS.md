@@ -24,10 +24,19 @@ This document summarizes the up-to-date definitions for terms used throughout th
 ### Hardship (ת״ש)
 Approved hardship requests are tracked separately from active requests (no date criteria). Shown on the soldiers page via a dedicated filter pill with urgent overlay when `specialConditions` or `urgent` is set.  
 
-### Edit permissions
-* Any assigned role
-  * Medical requests  can be edited by platoon commanders regardless of assignment
-* Hardship coordinators, company medic can edit their requests types always
+### Edit permissions (role-based)
+Edit permissions are based on role, not workflow state:
+* **Platoon commanders, platoon sergeants, company commanders, deputy company commanders** — can edit and delete all request types
+* **Company medic** — can edit and delete medical requests only
+* **Hardship coordinator** — can edit and delete hardship requests only
+* **Squad commanders, instructors** — cannot edit or delete requests
+
+Editing is done via a modal dialog for core request fields. Medical appointments and sick days have separate inline editing sections.
+
+### Delete permissions
+* Same roles as edit permissions (above)
+* Request creators can always delete their own requests
+* Only open requests (with `assignedRole !== null`) can be deleted
 
 
 ## Roles
