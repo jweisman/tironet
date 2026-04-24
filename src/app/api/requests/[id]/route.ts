@@ -9,7 +9,7 @@ import { sendPushToUsers } from "@/lib/push/send";
 import { scheduleRemindersForRequest, cancelAllRemindersForRequest } from "@/lib/reminders/schedule";
 import { parseMedicalAppointments } from "@/lib/requests/medical-appointments";
 import { z } from "zod";
-import { effectiveRole } from "@/lib/auth/permissions";
+import { canEditRequest } from "@/lib/requests/permissions";
 import type { RequestStatus, RequestType, Role, SessionUser } from "@/types";
 
 const patchSchema = z.object({
@@ -166,12 +166,10 @@ export async function PATCH(
     return NextResponse.json({ request: updated });
   }
 
-  // Handle field edits — assigned role, company medic, hardship coordinator, or platoon commander (medical requests only) can edit
-  const isMedicOnMedical = scope.role === "company_medic" && req.type === "medical";
-  const isCoordinatorOnHardship = scope.role === "hardship_coordinator" && req.type === "hardship";
-  const isPlatoonCmdrOnMedical = effectiveRole(scope.role as Role) === "platoon_commander" && req.type === "medical";
-  if (!isMedicOnMedical && !isCoordinatorOnHardship && !isPlatoonCmdrOnMedical && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
-    return NextResponse.json({ error: "Only the assigned role can edit" }, { status: 403 });
+  // Handle field edits — role-based permission check
+  const hasFieldEditPermission = scope.role ? canEditRequest(scope.role as Role, req.type as RequestType) : false;
+  if (!hasFieldEditPermission && !canActOnRequest(scope.role as Role, req.assignedRole as Role)) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   // If this is from the connector (has status/assignedRole), validate the transition
@@ -294,11 +292,14 @@ export async function DELETE(
   const { scope, error, user } = await getRequestScope(req.cycleId);
   if (error || !scope) return error!;
 
-  // Only the creator can delete, and only open requests
-  if (req.createdByUserId !== user?.id) {
-    return NextResponse.json({ error: "Only the creator can delete" }, { status: 403 });
+  // Role-based delete: same roles that can edit, plus the creator
+  const isCreator = req.createdByUserId === user?.id;
+  const hasEditPermission = scope.role ? canEditRequest(scope.role as Role, req.type as RequestType) : false;
+  if (!isCreator && !hasEditPermission) {
+    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
-  if (req.status !== "open") {
+  // Can only delete open requests (assignedRole !== null)
+  if (req.assignedRole === null) {
     return NextResponse.json({ error: "Can only delete open requests" }, { status: 400 });
   }
 

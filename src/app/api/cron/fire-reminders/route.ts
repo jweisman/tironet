@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { sendPushToUser } from "@/lib/push/send";
+import { publishReminder } from "@/lib/reminders/qstash";
 
 /**
  * GET /api/cron/fire-reminders
@@ -69,11 +70,36 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Schedule reminders that are within 7 days but don't have a QStash message yet
+  // (created when the event was too far in the future for QStash's max delay)
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const unscheduled = await prisma.scheduledReminder.findMany({
+    where: {
+      fired: false,
+      qstashMessageId: null,
+      scheduledFor: { gt: now, lte: sevenDaysFromNow },
+    },
+    take: 100,
+  });
+
+  let scheduled = 0;
+  for (const reminder of unscheduled) {
+    const notBefore = Math.floor(reminder.scheduledFor.getTime() / 1000);
+    const messageId = await publishReminder(reminder.id, notBefore);
+    if (messageId) {
+      await prisma.scheduledReminder.update({
+        where: { id: reminder.id },
+        data: { qstashMessageId: messageId },
+      });
+      scheduled++;
+    }
+  }
+
   // Clean up fired reminders older than 30 days
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const { count: cleaned } = await prisma.scheduledReminder.deleteMany({
     where: { fired: true, scheduledFor: { lt: thirtyDaysAgo } },
   });
 
-  return NextResponse.json({ fired, total: pending.length, cleaned });
+  return NextResponse.json({ fired, total: pending.length, scheduled, cleaned });
 }

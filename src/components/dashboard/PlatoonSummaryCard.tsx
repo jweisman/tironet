@@ -127,7 +127,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
                   <span className="text-xs text-muted-foreground">עם פערים</span>
                 </StatButton>
               ) : (
-                <p className="text-xs text-green-600 font-medium py-0.5">ללא פערים</p>
+                <p className="text-xs text-green-600 font-medium py-0.5 min-h-[28px] flex items-center">ללא פערים</p>
               )}
             </div>
           )}
@@ -150,7 +150,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
                   <span className="text-xs text-muted-foreground">{hebrewLabel(total.missingReportActivities, "חסרת דיווח", "חסרות דיווח")}</span>
                 </StatButton>
               ) : (
-                <p className="text-xs text-green-600 font-medium py-0.5">הכל דווח</p>
+                <p className="text-xs text-green-600 font-medium py-0.5 min-h-[28px] flex items-center">הכל דווח</p>
               )}
             </div>
           )}
@@ -167,7 +167,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
                   <span className="text-xs text-muted-foreground">{hebrewLabel(total.approvedRequests, "פעילה", "פעילות")}</span>
                 </StatButton>
               ) : (
-                <p className="text-xs text-muted-foreground py-0.5">—</p>
+                <p className="text-xs text-muted-foreground py-0.5 min-h-[28px] flex items-center">—</p>
               )}
               {total.inProgressRequests > 0 ? (
                 <StatButton onClick={() => router.push("/requests")}>
@@ -177,7 +177,7 @@ export function PlatoonSummaryCard({ platoonName, squads, sections, dataTour }: 
                   <span className="text-xs text-muted-foreground">{hebrewLabel(total.inProgressRequests, "ממתינה", "ממתינות")}</span>
                 </StatButton>
               ) : (
-                <p className="text-xs text-muted-foreground py-0.5">—</p>
+                <p className="text-xs text-muted-foreground py-0.5 min-h-[28px] flex items-center">—</p>
               )}
             </div>
           )}

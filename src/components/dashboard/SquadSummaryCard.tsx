@@ -82,7 +82,7 @@ export function SquadSummaryCard({ squad, dataTour, sections }: Props) {
                 <span className="text-xs text-muted-foreground">עם פערים</span>
               </StatButton>
             ) : (
-              <p className="text-xs text-green-600 font-medium py-0.5">ללא פערים</p>
+              <p className="text-xs text-green-600 font-medium py-0.5 min-h-[28px] flex items-center">ללא פערים</p>
             )}
           </div>
         )}
@@ -105,7 +105,7 @@ export function SquadSummaryCard({ squad, dataTour, sections }: Props) {
                 <span className="text-xs text-muted-foreground">{hebrewLabel(squad.missingReportActivities, "חסר דיווח", "חסרות דיווח")}</span>
               </StatButton>
             ) : (
-              <p className="text-xs text-green-600 font-medium py-0.5">הכל דווח</p>
+              <p className="text-xs text-green-600 font-medium py-0.5 min-h-[28px] flex items-center">הכל דווח</p>
             )}
           </div>
         )}
@@ -122,7 +122,7 @@ export function SquadSummaryCard({ squad, dataTour, sections }: Props) {
                 <span className="text-xs text-muted-foreground">{hebrewLabel(squad.approvedRequests, "פעילה", "פעילות")}</span>
               </StatButton>
             ) : (
-              <p className="text-xs text-muted-foreground py-0.5">—</p>
+              <p className="text-xs text-muted-foreground py-0.5 min-h-[28px] flex items-center">—</p>
             )}
             {squad.inProgressRequests > 0 ? (
               <StatButton onClick={() => router.push("/requests")}>
@@ -132,7 +132,7 @@ export function SquadSummaryCard({ squad, dataTour, sections }: Props) {
                 <span className="text-xs text-muted-foreground">{hebrewLabel(squad.inProgressRequests, "ממתינה", "ממתינות")}</span>
               </StatButton>
             ) : (
-              <p className="text-xs text-muted-foreground py-0.5">—</p>
+              <p className="text-xs text-muted-foreground py-0.5 min-h-[28px] flex items-center">—</p>
             )}
           </div>
         )}

@@ -84,7 +84,7 @@ export function TabBar() {
               <span className="relative">
                 <Icon size={22} strokeWidth={active ? 2.5 : 2} />
                 {href === "/requests" && requestBadge > 0 && (
-                  <span className="absolute -top-1.5 -end-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                  <span className="absolute -top-1.5 -end-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
                     {requestBadge}
                   </span>
                 )}

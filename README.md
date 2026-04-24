@@ -8,7 +8,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Role-based access** — Admins, company commanders (and deputies), platoon commanders (and sergeants), squad commanders, instructors (activity-focused), company medics (medical request-focused), and hardship coordinators (hardship request-focused) each see only their slice of the hierarchy
 - **Activity management** — Create training activities, assign them to platoons, and record per-soldier results (pass / fail / N/A) with up to 6 labeled scores per activity type and notes; bulk import activities from Excel/CSV
 - **Bulk reporting** — Update an entire squad's activity results in one action; import reports from Excel/CSV with user-defined column mapping (saved per activity type)
-- **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), commander notes on approve/deny, and full offline support
+- **Requests workflow** — Leave, medical, and hardship requests with a hierarchical approval chain (squad → platoon → company commander), commander notes on approve/deny, role-based editing and deletion, and full offline support
 - **Reports** — Activity summary (PDF with pie charts and grade tables by unit), all-activity matrix (Google Sheets), and approved request summary (PDF grouped by unit); all scoped by role and filterable by type
 - **Dashboard** — Today's activities with progress bars, today's active requests (leave/medical), and live summary cards per squad (squad/platoon commander) or per platoon (company-level roles)
 - **Soldier profiles** — Photo upload with in-browser cropping and compression; bulk import from Excel

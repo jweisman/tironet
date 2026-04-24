@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/fire-reminders",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     }
   ],
   "redirects": [

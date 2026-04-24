@@ -180,6 +180,18 @@ export default function ActivitiesPage() {
   const [filter, setFilter] = useState<FilterPill>(
     (FILTER_PILLS as readonly string[]).includes(initialFilter) ? initialFilter as FilterPill : "open"
   );
+  // Sync filter to URL so browser back button preserves it
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const current = params.get("filter");
+    const target = filter === "open" ? null : filter;
+    if (current === target) return;
+    if (target) params.set("filter", target);
+    else params.delete("filter");
+    const qs = params.toString();
+    router.replace(`/activities${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [filter]);
+
   const [sortMode, setSortMode] = useState<SortMode>("date-asc");
   const [sortOpen, setSortOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);

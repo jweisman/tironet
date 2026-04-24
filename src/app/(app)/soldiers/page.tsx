@@ -309,11 +309,30 @@ export default function SoldiersPage() {
   // -------- UI state --------
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
-  const [showGapsOnly, setShowGapsOnly] = useState(
-    searchParams.get("filter") === "gaps"
-  );
-  const [showRequestsOnly, setShowRequestsOnly] = useState(false);
-  const [showHardshipOnly, setShowHardshipOnly] = useState(false);
+  type SoldierFilter = "gaps" | "requests" | "hardship" | null;
+  const [activeFilter, setActiveFilter] = useState<SoldierFilter>(() => {
+    const f = searchParams.get("filter");
+    if (f === "gaps" || f === "requests" || f === "hardship") return f;
+    return null;
+  });
+  const showGapsOnly = activeFilter === "gaps";
+  const showRequestsOnly = activeFilter === "requests";
+  const showHardshipOnly = activeFilter === "hardship";
+
+  function toggleFilter(f: SoldierFilter) {
+    setActiveFilter((prev) => (prev === f ? null : f));
+  }
+
+  // Sync filter to URL so browser back button preserves it
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const current = params.get("filter");
+    if (current === activeFilter) return;
+    if (activeFilter) params.set("filter", activeFilter);
+    else params.delete("filter");
+    const qs = params.toString();
+    router.replace(`/soldiers${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [activeFilter]);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -499,7 +518,7 @@ export default function SoldiersPage() {
           <button
             data-tour="soldiers-requests-filter"
             type="button"
-            onClick={() => setShowRequestsOnly((v) => !v)}
+            onClick={() => toggleFilter("requests")}
             className={cn(
               "shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
               showRequestsOnly
@@ -512,7 +531,7 @@ export default function SoldiersPage() {
           </button>
           <button
             type="button"
-            onClick={() => setShowHardshipOnly((v) => !v)}
+            onClick={() => toggleFilter("hardship")}
             className={cn(
               "shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
               showHardshipOnly
@@ -526,7 +545,7 @@ export default function SoldiersPage() {
           <button
             data-tour="soldiers-gaps-filter"
             type="button"
-            onClick={() => setShowGapsOnly((v) => !v)}
+            onClick={() => toggleFilter("gaps")}
             className={cn(
               "shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
               showGapsOnly

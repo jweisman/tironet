@@ -3,8 +3,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward, MessageSquare, Pencil, Trash2, WifiOff } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { usePowerSync, useQuery } from "@powersync/react";
@@ -19,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -33,10 +33,14 @@ import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
 import { isRequestOpen, isRequestUrgent } from "@/lib/requests/active";
 import { getAvailableActions, getNextState, canActOnRequest } from "@/lib/requests/workflow";
 import { effectiveRole } from "@/lib/auth/permissions";
-import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
-import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
-import { parseSickDays, expandSickDayRange } from "@/lib/requests/sick-days";
-import type { SickDay } from "@/lib/requests/sick-days";
+import { canEditRequest, canDeleteRequest } from "@/lib/requests/permissions";
+import { formatAppointment, parseMedicalAppointments } from "@/lib/requests/medical-appointments";
+import { parseSickDays } from "@/lib/requests/sick-days";
+import { EditLeaveRequestForm } from "@/components/requests/EditLeaveRequestForm";
+import { EditMedicalRequestForm } from "@/components/requests/EditMedicalRequestForm";
+import { EditHardshipRequestForm } from "@/components/requests/EditHardshipRequestForm";
+import { MedicalAppointmentsSection } from "@/components/requests/MedicalAppointmentsSection";
+import { SickDaysSection } from "@/components/requests/SickDaysSection";
 import type { RequestType, RequestStatus, Role, Transportation, RequestActionType } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -206,18 +210,10 @@ export default function RequestDetailPage() {
   const [editingActionId, setEditingActionId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
 
-  // Appointment editing
-  const [editingAppointments, setEditingAppointments] = useState(false);
-  const [editAppointmentsList, setEditAppointmentsList] = useState<MedicalAppointment[]>([]);
-
-  // Sick days editing — each entry is a from/to range row
-  const [editingSickDays, setEditingSickDays] = useState(false);
-  const [editSickDayRanges, setEditSickDayRanges] = useState<{ id: string; from: string; to: string }[]>([]);
-
-  // Field editing (description, specialConditions)
-  const [editingDescription, setEditingDescription] = useState(false);
-  const [editDescriptionText, setEditDescriptionText] = useState("");
-  const [editingSpecialConditions, setEditingSpecialConditions] = useState(false);
+  // Edit / delete dialogs
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!raw, requestLoading);
 
@@ -265,12 +261,17 @@ export default function RequestDetailPage() {
 
   const isAssignedToMe = assignedRole !== null && rawUserRole !== "" && canActOnRequest(rawUserRole as Role, assignedRole);
 
-  // Company medics and platoon commanders can edit medical request fields (appointments, etc.)
+  // Role-based edit/delete permissions
+  const canEdit = rawUserRole ? canEditRequest(rawUserRole as Role, requestType) : false;
+  const canDelete = rawUserRole ? canDeleteRequest(rawUserRole as Role, requestType, assignedRole) : false;
+
+  // Inline editing permissions for appointments/sick days sections
+  // These stay workflow-aware: assigned role, medics, coordinators, platoon commanders
   const effRole = rawUserRole ? effectiveRole(rawUserRole as Role) : "";
   const isMedicOnMedical = rawUserRole === "company_medic" && requestType === "medical";
   const isCoordinatorOnHardship = rawUserRole === "hardship_coordinator" && requestType === "hardship";
   const isPlatoonCmdrOnMedical = effRole === "platoon_commander" && requestType === "medical";
-  const canEditFields = isAssignedToMe || isMedicOnMedical || isCoordinatorOnHardship || isPlatoonCmdrOnMedical;
+  const canEditSections = isAssignedToMe || isMedicOnMedical || isCoordinatorOnHardship || isPlatoonCmdrOnMedical || canEdit;
 
   const userName = session?.user
     ? `${(session.user as { familyName?: string }).familyName ?? ""} ${(session.user as { givenName?: string }).givenName ?? ""}`.trim()
@@ -385,12 +386,26 @@ export default function RequestDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await db.execute("DELETE FROM request_actions WHERE request_id = ?", [raw.id]);
+      await db.execute("DELETE FROM requests WHERE id = ?", [raw.id]);
+      toast.success("הבקשה נמחקה");
+      router.push("/requests");
+    } catch {
+      toast.error("שגיאה במחיקת הבקשה");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Back button */}
       <button
         type="button"
-        onClick={() => router.push("/requests")}
+        onClick={() => router.back()}
         className="flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground hover:bg-muted rounded-md px-1.5 py-0.5 -ms-1.5 transition-colors"
       >
         <ArrowRight size={18} />
@@ -422,26 +437,19 @@ export default function RequestDetailPage() {
             <Badge variant={REQUEST_STATUS_VARIANT[requestStatus]}>
               {REQUEST_STATUS_LABELS[requestStatus]}
             </Badge>
-            {canEditFields ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  const newVal = raw.urgent ? 0 : 1;
-                  await db.execute("UPDATE requests SET urgent = ?, updated_at = ? WHERE id = ?", [newVal, new Date().toISOString(), raw.id]);
-                  toast.success(newVal ? "סומן כדחוף" : "הוסר סימון דחוף");
-                }}
-                className={cn(
-                  "rounded-full px-2.5 py-0.5 text-[10px] font-semibold border transition-colors",
-                  raw.urgent
-                    ? "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20"
-                    : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
-                )}
-              >
-                {raw.urgent ? "דחוף ✕" : "+ דחוף"}
-              </button>
-            ) : raw.urgent ? (
+            {raw.urgent ? (
               <Badge variant="destructive">דחוף</Badge>
             ) : null}
+            {canEdit && (
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditDialogOpen(true)} aria-label="ערוך בקשה">
+                <Pencil size={14} />
+              </Button>
+            )}
+            {canDelete && (
+              <Button variant="outline" size="icon" className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDeleteOpen(true)} aria-label="מחק בקשה">
+                <Trash2 size={14} />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -477,46 +485,7 @@ export default function RequestDetailPage() {
       <div data-tour="request-details" className="rounded-xl border border-border bg-card p-4 space-y-1">
         <h2 className="text-sm font-semibold text-muted-foreground mb-2">פרטי הבקשה</h2>
 
-        <div className="py-2 border-b border-border">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-sm text-muted-foreground">תיאור</p>
-            {canEditFields && !editingDescription && (
-              <button
-                type="button"
-                onClick={() => { setEditDescriptionText(raw.description ?? ""); setEditingDescription(true); }}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Pencil size={12} />
-              </button>
-            )}
-          </div>
-          {editingDescription ? (
-            <div className="space-y-2">
-              <textarea
-                value={editDescriptionText}
-                onChange={(e) => setEditDescriptionText(e.target.value)}
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                rows={3}
-              />
-              <div className="flex gap-2 justify-end">
-                <button type="button" onClick={() => setEditingDescription(false)} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const val = editDescriptionText.trim() || null;
-                    await db.execute("UPDATE requests SET description = ?, updated_at = ? WHERE id = ?", [val, new Date().toISOString(), raw.id]);
-                    toast.success("תיאור עודכן");
-                    setEditingDescription(false);
-                  }}
-                  className="text-primary hover:text-primary/80"
-                ><Check size={16} /></button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm whitespace-pre-wrap">{raw.description || "—"}</p>
-          )}
-        </div>
-
+        <DetailRow label="תיאור" value={raw.description || "—"} />
         <DetailRow label="מחלקה" value={raw.platoon_name} />
         <DetailRow
           label="נוצר בתאריך"
@@ -547,333 +516,25 @@ export default function RequestDetailPage() {
               label='תאריך בדיקת חופ"ל'
               value={formatDate(raw.paramedic_date)}
             />
-            {/* Appointments section */}
-            {(() => {
-              const appts = parseMedicalAppointments(raw.medical_appointments);
-              return (
-                <div className="py-2 border-b border-border">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-muted-foreground">תורים</span>
-                    {canEditFields && !editingAppointments && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditAppointmentsList(appts.length > 0 ? appts : []);
-                          setEditingAppointments(true);
-                        }}
-                        className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <Pencil size={14} />
-                        ערוך תורים
-                      </button>
-                    )}
-                  </div>
-                  {!editingAppointments ? (
-                    appts.length > 0 ? (
-                      <ul className="space-y-1">
-                        {appts.map((a) => (
-                          <li key={a.id} className="text-sm font-medium">
-                            {formatAppointment(a)}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">אין תורים</p>
-                    )
-                  ) : (
-                    <div className="space-y-2 mt-2">
-                      {editAppointmentsList.map((appt) => (
-                        <div key={appt.id} className="rounded-lg border border-border p-2 space-y-1.5">
-                          <div className="flex items-center justify-end">
-                            <button
-                              type="button"
-                              onClick={() => setEditAppointmentsList((prev) => prev.filter((a) => a.id !== appt.id))}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div className="space-y-0.5">
-                              <Label className="text-xs">תאריך ושעה</Label>
-                              <Input
-                                type="datetime-local"
-                                value={appt.date}
-                                onChange={(e) =>
-                                  setEditAppointmentsList((prev) =>
-                                    prev.map((a) => (a.id === appt.id ? { ...a, date: e.target.value } : a)),
-                                  )
-                                }
-                                dir="ltr"
-                                lang="he"
-                                style={appt.date ? undefined : { color: "transparent" }}
-                              />
-                            </div>
-                            <div className="space-y-0.5">
-                              <Label className="text-xs">מקום</Label>
-                              <Input
-                                value={appt.place}
-                                onChange={(e) =>
-                                  setEditAppointmentsList((prev) =>
-                                    prev.map((a) => (a.id === appt.id ? { ...a, place: e.target.value } : a)),
-                                  )
-                                }
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-0.5">
-                            <Label className="text-xs">סוג</Label>
-                            <Input
-                              value={appt.type}
-                              onChange={(e) =>
-                                setEditAppointmentsList((prev) =>
-                                  prev.map((a) => (a.id === appt.id ? { ...a, type: e.target.value } : a)),
-                                )
-                              }
-                              placeholder="לדוגמה: פיזיותרפיה"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditAppointmentsList((prev) => [
-                            ...prev,
-                            { id: crypto.randomUUID(), date: "", place: "", type: "" },
-                          ])
-                        }
-                        className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center"
-                      >
-                        <Plus size={14} />
-                        הוסף תור
-                      </button>
-                      <div className="flex gap-1.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const valid = editAppointmentsList.filter((a) => a.date);
-                            try {
-                              await db.execute(
-                                `UPDATE requests SET medical_appointments = ?, updated_at = ? WHERE id = ?`,
-                                [valid.length > 0 ? JSON.stringify(valid) : null, new Date().toISOString(), raw.id],
-                              );
-                              toast.success("תורים עודכנו");
-                              setEditingAppointments(false);
-                            } catch {
-                              toast.error("שגיאה בעדכון תורים");
-                            }
-                          }}
-                          disabled={acting}
-                          className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                        >
-                          <Check size={12} />
-                          שמור
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingAppointments(false)}
-                          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
-                        >
-                          <X size={12} />
-                          ביטול
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-            {/* Sick days section */}
-            {(() => {
-              const days = parseSickDays(raw.sick_days);
-              const today = new Date().toISOString().split("T")[0];
-
-              async function saveDays(updated: SickDay[]) {
-                const sorted = [...updated].sort((a, b) => a.date.localeCompare(b.date));
-                try {
-                  await db.execute(
-                    `UPDATE requests SET sick_days = ?, updated_at = ? WHERE id = ?`,
-                    [sorted.length > 0 ? JSON.stringify(sorted) : null, new Date().toISOString(), raw.id],
-                  );
-                } catch {
-                  toast.error("שגיאה בעדכון ימי מחלה");
-                }
-              }
-
-              return (
-                <div className="py-2 border-b border-border">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-muted-foreground">ימי מחלה</span>
-                    {canEditFields && !editingSickDays && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditSickDayRanges([]);
-                          setEditingSickDays(true);
-                        }}
-                        className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <Pencil size={14} />
-                        ערוך ימי מחלה
-                      </button>
-                    )}
-                  </div>
-                  {/* Existing days as chips — always visible, deletable in edit mode */}
-                  {days.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {days.map((d) => (
-                        <span
-                          key={d.id}
-                          className={cn("inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs", d.date >= today && "font-bold")}
-                        >
-                          {new Date(d.date + "T00:00:00").toLocaleDateString("he-IL")}
-                          {editingSickDays && (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                const updated = days.filter((s) => s.id !== d.id);
-                                await saveDays(updated);
-                              }}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {days.length === 0 && !editingSickDays && (
-                    <p className="text-sm text-muted-foreground">אין ימי מחלה</p>
-                  )}
-                  {/* Add mode: range rows + save/cancel */}
-                  {editingSickDays && (
-                    <div className="space-y-2 mt-1">
-                      {editSickDayRanges.map((range) => (
-                        <div key={range.id} className="rounded-lg border border-border p-2 space-y-1.5">
-                          <div className="flex items-center justify-end">
-                            <button
-                              type="button"
-                              onClick={() => setEditSickDayRanges((prev) => prev.filter((r) => r.id !== range.id))}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div className="space-y-0.5">
-                              <Label className="text-xs">מתאריך</Label>
-                              <Input
-                                type="date"
-                                value={range.from}
-                                onChange={(e) =>
-                                  setEditSickDayRanges((prev) =>
-                                    prev.map((r) => (r.id === range.id ? { ...r, from: e.target.value } : r)),
-                                  )
-                                }
-                                dir="ltr"
-                                lang="he"
-                                style={range.from ? undefined : { color: "transparent" }}
-                              />
-                            </div>
-                            <div className="space-y-0.5">
-                              <Label className="text-xs">עד תאריך</Label>
-                              <Input
-                                type="date"
-                                value={range.to}
-                                onChange={(e) =>
-                                  setEditSickDayRanges((prev) =>
-                                    prev.map((r) => (r.id === range.id ? { ...r, to: e.target.value } : r)),
-                                  )
-                                }
-                                min={range.from || undefined}
-                                dir="ltr"
-                                lang="he"
-                                style={range.to ? undefined : { color: "transparent" }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditSickDayRanges((prev) => [
-                            ...prev,
-                            { id: crypto.randomUUID(), from: "", to: "" },
-                          ])
-                        }
-                        className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center"
-                      >
-                        <Plus size={14} />
-                        הוסף ימי מחלה
-                      </button>
-                      <div className="flex gap-1.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            // Expand new ranges into individual days, merge with existing
-                            const existing = new Set(days.map((d) => d.date));
-                            const newDays: SickDay[] = [];
-                            for (const range of editSickDayRanges) {
-                              if (!range.from) continue;
-                              for (const d of expandSickDayRange(range.from, range.to || null)) {
-                                if (!existing.has(d.date)) {
-                                  existing.add(d.date);
-                                  newDays.push(d);
-                                }
-                              }
-                            }
-                            if (newDays.length > 0) {
-                              await saveDays([...days, ...newDays]);
-                              toast.success("ימי מחלה עודכנו");
-                            }
-                            setEditingSickDays(false);
-                          }}
-                          disabled={acting || editSickDayRanges.length === 0}
-                          className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                        >
-                          <Check size={12} />
-                          שמור
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingSickDays(false)}
-                          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted"
-                        >
-                          <X size={12} />
-                          ביטול
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <MedicalAppointmentsSection
+              requestId={raw.id}
+              medicalAppointmentsJson={raw.medical_appointments}
+              canEdit={canEditSections}
+            />
+            <SickDaysSection
+              requestId={raw.id}
+              sickDaysJson={raw.sick_days}
+              canEdit={canEditSections}
+            />
           </>
         )}
 
         {/* Hardship-specific */}
         {requestType === "hardship" && (
-          <div className="py-2 border-b border-border flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">אוכלוסיות מיוחדות</p>
-            {canEditFields ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  const newVal = raw.special_conditions ? 0 : 1;
-                  await db.execute("UPDATE requests SET special_conditions = ?, updated_at = ? WHERE id = ?", [newVal, new Date().toISOString(), raw.id]);
-                  toast.success(newVal ? "סומן כאוכלוסיות מיוחדות" : "הוסר סימון אוכלוסיות מיוחדות");
-                }}
-                className={cn("text-sm font-medium px-2 py-0.5 rounded", raw.special_conditions ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground")}
-              >
-                {raw.special_conditions ? "כן" : "לא"}
-              </button>
-            ) : (
-              <p className="text-sm">{raw.special_conditions ? "כן" : "לא"}</p>
-            )}
-          </div>
+          <DetailRow
+            label="אוכלוסיות מיוחדות"
+            value={raw.special_conditions ? "כן" : "לא"}
+          />
         )}
       </div>
 
@@ -884,7 +545,7 @@ export default function RequestDetailPage() {
           <div className="space-y-0">
             {actionRows.map((a, i) => {
               const isOwn = a.user_id === session?.user?.id;
-              const canEdit = isOwn && assignedRole !== null;
+              const canEditNote = isOwn && assignedRole !== null;
               const isEditing = editingActionId === a.id;
 
               return (
@@ -914,7 +575,7 @@ export default function RequestDetailPage() {
                         <p className="flex-1 min-w-0 text-sm whitespace-pre-wrap text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
                           {a.note}
                         </p>
-                        {canEdit && (
+                        {canEditNote && (
                           <button
                             type="button"
                             onClick={() => { setEditingActionId(a.id); setEditingNoteText(a.note ?? ""); }}
@@ -962,7 +623,7 @@ export default function RequestDetailPage() {
                             <p className="flex-1 text-sm whitespace-pre-wrap text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
                               {a.note}
                             </p>
-                            {canEdit && (
+                            {canEditNote && (
                               <button
                                 type="button"
                                 onClick={() => { setEditingActionId(a.id); setEditingNoteText(a.note ?? ""); }}
@@ -974,7 +635,7 @@ export default function RequestDetailPage() {
                             )}
                           </div>
                         )}
-                        {!a.note && canEdit && (
+                        {!a.note && canEditNote && (
                           <button
                             type="button"
                             onClick={() => { setEditingActionId(a.id); setEditingNoteText(""); }}
@@ -1109,6 +770,73 @@ export default function RequestDetailPage() {
               </Button>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit request dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>עריכת {REQUEST_TYPE_LABELS[requestType]}</DialogTitle>
+          </DialogHeader>
+          {requestType === "leave" && (
+            <EditLeaveRequestForm
+              request={{
+                id: raw.id,
+                description: raw.description,
+                place: raw.place,
+                departureAt: raw.departure_at,
+                returnAt: raw.return_at,
+                transportation: raw.transportation,
+              }}
+              onSuccess={() => { setEditDialogOpen(false); toast.success("הבקשה עודכנה"); }}
+              onCancel={() => setEditDialogOpen(false)}
+            />
+          )}
+          {requestType === "medical" && (
+            <EditMedicalRequestForm
+              request={{
+                id: raw.id,
+                description: raw.description,
+                paramedicDate: raw.paramedic_date,
+                urgent: raw.urgent,
+              }}
+              onSuccess={() => { setEditDialogOpen(false); toast.success("הבקשה עודכנה"); }}
+              onCancel={() => setEditDialogOpen(false)}
+            />
+          )}
+          {requestType === "hardship" && (
+            <EditHardshipRequestForm
+              request={{
+                id: raw.id,
+                description: raw.description,
+                urgent: raw.urgent,
+                specialConditions: raw.special_conditions,
+              }}
+              onSuccess={() => { setEditDialogOpen(false); toast.success("הבקשה עודכנה"); }}
+              onCancel={() => setEditDialogOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>מחיקת בקשה</DialogTitle>
+            <DialogDescription>
+              האם למחוק את הבקשה? פעולה זו לא ניתנת לביטול.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)} disabled={deleting}>
+              ביטול
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "מוחק..." : "מחק"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

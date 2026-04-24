@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Chrome uses color-scheme to style native date/time picker icons.
+   Without this, the calendar icon is invisible on dark backgrounds. */
+.dark {
+  color-scheme: dark;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

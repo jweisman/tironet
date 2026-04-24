@@ -14,11 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus } from "lucide-react";
 import { TRANSPORTATION_LABELS } from "@/lib/requests/constants";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import { expandSickDayRange } from "@/lib/requests/sick-days";
 import type { SickDay } from "@/lib/requests/sick-days";
+import { AppointmentListEditor } from "./AppointmentListEditor";
+import { SickDayRangeEditor } from "./SickDayRangeEditor";
+import type { SickDayRange } from "./SickDayRangeEditor";
 import type { RequestType, Transportation, Role } from "@/types";
 
 /** Format a Date as a `datetime-local` input value (YYYY-MM-DDTHH:MM). */
@@ -151,24 +153,7 @@ export function CreateRequestForm({
   const [paramedicDate, setParamedicDate] = useState("");
   const [appointments, setAppointments] = useState<MedicalAppointment[]>([]);
   const [sickDays, setSickDays] = useState<SickDay[]>([]);
-  const [sickDayRanges, setSickDayRanges] = useState<{ id: string; from: string; to: string }[]>([]);
-
-  function addAppointment() {
-    setAppointments((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), date: "", place: "", type: "" },
-    ]);
-  }
-
-  function updateAppointment(id: string, field: keyof Omit<MedicalAppointment, "id">, value: string) {
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, [field]: value } : a)),
-    );
-  }
-
-  function removeAppointment(id: string) {
-    setAppointments((prev) => prev.filter((a) => a.id !== id));
-  }
+  const [sickDayRanges, setSickDayRanges] = useState<SickDayRange[]>([]);
 
   // Hardship fields
   const [specialConditions, setSpecialConditions] = useState(false);
@@ -415,135 +400,22 @@ export function CreateRequestForm({
           </div>
 
           {/* Appointments list */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>תורים</Label>
-              <button
-                type="button"
-                onClick={addAppointment}
-                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
-              >
-                <Plus size={14} />
-                הוסף תור
-              </button>
-            </div>
+          <div className="space-y-1.5">
+            <Label>תורים</Label>
             {appointments.length === 0 && (
               <p className="text-xs text-muted-foreground">אין תורים. לחץ &quot;הוסף תור&quot; כדי להוסיף.</p>
             )}
-            {appointments.map((appt) => (
-              <div key={appt.id} className="rounded-lg border border-border p-3 space-y-2 overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">תור</span>
-                  <button
-                    type="button"
-                    onClick={() => removeAppointment(appt.id)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">תאריך ושעה</Label>
-                    <Input
-                      type="datetime-local"
-                      value={appt.date}
-                      onChange={(e) => updateAppointment(appt.id, "date", e.target.value)}
-                      dir="ltr"
-                      lang="he"
-                      className="w-full min-w-0"
-                      style={appt.date ? undefined : { color: "transparent" }}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">מקום</Label>
-                    <Input
-                      value={appt.place}
-                      onChange={(e) => updateAppointment(appt.id, "place", e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">סוג</Label>
-                  <Input
-                    value={appt.type}
-                    onChange={(e) => updateAppointment(appt.id, "type", e.target.value)}
-                    placeholder="לדוגמה: פיזיותרפיה"
-                  />
-                </div>
-              </div>
-            ))}
+            <AppointmentListEditor value={appointments} onChange={setAppointments} />
           </div>
 
           <div className="space-y-1.5">
             <Label>ימי מחלה</Label>
-            {sickDays.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {sickDays.map((d) => (
-                  <span
-                    key={d.id}
-                    className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs"
-                  >
-                    {new Date(d.date + "T00:00:00").toLocaleDateString("he-IL")}
-                    <button
-                      type="button"
-                      onClick={() => setSickDays((prev) => prev.filter((s) => s.id !== d.id))}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            {sickDayRanges.map((range) => (
-              <div key={range.id} className="rounded-lg border border-border p-2 space-y-1.5 overflow-hidden">
-                <div className="flex items-center justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setSickDayRanges((prev) => prev.filter((r) => r.id !== range.id))}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  <div className="space-y-0.5">
-                    <Label className="text-xs">מתאריך</Label>
-                    <Input
-                      type="date"
-                      value={range.from}
-                      onChange={(e) => setSickDayRanges((prev) => prev.map((r) => (r.id === range.id ? { ...r, from: e.target.value } : r)))}
-                      dir="ltr"
-                      lang="he"
-                      className="w-full min-w-0"
-                      style={range.from ? undefined : { color: "transparent" }}
-                    />
-                  </div>
-                  <div className="space-y-0.5">
-                    <Label className="text-xs">עד תאריך</Label>
-                    <Input
-                      type="date"
-                      value={range.to}
-                      onChange={(e) => setSickDayRanges((prev) => prev.map((r) => (r.id === range.id ? { ...r, to: e.target.value } : r)))}
-                      min={range.from || undefined}
-                      dir="ltr"
-                      lang="he"
-                      className="w-full min-w-0"
-                      style={range.to ? undefined : { color: "transparent" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setSickDayRanges((prev) => [...prev, { id: crypto.randomUUID(), from: "", to: "" }])}
-              className="flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors w-full justify-center"
-            >
-              <Plus size={14} />
-              הוסף ימי מחלה
-            </button>
+            <SickDayRangeEditor
+              days={sickDays}
+              onDeleteDay={(id) => setSickDays((prev) => prev.filter((s) => s.id !== id))}
+              ranges={sickDayRanges}
+              onRangesChange={setSickDayRanges}
+            />
           </div>
         </>
       )}
