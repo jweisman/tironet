@@ -471,14 +471,43 @@ export default function ActivitiesPage() {
             </button>
           )}
           {multiSelect && (
-            <button
-              type="button"
-              onClick={exitMultiSelect}
-              className="shrink-0 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              title="ביטול בחירה"
-            >
-              <X size={16} />
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={exitMultiSelect}
+                className="shrink-0 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="ביטול בחירה"
+              >
+                <X size={16} />
+              </button>
+              <span className="hidden md:inline text-xs text-muted-foreground">
+                {selectedIds.size === 0 ? "בחר פעילויות" : hebrewCount(selectedIds.size, "פעילות נבחרה", "פעילויות נבחרו")}
+              </span>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0}
+                onClick={() => {
+                  setMultiEditFields({});
+                  setMultiEditDate(new Date().toISOString().split("T")[0]);
+                  setMultiEditIsRequired(true);
+                  setMultiEditName("");
+                  setMultiEditOpen(true);
+                }}
+                className="hidden md:flex items-center gap-1.5 shrink-0 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+              >
+                <Pencil size={14} />
+                ערוך
+              </button>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0}
+                onClick={() => setMultiDeleteOpen(true)}
+                className="hidden md:flex items-center gap-1.5 shrink-0 rounded-md border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
+              >
+                <Trash2 size={14} />
+                מחק
+              </button>
+            </>
           )}
           {canCreate && !multiSelect && (
             <>
@@ -655,34 +684,6 @@ export default function ActivitiesPage() {
           >
             <Pencil size={24} />
           </button>
-          {/* Desktop buttons in header area */}
-          <div className="hidden md:flex fixed bottom-4 end-4 z-30 gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10 shadow-lg"
-              disabled={selectedIds.size === 0}
-              onClick={() => setMultiDeleteOpen(true)}
-            >
-              <Trash2 size={14} className="ms-1" />
-              מחק
-            </Button>
-            <Button
-              size="sm"
-              className="shadow-lg"
-              disabled={selectedIds.size === 0}
-              onClick={() => {
-                setMultiEditFields({});
-                setMultiEditDate(new Date().toISOString().split("T")[0]);
-                setMultiEditIsRequired(true);
-                setMultiEditName("");
-                setMultiEditOpen(true);
-              }}
-            >
-              <Pencil size={14} className="ms-1" />
-              ערוך
-            </Button>
-          </div>
         </>
       )}
 
