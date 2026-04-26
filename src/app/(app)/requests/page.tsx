@@ -253,27 +253,14 @@ export default function RequestsPage() {
     return mapped;
   }, [rawRequests, role, selectedAssignment?.unitId, isMedic, isCoordinator]);
 
-  // UI state — initialise from URL params
+  // UI state — initialise from URL params (e.g. /requests?filter=mine from home page callout)
   const [viewTab, setViewTab] = useState<ViewTab>(() => {
     const filter = searchParams.get("filter");
-    const tab = searchParams.get("tab");
     if (filter === "mine") return "mine";
-    if (filter === "active" || tab === "active") return "active";
+    if (filter === "active") return "active";
     if (filter === "approved") return "approved";
     return "open";
   });
-  // Sync viewTab to URL so browser back button preserves the filter
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    const current = params.get("filter");
-    const target = viewTab === "open" ? null : viewTab;
-    if (current === target) return;
-    if (target) params.set("filter", target);
-    else params.delete("filter");
-    params.delete("tab"); // legacy param
-    const qs = params.toString();
-    router.replace(`/requests${qs ? `?${qs}` : ""}`, { scroll: false });
-  }, [viewTab]);
 
   const [filterType, setFilterType] = useState<RequestType | "all">("all");
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
