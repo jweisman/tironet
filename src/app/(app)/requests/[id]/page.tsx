@@ -489,10 +489,6 @@ export default function RequestDetailPage() {
 
         <DetailRow label="תיאור" value={raw.description || "—"} />
         <DetailRow label="מחלקה" value={raw.platoon_name} />
-        <DetailRow
-          label="נוצר בתאריך"
-          value={formatDateTime(raw.created_at)}
-        />
 
         {/* Leave-specific */}
         {requestType === "leave" && (
