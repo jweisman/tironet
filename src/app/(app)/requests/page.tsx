@@ -253,14 +253,20 @@ export default function RequestsPage() {
     return mapped;
   }, [rawRequests, role, selectedAssignment?.unitId, isMedic, isCoordinator]);
 
-  // UI state — initialise from URL params (e.g. /requests?filter=mine from home page callout)
-  const [viewTab, setViewTab] = useState<ViewTab>(() => {
+  // UI state — URL params take priority (deep links), then sessionStorage (back navigation), then default
+  const [viewTab, setViewTabRaw] = useState<ViewTab>(() => {
     const filter = searchParams.get("filter");
-    if (filter === "mine") return "mine";
-    if (filter === "active") return "active";
-    if (filter === "approved") return "approved";
+    if (filter === "mine" || filter === "active" || filter === "approved") return filter;
+    if (typeof sessionStorage !== "undefined") {
+      const saved = sessionStorage.getItem("requests:viewTab") as ViewTab | null;
+      if (saved === "mine" || saved === "active" || saved === "approved") return saved;
+    }
     return "open";
   });
+  function setViewTab(tab: ViewTab) {
+    setViewTabRaw(tab);
+    sessionStorage.setItem("requests:viewTab", tab);
+  }
 
   const [filterType, setFilterType] = useState<RequestType | "all">("all");
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);

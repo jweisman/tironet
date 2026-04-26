@@ -10,14 +10,18 @@ import { useCallback } from "react";
 export function useGoBack(fallback: string) {
   const router = useRouter();
   return useCallback(() => {
-    const hasAppHistory =
-      typeof document !== "undefined" &&
-      document.referrer &&
-      new URL(document.referrer).origin === window.location.origin;
+    let hasAppHistory = false;
+    try {
+      const referrer = typeof document !== "undefined" ? document.referrer : "";
+      if (referrer) {
+        const url = new URL(referrer);
+        hasAppHistory = url.origin === window.location.origin && !url.pathname.startsWith("/serwist");
+      }
+    } catch { /* invalid referrer URL */ }
     if (hasAppHistory) {
       router.back();
     } else {
-      router.push(fallback);
+      window.location.assign(fallback);
     }
   }, [router, fallback]);
 }

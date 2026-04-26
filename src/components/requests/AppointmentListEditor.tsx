@@ -52,7 +52,6 @@ export function AppointmentListEditor({ value, onChange }: Props) {
                 dir="ltr"
                 lang="he"
                 className="w-full min-w-0"
-                style={appt.date ? undefined : { color: "transparent" }}
               />
             </div>
             <div className="space-y-0.5">

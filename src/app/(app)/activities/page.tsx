@@ -191,10 +191,20 @@ export default function ActivitiesPage() {
   );
 
   // -------- UI state --------
-  const initialFilter = (searchParams.get("filter") as FilterPill | null) ?? "open";
-  const [filter, setFilter] = useState<FilterPill>(
-    (FILTER_PILLS as readonly string[]).includes(initialFilter) ? initialFilter as FilterPill : "open"
-  );
+  // URL params take priority (deep links), then sessionStorage (back navigation), then default
+  const [filter, setFilterRaw] = useState<FilterPill>(() => {
+    const param = searchParams.get("filter");
+    if (param && (FILTER_PILLS as readonly string[]).includes(param)) return param as FilterPill;
+    if (typeof sessionStorage !== "undefined") {
+      const saved = sessionStorage.getItem("activities:filter") as FilterPill | null;
+      if (saved && (FILTER_PILLS as readonly string[]).includes(saved)) return saved;
+    }
+    return "open";
+  });
+  function setFilter(f: FilterPill) {
+    setFilterRaw(f);
+    sessionStorage.setItem("activities:filter", f);
+  }
 
   const [sortMode, setSortMode] = useState<SortMode>("date-asc");
   const [sortOpen, setSortOpen] = useState(false);
