@@ -39,15 +39,11 @@ export async function loginAndSaveState(
   // Wait for redirect to /home (authenticated)
   await page.waitForURL("**/home", { timeout: 15000 });
 
-  // Dismiss all guided tours so the driver.js overlay doesn't block interactions
-  await page.evaluate(() => {
-    const pages = [
-      "home", "soldiers", "activities", "requests",
-      "soldier-detail", "activity-detail", "request-detail",
-    ];
-    for (const p of pages) {
-      localStorage.setItem(`tironet:tour-seen:${p}`, "1");
-    }
+  // Disable guided tours so the driver.js overlay doesn't block interactions
+  await page.request.fetch("/api/user-preferences", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    data: { showTour: false },
   });
 
   // Save the authenticated state

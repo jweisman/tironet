@@ -11,6 +11,7 @@ export interface OverflowItem {
   href: string;
   icon: LucideIcon;
   label: string;
+  dataTour?: string;
 }
 
 interface OverflowMenuProps {
@@ -44,6 +45,7 @@ export function OverflowMenu({ items }: OverflowMenuProps) {
     <div ref={menuRef} className="relative flex flex-1 flex-col items-center justify-center">
       <button
         type="button"
+        data-tour="nav-more"
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "flex flex-1 flex-col items-center justify-center gap-1 py-3 text-xs transition-colors min-h-[60px] w-full",

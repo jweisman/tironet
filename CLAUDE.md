@@ -841,14 +841,39 @@ The auto-select `useEffect` depends on a stable key of all active cycle IDs (`ac
 
 ### Guided tour (driver.js)
 
-An interactive walkthrough runs on 7 pages: home, soldiers, activities, requests (list pages), and soldier detail, activity detail, request detail. Implementation:
+An interactive walkthrough runs on 8 pages: home, soldiers, activities, requests, calendar (list pages), and soldier detail, activity detail, request detail. Implementation:
 
 - **`driver.js`** (v1.4) — lightweight step-by-step tour library. CSS imported globally in `src/app/layout.tsx`. RTL overrides in `globals.css` (class `.tironet-tour-popover`).
-- **`useTour` hook** (`src/hooks/useTour.ts`) — wraps driver.js. Auto-starts on first visit by observing the DOM via `MutationObserver` until a tour-targeted element is visible (no fixed delay). Tracks completion per page in `localStorage` (`tironet:tour-seen:<page>`). Filters steps to only those whose `element` is visible in the DOM — handles role-based UI and mobile/desktop differences automatically.
+- **`useTour` hook** (`src/hooks/useTour.ts`) — wraps driver.js with versioned step support. Filters steps to only those whose `element` is visible in the DOM — handles role-based UI and mobile/desktop differences automatically.
 - **`TourContext`** (`src/contexts/TourContext.tsx`) — each page registers its `startTour` function so the help button in `AppShell` (mobile) and `Sidebar` (desktop) can trigger the current page's tour.
-- **Tour steps** (`src/lib/tour/steps.ts`) — Hebrew step configs per page. Steps target `data-tour="..."` attributes on UI elements.
+- **Tour steps** (`src/lib/tour/steps.ts`) — Hebrew step configs per page using `VersionedStep` type (extends `DriveStep` with optional `version?: number`). Steps target `data-tour="..."` attributes on UI elements.
 - **`data-tour` attributes** — added to key UI elements on each page. When both a desktop and mobile variant exist (e.g. desktop header button + mobile FAB), both get the same `data-tour` value; the `useTour` visibility check picks the one actually rendered.
 - **Adding a tour to a new page:** (1) define steps in `steps.ts`, (2) add `data-tour` attributes to target elements, (3) call `useTour()` and register via `useTourContext()` in a `useEffect`. Place the hooks before any early returns so they're called unconditionally.
+
+### Versioned tour steps (#168)
+
+Tour steps support versioning so new features can be highlighted to returning users.
+
+**How it works:**
+- Each step has an optional `version` field (defaults to 1). Multiple steps can share the same version (e.g. a batch of features released together).
+- `localStorage` stores the max version seen per page (`tironet:tour-seen:{page}` = version number). Legacy boolean `"1"` is treated as version 1 for migration.
+- **First visit** (stored version = 0): full tour auto-starts, all steps shown.
+- **Return visit with new steps** (stored version < max version): only steps with `version > storedVersion` are shown, each with a "חדש" (new) badge injected via `onPopoverRender`.
+- **Help button**: always replays all steps without badges, regardless of version or preference.
+- **User preference**: `showTour` boolean on `UserPreference` (server-persisted) gates auto-start. When false, no tours auto-start. Toggle on profile page under "העדפות כלליות".
+
+**Adding new versioned steps:**
+1. Add steps to the relevant array in `steps.ts` with `version: N` where N > current max
+2. E2e helper (`e2e/helpers/auth.ts`) sets `tironet:tour-seen:*` to `"1"` (version 1) — if you add v2+ steps, update the stored value to match the max version to suppress tours in tests
+
+### User Preferences (`UserPreference` model)
+
+General user preferences (not notification-specific) are stored in the `UserPreference` model (one-to-one with User, server-persisted).
+
+- **API:** `GET/PATCH /api/user-preferences` — same upsert pattern as notification preferences. Returns defaults if no row exists.
+- **Context:** `UserPreferenceProvider` (`src/contexts/UserPreferenceContext.tsx`) wraps the app layout, fetches on mount, provides `{ showTour, loaded, updatePreference }`.
+- **Profile page:** "העדפות כלליות" section between display mode and notifications.
+- **Current fields:** `showTour` (Boolean, default true) — controls tour auto-start.
 
 ## PowerSync + React Rendering Gotchas (continued)
 
@@ -954,7 +979,7 @@ This creates a separate `tironet_test` database so e2e tests don't touch the dev
 
 9. **Profile test interference with admin assertions** — The profile edit test (`e2e/profile.spec.ts`) temporarily changes the admin user's display name. Admin tests that assert on the admin user should use the email (`admin-e2e@test.com`) rather than the display name to avoid flaky failures from parallel execution.
 
-10. **Guided tour overlay blocks interactions** — The driver.js tour auto-starts on first visit and its SVG overlay intercepts all pointer events, causing clicks to fail. The `loginAndSaveState` helper pre-sets `tironet:tour-seen:*` localStorage flags for all 7 tour pages so tours never trigger during tests. If you add a new tour page, add its key to the list in `e2e/helpers/auth.ts`.
+10. **Guided tour overlay blocks interactions** — The driver.js tour auto-starts on first visit and its SVG overlay intercepts all pointer events, causing clicks to fail. The `loginAndSaveState` helper sets `showTour: false` via the `/api/user-preferences` endpoint during login, which disables auto-start for all pages. No per-page localStorage management is needed.
 
 ## Environment Variable Naming
 

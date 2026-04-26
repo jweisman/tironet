@@ -382,7 +382,7 @@ export default function HomePage() {
 
   // Tour
   const { registerTour, unregisterTour } = useTourContext();
-  const { startTour } = useTour({ page: "home", steps: homeTourSteps });
+  const { startTour } = useTour({ page: "home", steps: homeTourSteps, ready: !showLoading });
   useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
 
   // Role-based section visibility (#99)

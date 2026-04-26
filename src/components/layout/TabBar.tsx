@@ -45,7 +45,7 @@ export function TabBar() {
   const overflowItems: OverflowItem[] = [];
 
   if (canSeeCalendar) {
-    overflowItems.push({ href: "/calendar", icon: Calendar, label: "לוח אירועים" });
+    overflowItems.push({ href: "/calendar", icon: Calendar, label: "לוח אירועים", dataTour: "nav-calendar" });
   }
 
   if (canSeeReports) {
@@ -99,12 +99,13 @@ export function TabBar() {
           );
         })}
 
-        {promotedItems.map(({ href, icon: Icon, label }) => {
+        {promotedItems.map(({ href, icon: Icon, label, dataTour }) => {
           const active = pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
+              data-tour={dataTour}
               className={cn(
                 "flex flex-1 flex-col items-center justify-center gap-1 py-3 text-xs transition-colors min-h-[60px]",
                 active

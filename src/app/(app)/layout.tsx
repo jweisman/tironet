@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { CycleProvider } from "@/contexts/CycleContext";
 import { TironetPowerSyncProvider } from "@/components/providers/PowerSyncProvider";
 import { TourProvider } from "@/contexts/TourContext";
+import { UserPreferenceProvider } from "@/contexts/UserPreferenceContext";
 
 export default async function AppLayout({
   children,
@@ -19,13 +20,15 @@ export default async function AppLayout({
 
   return (
     <SessionProvider session={session}>
-      <CycleProvider>
-        <TironetPowerSyncProvider>
-          <TourProvider>
-            <AppShell>{children}</AppShell>
-          </TourProvider>
-        </TironetPowerSyncProvider>
-      </CycleProvider>
+      <UserPreferenceProvider>
+        <CycleProvider>
+          <TironetPowerSyncProvider>
+            <TourProvider>
+              <AppShell>{children}</AppShell>
+            </TourProvider>
+          </TironetPowerSyncProvider>
+        </CycleProvider>
+      </UserPreferenceProvider>
     </SessionProvider>
   );
 }

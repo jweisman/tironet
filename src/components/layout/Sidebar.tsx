@@ -95,6 +95,7 @@ export function Sidebar() {
         {canSeeCalendar && (
           <Link
             href="/calendar"
+            data-tour="nav-calendar"
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
               pathname.startsWith("/calendar")

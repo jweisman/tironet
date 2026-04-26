@@ -17,8 +17,9 @@ const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").the
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
 import { useTheme, type ThemePreference } from "@/contexts/ThemeContext";
+import { useUserPreferences } from "@/contexts/UserPreferenceContext";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
-import { Monitor, Sun, Moon, Bell } from "lucide-react";
+import { Monitor, Sun, Moon, Bell, Sparkles } from "lucide-react";
 import type { Role } from "@/types";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
@@ -35,6 +36,9 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // General preferences
+  const { showTour, loaded: userPrefsLoaded, updatePreference: updateUserPref } = useUserPreferences();
 
   // Push notification state
   const push = usePushSubscription();
@@ -220,6 +224,26 @@ export default function ProfilePage() {
               <span>{label}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* General preferences */}
+      <Separator />
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Sparkles size={18} />
+          <Label className="text-base font-semibold">העדפות כלליות</Label>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">סיור תכונות חדשות</p>
+            <p className="text-xs text-muted-foreground">הצג הדרכה אוטומטית כשנוספות תכונות חדשות</p>
+          </div>
+          <Switch
+            checked={showTour}
+            disabled={!userPrefsLoaded}
+            onCheckedChange={(v) => updateUserPref("showTour", v)}
+          />
         </div>
       </div>
 

@@ -217,10 +217,11 @@ export default function ActivitiesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [multiEditOpen, setMultiEditOpen] = useState(false);
   const [multiDeleteOpen, setMultiDeleteOpen] = useState(false);
-  const [multiEditFields, setMultiEditFields] = useState<{ date?: boolean; isRequired?: boolean; name?: boolean }>({});
+  const [multiEditFields, setMultiEditFields] = useState<{ date?: boolean; isRequired?: boolean; name?: boolean; activityType?: boolean }>({});
   const [multiEditDate, setMultiEditDate] = useState("");
   const [multiEditIsRequired, setMultiEditIsRequired] = useState(true);
   const [multiEditName, setMultiEditName] = useState("");
+  const [multiEditActivityTypeId, setMultiEditActivityTypeId] = useState("");
   const [multiSubmitting, setMultiSubmitting] = useState(false);
 
   // Activity types for edit dialog
@@ -261,6 +262,10 @@ export default function ActivitiesPage() {
       if (multiEditFields.name && multiEditName.trim()) {
         updates.push("name = ?");
         values.push(multiEditName.trim());
+      }
+      if (multiEditFields.activityType && multiEditActivityTypeId) {
+        updates.push("activity_type_id = ?");
+        values.push(multiEditActivityTypeId);
       }
       if (updates.length === 0) { toast.error("לא נבחרו שדות לעדכון"); setMultiSubmitting(false); return; }
 
@@ -463,6 +468,7 @@ export default function ActivitiesPage() {
           {canEdit && !multiSelect && (
             <button
               type="button"
+              data-tour="activities-multiselect-btn"
               onClick={() => setMultiSelect(true)}
               className="shrink-0 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
               title="בחירה מרובה"
@@ -491,6 +497,7 @@ export default function ActivitiesPage() {
                   setMultiEditDate(new Date().toISOString().split("T")[0]);
                   setMultiEditIsRequired(true);
                   setMultiEditName("");
+                  setMultiEditActivityTypeId("");
                   setMultiEditOpen(true);
                 }}
                 className="hidden md:flex items-center gap-1.5 shrink-0 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
@@ -695,25 +702,28 @@ export default function ActivitiesPage() {
             <DialogDescription>בחר את השדות לעדכון</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Date field */}
+            {/* Activity type field */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={!!multiEditFields.date}
-                  onChange={(e) => setMultiEditFields((f) => ({ ...f, date: e.target.checked }))}
+                  checked={!!multiEditFields.activityType}
+                  onChange={(e) => setMultiEditFields((f) => ({ ...f, activityType: e.target.checked }))}
                   className="rounded"
                 />
-                <Label>תאריך</Label>
+                <Label>סוג פעילות</Label>
               </div>
-              {multiEditFields.date && (
-                <Input
-                  type="date"
-                  value={multiEditDate}
-                  onChange={(e) => setMultiEditDate(e.target.value)}
-                  dir="ltr"
-                  lang="he"
-                />
+              {multiEditFields.activityType && (
+                <select
+                  value={multiEditActivityTypeId}
+                  onChange={(e) => setMultiEditActivityTypeId(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">בחר סוג</option>
+                  {activityTypes.map((at) => (
+                    <option key={at.id} value={at.id}>{at.name}</option>
+                  ))}
+                </select>
               )}
             </div>
 
@@ -733,6 +743,28 @@ export default function ActivitiesPage() {
                   value={multiEditName}
                   onChange={(e) => setMultiEditName(e.target.value)}
                   placeholder="שם הפעילות"
+                />
+              )}
+            </div>
+
+            {/* Date field */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!multiEditFields.date}
+                  onChange={(e) => setMultiEditFields((f) => ({ ...f, date: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label>תאריך</Label>
+              </div>
+              {multiEditFields.date && (
+                <Input
+                  type="date"
+                  value={multiEditDate}
+                  onChange={(e) => setMultiEditDate(e.target.value)}
+                  dir="ltr"
+                  lang="he"
                 />
               )}
             </div>

@@ -38,6 +38,7 @@ model User {
   reportExportDefaults  ReportExportDefault[]
   pushSubscriptions     PushSubscription[]
   notificationPreference NotificationPreference?
+  userPreference         UserPreference?
 
   @@map("users")
 }
@@ -464,6 +465,16 @@ model NotificationPreference {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_preferences")
+}
+
+model UserPreference {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId   String  @unique @map("user_id") @db.Uuid
+  showTour Boolean @default(true) @map("show_tour")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
 
 // ---------------------------------------------------------------------------

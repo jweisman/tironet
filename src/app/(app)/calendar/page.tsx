@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
+import { useTour } from "@/hooks/useTour";
+import { useTourContext } from "@/contexts/TourContext";
+import { calendarTourSteps } from "@/lib/tour/steps";
 import type {
   CalendarData,
   CalendarEvent,
@@ -28,6 +31,11 @@ export default function CalendarPage() {
   const { selectedCycleId, isLoading: cycleLoading } = useCycle();
   const [data, setData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Tour — gated by `ready: !loading` since data comes from server API, not PowerSync
+  const { registerTour, unregisterTour } = useTourContext();
+  const { startTour } = useTour({ page: "calendar", steps: calendarTourSteps, ready: !loading });
+  useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   // Month navigation — start at current month
@@ -181,6 +189,7 @@ export default function CalendarPage() {
           <h1 className="text-lg font-bold flex-1">לוח אירועים</h1>
           <button
             type="button"
+            data-tour="calendar-export"
             onClick={handleExportPdf}
             disabled={pdfLoading || loading}
             className="flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
@@ -212,15 +221,17 @@ export default function CalendarPage() {
         {!loading && data && (
           <>
             {/* Toolbar */}
-            <CalendarToolbar
-              platoons={data.platoons}
-              selectedPlatoonId={selectedPlatoonId}
-              onPlatoonChange={setSelectedPlatoonId}
-              visibleFilters={visibleFilters}
-              enabledFilters={enabledFilters}
-              onToggleFilter={handleToggleFilter}
-              showPlatoonFilter={isMultiPlatoon}
-            />
+            <div data-tour="calendar-filters">
+              <CalendarToolbar
+                platoons={data.platoons}
+                selectedPlatoonId={selectedPlatoonId}
+                onPlatoonChange={setSelectedPlatoonId}
+                visibleFilters={visibleFilters}
+                enabledFilters={enabledFilters}
+                onToggleFilter={handleToggleFilter}
+                showPlatoonFilter={isMultiPlatoon}
+              />
+            </div>
 
             {/* Legend */}
             {isMultiPlatoon && selectedPlatoonId === "all" ? (
@@ -237,17 +248,19 @@ export default function CalendarPage() {
             )}
 
             {/* Month navigation — shared between mobile and desktop */}
-            <MonthNav
-              year={viewYear}
-              month={viewMonth}
-              onPrev={goToPrevMonth}
-              onNext={goToNextMonth}
-              canGoPrev={canGoPrev}
-              canGoNext={canGoNext}
-            />
+            <div data-tour="calendar-month-nav">
+              <MonthNav
+                year={viewYear}
+                month={viewMonth}
+                onPrev={goToPrevMonth}
+                onNext={goToNextMonth}
+                canGoPrev={canGoPrev}
+                canGoNext={canGoNext}
+              />
+            </div>
 
             {/* Mobile: compact dots + day detail list */}
-            <div className="md:hidden">
+            <div className="md:hidden" data-tour="calendar-grid">
               <CalendarMobileView
                 year={viewYear}
                 month={viewMonth}
@@ -258,7 +271,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Desktop: full grid with event chips */}
-            <div className="hidden md:block">
+            <div className="hidden md:block" data-tour="calendar-grid">
               <CalendarGrid
                 year={viewYear}
                 month={viewMonth}

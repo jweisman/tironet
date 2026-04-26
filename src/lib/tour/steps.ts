@@ -1,9 +1,15 @@
 import type { DriveStep } from "driver.js";
 
+/** A tour step with an optional version number (defaults to 1). */
+export interface VersionedStep extends DriveStep {
+  /** Version number for this step. Steps with version > stored version are treated as "new". Defaults to 1. */
+  version?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Home page tour
 // ---------------------------------------------------------------------------
-export const homeTourSteps: DriveStep[] = [
+export const homeTourSteps: VersionedStep[] = [
   {
     popover: {
       title: "ברוכים הבאים לטירונט!",
@@ -91,12 +97,40 @@ export const homeTourSteps: DriveStep[] = [
         "לחצו על התמונה כדי לעבור לדף הפרופיל — עדכון פרטים, תמונה והגדרות התראות.",
     },
   },
+  // v2 — new features
+  {
+    element: "[data-tour='user-avatar']",
+    popover: {
+      title: "תזכורות לתורים ויציאות",
+      description:
+        "הגדירו תזכורת אוטומטית לפני תורים רפואיים ושעות יציאה. לחצו על הפרופיל ועברו להגדרות התראות.",
+    },
+    version: 2,
+  },
+  {
+    element: "[data-tour='nav-calendar']",
+    popover: {
+      title: "לוח אירועים",
+      description:
+        "לוח חודשי עם כל הפעילויות, היציאות, התורים וימי המחלה. ניתן לסנן ולייצא ל-PDF.",
+    },
+    version: 2,
+  },
+  {
+    element: "[data-tour='nav-more']",
+    popover: {
+      title: "לוח אירועים",
+      description:
+        "לחצו על ׳עוד׳ כדי למצוא את לוח האירועים — לוח חודשי עם פעילויות, יציאות, תורים וימי מחלה.",
+    },
+    version: 2,
+  },
 ];
 
 // ---------------------------------------------------------------------------
 // Soldiers page tour
 // ---------------------------------------------------------------------------
-export const soldiersTourSteps: DriveStep[] = [
+export const soldiersTourSteps: VersionedStep[] = [
   {
     popover: {
       title: "דף חיילים",
@@ -159,7 +193,7 @@ export const soldiersTourSteps: DriveStep[] = [
 // ---------------------------------------------------------------------------
 // Activities page tour
 // ---------------------------------------------------------------------------
-export const activitiesTourSteps: DriveStep[] = [
+export const activitiesTourSteps: VersionedStep[] = [
   {
     popover: {
       title: "דף פעילויות",
@@ -205,12 +239,22 @@ export const activitiesTourSteps: DriveStep[] = [
         "לחצו על פעילות כדי לצפות בפרטים, לערוך או לדווח על חיילים. פעילות שהושלמה וללא פערים עוברת אוטומטית להושלמו.",
     },
   },
+  // v2 — new features
+  {
+    element: "[data-tour='activities-multiselect-btn']",
+    popover: {
+      title: "עריכה מרובה",
+      description:
+        "בחרו מספר פעילויות ועדכנו סטטוס, תאריך או מחקו אותן בבת אחת.",
+    },
+    version: 2,
+  },
 ];
 
 // ---------------------------------------------------------------------------
 // Requests page tour
 // ---------------------------------------------------------------------------
-export const requestsTourSteps: DriveStep[] = [
+export const requestsTourSteps: VersionedStep[] = [
   {
     popover: {
       title: "דף בקשות",
@@ -270,7 +314,7 @@ export const requestsTourSteps: DriveStep[] = [
 // ---------------------------------------------------------------------------
 // Soldier detail page tour
 // ---------------------------------------------------------------------------
-export const soldierDetailTourSteps: DriveStep[] = [
+export const soldierDetailTourSteps: VersionedStep[] = [
   {
     element: "[data-tour='soldier-header']",
     popover: {
@@ -318,7 +362,7 @@ export const soldierDetailTourSteps: DriveStep[] = [
 // ---------------------------------------------------------------------------
 // Activity detail page tour
 // ---------------------------------------------------------------------------
-export const activityDetailTourSteps: DriveStep[] = [
+export const activityDetailTourSteps: VersionedStep[] = [
   {
     element: "[data-tour='activity-header']",
     popover: {
@@ -366,7 +410,7 @@ export const activityDetailTourSteps: DriveStep[] = [
 // ---------------------------------------------------------------------------
 // Request detail page tour
 // ---------------------------------------------------------------------------
-export const requestDetailTourSteps: DriveStep[] = [
+export const requestDetailTourSteps: VersionedStep[] = [
   {
     element: "[data-tour='request-header']",
     popover: {
@@ -407,6 +451,49 @@ export const requestDetailTourSteps: DriveStep[] = [
     popover: {
       title: "פעולות",
       description: "אשרו, דחו או אשרו קבלה של הבקשה — בהתאם לתפקידכם בשרשרת האישור.",
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Calendar page tour
+// ---------------------------------------------------------------------------
+export const calendarTourSteps: VersionedStep[] = [
+  {
+    popover: {
+      title: "לוח אירועים",
+      description:
+        "לוח חודשי עם כל הפעילויות, היציאות, התורים וימי המחלה. לחצו על יום כדי לראות את האירועים.",
+    },
+  },
+  {
+    element: "[data-tour='calendar-filters']",
+    popover: {
+      title: "סינון אירועים",
+      description:
+        "סננו לפי מחלקה וסוג אירוע — פעילויות, יציאות או רפואה.",
+    },
+  },
+  {
+    element: "[data-tour='calendar-month-nav']",
+    popover: {
+      title: "ניווט חודשי",
+      description: "עברו בין חודשים כדי לראות אירועים עתידיים או עבר.",
+    },
+  },
+  {
+    element: "[data-tour='calendar-grid']",
+    popover: {
+      title: "תצוגת לוח",
+      description:
+        "כל יום מציג את האירועים בצבעים לפי סוג או מחלקה. לחצו על אירוע כדי לעבור לפרטים.",
+    },
+  },
+  {
+    element: "[data-tour='calendar-export']",
+    popover: {
+      title: "ייצוא ל-PDF",
+      description: "ייצאו את לוח האירועים כקובץ PDF — מסודר לפי חודש בפריסת נוף.",
     },
   },
 ];
