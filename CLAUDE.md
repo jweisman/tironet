@@ -551,6 +551,58 @@ PowerSync sync streams scope soldiers by `visible_squad_ids` (the global CTE), s
 - **Tokens are never exposed in API responses.** All endpoints return `inviteUrl` (the full `/invite/{token}` URL) instead of the raw `token`. This applies to the admin list, admin refresh, hierarchy, and pending invitations endpoints.
 - **Phone-only invitation acceptance** requires the accepting user to have a matching phone number. Users without a phone set are rejected with `phone_mismatch` (403).
 
+## Calendar (לוח אירועים)
+
+A top-level page (`/calendar`) showing a monthly calendar of activities, leave requests, medical appointments, and sick days. Available to all roles except hardship coordinators — including squad commanders (unlike reports, which are platoon+ only).
+
+### Architecture
+
+- **Page:** `src/app/(app)/calendar/page.tsx` — client component. Fetches from `/api/calendar?cycleId=...`, renders filters + month navigation + calendar grid.
+- **API (JSON):** `src/app/api/calendar/route.ts` — uses `getCalendarScope()` for auth/scope.
+- **API (PDF):** `src/app/api/calendar/pdf/route.ts` — landscape A4, one month per page.
+- **Scope:** `src/lib/api/calendar-scope.ts` — like `getReportScope` but includes `squad_commander` (with `squadId` for filtering requests to their squad's soldiers).
+- **Data:** `src/lib/calendar/fetch.ts` — Prisma queries for activities (status=active) and requests (status=approved, type=leave/medical).
+- **Event logic:** `src/lib/calendar/events.ts` — types, color palettes, date expansion, filter categories, month bounds.
+- **PDF renderer:** `src/lib/calendar/render.ts` — self-contained HTML with inline SVG icons from lucide-react.
+
+### Event types and filter categories
+
+Four internal event types: `activity`, `leave`, `medical_appointment`, `sick_day`. The toolbar exposes three **filter categories** that group these: `activity`, `leave`, `medical` (combines appointments + sick days). This keeps the toolbar compact on mobile.
+
+### Responsive views
+
+- **Mobile** (`md:hidden`): `CalendarMobileView` — compact day cells with colored dots (up to 3 per day). Tapping a day shows an event list below. Events link to their detail pages.
+- **Desktop** (`hidden md:block`): `CalendarGrid` with `CalendarDayCell` + `CalendarEventChip` — full event chips with icons and labels. Chips link to detail pages.
+- Both views share month navigation (`MonthNav`) and are bounded by min/max event dates.
+
+### Color scheme
+
+- **Multi-platoon users** (company level, "all platoons" selected): events colored by **platoon** using a fixed 8-color palette assigned by sort order.
+- **Single-platoon users** or filtered to one platoon: events colored by **event type** (blue=activity, amber=leave, rose=medical, purple=sick day).
+- Legend and dots both use `color.hex` (inline style) for consistent rendering in light and dark mode.
+
+### Role access
+
+| Role | Activities | Leave | Medical/Sick | Platoon filter |
+|---|---|---|---|---|
+| squad_commander | Yes | Yes | Yes | Own platoon (no filter) |
+| platoon_commander | Yes | Yes | Yes | Own platoon (no filter) |
+| company_commander | Yes | Yes | Yes | All + per-platoon |
+| instructor | Yes | No | No | All platoons in company |
+| company_medic | No | No | Yes | All platoons in company |
+| hardship_coordinator | No access | | | |
+
+### Safari grid-cols-7 workaround
+
+`grid-cols-7` (Tailwind v4) doesn't render correctly in Safari mobile — the grid collapses to a single column. Both `CalendarMobileView` and `CalendarGrid` use inline `style={{ gridTemplateColumns: "repeat(7, 1fr)" }}` instead.
+
+### Key files
+- `src/lib/calendar/events.ts` — types, colors, `buildCalendarEvents()`, `expandLeaveDates()`, filter category logic, `getMonthBounds()`
+- `src/lib/calendar/fetch.ts` — `fetchCalendarData()` (Prisma)
+- `src/lib/calendar/render.ts` — `renderCalendarHtml()` (PDF)
+- `src/lib/api/calendar-scope.ts` — `getCalendarScope()`
+- `src/components/reports/calendar/` — UI components (CalendarGrid, CalendarMobileView, CalendarEventChip, CalendarDayCell, CalendarToolbar, CalendarLegend, MonthNav)
+
 ## Physical Training Report (מעקב כשירות גופנית)
 
 A Google Sheets export that produces a weekly training attendance grid per platoon, matching the IDF מדא"גיות spreadsheet format. Available from the reports page under "מעקב כשירות גופנית". File is named `מעקב כשירות גופנית - {company} - {cycle}`.

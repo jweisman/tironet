@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, UserCog, Settings, FileText, BarChart3 } from "lucide-react";
+import { Home, Users, Activity, UserCog, Settings, FileText, BarChart3, Calendar } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ export function TabBar() {
   const isCommander = session?.user?.cycleAssignments?.some(
     (a) => { const r = effectiveRole(a.role as Role); return r === "company_commander" || r === "platoon_commander"; }
   );
+  const canSeeCalendar = selectedRole !== "hardship_coordinator";
   const canSeeReports = isAdmin || isCommander || selectedRole === "instructor" || selectedRole === "company_medic" || selectedRole === "hardship_coordinator";
   const canSeeCommanders = !isAdmin && isCommander && selectedRole !== "instructor" && selectedRole !== "company_medic" && selectedRole !== "hardship_coordinator";
 
@@ -42,6 +43,10 @@ export function TabBar() {
 
   // Build overflow menu items
   const overflowItems: OverflowItem[] = [];
+
+  if (canSeeCalendar) {
+    overflowItems.push({ href: "/calendar", icon: Calendar, label: "לוח אירועים" });
+  }
 
   if (canSeeReports) {
     overflowItems.push({ href: "/reports", icon: BarChart3, label: "דוחות" });

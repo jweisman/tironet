@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Activity, Settings, LogOut, UserCog, FileText, BarChart3, HelpCircle, LifeBuoy } from "lucide-react";
+import { Home, Users, Activity, Settings, LogOut, UserCog, FileText, BarChart3, HelpCircle, LifeBuoy, Calendar } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { signOutAndClearCaches } from "@/lib/auth/sign-out";
 import { useSession } from "next-auth/react";
@@ -35,6 +35,7 @@ export function Sidebar() {
   const isCommander = session?.user?.cycleAssignments?.some(
     (a) => { const r = effectiveRole(a.role as Role); return r === "company_commander" || r === "platoon_commander"; }
   );
+  const canSeeCalendar = selectedRole !== "hardship_coordinator";
   const canSeeReports = isAdmin || isCommander || selectedRole === "instructor" || selectedRole === "company_medic" || selectedRole === "hardship_coordinator";
   const canSeeCommanders = !isAdmin && isCommander && selectedRole !== "instructor" && selectedRole !== "company_medic" && selectedRole !== "hardship_coordinator";
 
@@ -90,6 +91,21 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {canSeeCalendar && (
+          <Link
+            href="/calendar"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+              pathname.startsWith("/calendar")
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Calendar size={18} />
+            <span>לוח אירועים</span>
+          </Link>
+        )}
 
         {canSeeReports && (
           <Link
