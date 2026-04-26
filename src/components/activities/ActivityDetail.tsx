@@ -231,7 +231,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           await db.execute("DELETE FROM activity_reports WHERE id = ?", [report.id]);
           setReports((prev) => {
             const next = new Map(prev);
-            next.set(soldierId, { ...EMPTY_REPORT });
+            next.set(soldierId, EMPTY_REPORT);
             return next;
           });
         } else if (report.id) {
@@ -262,7 +262,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     (soldierId: string, field: "result" | GradeKey | "note", value: unknown) => {
       setReports((prev) => {
         const next = new Map(prev);
-        const current = next.get(soldierId) ?? { ...EMPTY_REPORT };
+        const current = next.get(soldierId) ?? EMPTY_REPORT;
         const updated = { ...current, [field]: value };
         next.set(soldierId, updated);
 
@@ -291,7 +291,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     for (const squad of data.squads) {
       if (squad.canEdit) {
         for (const soldier of squad.soldiers) {
-          const report = reports.get(soldier.id) ?? { ...EMPTY_REPORT };
+          const report = reports.get(soldier.id) ?? EMPTY_REPORT;
           if (!report.result) {
             targets.push({ soldierId: soldier.id, report });
           }
@@ -623,7 +623,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 )}
                 <div className="divide-y divide-border">
                 {visibleSoldiers.map((soldier) => {
-                  const report = reports.get(soldier.id) ?? { ...EMPTY_REPORT };
+                  const report = reports.get(soldier.id) ?? EMPTY_REPORT;
                   const hasGrades = activeScores.some((s) => report[s.gradeKey] != null);
                   const tagRow = !firstSoldierTagged;
                   if (tagRow) firstSoldierTagged = true;
