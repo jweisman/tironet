@@ -6,6 +6,7 @@ import { CycleProvider } from "@/contexts/CycleContext";
 import { TironetPowerSyncProvider } from "@/components/providers/PowerSyncProvider";
 import { TourProvider } from "@/contexts/TourContext";
 import { UserPreferenceProvider } from "@/contexts/UserPreferenceContext";
+import { SentryUserProvider } from "@/components/providers/SentryUserProvider";
 
 export default async function AppLayout({
   children,
@@ -20,6 +21,7 @@ export default async function AppLayout({
 
   return (
     <SessionProvider session={session}>
+      <SentryUserProvider />
       <UserPreferenceProvider>
         <CycleProvider>
           <TironetPowerSyncProvider>

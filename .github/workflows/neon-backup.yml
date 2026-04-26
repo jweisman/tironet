@@ -1,0 +1,33 @@
+name: Weekly DB Backup
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # Sundays at 2am UTC
+  workflow_dispatch:       # allows manual trigger
+
+jobs:
+  neon-backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install postgres client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run pg_dump
+        env:
+          DB_URL: ${{ secrets.NEON_DB_URL }}
+        run: |
+          FILENAME="tironet-$(date +%Y%m%d).bak"
+          pg_dump -Fc -Z9 -d "$DB_URL" -f "$FILENAME"
+          echo "FILENAME=$FILENAME" >> $GITHUB_ENV
+
+      - name: Upload to S3 Glacier Deep Archive
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          aws s3 cp "$FILENAME" s3://weisman-neon-db-backups-prod/tironet/ \
+            --storage-class DEEP_ARCHIVE
