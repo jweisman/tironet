@@ -384,7 +384,7 @@ function findNewAppointmentDates(
   const oldIds = new Set(oldAppts.map((a) => a.id));
   return newAppts.filter((a) => !oldIds.has(a.id) && a.date).map((a) => {
     const d = a.date.includes("T") ? new Date(a.date) : new Date(a.date + "T00:00:00");
-    return d.toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" });
+    return d.toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jerusalem" });
   });
 }
 

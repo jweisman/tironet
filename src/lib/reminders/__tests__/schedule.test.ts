@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { parseAsIsraelTime } from "../schedule";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
@@ -329,5 +330,62 @@ describe("rescheduleRemindersForUser", () => {
 
     expect(mockCancel).toHaveBeenCalledWith("qmsg-old");
     expect(mockReminderCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("parseAsIsraelTime", () => {
+  it("passes through full ISO strings with Z", () => {
+    const result = parseAsIsraelTime("2026-04-26T12:40:00.000Z");
+    expect(result.toISOString()).toBe("2026-04-26T12:40:00.000Z");
+  });
+
+  it("passes through strings with explicit offset", () => {
+    const result = parseAsIsraelTime("2026-04-26T15:40+03:00");
+    expect(result.toISOString()).toBe("2026-04-26T12:40:00.000Z");
+  });
+
+  it("interprets naive datetime as Israel summer time (IDT = UTC+3)", () => {
+    // April = IDT (UTC+3), so 15:40 Israel = 12:40 UTC
+    const result = parseAsIsraelTime("2026-04-26T15:40");
+    expect(result.toISOString()).toBe("2026-04-26T12:40:00.000Z");
+  });
+
+  it("interprets naive datetime as Israel winter time (IST = UTC+2)", () => {
+    // December = IST (UTC+2), so 15:40 Israel = 13:40 UTC
+    const result = parseAsIsraelTime("2026-12-15T15:40");
+    expect(result.toISOString()).toBe("2026-12-15T13:40:00.000Z");
+  });
+
+  it("handles midnight in summer", () => {
+    // 00:00 Israel IDT = 21:00 UTC previous day
+    const result = parseAsIsraelTime("2026-07-01T00:00");
+    expect(result.toISOString()).toBe("2026-06-30T21:00:00.000Z");
+  });
+
+  it("handles midnight in winter", () => {
+    // 00:00 Israel IST = 22:00 UTC previous day
+    const result = parseAsIsraelTime("2026-01-15T00:00");
+    expect(result.toISOString()).toBe("2026-01-14T22:00:00.000Z");
+  });
+
+  it("handles time near DST spring-forward boundary", () => {
+    // Israel DST 2026 starts March 27 at 02:00 (clocks → 03:00)
+    // 03:30 Israel on March 27 = IDT (UTC+3) = 00:30 UTC
+    const result = parseAsIsraelTime("2026-03-27T03:30");
+    expect(result.toISOString()).toBe("2026-03-27T00:30:00.000Z");
+  });
+
+  it("handles time before DST spring-forward boundary", () => {
+    // 01:30 Israel on March 27 = still IST (UTC+2) = 23:30 UTC March 26
+    const result = parseAsIsraelTime("2026-03-27T01:30");
+    expect(result.toISOString()).toBe("2026-03-26T23:30:00.000Z");
+  });
+
+  it("handles the exact production case — 15:40 legacy format", () => {
+    // The original bug: "2026-04-26T15:40" was treated as 15:40 UTC
+    // instead of 15:40 Israel (IDT, UTC+3) = 12:40 UTC
+    const result = parseAsIsraelTime("2026-04-26T15:40");
+    expect(result.getUTCHours()).toBe(12);
+    expect(result.getUTCMinutes()).toBe(40);
   });
 });

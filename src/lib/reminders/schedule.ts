@@ -11,6 +11,51 @@ interface TimeEvent {
 }
 
 /**
+ * Parse a date string that may lack a timezone indicator.
+ * Timezone-naive strings (e.g. "2026-04-26T15:40") are interpreted as Israel
+ * time, not UTC. Full ISO strings with "Z" or offset are parsed as-is.
+ *
+ * Uses Intl to resolve the correct UTC offset for the given date in
+ * Asia/Jerusalem (handles IST +02:00 vs IDT +03:00 automatically).
+ */
+export function parseAsIsraelTime(dateStr: string): Date {
+  if (dateStr.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(dateStr)) {
+    return new Date(dateStr);
+  }
+  // Construct a date string with an explicit Israel timezone.
+  // Intl.DateTimeFormat gives us the UTC offset for this wall-clock time.
+  // We try the naive offset, then verify by round-tripping through Intl.
+  const probe = new Date(dateStr + "Z"); // treat as UTC temporarily
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Jerusalem",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  // Get Israel's offset at this UTC instant
+  const parts = fmt.formatToParts(probe);
+  const get = (t: string) => parts.find((p) => p.type === t)!.value;
+  const israelStr = `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+  const offsetMs = new Date(israelStr + "Z").getTime() - probe.getTime();
+
+  // Candidate: subtract the offset to convert Israel wall-clock → UTC
+  const candidate = new Date(probe.getTime() - offsetMs);
+
+  // Verify: the offset at the *candidate* UTC time might differ (DST boundary).
+  // Round-trip to confirm and correct if needed.
+  const parts2 = fmt.formatToParts(candidate);
+  const get2 = (t: string) => parts2.find((p) => p.type === t)!.value;
+  const israelStr2 = `${get2("year")}-${get2("month")}-${get2("day")}T${get2("hour")}:${get2("minute")}`;
+  const offsetMs2 = new Date(israelStr2 + "Z").getTime() - candidate.getTime();
+
+  if (offsetMs !== offsetMs2) {
+    // DST boundary: use the corrected offset
+    return new Date(probe.getTime() - offsetMs2);
+  }
+
+  return candidate;
+}
+
+/**
  * Find squad + platoon commanders for a soldier (active cycles only).
  * Returns array of { userId, reminderLeadMinutes }.
  */
@@ -81,7 +126,7 @@ function extractTimeEvents(request: {
       events.push({
         appointmentId: appt.id,
         reminderType: "medical",
-        eventAt: new Date(appt.date),
+        eventAt: parseAsIsraelTime(appt.date),
       });
     }
   }
