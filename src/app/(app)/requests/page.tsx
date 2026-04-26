@@ -259,6 +259,7 @@ export default function RequestsPage() {
     const tab = searchParams.get("tab");
     if (filter === "mine") return "mine";
     if (filter === "active" || tab === "active") return "active";
+    if (filter === "approved") return "approved";
     return "open";
   });
   // Sync viewTab to URL so browser back button preserves the filter

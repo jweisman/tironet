@@ -22,7 +22,17 @@ export function MedicalAppointmentsSection({ requestId, medicalAppointmentsJson,
   const [editList, setEditList] = useState<MedicalAppointment[]>([]);
 
   function startEditing() {
-    setEditList(appts.length > 0 ? appts : []);
+    setEditList(
+      appts.length > 0
+        ? appts.map((a) => {
+            if (!a.date.includes("T")) return a;
+            // Convert ISO string (UTC) to datetime-local format (local time)
+            const d = new Date(a.date);
+            const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+            return { ...a, date: local };
+          })
+        : [],
+    );
     setEditing(true);
   }
 
