@@ -6,15 +6,12 @@ on:
   workflow_dispatch:       # allows manual trigger
 
 jobs:
-  neon-backup:
+  backup:
     runs-on: ubuntu-latest
+    container:
+      image: postgres:17-alpine
 
     steps:
-      - name: Install postgres client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
       - name: Run pg_dump
         env:
           DB_URL: ${{ secrets.NEON_DB_URL }}
@@ -27,7 +24,8 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
+          AWS_DEFAULT_REGION: eu-central-1
         run: |
+          apk add --no-cache aws-cli
           aws s3 cp "$FILENAME" s3://weisman-neon-db-backups-prod/tironet/ \
             --storage-class DEEP_ARCHIVE
