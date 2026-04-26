@@ -70,23 +70,42 @@ export function CyclePicker({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="space-y-1">
-      <p className="text-xs text-muted-foreground px-1">מחזור</p>
-      <div className="flex rounded-lg bg-muted p-0.5">
-        {uniqueCycles.map((a) => (
-          <button
-            key={a.cycleId}
-            onClick={() => setSelectedCycleId(a.cycleId)}
-            className={`flex-1 min-w-0 truncate px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              a.cycleId === selectedCycleId
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {a.cycleName}
-          </button>
-        ))}
+    <>
+      <div className="space-y-1">
+        <p className="text-xs text-muted-foreground px-1">מחזור</p>
+        <button
+          type="button"
+          onClick={() => setDialogOpen(true)}
+          className="flex w-full items-center justify-between rounded-lg bg-muted px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/80 transition-colors"
+        >
+          <span className="truncate">{selectedName}</span>
+          <ChevronDown size={12} className="shrink-0 text-muted-foreground" />
+        </button>
       </div>
-    </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>בחר מחזור</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {activeCycles.map((a) => (
+              <button
+                key={`${a.cycleId}-${a.unitId}`}
+                type="button"
+                onClick={() => select(a.cycleId)}
+                className={`w-full rounded-lg border p-3 text-start transition-colors ${
+                  a.cycleId === selectedCycleId
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                <p className="font-medium text-sm">{a.cycleName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{ROLE_LABELS[a.role as Role]}</p>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
