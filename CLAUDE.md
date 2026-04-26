@@ -275,19 +275,19 @@ A colored dot next to the support icon (LifeBuoy) in both AppShell (mobile) and 
 
 | State | Color | Condition |
 |---|---|---|
-| `initializing` | Grey | Grace period (<5s after mount) with no cached data |
-| `synced` | Green | Connected and not downloading, OR during grace period with cached data |
+| `initializing` | Grey | Haven't connected to PowerSync yet this session |
+| `synced` | Green | Connected and not downloading |
 | `syncing` | Blue (pulse) | Connected and actively downloading |
-| `stale` | Yellow | Not connected after grace period (device online or offline) |
+| `stale` | Yellow | Was connected this session, now disconnected |
 | `error` | Red | `downloadError` contains "CORRUPT" (database corruption only) |
 
-**Debouncing — critical for avoiding false alarms:**
-- **10s app-load grace:** PowerSync takes 1-3s to establish its WebSocket. Without the grace period, every app open would briefly show yellow. The grace timer is shared across all `useSyncStatus()` instances via a module-level `APP_LOAD_TIME` constant — components that mount later (e.g. the support page) use the remaining time from app load, not a fresh window. This prevents the toolbar dot and support page from showing different states. During grace, returning users (with `hasSynced: true` AND `lastSyncedAt` set) see green; otherwise grey.
-- **2s connected → disconnected debounce:** Brief WebSocket drops during reconnection don't flash yellow. Only disconnects lasting >2s are shown.
+**No grace period — signal-based:** The hook tracks `hasConnectedThisSession` (a ref, resets on page load). Before first connection, the state is always "initializing" (grey). This is simpler than the previous timer-based grace period and guarantees the toolbar dot and support page always agree — both use the same ref. On app open, users see grey for 1-3s until PowerSync's WebSocket connects, then green.
+
+**2s connected → disconnected debounce:** After the first connection, brief WebSocket drops during reconnection don't flash yellow. Only disconnects lasting >2s are shown. The debounce is inactive before the first connection (always grey).
 
 **Error vs stale distinction:** Connection failures (server unreachable, network issues) are **stale** (yellow), not error. **Error** (red) is reserved for OPFS database corruption, which triggers the auto-recovery flow. This distinction is important — yellow means "check your connection", red means "data is broken and being reset".
 
-**SSR safety:** Uses `useSafeStatus()` (not `useStatus()`) and `navigator.onLine` directly (not `useOnlineStatus()` which internally calls the SSR-unsafe `useStatus()`). `SyncStatusDot` is a `"use client"` component.
+**SSR safety:** Uses `useSafeStatus()` (not `useStatus()`). `SyncStatusDot` is a `"use client"` component.
 
 **Support page sync section:** `SyncStatusSection` on the support page shows status label + last synced time. When state is error (corruption), a red callout recommends reset. Otherwise, reset is collapsed behind a text link to reduce visual noise.
 

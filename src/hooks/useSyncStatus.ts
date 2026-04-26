@@ -1,74 +1,46 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSafeStatus } from "./useSafeStatus";
 
 export type SyncState = "initializing" | "synced" | "syncing" | "stale" | "error";
-
-// App-level grace period: shared across all useSyncStatus() instances so the
-// toolbar dot and support page (which mount at different times) agree on state.
-const APP_LOAD_TIME = typeof window !== "undefined" ? Date.now() : 0;
-const GRACE_DURATION_MS = 10_000;
 
 /**
  * Returns the current sync state for display as a status indicator.
  *
  * States:
- *   initializing (grey)  — first-ever sync, no data yet
- *   synced       (green) — connected, not downloading, recent checkpoint
+ *   initializing (grey)  — haven't connected to PowerSync yet this session
+ *   synced       (green) — connected, not downloading
  *   syncing      (blue)  — connected and actively downloading
- *   stale        (yellow)— device online but PowerSync not connected
+ *   stale        (yellow)— was connected this session, now disconnected
  *   error        (red)   — CORRUPT downloadError (database corruption)
  *
- * Includes debouncing:
- *   - 10s grace from app load before transitioning out of initializing
- *   - 2s debounce on connected → stale to avoid flicker during reconnects
+ * Before the first successful connection this session, the state is always
+ * "initializing" (grey). No grace period or timer — just a simple signal.
+ * After the first connection, disconnects are debounced by 2s to avoid
+ * brief yellow flashes during WebSocket reconnects.
  */
 export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefined } {
   const status = useSafeStatus();
-  const [online, setOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
-  useEffect(() => {
-    const up = () => setOnline(true);
-    const down = () => setOnline(false);
-    window.addEventListener("online", up);
-    window.addEventListener("offline", down);
-    return () => {
-      window.removeEventListener("online", up);
-      window.removeEventListener("offline", down);
-    };
-  }, []);
   const connected = status.connected ?? false;
   const downloading = status.dataFlowStatus?.downloading ?? false;
   const downloadError = status.dataFlowStatus?.downloadError;
-  const hasSynced = status.hasSynced ?? false;
   const lastSyncedAt = status.lastSyncedAt;
 
-  // Grace period: shared across all instances via APP_LOAD_TIME so components
-  // that mount later (e.g. support page) don't restart the grace window.
-  const [graceOver, setGraceOver] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return Date.now() - APP_LOAD_TIME >= GRACE_DURATION_MS;
-  });
-  useEffect(() => {
-    if (graceOver) return;
-    const remaining = GRACE_DURATION_MS - (Date.now() - APP_LOAD_TIME);
-    // If already expired, the useState initializer should have caught it.
-    // Use Math.max(1, ...) as a safety net to avoid a synchronous setState.
-    const t = setTimeout(() => setGraceOver(true), Math.max(1, remaining));
-    return () => clearTimeout(t);
-  }, [graceOver]);
+  // Track whether PowerSync has connected at least once this session.
+  // This is a ref (not persisted) — resets on every page load.
+  const hasConnectedThisSession = useRef(false);
+  if (connected) {
+    hasConnectedThisSession.current = true;
+  }
 
   // Debounce connected → disconnected transitions by 2s
   // to avoid brief yellow flashes during WebSocket reconnects.
-  // Connected → true is immediate (via queueMicrotask to satisfy the lint rule);
-  // connected → false is delayed by 2s.
+  // Only active after the first connection — before that, always grey.
   const [debouncedConnected, setDebouncedConnected] = useState(connected);
   const prevConnected = useRef(connected);
   useEffect(() => {
     if (connected) {
-      // Connected — update on next microtask to avoid synchronous setState in effect
       prevConnected.current = true;
       queueMicrotask(() => setDebouncedConnected(true));
       return;
@@ -102,23 +74,15 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
 
   if (isCorrupt) {
     state = "error";
-  } else if (!graceOver && !connected) {
-    // During the grace period, if PowerSync hasn't connected yet,
-    // show initializing (grey) or synced (green) based on cached data —
-    // never yellow/stale during startup while the WebSocket is establishing.
-    // Once connected, skip the grace and show the real state immediately.
-    // Only show "synced" if we have a lastSyncedAt timestamp — hasSynced
-    // persists across sessions but lastSyncedAt is runtime-only, so without
-    // this check we'd show "synced" with no sync timestamp on the support page.
-    state = hasSynced && lastSyncedAt ? "synced" : "initializing";
+  } else if (!hasConnectedThisSession.current) {
+    // Haven't connected yet this session — grey until first connection.
+    state = "initializing";
   } else if (debouncedConnected && downloading) {
     state = "syncing";
   } else if (debouncedConnected && !downloading) {
     state = "synced";
-  } else if (!debouncedConnected && online) {
-    state = "stale";
-  } else if (!debouncedConnected && !online) {
-    // Offline — the offline banner handles this, show stale for the dot
+  } else if (!debouncedConnected) {
+    // Was connected, now disconnected (online or offline) — stale
     state = "stale";
   } else {
     state = "initializing";
