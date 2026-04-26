@@ -184,28 +184,32 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
               dir="ltr"
             />
           ))}
-          {noteOptions && noteOptions.length > 0 ? (
-            <select
-              value={noteOptions.includes(report.note ?? "") ? report.note ?? "" : ""}
-              onChange={handleNoteSelect}
-              aria-label="הערה"
-              className="flex-1 min-w-[100px] rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="">בחר...</option>
-              {noteOptions.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type="text"
-              defaultValue={report.note ?? ""}
-              onChange={handleNoteChange}
-              placeholder="הערה"
-              aria-label="הערה"
-              className="flex-1 min-w-[100px] rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          )}
+          {(() => {
+            const needsNote = report.result === "failed" && !report.note;
+            const noteHighlight = needsNote ? "border-red-400 ring-1 ring-red-300 placeholder:text-red-400" : "";
+            return noteOptions && noteOptions.length > 0 ? (
+              <select
+                value={noteOptions.includes(report.note ?? "") ? report.note ?? "" : ""}
+                onChange={handleNoteSelect}
+                aria-label="הערה"
+                className={cn("flex-1 min-w-[100px] rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring", noteHighlight)}
+              >
+                <option value="">{needsNote ? "חובה לבחור..." : "בחר..."}</option>
+                {noteOptions.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                defaultValue={report.note ?? ""}
+                onChange={handleNoteChange}
+                placeholder={needsNote ? "נא להוסיף הערה" : "הערה"}
+                aria-label="הערה"
+                className={cn("flex-1 min-w-[100px] rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring", noteHighlight)}
+              />
+            );
+          })()}
         </div>
       )}
     </div>
