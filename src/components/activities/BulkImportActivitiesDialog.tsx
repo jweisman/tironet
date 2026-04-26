@@ -68,10 +68,10 @@ function downloadTemplate(activityTypes: ActivityType[]) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    [type1, `${type1} יום 1`, "2026-04-01", "כן", "טיוטה"],
-    [type2, `${type2} מסכם`, "", "", ""],
+    [type1, `${type1} יום 1`, "2026-04-01", "כן"],
+    [type2, `${type2} מסכם`],
   ]);
-  ws["!cols"] = [{ wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 10 }, { wch: 10 }];
+  ws["!cols"] = [{ wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 10 }];
   XLSX.utils.book_append_sheet(wb, ws, "פעילויות");
   XLSX.writeFile(wb, "תבנית-פעילויות.xlsx");
 }
