@@ -76,6 +76,18 @@ export function TironetPowerSyncProvider({
       .then(() => {
         performance.mark("powersync-connect-end");
         console.log("[PowerSync] connect() resolved — sync started");
+        // Confirm successful rebuild after a DB clear
+        try {
+          if (sessionStorage.getItem("tironet:db-cleared") === "1") {
+            sessionStorage.removeItem("tironet:db-cleared");
+            Sentry.captureMessage("DB rebuild successful after corruption recovery", {
+              level: "info",
+              tags: { component: "powersync", phase: "rebuild-success" },
+            });
+          }
+        } catch {
+          // sessionStorage unavailable
+        }
       })
       .catch((err: unknown) => {
         if (isCorruptError(err)) {

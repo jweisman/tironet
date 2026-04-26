@@ -90,6 +90,13 @@ export async function clearLocalDatabase(): Promise<void> {
   });
   await Sentry.flush(2000);
 
+  // Flag so PowerSyncProvider can confirm successful rebuild after reload
+  try {
+    sessionStorage.setItem("tironet:db-cleared", "1");
+  } catch {
+    // sessionStorage unavailable (private browsing edge case)
+  }
+
   // Reload to reinitialize PowerSync with a fresh DB
   window.location.reload();
 }
