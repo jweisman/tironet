@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { InstallPrompt } from "@/components/layout/InstallPrompt";
 
 // Public layout — no app shell, no auth requirement.
 // Must dismiss the inline splash spinner (which AppShell handles for
@@ -17,5 +18,10 @@ export default function PublicLayout({
     });
   }, []);
 
-  return <>{children}</>;
+  return (
+    <>
+      <InstallPrompt />
+      {children}
+    </>
+  );
 }
