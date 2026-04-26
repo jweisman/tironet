@@ -5,6 +5,11 @@ import { useSafeStatus } from "./useSafeStatus";
 
 export type SyncState = "initializing" | "synced" | "syncing" | "stale" | "error";
 
+// App-level grace period: shared across all useSyncStatus() instances so the
+// toolbar dot and support page (which mount at different times) agree on state.
+const APP_LOAD_TIME = typeof window !== "undefined" ? Date.now() : 0;
+const GRACE_DURATION_MS = 10_000;
+
 /**
  * Returns the current sync state for display as a status indicator.
  *
@@ -16,7 +21,7 @@ export type SyncState = "initializing" | "synced" | "syncing" | "stale" | "error
  *   error        (red)   — CORRUPT downloadError (database corruption)
  *
  * Includes debouncing:
- *   - 5s grace on mount before transitioning out of initializing
+ *   - 10s grace from app load before transitioning out of initializing
  *   - 2s debounce on connected → stale to avoid flicker during reconnects
  */
 export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefined } {
@@ -40,23 +45,32 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
   const hasSynced = status.hasSynced ?? false;
   const lastSyncedAt = status.lastSyncedAt;
 
-  // Grace period: suppress non-grey states for 5s after mount
-  // to let PowerSync establish its WebSocket connection.
-  const [graceOver, setGraceOver] = useState(false);
+  // Grace period: shared across all instances via APP_LOAD_TIME so components
+  // that mount later (e.g. support page) don't restart the grace window.
+  const [graceOver, setGraceOver] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return Date.now() - APP_LOAD_TIME >= GRACE_DURATION_MS;
+  });
   useEffect(() => {
-    const t = setTimeout(() => setGraceOver(true), 10_000);
+    if (graceOver) return;
+    const remaining = GRACE_DURATION_MS - (Date.now() - APP_LOAD_TIME);
+    // If already expired, the useState initializer should have caught it.
+    // Use Math.max(1, ...) as a safety net to avoid a synchronous setState.
+    const t = setTimeout(() => setGraceOver(true), Math.max(1, remaining));
     return () => clearTimeout(t);
-  }, []);
+  }, [graceOver]);
 
   // Debounce connected → disconnected transitions by 2s
   // to avoid brief yellow flashes during WebSocket reconnects.
+  // Connected → true is immediate (via queueMicrotask to satisfy the lint rule);
+  // connected → false is delayed by 2s.
   const [debouncedConnected, setDebouncedConnected] = useState(connected);
   const prevConnected = useRef(connected);
   useEffect(() => {
     if (connected) {
-      // Connected immediately
-      setDebouncedConnected(true);
+      // Connected — update on next microtask to avoid synchronous setState in effect
       prevConnected.current = true;
+      queueMicrotask(() => setDebouncedConnected(true));
       return;
     }
     if (prevConnected.current && !connected) {
@@ -68,8 +82,8 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
       return () => clearTimeout(t);
     }
     // Was already disconnected
-    setDebouncedConnected(false);
     prevConnected.current = false;
+    queueMicrotask(() => setDebouncedConnected(false));
   }, [connected]);
 
   // Only treat corruption as a true error (red). Connection failures
@@ -93,7 +107,10 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
     // show initializing (grey) or synced (green) based on cached data —
     // never yellow/stale during startup while the WebSocket is establishing.
     // Once connected, skip the grace and show the real state immediately.
-    state = hasSynced ? "synced" : "initializing";
+    // Only show "synced" if we have a lastSyncedAt timestamp — hasSynced
+    // persists across sessions but lastSyncedAt is runtime-only, so without
+    // this check we'd show "synced" with no sync timestamp on the support page.
+    state = hasSynced && lastSyncedAt ? "synced" : "initializing";
   } else if (debouncedConnected && downloading) {
     state = "syncing";
   } else if (debouncedConnected && !downloading) {

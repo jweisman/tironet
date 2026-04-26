@@ -282,7 +282,7 @@ A colored dot next to the support icon (LifeBuoy) in both AppShell (mobile) and 
 | `error` | Red | `downloadError` contains "CORRUPT" (database corruption only) |
 
 **Debouncing — critical for avoiding false alarms:**
-- **5s mount grace:** PowerSync takes 1-3s to establish its WebSocket. Without the grace period, every app open would briefly show yellow. During grace, returning users (with `hasSynced: true`) see green; first-time users see grey.
+- **10s app-load grace:** PowerSync takes 1-3s to establish its WebSocket. Without the grace period, every app open would briefly show yellow. The grace timer is shared across all `useSyncStatus()` instances via a module-level `APP_LOAD_TIME` constant — components that mount later (e.g. the support page) use the remaining time from app load, not a fresh window. This prevents the toolbar dot and support page from showing different states. During grace, returning users (with `hasSynced: true` AND `lastSyncedAt` set) see green; otherwise grey.
 - **2s connected → disconnected debounce:** Brief WebSocket drops during reconnection don't flash yellow. Only disconnects lasting >2s are shown.
 
 **Error vs stale distinction:** Connection failures (server unreachable, network issues) are **stale** (yellow), not error. **Error** (red) is reserved for OPFS database corruption, which triggers the auto-recovery flow. This distinction is important — yellow means "check your connection", red means "data is broken and being reset".
