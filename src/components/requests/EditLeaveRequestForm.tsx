@@ -64,8 +64,8 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
         [
           description.trim() || null,
           place.trim() || null,
-          departureAt || null,
-          returnAt || null,
+          departureAt ? new Date(departureAt).toISOString() : null,
+          returnAt ? new Date(returnAt).toISOString() : null,
           transportation || null,
           new Date().toISOString(),
           request.id,
@@ -109,6 +109,7 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
           <Input
             id="edit-departure"
             type="datetime-local"
+            step={900}
             value={departureAt}
             onChange={(e) => setDepartureAt(e.target.value)}
             dir="ltr"
@@ -120,6 +121,7 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
           <Input
             id="edit-return"
             type="datetime-local"
+            step={900}
             value={returnAt}
             onChange={(e) => setReturnAt(e.target.value)}
             dir="ltr"

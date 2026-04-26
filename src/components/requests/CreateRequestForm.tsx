@@ -200,8 +200,8 @@ export function CreateRequestForm({
         columns.push("place", "departure_at", "return_at", "transportation");
         values.push(
           place || null,
-          departureAt || null,
-          returnAt || null,
+          departureAt ? new Date(departureAt).toISOString() : null,
+          returnAt ? new Date(returnAt).toISOString() : null,
           transportation || null,
         );
       }
@@ -210,7 +210,9 @@ export function CreateRequestForm({
         columns.push(
           "urgent", "paramedic_date", "medical_appointments", "sick_days",
         );
-        const validAppointments = appointments.filter((a) => a.date);
+        const validAppointments = appointments
+          .filter((a) => a.date)
+          .map((a) => a.date.includes("T") ? { ...a, date: new Date(a.date).toISOString() } : a);
         // Expand all sick day ranges into individual days
         const existing = new Set(sickDays.map((d) => d.date));
         let allSickDays = [...sickDays];
@@ -339,6 +341,7 @@ export function CreateRequestForm({
               <Input
                 id="req-departure"
                 type="datetime-local"
+                step={900}
                 value={departureAt}
                 onChange={(e) => setDepartureAt(e.target.value)}
                 dir="ltr"
@@ -350,6 +353,7 @@ export function CreateRequestForm({
               <Input
                 id="req-return"
                 type="datetime-local"
+                step={900}
                 value={returnAt}
                 onChange={(e) => setReturnAt(e.target.value)}
                 dir="ltr"

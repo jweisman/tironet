@@ -27,7 +27,9 @@ export function MedicalAppointmentsSection({ requestId, medicalAppointmentsJson,
   }
 
   async function save() {
-    const valid = editList.filter((a) => a.date);
+    const valid = editList
+      .filter((a) => a.date)
+      .map((a) => a.date.includes("T") ? { ...a, date: new Date(a.date).toISOString() } : a);
     try {
       await db.execute(
         `UPDATE requests SET medical_appointments = ?, updated_at = ? WHERE id = ?`,

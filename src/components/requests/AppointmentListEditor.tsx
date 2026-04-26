@@ -46,6 +46,7 @@ export function AppointmentListEditor({ value, onChange }: Props) {
               <Label className="text-xs">תאריך ושעה</Label>
               <Input
                 type="datetime-local"
+                step={300}
                 value={appt.date}
                 onChange={(e) => update(appt.id, "date", e.target.value)}
                 dir="ltr"
