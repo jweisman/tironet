@@ -69,8 +69,7 @@ export default function ReportsPage() {
   const isInstructor = rawRoles.includes("instructor");
   const isMedic = rawRoles.includes("company_medic");
   const isCoordinator = rawRoles.includes("hardship_coordinator");
-  const isAdmin = session?.user?.isAdmin;
-  const hasAccess = isAdmin || !!role || isInstructor || isMedic || isCoordinator;
+  const hasAccess = !!role || isInstructor || isMedic || isCoordinator;
   const showActivityReports = !isMedic && !isCoordinator;
   const showRequestReports = !isInstructor;
   const showDailyForum = !!role; // platoon or company commander only

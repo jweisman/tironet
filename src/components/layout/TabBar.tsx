@@ -31,8 +31,8 @@ export function TabBar() {
     (a) => { const r = effectiveRole(a.role as Role); return r === "company_commander" || r === "platoon_commander"; }
   );
   const canSeeCalendar = selectedRole !== "hardship_coordinator";
-  const canSeeReports = isAdmin || isCommander || selectedRole === "instructor" || selectedRole === "company_medic" || selectedRole === "hardship_coordinator";
-  const canSeeCommanders = !isAdmin && isCommander && selectedRole !== "instructor" && selectedRole !== "company_medic" && selectedRole !== "hardship_coordinator";
+  const canSeeReports = isCommander || selectedRole === "instructor" || selectedRole === "company_medic" || selectedRole === "hardship_coordinator";
+  const canSeeCommanders = isCommander && selectedRole !== "instructor" && selectedRole !== "company_medic" && selectedRole !== "hardship_coordinator";
 
   // Filter tabs by role
   const staticTabs = allTabs.filter(({ href }) => {
