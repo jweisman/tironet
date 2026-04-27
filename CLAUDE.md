@@ -489,6 +489,19 @@ The request badge (home page callout, sidebar/tab bar dot) counts requests assig
 - **Home page:** sees platoon summary cards with requests column only (no soldiers, activities, or gaps). Today's activities section is hidden.
 - **Scope functions:** `getRequestScope()` returns `role: "hardship_coordinator"`, `canCreate: true`
 
+### Invitation permissions (`canInviteRole` / `rolesInvitableBy`)
+
+| Inviter | Can invite |
+|---|---|
+| Company commander (or deputy) | platoon_commander, platoon_sergeant, squad_commander, instructor, company_medic, hardship_coordinator |
+| Platoon commander (or sergeant) | squad_commander, platoon_sergeant |
+| Squad commander | (nobody) |
+| Instructor / medic / hardship | Lower-ranked roles by rank, but not same-rank peers |
+
+Company commanders can invite company-level peer roles (instructor, medic, hardship coordinator) despite sharing the same rank (3). This is an explicit exception in `canInviteRole` and `rolesInvitableBy` — without it, these roles could only be created by admins.
+
+The `isAuthorizedToInvite` function in `POST /api/invitations` additionally verifies that the target unit is within the inviter's command hierarchy (e.g. a company commander can only invite to their own company, its platoons, or its squads).
+
 ### Page access guards
 
 Navigation (Sidebar/TabBar) filters out inaccessible pages, but pages also guard against direct URL access:
@@ -544,6 +557,32 @@ All soldier-facing views (soldiers page, requests page, activity reports) filter
 - **Company commanders** see soldiers across all platoons in their company
 
 PowerSync sync streams scope soldiers by `visible_squad_ids` (the global CTE), so squad commanders receive only their own squad's soldiers. Platoon and company commanders receive all soldiers within their visible platoons. Client-side pages may still filter by squad for UI purposes. Server-side API routes use `getRequestScope().soldierIds` which is already correctly scoped.
+
+### Commanders Page (`/users`)
+
+A client-side page for platoon+ commanders to manage subordinate users in their current cycle. Uses `CycleContext` (no cycle selector on the page itself — always shows the currently selected cycle).
+
+**Key files:**
+- `src/app/(app)/users/page.tsx` — client component, fetches from `/api/users/hierarchy?cycleId=...`
+- `src/components/CommanderUsersPanel.tsx` — user table with edit, invite dialog, and filter pills
+- `src/components/users/PendingInvitationsTable.tsx` — shared invitation table (used by both commanders and admin pages)
+- `src/types/users.ts` — shared types (`ManagedUser`, `ManagedInvitation`, `UserAssignment`, `UnitStructure`)
+
+**Scope:**
+- Platoon commanders see: platoon sergeant + squad commanders in their platoon
+- Company commanders (and deputies) see: all platoon/squad-level roles + company-level roles (instructor, medic, hardship coordinator)
+- Peer platoon commanders on the same platoon are excluded
+
+**Invite flow — smart existing-user detection:**
+`POST /api/invitations` checks if a user with the submitted email/phone already exists:
+- **Existing user, no cycle assignment** → creates `UserCycleAssignment` directly (no invitation link needed). Returns `{ assigned: true, userName }`. Profile fields from the form are silently ignored.
+- **Existing user, already assigned to this cycle** → returns 409 ("למשתמש זה כבר יש שיבוץ במחזור הנוכחי")
+- **No existing user** → creates an `Invitation` with a 7-day token as before
+
+The `InviteUserForm` handles both responses: shows "המשתמש שובץ בהצלחה" for direct assignments, and the copy link / send email / send SMS post-creation screen for invitations. The cycle selector is hidden when only one cycle is available (always the case on the commanders page).
+
+**Filter pills:**
+Both the commanders page and admin users page show role and unit filter pills (on separate rows) when there are enough users. Filters are toggle-based (click to activate, click again to deactivate).
 
 ### Invitation security
 

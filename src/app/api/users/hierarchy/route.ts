@@ -1,19 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
 import { ROLE_LABELS, effectiveRole, canInviteRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const filterCycleId = req.nextUrl.searchParams.get("cycleId");
+
   const { cycleAssignments } = session.user;
 
   // Only company/platoon commanders can manage subordinates
-  const managerAssignments = cycleAssignments.filter((a) => effectiveRole(a.role as Role) !== "squad_commander");
+  let managerAssignments = cycleAssignments.filter((a) => effectiveRole(a.role as Role) !== "squad_commander");
+  if (filterCycleId) {
+    managerAssignments = managerAssignments.filter((a) => a.cycleId === filterCycleId);
+  }
   if (managerAssignments.length === 0) {
     return NextResponse.json({
       users: [],
@@ -76,6 +81,7 @@ export async function GET() {
       });
       if (!company) continue;
 
+      subUnitIds.push(company.id); // Include company itself (for company-level roles: instructor, medic, hardship coordinator)
       company.platoons.forEach((p) => p.squads.forEach((s) => subUnitIds.push(s.id)));
       // Also collect platoon IDs for platoon_commander invitations
       company.platoons.forEach((p) => subUnitIds.push(p.id));
@@ -87,9 +93,12 @@ export async function GET() {
 
   const uniqueSubUnitIds = [...new Set(subUnitIds)];
 
-  // Users assigned to those sub-units
+  // Users assigned to those sub-units (scoped to the requested cycle if provided)
+  const assignmentWhere: Record<string, unknown> = { unitId: { in: uniqueSubUnitIds } };
+  if (filterCycleId) assignmentWhere.cycleId = filterCycleId;
+
   const assignments = await prisma.userCycleAssignment.findMany({
-    where: { unitId: { in: uniqueSubUnitIds } },
+    where: assignmentWhere,
     select: {
       id: true,
       role: true,
@@ -168,16 +177,20 @@ export async function GET() {
   }
 
   // Pending invitations for those sub-units
+  const invitationWhere: Record<string, unknown> = {
+    unitId: { in: uniqueSubUnitIds },
+    acceptedAt: null,
+    expiresAt: { gt: new Date() },
+  };
+  if (filterCycleId) invitationWhere.cycleId = filterCycleId;
+
   const invitations = await prisma.invitation.findMany({
-    where: {
-      unitId: { in: uniqueSubUnitIds },
-      acceptedAt: null,
-      expiresAt: { gt: new Date() },
-    },
+    where: invitationWhere,
     include: { cycle: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
   });
 
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const annotatedInvitations = invitations.map((inv) => ({
     id: inv.id,
     givenName: inv.givenName,
@@ -189,6 +202,7 @@ export async function GET() {
     unitName: unitMap.get(inv.unitId) ?? "",
     cycleName: inv.cycle.name,
     expiresAt: inv.expiresAt.toISOString(),
+    inviteUrl: `${baseUrl}/invite/${inv.token}`,
     invitedByUserId: inv.invitedByUserId,
   }));
 

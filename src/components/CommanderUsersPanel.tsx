@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, RefreshCw, Send, Trash2, Copy, Check, Pencil } from "lucide-react";
+import { UserPlus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,69 +13,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { EditUserForm } from "@/components/admin/EditUserForm";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { InviteUserForm } from "@/components/admin/InviteUserForm";
+import { PendingInvitationsTable } from "@/components/users/PendingInvitationsTable";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type { Role } from "@/types";
-
-type Assignment = {
-  id: string;
-  role: string;
-  unitType: string;
-  unitId: string;
-  unitName: string;
-  cycleId: string;
-  cycle: { name: string; isActive: boolean };
-};
-
-type User = {
-  id: string;
-  givenName: string;
-  familyName: string;
-  email: string | null;
-  phone: string | null;
-  rank: string | null;
-  isAdmin: boolean;
-  cycleAssignments: Assignment[];
-};
-
-type Invitation = {
-  id: string;
-  givenName: string | null;
-  familyName: string | null;
-  email: string | null;
-  phone: string | null;
-  role: string;
-  roleLabel: string;
-  unitName: string;
-  cycleName: string;
-  expiresAt: string;
-  inviteUrl: string;
-  invitedByUserId: string | null;
-};
-
-type Squad = { id: string; name: string };
-type Platoon = { id: string; name: string; squads: Squad[] };
-type Company = { id: string; name: string; platoons: Platoon[] };
-type Cycle = { id: string; name: string };
+import type { ManagedUser, ManagedInvitation, UnitStructure } from "@/types/users";
 
 type Props = {
-  initialUsers: User[];
-  initialInvitations: Invitation[];
-  cycles: Cycle[];
-  structureByCycle: Record<string, Company[]>;
+  initialUsers: ManagedUser[];
+  initialInvitations: ManagedInvitation[];
+  cycleId: string;
+  structureByCycle: Record<string, UnitStructure["company"][]>;
   invitableRoles: Role[];
   currentUserId: string;
   isAdmin: boolean;
@@ -84,7 +34,7 @@ type Props = {
 export function CommanderUsersPanel({
   initialUsers,
   initialInvitations,
-  cycles,
+  cycleId,
   structureByCycle,
   invitableRoles,
   currentUserId,
@@ -93,14 +43,12 @@ export function CommanderUsersPanel({
   const [users, setUsers] = useState(initialUsers);
   const [invitations, setInvitations] = useState(initialInvitations);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [selectedCycleId, setSelectedCycleId] = useState(cycles[0]?.id ?? "");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
-  const [sentEmailId, setSentEmailId] = useState<string | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [filterRole, setFilterRole] = useState<string | null>(null);
+  const [filterUnitId, setFilterUnitId] = useState<string | null>(null);
 
   async function reload() {
-    const res = await fetch("/api/users/hierarchy");
+    const res = await fetch(`/api/users/hierarchy?cycleId=${cycleId}`);
     if (res.ok) {
       const data = await res.json();
       setUsers(data.users);
@@ -108,70 +56,66 @@ export function CommanderUsersPanel({
     }
   }
 
-  async function cancelInvitation(id: string) {
-    await fetch(`/api/admin/invitations/${id}`, { method: "DELETE" });
-    toast.success("ההזמנה בוטלה");
-    await reload();
-  }
+  const inviteCycles = [{ id: cycleId, name: "" }];
+  const inviteStructure = { [cycleId]: structureByCycle[cycleId] ?? [] };
 
-  async function copyInviteLink(inv: Invitation) {
-    await navigator.clipboard.writeText(inv.inviteUrl);
-    setCopiedId(inv.id);
-    setTimeout(() => setCopiedId(null), 2500);
-  }
-
-  async function sendEmail(inv: Invitation) {
-    if (!inv.email) return;
-    setSendingEmailId(inv.id);
-    try {
-      await fetch("/api/invitations/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invitationId: inv.id }),
-      });
-      setSentEmailId(inv.id);
-      setTimeout(() => setSentEmailId(null), 2500);
-    } finally {
-      setSendingEmailId(null);
+  // Compute available filter options from current users
+  const roleSet = new Set(users.flatMap((u) => u.cycleAssignments.filter((a) => a.cycleId === cycleId).map((a) => a.role)));
+  const unitSet = new Map<string, string>();
+  for (const u of users) {
+    for (const a of u.cycleAssignments.filter((a) => a.cycleId === cycleId)) {
+      if (a.unitName && !unitSet.has(a.unitId)) unitSet.set(a.unitId, a.unitName);
     }
   }
+  const showFilters = users.length > 3 && (roleSet.size > 1 || unitSet.size > 1);
 
-  if (cycles.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground text-center py-12">
-        אינך מוגדר כמפקד מחלקה או פלוגה באף מחזור פעיל.
-      </p>
-    );
-  }
-
-  const selectedCycleName = cycles.find((c) => c.id === selectedCycleId)?.name ?? "";
-
-  const visibleUsers = users.filter((u) =>
-    u.cycleAssignments.some((a) => a.cycleId === selectedCycleId)
-  );
-  const visibleInvitations = invitations.filter((inv) => inv.cycleName === selectedCycleName);
-
-  const inviteCycles = cycles.filter((c) => c.id === selectedCycleId);
-  const inviteStructure = { [selectedCycleId]: structureByCycle[selectedCycleId] ?? [] };
+  // Apply filters
+  const filteredUsers = users.filter((u) => {
+    const assignments = u.cycleAssignments.filter((a) => a.cycleId === cycleId);
+    if (assignments.length === 0) return false;
+    if (filterRole && !assignments.some((a) => a.role === filterRole)) return false;
+    if (filterUnitId && !assignments.some((a) => a.unitId === filterUnitId)) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
-      {/* Cycle tabs */}
-      {cycles.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
-          {cycles.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => { setSelectedCycleId(c.id); setInviteOpen(false); }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                c.id === selectedCycleId
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-border hover:bg-muted"
-              }`}
-            >
-              {c.name}
-            </button>
-          ))}
+      {showFilters && (
+        <div className="space-y-2">
+          {roleSet.size > 1 && (
+            <div className="flex gap-2 flex-wrap">
+              {Array.from(roleSet).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setFilterRole(filterRole === r ? null : r)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    filterRole === r
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-border hover:bg-muted"
+                  }`}
+                >
+                  {ROLE_LABELS[r as Role]}
+                </button>
+              ))}
+            </div>
+          )}
+          {unitSet.size > 1 && (
+            <div className="flex gap-2 flex-wrap">
+              {Array.from(unitSet.entries()).map(([id, name]) => (
+                <button
+                  key={id}
+                  onClick={() => setFilterUnitId(filterUnitId === id ? null : id)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    filterUnitId === id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-border hover:bg-muted"
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -179,7 +123,7 @@ export function CommanderUsersPanel({
         {/* Users */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{hebrewCount(visibleUsers.length, "מפקד", "מפקדים")}</p>
+            <p className="text-sm text-muted-foreground">{hebrewCount(filteredUsers.length, "מפקד", "מפקדים")}</p>
             <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
               <DialogTrigger
                 render={
@@ -219,7 +163,7 @@ export function CommanderUsersPanel({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {visibleUsers.map((user) => (
+                {filteredUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-muted/20">
                     <td className="px-3 py-2.5">
                       <div className="font-medium">
@@ -236,7 +180,7 @@ export function CommanderUsersPanel({
                     <td className="px-3 py-2.5">
                       <div className="space-y-1">
                         {user.cycleAssignments
-                          .filter((a) => a.cycleId === selectedCycleId)
+                          .filter((a) => a.cycleId === cycleId)
                           .map((a) => (
                             <div key={a.id} className="text-xs">
                               <span className="font-medium">{ROLE_LABELS[a.role as Role]}</span>
@@ -262,7 +206,7 @@ export function CommanderUsersPanel({
                 ))}
               </tbody>
             </table>
-            {visibleUsers.length === 0 && (
+            {filteredUsers.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-8">אין מפקדים בהיררכיה שלך</p>
             )}
           </div>
@@ -291,119 +235,12 @@ export function CommanderUsersPanel({
           })()}
         </div>
 
-        {/* Pending invitations */}
-        {visibleInvitations.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              הזמנות ממתינות ({visibleInvitations.length})
-            </h3>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-start px-3 py-2 font-medium">שם</th>
-                    <th className="text-start px-3 py-2 font-medium">אימייל / טלפון</th>
-                    <th className="text-start px-3 py-2 font-medium hidden sm:table-cell">תפקיד / יחידה</th>
-                    <th className="px-3 py-2 w-28" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {visibleInvitations.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-muted/20">
-                      <td className="px-3 py-2">
-                        {inv.givenName || inv.familyName
-                          ? <div className="font-medium">{[inv.givenName, inv.familyName].filter(Boolean).join(" ")}</div>
-                          : <div className="text-muted-foreground text-xs">—</div>
-                        }
-                      </td>
-                      <td className="px-3 py-2" dir="ltr">
-                        {inv.email && <div>{inv.email}</div>}
-                        {inv.phone && (
-                          <div className="text-muted-foreground">{toIsraeliDisplay(inv.phone)}</div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 hidden sm:table-cell">
-                        <span className="font-medium">{inv.roleLabel}</span>
-                        <span className="text-muted-foreground"> — {inv.unitName}</span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1 justify-end">
-                          {/* Copy invite link */}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            title="העתק קישור הזמנה"
-                            onClick={() => copyInviteLink(inv)}
-                          >
-                            {copiedId === inv.id ? (
-                              <Check className="w-3.5 h-3.5 text-green-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </Button>
-
-                          {/* Send / resend email */}
-                          {inv.email && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              title="שלח הזמנה במייל"
-                              disabled={sendingEmailId === inv.id}
-                              onClick={() => sendEmail(inv)}
-                            >
-                              {sentEmailId === inv.id ? (
-                                <Check className="w-3.5 h-3.5 text-green-600" />
-                              ) : sendingEmailId === inv.id ? (
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Send className="w-3.5 h-3.5" />
-                              )}
-                            </Button>
-                          )}
-
-                          {/* Cancel — only visible to the inviter or admins */}
-                          {(isAdmin || inv.invitedByUserId === currentUserId) && <AlertDialog>
-                            <AlertDialogTrigger
-                              render={
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-destructive hover:text-destructive"
-                                />
-                              }
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>ביטול הזמנה</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  האם אתה בטוח שברצונך לבטל את ההזמנה
-                                  {inv.email ? ` ל-${inv.email}` : inv.phone ? ` ל-${toIsraeliDisplay(inv.phone)}` : ""}?
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>ביטול</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => cancelInvitation(inv.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  בטל הזמנה
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        <PendingInvitationsTable
+          invitations={invitations}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onCancelled={reload}
+        />
       </div>
     </div>
   );

@@ -46,16 +46,26 @@ export const UNIT_TYPE_FOR_ROLE: Record<Role, "company" | "platoon" | "squad"> =
   squad_commander: "squad",
 };
 
+/** Company-level roles that a company commander (or deputy) can invite. */
+const COMPANY_LEVEL_ROLES: Role[] = ["instructor", "company_medic", "hardship_coordinator"];
+
 /** Returns which roles the given role (or admin) can invite. */
 export function rolesInvitableBy(inviterRole: Role | null, isAdmin: boolean): Role[] {
   if (isAdmin) return Object.keys(ROLE_RANK) as Role[];
   if (!inviterRole) return [];
+  const eRole = effectiveRole(inviterRole);
   const roles = (Object.keys(ROLE_RANK) as Role[]).filter(
     (r) => ROLE_RANK[inviterRole] > ROLE_RANK[r]
   );
   // Exception: platoon commanders can also invite platoon sergeants
-  if (inviterRole === "platoon_commander" && !roles.includes("platoon_sergeant")) {
+  if (eRole === "platoon_commander" && !roles.includes("platoon_sergeant")) {
     roles.push("platoon_sergeant");
+  }
+  // Exception: company commanders can invite company-level peer roles
+  if (eRole === "company_commander") {
+    for (const r of COMPANY_LEVEL_ROLES) {
+      if (!roles.includes(r)) roles.push(r);
+    }
   }
   return roles;
 }
@@ -63,5 +73,7 @@ export function rolesInvitableBy(inviterRole: Role | null, isAdmin: boolean): Ro
 /** Returns true if the inviter can assign the target role. */
 export function canInviteRole(inviterRole: Role, targetRole: Role): boolean {
   if (inviterRole === "platoon_commander" && targetRole === "platoon_sergeant") return true;
+  const eRole = effectiveRole(inviterRole);
+  if (eRole === "company_commander" && COMPANY_LEVEL_ROLES.includes(targetRole)) return true;
   return ROLE_RANK[inviterRole] > ROLE_RANK[targetRole];
 }

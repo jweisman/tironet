@@ -82,6 +82,7 @@ export default async function UsersPage() {
     cycleName: inv.cycle.name,
     expiresAt: inv.expiresAt.toISOString(),
     inviteUrl: `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/invite/${inv.token}`,
+    invitedByUserId: inv.invitedByUserId,
   }));
 
   const structureByCycle: Record<string, typeof companies> = {};

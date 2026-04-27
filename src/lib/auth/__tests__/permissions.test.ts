@@ -50,11 +50,14 @@ describe("rolesInvitableBy", () => {
     expect(roles).toHaveLength(8);
   });
 
-  it("company_commander can invite lower-ranked roles", () => {
+  it("company_commander can invite lower-ranked and company-level roles", () => {
     const roles = rolesInvitableBy("company_commander", false);
     expect(roles).toContain("platoon_commander");
     expect(roles).toContain("platoon_sergeant");
     expect(roles).toContain("squad_commander");
+    expect(roles).toContain("instructor");
+    expect(roles).toContain("company_medic");
+    expect(roles).toContain("hardship_coordinator");
     expect(roles).not.toContain("company_commander");
     expect(roles).not.toContain("deputy_company_commander");
   });
@@ -64,6 +67,9 @@ describe("rolesInvitableBy", () => {
     expect(roles).toContain("platoon_commander");
     expect(roles).toContain("platoon_sergeant");
     expect(roles).toContain("squad_commander");
+    expect(roles).toContain("instructor");
+    expect(roles).toContain("company_medic");
+    expect(roles).toContain("hardship_coordinator");
     expect(roles).not.toContain("company_commander");
     expect(roles).not.toContain("deputy_company_commander");
   });
@@ -75,9 +81,11 @@ describe("rolesInvitableBy", () => {
     expect(roles).toHaveLength(2);
   });
 
-  it("platoon_sergeant can invite squad_commander only", () => {
+  it("platoon_sergeant can invite squad_commander and platoon_sergeant", () => {
     const roles = rolesInvitableBy("platoon_sergeant", false);
-    expect(roles).toEqual(["squad_commander"]);
+    expect(roles).toContain("squad_commander");
+    expect(roles).toContain("platoon_sergeant");
+    expect(roles).toHaveLength(2);
   });
 
   it("squad_commander cannot invite anyone", () => {
@@ -135,9 +143,16 @@ describe("canInviteRole", () => {
     expect(canInviteRole("company_medic", "company_medic")).toBe(false);
   });
 
-  it("company_commander cannot invite instructor or company_medic (same rank)", () => {
-    expect(canInviteRole("company_commander", "instructor")).toBe(false);
-    expect(canInviteRole("company_commander", "company_medic")).toBe(false);
+  it("company_commander can invite company-level roles", () => {
+    expect(canInviteRole("company_commander", "instructor")).toBe(true);
+    expect(canInviteRole("company_commander", "company_medic")).toBe(true);
+    expect(canInviteRole("company_commander", "hardship_coordinator")).toBe(true);
+  });
+
+  it("deputy_company_commander can invite company-level roles", () => {
+    expect(canInviteRole("deputy_company_commander", "instructor")).toBe(true);
+    expect(canInviteRole("deputy_company_commander", "company_medic")).toBe(true);
+    expect(canInviteRole("deputy_company_commander", "hardship_coordinator")).toBe(true);
   });
 });
 

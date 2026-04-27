@@ -39,6 +39,7 @@ export async function GET() {
       unitType: inv.unitType,
       expiresAt: inv.expiresAt.toISOString(),
       inviteUrl: `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/invite/${inv.token}`,
+      invitedByUserId: inv.invitedByUserId,
     }))
   );
 }

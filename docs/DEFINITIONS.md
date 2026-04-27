@@ -47,17 +47,21 @@ Editing is done via a modal dialog for core request fields. Medical appointments
 * _Platoon commander_:
   * access to all soldiers in all squads in their platoon
   * approves/denies requests
-  * manages squad commanders
+  * commanders page: manages platoon sergeant and squad commanders in their platoon
+  * can invite: squad commander, platoon sergeant
   * access to reports
 * _Platoon sergeant_:
   * access like platoon commander (activities, soldiers, reports)
   * for requests: treated like squad commander — creates requests routed to platoon commander, cannot act on requests assigned to platoon commander
+  * commanders page: same as platoon commander
+  * can invite: squad commander, platoon sergeant
 * _Company commander_:
   * access to all soldiers in all platoons in their company
-  * manages squad commanders
+  * commanders page: manages all roles in their company (platoon commanders, squad commanders, instructors, medics, hardship coordinators)
+  * can invite: platoon commander, platoon sergeant, squad commander, instructor, company medic, hardship coordinator
   * access to reports
 * _Deputy company commander_:
-  * access like company commander
+  * access like company commander (including commanders page and invitation permissions)
 * _Company medic_:
   * creates and edits medical requests for all soldiers in company
   * views request reports (limited to medical requests)

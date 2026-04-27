@@ -38,6 +38,11 @@ type CreatedInvitation = {
   hasPhone: boolean;
 };
 
+type DirectAssignment = {
+  id: string;
+  userName: string;
+};
+
 const ALL_ROLES: Role[] = ["company_commander", "deputy_company_commander", "platoon_commander", "platoon_sergeant", "squad_commander", "instructor", "company_medic", "hardship_coordinator"];
 
 export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSuccess, onCancel }: Props) {
@@ -56,6 +61,7 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedInvitation | null>(null);
+  const [assigned, setAssigned] = useState<DirectAssignment | null>(null);
   const [copied, setCopied] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -117,7 +123,11 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
         return;
       }
       const data = await res.json();
-      setCreated({ id: data.id, inviteUrl: data.inviteUrl, hasEmail: !!email.trim(), hasPhone: !!phone.trim() });
+      if (data.assigned) {
+        setAssigned({ id: data.id, userName: data.userName });
+      } else {
+        setCreated({ id: data.id, inviteUrl: data.inviteUrl, hasEmail: !!email.trim(), hasPhone: !!phone.trim() });
+      }
     } catch {
       setError("שגיאה ביצירת ההזמנה");
     } finally {
@@ -160,6 +170,23 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
     } finally {
       setSmsSending(false);
     }
+  }
+
+  // Direct assignment screen: existing user was assigned directly
+  if (assigned) {
+    return (
+      <div className="space-y-5">
+        <div className="rounded-lg border bg-muted/30 p-4 text-sm space-y-1">
+          <p className="font-medium">המשתמש שובץ בהצלחה</p>
+          <p className="text-muted-foreground">
+            {assigned.userName || "המשתמש"} כבר רשום במערכת ושובץ ישירות למחזור.
+          </p>
+        </div>
+        <Button variant="ghost" className="w-full" onClick={onSuccess}>
+          סיום
+        </Button>
+      </div>
+    );
   }
 
   // Post-creation screen: choose send email, SMS, or copy link
@@ -289,21 +316,23 @@ export function InviteUserForm({ cycles, structureByCycle, allowedRoles, onSucce
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label required>מחזור</Label>
-        <Select value={cycleId} onValueChange={(v) => { setCycleId(v ?? ""); setUnitId(""); }}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="בחר מחזור">
-              {cycles.find((c) => c.id === cycleId)?.name ?? "בחר מחזור"}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {cycles.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {cycles.length > 1 && (
+        <div className="space-y-1.5">
+          <Label required>מחזור</Label>
+          <Select value={cycleId} onValueChange={(v) => { setCycleId(v ?? ""); setUnitId(""); }}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="בחר מחזור">
+                {cycles.find((c) => c.id === cycleId)?.name ?? "בחר מחזור"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {cycles.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label required>תפקיד</Label>

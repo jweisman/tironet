@@ -13,7 +13,8 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Reports** — Activity summary (PDF with pie charts and grade tables by unit), all-activity matrix (Google Sheets), physical training tracker (Google Sheets, IDF מדא"גיות format), and approved request summary (PDF grouped by unit); all scoped by role and filterable by type
 - **Dashboard** — Today's activities with progress bars, today's active requests (leave/medical), and live summary cards per squad (squad/platoon commander) or per platoon (company-level roles)
 - **Soldier profiles** — Photo upload with in-browser cropping and compression; bulk import from Excel
-- **Invitation system** — Admins invite users by email or SMS; each invitation scopes the user to a specific unit and role
+- **Commanders page** — Platoon+ commanders manage subordinate users: invite new commanders (or auto-assign existing users), edit profiles, send invitations via email or SMS, and filter by role or unit
+- **Invitation system** — Admins and commanders invite users by email or SMS; if the user already exists, they are assigned directly to the cycle without an invitation link
 - **Authentication** — Google OAuth, email magic link (Nodemailer), and SMS OTP (Twilio Verify)
 - **Admin panel** — Manage cycles, companies, platoons, squads, activity types, and users
 - **Push notifications** — Daily task reminders for squad commanders (missing activity reports), real-time request assignment alerts, and scheduled reminders before medical appointments and leave departures (via QStash); opt-out per notification type and configurable reminder lead time in the profile page
@@ -373,7 +374,7 @@ src/
 │   │   ├── soldiers/        # Soldier roster
 │   │   ├── requests/        # Leave, medical & hardship requests workflow
 │   │   ├── reports/         # Activity summary, request summary (PDF), Sheets export
-│   │   ├── users/           # User management (admin)
+│   │   ├── users/           # Commanders page (subordinate user management)
 │   │   ├── admin/           # Admin panel (cycles, structure, activity types)
 │   │   └── profile/         # User profile
 │   ├── (public)/            # Unauthenticated pages (login, invite)

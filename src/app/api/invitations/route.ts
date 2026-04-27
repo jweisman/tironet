@@ -25,7 +25,9 @@ async function isAuthorizedToInvite(
   for (const a of eligible) {
     const eRole = effectiveRole(a.role as Role);
     if (eRole === "company_commander") {
-      if (unitType === "platoon") {
+      if (unitType === "company") {
+        if (unitId === a.unitId) return true;
+      } else if (unitType === "platoon") {
         const p = await prisma.platoon.findUnique({ where: { id: unitId }, select: { companyId: true } });
         if (p?.companyId === a.unitId) return true;
       } else if (unitType === "squad") {
@@ -124,6 +126,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
   }
 
+  // Check if a user with this email or phone already exists
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        ...(email ? [{ email: email.toLowerCase() }] : []),
+        ...(phone ? [{ phone }] : []),
+      ],
+    },
+    select: { id: true, givenName: true, familyName: true },
+  });
+
+  if (existingUser) {
+    // Check if user already has an assignment in this cycle
+    const existingAssignment = await prisma.userCycleAssignment.findUnique({
+      where: { uq_user_cycle: { userId: existingUser.id, cycleId } },
+    });
+    if (existingAssignment) {
+      return NextResponse.json(
+        { error: "למשתמש זה כבר יש שיבוץ במחזור הנוכחי" },
+        { status: 409 }
+      );
+    }
+
+    // Create direct assignment for existing user
+    const assignment = await prisma.userCycleAssignment.create({
+      data: {
+        userId: existingUser.id,
+        cycleId,
+        role,
+        unitType,
+        unitId,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        id: assignment.id,
+        assigned: true,
+        userName: `${existingUser.givenName} ${existingUser.familyName}`.trim(),
+      },
+      { status: 201 }
+    );
+  }
+
+  // No existing user — create an invitation
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 

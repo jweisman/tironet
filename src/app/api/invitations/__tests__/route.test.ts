@@ -11,8 +11,8 @@ vi.mock("@/lib/db/prisma", () => ({
     platoon: { findUnique: vi.fn() },
     squad: { findUnique: vi.fn() },
     company: { findUnique: vi.fn() },
-    user: { findUnique: vi.fn(), update: vi.fn() },
-    userCycleAssignment: { create: vi.fn() },
+    user: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    userCycleAssignment: { create: vi.fn(), findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -49,12 +49,17 @@ const mockCycleFindUnique = vi.mocked(prisma.cycle.findUnique);
 const mockPlatoonFindUnique = vi.mocked(prisma.platoon.findUnique);
 const mockSquadFindUnique = vi.mocked(prisma.squad.findUnique);
 const mockUserFindUnique = vi.mocked(prisma.user.findUnique);
+const mockUserFindFirst = vi.mocked(prisma.user.findFirst);
+const mockAssignmentFindUnique = vi.mocked(prisma.userCycleAssignment.findUnique);
+const mockAssignmentCreate = vi.mocked(prisma.userCycleAssignment.create);
 const mockTransaction = vi.mocked(prisma.$transaction);
 const mockCompanyFindUnique = vi.mocked(prisma.company.findUnique);
 
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.NEXTAUTH_URL = "http://localhost:3000";
+  // Default: no existing user found (so invitation flow proceeds)
+  mockUserFindFirst.mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -319,6 +324,59 @@ describe("POST /api/invitations (create)", () => {
     const res = await CreateInvitation(req);
 
     expect(res.status).toBe(404);
+  });
+
+  it("creates direct assignment when user with matching email already exists", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+    mockCycleFindUnique.mockResolvedValue({ name: "Cycle 1" } as never);
+    mockUserFindFirst.mockResolvedValue({
+      id: "existing-user-id",
+      givenName: "Existing",
+      familyName: "User",
+    } as never);
+    mockAssignmentFindUnique.mockResolvedValue(null); // no existing assignment
+    mockAssignmentCreate.mockResolvedValue({ id: "new-assignment-id" } as never);
+
+    const req = createMockRequest("POST", "/api/invitations", validBody);
+    const res = await CreateInvitation(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.assigned).toBe(true);
+    expect(body.userName).toBe("Existing User");
+    expect(mockInvitationCreate).not.toHaveBeenCalled();
+    expect(mockAssignmentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: "existing-user-id",
+        cycleId: validBody.cycleId,
+        role: "squad_commander",
+        unitType: "squad",
+        unitId: validBody.unitId,
+      }),
+    });
+  });
+
+  it("returns 409 when existing user already has assignment in cycle", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({ isAdmin: true }),
+    } as never);
+    mockCycleFindUnique.mockResolvedValue({ name: "Cycle 1" } as never);
+    mockUserFindFirst.mockResolvedValue({
+      id: "existing-user-id",
+      givenName: "Existing",
+      familyName: "User",
+    } as never);
+    mockAssignmentFindUnique.mockResolvedValue({ id: "existing-assignment" } as never);
+
+    const req = createMockRequest("POST", "/api/invitations", validBody);
+    const res = await CreateInvitation(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.error).toContain("שיבוץ");
+    expect(mockInvitationCreate).not.toHaveBeenCalled();
   });
 });
 

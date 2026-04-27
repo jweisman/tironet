@@ -1,17 +1,34 @@
-import { auth } from "@/lib/auth/auth";
-import { prisma } from "@/lib/db/prisma";
-import { ROLE_LABELS, rolesInvitableBy, effectiveRole, canInviteRole } from "@/lib/auth/permissions";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useCycle } from "@/contexts/CycleContext";
+import { effectiveRole, rolesInvitableBy } from "@/lib/auth/permissions";
 import { CommanderUsersPanel } from "@/components/CommanderUsersPanel";
 import type { Role } from "@/types";
 
-export default async function UsersPage() {
-  const session = await auth();
-  if (!session?.user) return null;
+export default function UsersPage() {
+  const { data: session } = useSession();
+  const { selectedCycleId, selectedAssignment, isLoading: cycleLoading } = useCycle();
+  const [data, setData] = useState<{
+    users: Parameters<typeof CommanderUsersPanel>[0]["initialUsers"];
+    invitations: Parameters<typeof CommanderUsersPanel>[0]["initialInvitations"];
+    structureByCycle: Parameters<typeof CommanderUsersPanel>[0]["structureByCycle"];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const { cycleAssignments } = session.user;
-  const managerAssignments = cycleAssignments.filter((a) => effectiveRole(a.role as Role) !== "squad_commander");
+  useEffect(() => {
+    if (!selectedCycleId || !session?.user) return;
+    setLoading(true);
+    fetch(`/api/users/hierarchy?cycleId=${selectedCycleId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => { if (d) setData(d); })
+      .finally(() => setLoading(false));
+  }, [selectedCycleId, session?.user]);
 
-  if (managerAssignments.length === 0) {
+  if (cycleLoading || loading) return null;
+
+  if (!session?.user || !selectedAssignment) {
     return (
       <div className="max-w-3xl mx-auto">
         <h1 className="text-xl font-bold mb-6">מפקדים</h1>
@@ -20,197 +37,29 @@ export default async function UsersPage() {
     );
   }
 
-  // Compute the union of invitable roles across all assignments
-  const invitableRolesSet = new Set<Role>();
-  for (const a of managerAssignments) {
-    for (const r of rolesInvitableBy(a.role as Role, false)) {
-      invitableRolesSet.add(r);
-    }
-  }
-  const invitableRoles = Array.from(invitableRolesSet);
-
-  // Build structureByCycle and collect sub-unit IDs
-  type SquadItem = { id: string; name: string };
-  type PlatoonItem = { id: string; name: string; squads: SquadItem[] };
-  type CompanyItem = { id: string; name: string; platoons: PlatoonItem[] };
-  const structureByCycle: Record<string, CompanyItem[]> = {};
-  const subUnitIds: string[] = [];
-  const cycleMap: Record<string, string> = {};
-
-  for (const a of managerAssignments) {
-    const eRole = effectiveRole(a.role as Role);
-    if (eRole === "platoon_commander") {
-      const platoon = await prisma.platoon.findUnique({
-        where: { id: a.unitId },
-        select: {
-          id: true,
-          name: true,
-          company: { select: { id: true, name: true } },
-          squads: {
-            select: { id: true, name: true },
-            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          },
-        },
-      });
-      if (!platoon) continue;
-
-      // Only add to cycleMap after confirming the platoon exists
-      cycleMap[a.cycleId] = a.cycleName;
-      subUnitIds.push(platoon.id); // Include platoon itself (for platoon-level assignments like platoon_sergeant)
-      platoon.squads.forEach((s) => subUnitIds.push(s.id));
-
-      if (!structureByCycle[a.cycleId]) structureByCycle[a.cycleId] = [];
-      let company = structureByCycle[a.cycleId].find((c) => c.id === platoon.company.id);
-      if (!company) {
-        company = { id: platoon.company.id, name: platoon.company.name, platoons: [] };
-        structureByCycle[a.cycleId].push(company);
-      }
-      company.platoons.push({ id: platoon.id, name: platoon.name, squads: platoon.squads });
-    } else if (eRole === "company_commander") {
-      const company = await prisma.company.findUnique({
-        where: { id: a.unitId },
-        select: {
-          id: true,
-          name: true,
-          platoons: {
-            select: {
-              id: true,
-              name: true,
-              squads: {
-                select: { id: true, name: true },
-                orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-              },
-            },
-            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          },
-        },
-      });
-      if (!company) continue;
-
-      // Only add to cycleMap after confirming the company exists
-      cycleMap[a.cycleId] = a.cycleName;
-      company.platoons.forEach((p) => {
-        subUnitIds.push(p.id);
-        p.squads.forEach((s) => subUnitIds.push(s.id));
-      });
-
-      if (!structureByCycle[a.cycleId]) structureByCycle[a.cycleId] = [];
-      structureByCycle[a.cycleId].push(company);
-    }
+  const eRole = effectiveRole(selectedAssignment.role as Role);
+  if (eRole !== "company_commander" && eRole !== "platoon_commander") {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-xl font-bold mb-6">מפקדים</h1>
+        <p className="text-sm text-muted-foreground">אינך מוגדר כמפקד מחלקה או פלוגה.</p>
+      </div>
+    );
   }
 
-  const uniqueSubUnitIds = [...new Set(subUnitIds)];
+  // Compute invitable roles for the current assignment
+  const invitableRoles = rolesInvitableBy(selectedAssignment.role as Role, false);
 
-  // Users assigned to sub-units
-  const dbAssignments = await prisma.userCycleAssignment.findMany({
-    where: { unitId: { in: uniqueSubUnitIds } },
-    select: {
-      id: true,
-      role: true,
-      unitType: true,
-      unitId: true,
-      cycleId: true,
-      user: {
-        select: { id: true, givenName: true, familyName: true, rank: true, email: true, phone: true, isAdmin: true },
-      },
-      cycle: { select: { name: true, isActive: true } },
-    },
-  });
-
-  // Build full-path unit name map from structureByCycle: "פלוגה א / כיתה א" etc.
-  const unitMap = new Map<string, string>();
-  for (const cos of Object.values(structureByCycle)) {
-    for (const co of cos) {
-      unitMap.set(co.id, co.name);
-      for (const pl of co.platoons) {
-        unitMap.set(pl.id, `${co.name} / ${pl.name}`);
-        for (const sq of pl.squads) {
-          unitMap.set(sq.id, `${co.name} / ${pl.name} / ${sq.name}`);
-        }
-      }
-    }
-  }
-
-  // Platoon IDs the viewer commands as platoon_commander (not company_commander).
-  // Used to exclude peer platoon_commander assignments from the list.
-  const viewerPlatoonIds = new Set(
-    managerAssignments
-      .filter((a) => effectiveRole(a.role as Role) === "platoon_commander")
-      .map((a) => a.unitId)
-  );
-
-  // Group by user
-  const userMap = new Map<
-    string,
-    {
-      id: string;
-      givenName: string;
-      familyName: string;
-      rank: string | null;
-      email: string | null;
-      phone: string | null;
-      isAdmin: boolean;
-      cycleAssignments: {
-        id: string;
-        role: string;
-        unitType: string;
-        unitId: string;
-        unitName: string;
-        cycleId: string;
-        cycle: { name: string; isActive: boolean };
-      }[];
-    }
-  >();
-  for (const a of dbAssignments) {
-    // For platoon-level assignments on the viewer's own platoon(s), only show roles the viewer can invite
-    if (viewerPlatoonIds.has(a.unitId) && (a.role === "platoon_commander" || a.role === "platoon_sergeant")) {
-      const viewerAssignment = managerAssignments.find((m) => m.unitId === a.unitId);
-      if (!viewerAssignment || !canInviteRole(viewerAssignment.role as Role, a.role as Role)) continue;
-    }
-    if (!userMap.has(a.user.id)) userMap.set(a.user.id, { ...a.user, cycleAssignments: [] });
-    userMap.get(a.user.id)!.cycleAssignments.push({
-      id: a.id,
-      role: a.role,
-      unitType: a.unitType,
-      unitId: a.unitId,
-      unitName: unitMap.get(a.unitId) ?? "",
-      cycleId: a.cycleId,
-      cycle: a.cycle,
-    });
-  }
-
-  // Pending invitations for sub-units
-  const invitations = await prisma.invitation.findMany({
-    where: { unitId: { in: uniqueSubUnitIds }, acceptedAt: null, expiresAt: { gt: new Date() } },
-    include: { cycle: { select: { name: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const annotatedInvitations = invitations.map((inv) => ({
-    id: inv.id,
-    givenName: inv.givenName,
-    familyName: inv.familyName,
-    email: inv.email,
-    phone: inv.phone,
-    role: inv.role,
-    roleLabel: ROLE_LABELS[inv.role as Role],
-    unitName: unitMap.get(inv.unitId) ?? "",
-    cycleName: inv.cycle.name,
-    expiresAt: inv.expiresAt.toISOString(),
-    inviteUrl: `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/invite/${inv.token}`,
-    invitedByUserId: inv.invitedByUserId,
-  }));
-
-  const cycles = Object.entries(cycleMap).map(([id, name]) => ({ id, name }));
+  if (!data) return null;
 
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="text-xl font-bold mb-6">מפקדים</h1>
       <CommanderUsersPanel
-        initialUsers={Array.from(userMap.values())}
-        initialInvitations={annotatedInvitations}
-        cycles={cycles}
-        structureByCycle={structureByCycle}
+        initialUsers={data.users}
+        initialInvitations={data.invitations}
+        cycleId={selectedCycleId!}
+        structureByCycle={data.structureByCycle}
         invitableRoles={invitableRoles}
         currentUserId={session.user.id}
         isAdmin={session.user.isAdmin ?? false}
