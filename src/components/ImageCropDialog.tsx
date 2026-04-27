@@ -45,8 +45,8 @@ async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> 
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error("Canvas is empty"))),
-      "image/jpeg",
-      0.95
+      "image/webp",
+      0.85
     );
   });
 }
@@ -82,7 +82,7 @@ export function ImageCropDialog({ file, onConfirm, onCancel }: Props) {
     try {
       const blob = await getCroppedBlob(imgSrc, croppedAreaPixels);
       const compressed = await imageCompression(
-        new File([blob], "crop.jpg", { type: "image/jpeg" }),
+        new File([blob], "crop.webp", { type: "image/webp" }),
         { maxSizeMB: 0.1, maxWidthOrHeight: 400, useWebWorker: true }
       );
       const reader = new FileReader();
