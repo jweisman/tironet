@@ -220,7 +220,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   }, [editingMetadata]);
 
   const saveReport = useCallback(
-    async (soldierId: string, report: SoldierReport) => {
+    async (soldierId: string, report: SoldierReport, changedField?: "result" | GradeKey | "note") => {
       setSaveError(null);
 
       try {
@@ -234,6 +234,15 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             next.set(soldierId, EMPTY_REPORT);
             return next;
           });
+        } else if (report.id && changedField) {
+          // Only UPDATE the changed column so PowerSync's opData contains
+          // just that field. This prevents concurrent edits to different
+          // fields (e.g. two commanders scoring different grades) from
+          // overwriting each other.
+          await db.execute(
+            `UPDATE activity_reports SET ${changedField} = ? WHERE id = ?`,
+            [report[changedField], report.id]
+          );
         } else if (report.id) {
           await db.execute(
             "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
@@ -267,12 +276,12 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         next.set(soldierId, updated);
 
         if (field === "result") {
-          saveReport(soldierId, updated);
+          saveReport(soldierId, updated, field);
         } else {
           const existing = debounceRefs.current.get(soldierId);
           if (existing) clearTimeout(existing);
           const timeout = setTimeout(() => {
-            saveReport(soldierId, updated);
+            saveReport(soldierId, updated, field);
           }, 500);
           debounceRefs.current.set(soldierId, timeout);
         }
