@@ -212,17 +212,8 @@ export async function PATCH(
       );
     }
 
-    // Notify on new appointments (connector path)
-    if (data.medicalAppointments !== undefined && req.type === "medical") {
-      const newDates = findNewAppointmentDates(req.medicalAppointments, data.medicalAppointments);
-      if (newDates.length > 0) {
-        after(() =>
-          notifyNewAppointment(req.soldierId, `${req.soldier.familyName} ${req.soldier.givenName}`, newDates, sessionUser.id, id).catch((err) =>
-            console.warn("[push] new appointment notification failed:", err),
-          ),
-        );
-      }
-    }
+    // Notify on new/changed appointments (connector path)
+    fireAppointmentNotifications(req, data, sessionUser.id, id);
 
     // Reconcile reminders (status/assignedRole/appointments/departure may have changed)
     after(() =>
@@ -256,17 +247,8 @@ export async function PATCH(
     data: updateData,
   });
 
-  // Notify on new appointments (regular edit path)
-  if (data.medicalAppointments !== undefined && req.type === "medical") {
-    const newDates = findNewAppointmentDates(req.medicalAppointments, data.medicalAppointments);
-    if (newDates.length > 0) {
-      after(() =>
-        notifyNewAppointment(req.soldierId, `${req.soldier.familyName} ${req.soldier.givenName}`, newDates, sessionUser.id, id).catch((err) =>
-          console.warn("[push] new appointment notification failed:", err),
-        ),
-      );
-    }
-  }
+  // Notify on new/changed appointments (regular edit path)
+  fireAppointmentNotifications(req, data, sessionUser.id, id);
 
   // Reconcile reminders (appointments or departure may have changed)
   after(() =>
@@ -371,6 +353,38 @@ async function notifyAssignedRole(cycleId: string, assignedRole: string, request
   );
 }
 
+/** Fire notifications for new and changed appointments if applicable. */
+function fireAppointmentNotifications(
+  req: { type: string; medicalAppointments: unknown; soldierId: string; soldier: { familyName: string; givenName: string } },
+  data: { medicalAppointments?: unknown },
+  excludeUserId: string,
+  requestId: string,
+) {
+  if (data.medicalAppointments === undefined || req.type !== "medical") return;
+  const soldierName = `${req.soldier.familyName} ${req.soldier.givenName}`;
+  const newDates = findNewAppointmentDates(req.medicalAppointments, data.medicalAppointments);
+  if (newDates.length > 0) {
+    after(() =>
+      notifyAppointmentChange("added", req.soldierId, soldierName, newDates, excludeUserId, requestId).catch((err) =>
+        console.warn("[push] appointment notification failed:", err),
+      ),
+    );
+  }
+  const changedDates = findChangedAppointmentDates(req.medicalAppointments, data.medicalAppointments);
+  if (changedDates.length > 0) {
+    after(() =>
+      notifyAppointmentChange("changed", req.soldierId, soldierName, changedDates, excludeUserId, requestId).catch((err) =>
+        console.warn("[push] appointment notification failed:", err),
+      ),
+    );
+  }
+}
+
+function formatApptDate(date: string): string {
+  const d = date.includes("T") ? new Date(date) : new Date(date + "T00:00:00");
+  return d.toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jerusalem" });
+}
+
 /**
  * Detect newly added appointments by comparing old vs new JSON arrays.
  * Returns dates of new appointments (by id).
@@ -379,34 +393,50 @@ function findNewAppointmentDates(
   oldJson: unknown,
   newJson: unknown,
 ): string[] {
+  const today = new Date().toISOString().split("T")[0];
   const oldAppts = parseMedicalAppointments(oldJson as string | null);
   const newAppts = parseMedicalAppointments(newJson as string | null);
   const oldIds = new Set(oldAppts.map((a) => a.id));
-  return newAppts.filter((a) => !oldIds.has(a.id) && a.date).map((a) => {
-    const d = a.date.includes("T") ? new Date(a.date) : new Date(a.date + "T00:00:00");
-    return d.toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jerusalem" });
-  });
+  return newAppts
+    .filter((a) => !oldIds.has(a.id) && a.date && a.date.split("T")[0] >= today)
+    .map((a) => formatApptDate(a.date));
 }
 
 /**
- * Send notification to squad + platoon commanders when a new appointment is added.
- * Excludes the user who made the change.
+ * Detect changed appointments — same id but different date.
+ * Returns formatted dates of changed appointments (future only).
  */
-async function notifyNewAppointment(
+function findChangedAppointmentDates(
+  oldJson: unknown,
+  newJson: unknown,
+): string[] {
+  const today = new Date().toISOString().split("T")[0];
+  const oldAppts = parseMedicalAppointments(oldJson as string | null);
+  const newAppts = parseMedicalAppointments(newJson as string | null);
+  const oldMap = new Map(oldAppts.map((a) => [a.id, a.date]));
+  return newAppts
+    .filter((a) => oldMap.has(a.id) && oldMap.get(a.id) !== a.date && a.date && a.date.split("T")[0] >= today)
+    .map((a) => formatApptDate(a.date));
+}
+
+/**
+ * Send appointment notification to squad + platoon commanders.
+ * kind "added" → "תור נוסף", kind "changed" → "שונה תור".
+ */
+async function notifyAppointmentChange(
+  kind: "added" | "changed",
   soldierId: string,
   soldierName: string,
-  appointmentDates: string[],
+  dates: string[],
   excludeUserId: string,
   requestId: string,
 ): Promise<void> {
-  // Look up the soldier's squad → platoon
   const soldier = await prisma.soldier.findUnique({
     where: { id: soldierId },
     select: { squadId: true, squad: { select: { platoonId: true } } },
   });
   if (!soldier) return;
 
-  // Find squad commanders for this squad + platoon commanders/sergeants for this platoon
   const assignments = await prisma.userCycleAssignment.findMany({
     where: {
       OR: [
@@ -421,15 +451,11 @@ async function notifyNewAppointment(
   const userIds = [...new Set(assignments.map((a) => a.userId))].filter((id) => id !== excludeUserId);
   if (userIds.length === 0) return;
 
-  for (const dateStr of appointmentDates) {
-    await sendPushToUsers(
-      userIds,
-      {
-        title: "תור נוסף",
-        body: `תור ל-${dateStr} נוסף לבקשה רפואית של ${soldierName}`,
-        url: `/requests/${requestId}`,
-      },
-      "newAppointmentEnabled",
-    );
+  const title = kind === "added" ? "תור נוסף" : "שונה תור";
+  for (const dateStr of dates) {
+    const body = kind === "added"
+      ? `תור ל-${dateStr} נוסף לבקשה רפואית של ${soldierName}`
+      : `תור בבקשה רפואית של ${soldierName} שונה ל-${dateStr}`;
+    await sendPushToUsers(userIds, { title, body, url: `/requests/${requestId}` }, "newAppointmentEnabled");
   }
 }
