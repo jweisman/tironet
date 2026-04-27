@@ -21,6 +21,14 @@ export async function GET() {
 
   const { cycle_ids = [], squad_ids = [], platoon_ids = [], company_ids = [] } = session.user;
 
+  // No reason to issue a PowerSync token if the user has no cycle assignments
+  if (cycle_ids.length === 0) {
+    return NextResponse.json(
+      { error: "No cycle assignments" },
+      { status: 403 }
+    );
+  }
+
   // Audience must match client_auth.audience in powersync.config.yaml.
   const audience = powersyncUrl;
 

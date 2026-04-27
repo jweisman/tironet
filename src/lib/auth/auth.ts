@@ -177,6 +177,61 @@ async function resolvePowerSyncClaims(assignments: RawAssignment[]): Promise<{
 }
 
 // ---------------------------------------------------------------------------
+// Sign-in gate — only allow users with a cycle assignment, pending invitation,
+// or admin flag. Exported for testing.
+// ---------------------------------------------------------------------------
+
+export async function isSignInAllowed(user: {
+  id?: string;
+  email?: string | null;
+}): Promise<boolean> {
+  // Allow users who already have a cycle assignment (returning users)
+  if (user.id) {
+    const hasAssignment = await prisma.userCycleAssignment.findFirst({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (hasAssignment) return true;
+  }
+
+  // Allow users with a pending invitation matching their email or phone
+  const email = user.email?.toLowerCase();
+  const dbUser = user.id
+    ? await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { phone: true },
+      })
+    : null;
+  const phone = dbUser?.phone;
+
+  if (email || phone) {
+    const invitation = await prisma.invitation.findFirst({
+      where: {
+        acceptedAt: null,
+        expiresAt: { gt: new Date() },
+        OR: [
+          ...(email ? [{ email }] : []),
+          ...(phone ? [{ phone }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (invitation) return true;
+  }
+
+  // Allow admin users (they may not have cycle assignments)
+  if (user.id) {
+    const adminUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { isAdmin: true },
+    });
+    if (adminUser?.isAdmin) return true;
+  }
+
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // NextAuth config
 // ---------------------------------------------------------------------------
 
@@ -395,13 +450,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
 
-    // TODO (Phase 3): block sign-in for emails without a pending invitation
-    // async signIn({ user }) {
-    //   const hasAssignment = await prisma.userCycleAssignment.findFirst({
-    //     where: { userId: user.id }
-    //   });
-    //   if (!hasAssignment) return "/not-authorized";
-    //   return true;
-    // },
+    async signIn({ user }) {
+      if (user && (await isSignInAllowed(user))) return true;
+      return "/not-authorized";
+    },
   },
 });

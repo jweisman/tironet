@@ -16,6 +16,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Require at least one cycle assignment (don't let uninvited users send support emails)
+  const assignments = session.user.cycleAssignments ?? [];
+  if (assignments.length === 0 && !session.user.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

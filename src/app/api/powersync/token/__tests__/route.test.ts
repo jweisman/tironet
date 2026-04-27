@@ -91,30 +91,21 @@ describe("GET /api/powersync/token", () => {
     expect(payload.exp).toBeLessThanOrEqual(now + 300 + 5); // 5m + small buffer
   });
 
-  it("returns default empty claims when user has no assignments", async () => {
+  it("returns 403 when user has no cycle assignments", async () => {
     const user = mockSessionUser({ id: "user-2" });
-    // The route reads cycle_ids, squad_ids, platoon_ids, company_ids from session.user
-    // These default to [] when not present
     mockAuth.mockResolvedValue({ user } as never);
 
     const res = await GET();
-    expect(res.status).toBe(200);
-
+    expect(res.status).toBe(403);
     const body = await res.json();
-    const secret = new TextEncoder().encode(TEST_SECRET);
-    const { payload } = await jose.jwtVerify(body.token, secret, {
-      audience: TEST_POWERSYNC_URL,
-    });
-
-    expect(payload.sub).toBe("user-2");
-    expect(payload.cycle_ids).toEqual([]);
-    expect(payload.squad_ids).toEqual([]);
-    expect(payload.platoon_ids).toEqual([]);
-    expect(payload.company_ids).toEqual([]);
+    expect(body.error).toBe("No cycle assignments");
   });
 
   it("uses HS256 algorithm with kid header", async () => {
-    const user = mockSessionUser({ id: "user-1" });
+    const user = mockSessionUser({
+      id: "user-1",
+      cycle_ids: ["cycle-1"],
+    } as never);
     mockAuth.mockResolvedValue({ user } as never);
 
     const res = await GET();

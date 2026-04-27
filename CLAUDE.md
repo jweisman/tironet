@@ -547,6 +547,9 @@ PowerSync sync streams scope soldiers by `visible_squad_ids` (the global CTE), s
 
 ### Invitation security
 
+- **Sign-in gate:** The NextAuth `signIn` callback (`isSignInAllowed()` in `auth.ts`) blocks account access for users without a pending invitation, existing cycle assignment, or admin flag. Blocked users are redirected to `/not-authorized`. The PrismaAdapter may still create an orphan `User` record before the callback rejects — this is intentional (the record is inert without an assignment).
+- **SMS OTP is additionally gated:** The `sms-otp` credential provider in `auth.ts` requires a pending invitation to create a new user. The `/api/auth/sms/send` endpoint also checks for an existing user or invitation before sending an OTP (with rate limiting).
+- **PowerSync token requires assignments:** `/api/powersync/token` returns 403 if the user has no `cycle_ids`. No token is issued to users without cycle assignments.
 - **Send endpoints** (`/api/invitations/send-email`, `/api/invitations/send-sms`) verify the requester is the invitation creator or an admin before sending.
 - **Tokens are never exposed in API responses.** All endpoints return `inviteUrl` (the full `/invite/{token}` URL) instead of the raw `token`. This applies to the admin list, admin refresh, hierarchy, and pending invitations endpoints.
 - **Phone-only invitation acceptance** requires the accepting user to have a matching phone number. Users without a phone set are rejected with `phone_mismatch` (403).
