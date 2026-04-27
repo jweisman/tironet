@@ -190,8 +190,13 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
+  // Filter invitations to only those whose role the viewer can invite
+  const visibleInvitations = invitations.filter((inv) =>
+    managerAssignments.some((a) => canInviteRole(a.role as Role, inv.role as Role))
+  );
+
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  const annotatedInvitations = invitations.map((inv) => ({
+  const annotatedInvitations = visibleInvitations.map((inv) => ({
     id: inv.id,
     givenName: inv.givenName,
     familyName: inv.familyName,

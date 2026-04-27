@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth/auth";
 import { sendEmail } from "@/lib/email/send";
-import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { ROLE_LABELS, canInviteRole, effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 
 const schema = z.object({
@@ -32,7 +32,12 @@ export async function POST(req: NextRequest) {
   if (!invitation) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (invitation.invitedByUserId !== session.user.id && !session.user.isAdmin) {
+  // Allow: original inviter, admins, or any commander with authority over this role/unit
+  const isInviter = invitation.invitedByUserId === session.user.id;
+  const hasAuthority = session.user.cycleAssignments.some(
+    (a) => a.cycleId === invitation.cycleId && canInviteRole(a.role as Role, invitation.role as Role)
+  );
+  if (!isInviter && !session.user.isAdmin && !hasAuthority) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!invitation.email) {
