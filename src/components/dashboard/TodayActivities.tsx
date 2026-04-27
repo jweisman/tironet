@@ -230,7 +230,7 @@ function TodayActivityCard({
       </div>
 
       {/* Stacked progress bar + fraction */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 w-full">
         <div className="flex flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           {passedPct > 0 && (
             <div
