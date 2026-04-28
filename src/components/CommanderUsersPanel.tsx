@@ -59,22 +59,44 @@ export function CommanderUsersPanel({
   const inviteCycles = [{ id: cycleId, name: "" }];
   const inviteStructure = { [cycleId]: structureByCycle[cycleId] ?? [] };
 
-  // Compute available filter options from current users
+  // Compute available filter options
   const roleSet = new Set(users.flatMap((u) => u.cycleAssignments.filter((a) => a.cycleId === cycleId).map((a) => a.role)));
-  const unitSet = new Map<string, string>();
-  for (const u of users) {
-    for (const a of u.cycleAssignments.filter((a) => a.cycleId === cycleId)) {
-      if (a.unitName && !unitSet.has(a.unitId)) unitSet.set(a.unitId, a.unitName);
+
+  // Platoon-level unit filters (not squad-level — too granular for a users page)
+  const platoonMap = new Map<string, string>();
+  const companies = structureByCycle[cycleId] ?? [];
+  for (const co of companies) {
+    for (const pl of co.platoons) {
+      platoonMap.set(pl.id, companies.length > 1 ? `${co.name} / ${pl.name}` : pl.name);
     }
   }
-  const showFilters = users.length > 3 && (roleSet.size > 1 || unitSet.size > 1);
+  // Build a lookup: squadId → platoonId for filtering users assigned at squad level
+  const squadToPlatoon = new Map<string, string>();
+  for (const co of companies) {
+    for (const pl of co.platoons) {
+      for (const sq of pl.squads) {
+        squadToPlatoon.set(sq.id, pl.id);
+      }
+    }
+  }
+
+  const showRoleFilter = roleSet.size > 1;
+  const showUnitFilter = platoonMap.size > 1;
+  const showFilters = users.length > 3 && (showRoleFilter || showUnitFilter);
+
+  // Resolve the platoon a user assignment belongs to
+  function assignmentPlatoonId(a: { unitType: string; unitId: string }): string | null {
+    if (a.unitType === "platoon") return a.unitId;
+    if (a.unitType === "squad") return squadToPlatoon.get(a.unitId) ?? null;
+    return null; // company-level roles don't belong to a specific platoon
+  }
 
   // Apply filters
   const filteredUsers = users.filter((u) => {
     const assignments = u.cycleAssignments.filter((a) => a.cycleId === cycleId);
     if (assignments.length === 0) return false;
     if (filterRole && !assignments.some((a) => a.role === filterRole)) return false;
-    if (filterUnitId && !assignments.some((a) => a.unitId === filterUnitId)) return false;
+    if (filterUnitId && !assignments.some((a) => assignmentPlatoonId(a) === filterUnitId)) return false;
     return true;
   });
 
@@ -99,9 +121,9 @@ export function CommanderUsersPanel({
               ))}
             </div>
           )}
-          {unitSet.size > 1 && (
+          {showUnitFilter && (
             <div className="flex gap-2 flex-wrap">
-              {Array.from(unitSet.entries()).map(([id, name]) => (
+              {Array.from(platoonMap.entries()).map(([id, name]) => (
                 <button
                   key={id}
                   onClick={() => setFilterUnitId(filterUnitId === id ? null : id)}

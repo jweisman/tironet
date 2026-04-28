@@ -96,13 +96,38 @@ export function UsersTable({
 
   // Compute available filter options
   const roleSet = new Set(users.flatMap((u) => u.cycleAssignments.map((a) => a.role)));
-  const unitNameSet = new Set(users.flatMap((u) => u.cycleAssignments.map((a) => a.unitName)).filter(Boolean));
-  const showFilters = users.length > 5 && (roleSet.size > 1 || unitNameSet.size > 1);
+
+  // Platoon-level unit filters from structure (not squad-level)
+  const platoonMap = new Map<string, string>();
+  const allCompanies = Object.values(structureByCycle).flat();
+  for (const co of allCompanies) {
+    for (const pl of co.platoons) {
+      platoonMap.set(pl.id, allCompanies.length > 1 ? `${co.name} / ${pl.name}` : pl.name);
+    }
+  }
+  const squadToPlatoon = new Map<string, string>();
+  for (const co of allCompanies) {
+    for (const pl of co.platoons) {
+      for (const sq of pl.squads) {
+        squadToPlatoon.set(sq.id, pl.id);
+      }
+    }
+  }
+
+  const showRoleFilter = roleSet.size > 1;
+  const showUnitFilter = platoonMap.size > 1;
+  const showFilters = users.length > 5 && (showRoleFilter || showUnitFilter);
+
+  function assignmentPlatoonId(a: { unitType: string; unitId: string }): string | null {
+    if (a.unitType === "platoon") return a.unitId;
+    if (a.unitType === "squad") return squadToPlatoon.get(a.unitId) ?? null;
+    return null;
+  }
 
   const filteredUsers = users.filter((u) => {
     if (!filterRole && !filterUnitName) return true;
     if (filterRole && !u.cycleAssignments.some((a) => a.role === filterRole)) return false;
-    if (filterUnitName && !u.cycleAssignments.some((a) => a.unitName === filterUnitName)) return false;
+    if (filterUnitName && !u.cycleAssignments.some((a) => assignmentPlatoonId(a) === filterUnitName)) return false;
     return true;
   });
 
@@ -164,14 +189,14 @@ export function UsersTable({
                 ))}
               </div>
             )}
-            {unitNameSet.size > 1 && (
+            {showUnitFilter && (
               <div className="flex gap-2 flex-wrap">
-                {Array.from(unitNameSet).map((name) => (
+                {Array.from(platoonMap.entries()).map(([id, name]) => (
                   <button
-                    key={name}
-                    onClick={() => setFilterUnitName(filterUnitName === name ? null : name)}
+                    key={id}
+                    onClick={() => setFilterUnitName(filterUnitName === id ? null : id)}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      filterUnitName === name
+                      filterUnitName === id
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background border-border hover:bg-muted"
                     }`}
