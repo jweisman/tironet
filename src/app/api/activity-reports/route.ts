@@ -71,6 +71,19 @@ export async function POST(request: NextRequest) {
     grade6: grade6 ?? null,
   };
 
+  // For the update clause, use `undefined` (Prisma: "don't touch") instead of
+  // `null` for fields that aren't set in the incoming data. This prevents a
+  // concurrent PUT from wiping grades that another commander already saved.
+  // Explicit clears go through the PATCH endpoint which is field-specific.
+  const mergeGrades = {
+    grade1: grade1 ?? undefined,
+    grade2: grade2 ?? undefined,
+    grade3: grade3 ?? undefined,
+    grade4: grade4 ?? undefined,
+    grade5: grade5 ?? undefined,
+    grade6: grade6 ?? undefined,
+  };
+
   const report = await prisma.activityReport.upsert({
     where: {
       activityId_soldierId: { activityId, soldierId },
@@ -86,8 +99,8 @@ export async function POST(request: NextRequest) {
     },
     update: {
       result,
-      ...grades,
-      note: note ?? null,
+      ...mergeGrades,
+      note: note ?? undefined,
       updatedByUserId: sessionUser.id,
     },
   });

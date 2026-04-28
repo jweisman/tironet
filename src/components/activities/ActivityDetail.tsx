@@ -39,6 +39,7 @@ import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { activityDetailTourSteps } from "@/lib/tour/steps";
 import { useRef } from "react";
+import { deterministicId } from "@/lib/deterministic-id";
 
 export type GradeKey = "grade1" | "grade2" | "grade3" | "grade4" | "grade5" | "grade6";
 export const GRADE_KEYS: GradeKey[] = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6"];
@@ -202,6 +203,11 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [metaError, setMetaError] = useState<string | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
 
+  // Keep a ref to the latest reports so handleReportChange can read current
+  // state without depending on `reports` (which would break memoization).
+  const reportsRef = useRef(reports);
+  reportsRef.current = reports;
+
   // Debounce refs per soldier — clear all pending timeouts on unmount
   // to prevent stale callbacks firing against unmounted state.
   const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -224,41 +230,53 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
       setSaveError(null);
 
       try {
-        if (report.id && report.result === null) {
-          // Result cleared — delete the entire report row so the server
-          // removes it too (issue #75). PowerSync queues a DELETE operation
-          // that the connector uploads via DELETE /api/activity-reports/:id.
-          await db.execute("DELETE FROM activity_reports WHERE id = ?", [report.id]);
+        // Deterministic id from composite key — both clients produce the same
+        // id for the same (activity, soldier) pair.
+        const rowId = report.id ?? await deterministicId(data.id, soldierId);
+
+        if (report.result === null) {
+          // Result cleared — delete the row.
+          const exists = await db.getOptional<{ id: string }>(
+            "SELECT id FROM activity_reports WHERE id = ?", [rowId]
+          );
+          if (exists) {
+            await db.execute("DELETE FROM activity_reports WHERE id = ?", [rowId]);
+          }
           setReports((prev) => {
             const next = new Map(prev);
             next.set(soldierId, EMPTY_REPORT);
             return next;
           });
-        } else if (report.id && changedField) {
-          // Only UPDATE the changed column so PowerSync's opData contains
-          // just that field. This prevents concurrent edits to different
-          // fields (e.g. two commanders scoring different grades) from
-          // overwriting each other.
-          await db.execute(
-            `UPDATE activity_reports SET ${changedField} = ? WHERE id = ?`,
-            [report[changedField], report.id]
+        } else {
+          // Upsert: try UPDATE first, INSERT if row doesn't exist yet.
+          const exists = await db.getOptional<{ id: string }>(
+            "SELECT id FROM activity_reports WHERE id = ?", [rowId]
           );
-        } else if (report.id) {
-          await db.execute(
-            "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
-            [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, report.id]
-          );
-        } else if (report.result !== null) {
-          const newId = crypto.randomUUID();
-          await db.execute(
-            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [newId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
-          );
-          setReports((prev) => {
-            const next = new Map(prev);
-            next.set(soldierId, { ...report, id: newId });
-            return next;
-          });
+          if (exists) {
+            if (changedField) {
+              await db.execute(
+                `UPDATE activity_reports SET ${changedField} = ?, activity_id = ?, soldier_id = ? WHERE id = ?`,
+                [report[changedField], data.id, soldierId, rowId]
+              );
+            } else {
+              await db.execute(
+                "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
+                [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, rowId]
+              );
+            }
+          } else {
+            await db.execute(
+              "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              [rowId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
+            );
+          }
+          if (!report.id) {
+            setReports((prev) => {
+              const next = new Map(prev);
+              next.set(soldierId, { ...report, id: rowId });
+              return next;
+            });
+          }
         }
       } catch {
         setSaveError("שגיאה בשמירת הדיווח");
@@ -269,25 +287,32 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
   const handleReportChange = useCallback(
     (soldierId: string, field: "result" | GradeKey | "note", value: unknown) => {
+      // Build updated report from the ref (always current) — NOT from the
+      // setReports updater, which React 18 may batch and not execute before
+      // the code below runs.
+      const current = reportsRef.current.get(soldierId) ?? EMPTY_REPORT;
+      const updated: SoldierReport = { ...current, [field]: value };
+
+      // Update React state (pure — no side effects inside the updater).
       setReports((prev) => {
         const next = new Map(prev);
-        const current = next.get(soldierId) ?? EMPTY_REPORT;
-        const updated = { ...current, [field]: value };
         next.set(soldierId, updated);
-
-        if (field === "result") {
-          saveReport(soldierId, updated, field);
-        } else {
-          const existing = debounceRefs.current.get(soldierId);
-          if (existing) clearTimeout(existing);
-          const timeout = setTimeout(() => {
-            saveReport(soldierId, updated, field);
-          }, 500);
-          debounceRefs.current.set(soldierId, timeout);
-        }
-
         return next;
       });
+
+      if (field === "result") {
+        saveReport(soldierId, updated, field);
+      } else {
+        const existing = debounceRefs.current.get(soldierId);
+        if (existing) clearTimeout(existing);
+        const timeout = setTimeout(() => {
+          // Re-read from the ref at fire time — the report may now have an id
+          // from an INSERT that completed after the debounce was scheduled.
+          const latest = reportsRef.current.get(soldierId) ?? updated;
+          saveReport(soldierId, latest, field);
+        }, 500);
+        debounceRefs.current.set(soldierId, timeout);
+      }
     },
     [saveReport]
   );
@@ -316,6 +341,14 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     try {
       const updates = new Map<string, SoldierReport>();
 
+      // Pre-compute deterministic IDs for new reports (async, before the tx).
+      const newIds = new Map<string, string>();
+      for (const { soldierId, report } of targets) {
+        if (!report.id) {
+          newIds.set(soldierId, await deterministicId(data.id, soldierId));
+        }
+      }
+
       // Batch all writes in a single transaction — one round-trip to the
       // SQLite worker instead of N sequential awaits.
       await db.writeTransaction(async (tx) => {
@@ -327,7 +360,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             );
             updates.set(soldierId, { ...report, result });
           } else {
-            const newId = crypto.randomUUID();
+            const newId = newIds.get(soldierId)!;
             await tx.execute(
               "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
               [newId, data.id, soldierId, result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
@@ -356,6 +389,14 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     setSaveError(null);
     const updates = new Map<string, SoldierReport>();
 
+    // Pre-compute deterministic IDs for new reports.
+    const newIds = new Map<string, string>();
+    for (const [soldierId, report] of imported) {
+      if (!report.id && report.result !== null) {
+        newIds.set(soldierId, await deterministicId(data.id, soldierId));
+      }
+    }
+
     await db.writeTransaction(async (tx) => {
       for (const [soldierId, report] of imported) {
         if (report.id) {
@@ -365,7 +406,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           );
           updates.set(soldierId, report);
         } else if (report.result !== null) {
-          const newId = crypto.randomUUID();
+          const newId = newIds.get(soldierId)!;
           await tx.execute(
             "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [newId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]

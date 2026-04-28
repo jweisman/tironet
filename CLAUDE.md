@@ -186,6 +186,10 @@ If you ever add another `useState(initialData)` component fed by chained `useQue
 
 **Debounce cleanup:** `ActivityDetail` stores `setTimeout` handles in a `debounceRefs` Map for score/note auto-save. A `useEffect` cleanup clears all pending timeouts on unmount to prevent stale callbacks firing against unmounted state. If you add more debounced refs, follow the same cleanup pattern.
 
+**`reportsRef` for stable callbacks:** `handleReportChange` is memoized (so `ReportRow`'s `memo` works) but needs current report state. A `reportsRef` is updated on every render (`reportsRef.current = reports`). The handler reads from the ref — not from the `setReports` updater (React 18 batches updaters, so values assigned inside may not be available outside) and not from a `reports` dependency (which would break memoization). Debounced callbacks also re-read from the ref at fire time to get the latest id.
+
+**Side effects outside state updaters:** `saveReport` is called **outside** `setReports`, not inside the updater. React Strict Mode (enabled by default in Next.js dev) double-invokes state updater functions. If `saveReport` (which calls `db.execute(INSERT...)`) runs inside the updater, each report save creates two rows. This was the root cause of duplicate POSTs in dev.
+
 ### Activity detail page uses activity-cycle assignment, not global context
 
 The activity detail page (`/activities/[id]/page.tsx`) resolves the user's role and squad from the assignment matching `activity.cycle_id`, not from `selectedAssignment` in `CycleContext`. This handles users with assignments in multiple cycles correctly (e.g. squad_commander in a past cycle + platoon_commander in the current one).
@@ -200,21 +204,47 @@ All user mutations that need to work offline must write to the local PowerSync S
 // In a component:
 const db = usePowerSync(); // from @powersync/react
 
-// UPDATE existing row
+// UPDATE existing row — only SET the changed field(s) to avoid overwriting
+// concurrent edits from other clients.
 await db.execute(
-  "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
-  [result, grade1, grade2, grade3, grade4, grade5, grade6, note, id]
+  "UPDATE activity_reports SET grade1 = ?, activity_id = ?, soldier_id = ? WHERE id = ?",
+  [grade1, activityId, soldierId, id]
 );
 
-// INSERT new row — always generate the UUID client-side
-const newId = crypto.randomUUID();
+// INSERT new row — use deterministicId() so all clients generate the same
+// UUID for the same (activityId, soldierId) pair. This prevents orphaned
+// CRUD ops when sync replaces one client's row with another's.
+const newId = await deterministicId(activityId, soldierId);
 await db.execute(
-  "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  [newId, activityId, soldierId, result, grade1, grade2, grade3, grade4, grade5, grade6, note]
+  "INSERT INTO activity_reports (id, activity_id, soldier_id, result, ...) VALUES (?, ?, ?, ?, ...)",
+  [newId, activityId, soldierId, result, ...]
 );
 ```
 
 Writes are **instant and optimistic** — no network round-trip, no loading state needed. `useQuery` on the same table reacts immediately. Update local component state manually when `useState` holds a derived copy (e.g. `reports` Map in `ActivityDetail`).
+
+### Concurrent activity report editing
+
+Multiple commanders (e.g. squad commander + platoon sergeant) can edit the same soldier's report simultaneously. The design prevents lost updates at every layer:
+
+**1. Deterministic IDs (`src/lib/deterministic-id.ts`):** `deterministicId(activityId, soldierId)` generates a UUID v5-style id from the composite key via SHA-1. Both clients produce the **same id** for the same soldier, so PowerSync treats their writes as operations on the same row. Without this, each client generates a random UUID and sync replaces one with the other, orphaning pending CRUD ops.
+
+**2. Field-specific UPDATEs:** `saveReport` with a `changedField` param UPDATEs only that column (`SET grade1 = ?`), not all columns. PowerSync's `opData` then contains only the changed field, and the server PATCH applies only that field — so commander A setting grade1 doesn't overwrite commander B's grade2.
+
+**3. Upsert in `saveReport`:** Before writing, `saveReport` queries local SQLite to check if the row exists (`SELECT id ... WHERE id = ?`). If yes → UPDATE; if no → INSERT. This handles the case where the debounced grade save fires before the INSERT's `setReports` has updated React state (the `report.id` in the closure is null, but the row exists in SQLite).
+
+**4. Server-side merge on POST upsert:** The POST endpoint's `update` clause uses `grade1 ?? undefined` (not `?? null`). Prisma treats `undefined` as "don't touch", so a PUT with `grade1: undefined` won't overwrite an existing grade1 value.
+
+**5. Composite key on PATCH:** The connector includes `activity_id` and `soldier_id` in the UPDATE SET clause so they appear in `opData`. The PATCH API looks up by composite key first (`activityId_soldierId`), falling back to the URL id. This resolves the correct server-side row even if the client's local id was orphaned.
+
+**6. Idempotent DELETE:** The DELETE endpoint returns 200 (not 404) when the id doesn't exist, since orphaned client UUIDs are expected in concurrent scenarios.
+
+**Key files:**
+- `src/lib/deterministic-id.ts` — SHA-1 based UUID generation
+- `src/components/activities/ActivityDetail.tsx` — `saveReport`, `handleReportChange`, `handleBulkUpdate`
+- `src/lib/powersync/connector.ts` — composite key enrichment on PATCH
+- `src/app/api/activity-reports/route.ts` — `mergeGrades` on upsert
+- `src/app/api/activity-reports/[id]/route.ts` — composite key lookup on PATCH, idempotent DELETE
 
 ### Connector: `uploadData` uploads the CRUD queue
 
@@ -225,6 +255,7 @@ Writes are **instant and optimistic** — no network round-trip, no loading stat
 3. **5xx server errors** — do not call `transaction.complete()`. PowerSync retries automatically.
 4. **PowerSync CRUD `opData` uses snake_case** (matching the local schema column names). Transform to camelCase before calling the API. Example: `opData.activity_id` → `activityId`.
 5. **PUT operations must pass the client-generated `id`** to the server so the server creates the record with the same UUID the local DB already has. Without this, the server generates a new UUID and PowerSync syncs back a duplicate record with a mismatched ID.
+6. **Activity report PATCHes include composite key** — the connector reads `activity_id` and `soldier_id` from `opData` (included in the UPDATE SET clause) and sends them as `activityId`/`soldierId` in the PATCH body. The server uses these to look up by composite key first, falling back to the URL id.
 
 ### API: accept client-generated `id` on POST (upsert)
 
@@ -248,6 +279,8 @@ The upsert `where` clause uses the composite unique key (e.g. `activityId_soldie
 `PowerSyncProvider` calls `db.init()` first, then `db.connect(connector)`. `init()` opens the local SQLite DB and creates tables from the schema — it is fast and requires no network. `connect()` additionally starts the sync stream, which calls `fetchCredentials()` and may fail offline. By calling `init()` first, `useQuery()` returns previously synced data immediately, even when offline.
 
 **Do not** gate `init()` or `connect()` on authentication state (e.g. `useSession()`). When offline, NextAuth's session refresh fails and `status` may flip to `"unauthenticated"`, which would disconnect the DB and break offline queries.
+
+**Do not** call `db.disconnect()` in the `useEffect` cleanup. The DB is a module-level singleton — disconnecting during cleanup (HMR, StrictMode, or Safari tab suspension/resume) leaves OPFS file handles in a broken state, causing the next `init()` to deadlock on `waitForReady()`. The cleanup should only remove listeners and clear timers, not disconnect the DB.
 
 If `init()` itself fails (OPFS corruption, quota exceeded, Safari Private Browsing), `PowerSyncProvider` shows a persistent banner ("מצב לא מקוון אינו זמין") so users know offline mode is unavailable. This is distinguished from `connect()` failure (offline, expected) by checking `!localDb.connected` after the catch.
 

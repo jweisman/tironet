@@ -110,7 +110,27 @@ export class TironetConnector implements PowerSyncBackendConnector {
               note: d.note,
             });
           } else if (opType === UpdateType.PATCH) {
-            await apiRequest(`/api/activity-reports/${id}`, "PATCH", opData);
+            // The composite key (activityId + soldierId) may be in opData
+            // (included in the UPDATE SET clause) or fetched from the local
+            // row. opData is preferred — the local row's id may have changed
+            // during sync if another client created the row first.
+            const d = opData as Record<string, unknown>;
+            let activityId = d.activity_id as string | undefined;
+            let soldierId = d.soldier_id as string | undefined;
+            if (!activityId || !soldierId) {
+              const row = await database.get<Record<string, unknown>>(
+                "SELECT activity_id, soldier_id FROM activity_reports WHERE id = ?",
+                [id]
+              );
+              if (row) {
+                activityId = row.activity_id as string;
+                soldierId = row.soldier_id as string;
+              }
+            }
+            await apiRequest(`/api/activity-reports/${id}`, "PATCH", {
+              ...opData,
+              ...(activityId && soldierId ? { activityId, soldierId } : {}),
+            });
           } else if (opType === UpdateType.DELETE) {
             await apiRequest(`/api/activity-reports/${id}`, "DELETE");
           }

@@ -175,12 +175,16 @@ describe("TironetConnector", () => {
   });
 
   describe("uploadData", () => {
-    function mockDatabase(crud: Array<{ table: string; op: UpdateType; id: string; opData?: Record<string, unknown> }>) {
+    function mockDatabase(
+      crud: Array<{ table: string; op: UpdateType; id: string; opData?: Record<string, unknown> }>,
+      getResult?: Record<string, unknown> | null,
+    ) {
       return {
         getNextCrudTransaction: vi.fn().mockResolvedValue({
           crud,
           complete: vi.fn(),
         }),
+        get: vi.fn().mockResolvedValue(getResult ?? null),
       } as unknown;
     }
 
@@ -240,24 +244,27 @@ describe("TironetConnector", () => {
       expect(tx.complete).toHaveBeenCalled();
     });
 
-    it("uploads activity_report PATCH to correct endpoint", async () => {
+    it("uploads activity_report PATCH with composite key from local row", async () => {
       mockFetch.mockResolvedValue({ ok: true });
 
-      const db = mockDatabase([
-        {
-          table: "activity_reports",
-          op: UpdateType.PATCH,
-          id: "report-1",
-          opData: { result: "failed" },
-        },
-      ]);
+      const db = mockDatabase(
+        [
+          {
+            table: "activity_reports",
+            op: UpdateType.PATCH,
+            id: "report-1",
+            opData: { result: "failed" },
+          },
+        ],
+        { activity_id: "act-1", soldier_id: "sol-1" },
+      );
 
       await connector.uploadData(db as never);
 
       expect(mockFetch).toHaveBeenCalledWith("/api/activity-reports/report-1", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ result: "failed" }),
+        body: JSON.stringify({ result: "failed", activityId: "act-1", soldierId: "sol-1" }),
       });
     });
 

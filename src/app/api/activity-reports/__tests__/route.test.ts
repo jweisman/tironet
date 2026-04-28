@@ -388,12 +388,14 @@ describe("PATCH /api/activity-reports/[id]", () => {
 // ---------------------------------------------------------------------------
 
 describe("DELETE /api/activity-reports/[id]", () => {
-  it("returns 404 when report not found", async () => {
+  it("returns 200 (idempotent) when report not found", async () => {
     mockPrisma.activityReport.findUnique.mockResolvedValue(null as never);
 
     const req = createMockRequest("DELETE", "/api/activity-reports/r-999");
     const res = await DELETE(req, makeParams("r-999"));
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
   });
 
   it("returns 403 when user cannot edit the report", async () => {

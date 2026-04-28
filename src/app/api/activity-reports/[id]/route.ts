@@ -7,6 +7,10 @@ import type { SessionUser } from "@/types";
 const gradeSchema = z.number().min(0).nullable().optional();
 
 const patchSchema = z.object({
+  // Composite key — used as the primary lookup (the URL id may be a
+  // client-generated UUID that lost the upsert race on the server).
+  activityId: z.string().uuid().optional(),
+  soldierId: z.string().uuid().optional(),
   result: z.enum(["passed", "failed", "na"]).optional(),
   grade1: gradeSchema,
   grade2: gradeSchema,
@@ -23,14 +27,40 @@ export async function PATCH(
 ) {
   const { id } = await params;
 
-  // Find the report and its activity
-  const report = await prisma.activityReport.findUnique({
-    where: { id },
-    include: {
-      activity: { select: { cycleId: true, platoonId: true } },
-      soldier: { select: { squadId: true, squad: { select: { platoonId: true } } } },
-    },
-  });
+  const body = await request.json();
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  // Prefer composite key lookup — the URL id may be orphaned if another
+  // client's PUT won the upsert race on the server.
+  let report;
+  if (parsed.data.activityId && parsed.data.soldierId) {
+    report = await prisma.activityReport.findUnique({
+      where: {
+        activityId_soldierId: {
+          activityId: parsed.data.activityId,
+          soldierId: parsed.data.soldierId,
+        },
+      },
+      include: {
+        activity: { select: { cycleId: true, platoonId: true } },
+        soldier: { select: { squadId: true, squad: { select: { platoonId: true } } } },
+      },
+    });
+  }
+
+  // Fall back to id lookup (backwards compatibility / direct API calls)
+  if (!report) {
+    report = await prisma.activityReport.findUnique({
+      where: { id },
+      include: {
+        activity: { select: { cycleId: true, platoonId: true } },
+        soldier: { select: { squadId: true, squad: { select: { platoonId: true } } } },
+      },
+    });
+  }
 
   if (!report) {
     return NextResponse.json({ error: "Report not found" }, { status: 404 });
@@ -45,12 +75,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await request.json();
-  const parsed = patchSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
-
   const updateData: Record<string, unknown> = {
     updatedByUserId: (user as SessionUser).id,
   };
@@ -62,7 +86,7 @@ export async function PATCH(
   if ("note" in parsed.data) updateData.note = parsed.data.note ?? null;
 
   const updated = await prisma.activityReport.update({
-    where: { id },
+    where: { id: report.id },
     data: updateData,
   });
 
@@ -93,8 +117,11 @@ export async function DELETE(
     },
   });
 
+  // Idempotent: if the id doesn't exist (orphaned client UUID from a lost
+  // upsert race), return success — the row either never existed with this id
+  // or was already deleted.
   if (!report) {
-    return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    return NextResponse.json({ success: true });
   }
 
   const { scope, error, user } = await getActivityScope(report.activity.cycleId);
@@ -105,7 +132,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await prisma.activityReport.delete({ where: { id } });
+  await prisma.activityReport.delete({ where: { id: report.id } });
 
   return NextResponse.json({ success: true });
 }
