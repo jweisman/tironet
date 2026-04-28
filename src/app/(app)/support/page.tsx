@@ -10,11 +10,28 @@ import { usePowerSync } from "@powersync/react";
 import { useSession } from "next-auth/react";
 import { useCycle } from "@/contexts/CycleContext";
 
+/** Race a promise against a timeout — returns the result or a timeout marker. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T | string> {
+  return Promise.race([
+    promise,
+    new Promise<string>((resolve) => setTimeout(() => resolve(`TIMEOUT after ${ms}ms (${label})`), ms)),
+  ]);
+}
+
+/** Safe db.execute that won't hang if init() hasn't completed. */
+async function safeExecute(db: ReturnType<typeof usePowerSync>, sql: string, params?: unknown[]) {
+  const result = await withTimeout(db.execute(sql, params), 5_000, sql.slice(0, 60));
+  if (typeof result === "string") throw new Error(result);
+  return result;
+}
+
 async function collectDiagnostics(
   db: ReturnType<typeof usePowerSync>,
   session: ReturnType<typeof useSession>["data"],
+  sessionStatus: string,
   selectedCycleId: string | null,
   selectedAssignment: { role: string; unitId: string; unitType: string } | null,
+  cycleIsLoading: boolean,
 ) {
   const diagnostics: Record<string, unknown> = {};
 
@@ -49,6 +66,8 @@ async function collectDiagnostics(
     userId: session?.user?.id ?? "not logged in",
     email: session?.user?.email ?? "—",
     isAdmin: session?.user?.isAdmin ?? false,
+    sessionStatus,
+    cycleIsLoading,
     selectedCycleId: selectedCycleId ?? "none",
     role: selectedAssignment?.role ?? "none",
     unitType: selectedAssignment?.unitType ?? "—",
@@ -64,6 +83,7 @@ async function collectDiagnostics(
       return JSON.stringify(err, Object.getOwnPropertyNames(err as object));
     };
     diagnostics["PowerSync"] = {
+      dbReady: (db as unknown as { ready?: boolean }).ready ?? "unknown",
       connected: status?.connected ?? false,
       hasSynced: status?.hasSynced ?? false,
       lastSyncedAt: status?.lastSyncedAt?.toISOString() ?? "never",
@@ -82,7 +102,7 @@ async function collectDiagnostics(
     const counts: Record<string, number> = {};
     for (const table of tables) {
       try {
-        const result = await db.execute(`SELECT COUNT(*) as c FROM ${table}`);
+        const result = await safeExecute(db, `SELECT COUNT(*) as c FROM ${table}`);
         counts[table] = Number(result.rows?._array?.[0]?.c ?? result.rows?.item?.(0)?.c ?? 0);
       } catch {
         counts[table] = -1; // table doesn't exist or query failed
@@ -95,7 +115,7 @@ async function collectDiagnostics(
 
   // PowerSync buckets
   try {
-    const buckets = await db.execute("SELECT name, count_at_last, count_since_last FROM ps_buckets LIMIT 20");
+    const buckets = await safeExecute(db, "SELECT name, count_at_last, count_since_last FROM ps_buckets LIMIT 20");
     const rows = buckets.rows?._array ?? [];
     diagnostics["Sync Buckets"] = rows.length > 0
       ? rows.map((r: Record<string, unknown>) => ({
@@ -110,7 +130,10 @@ async function collectDiagnostics(
 
   // PowerSync sync claims from token
   try {
-    const res = await fetch("/api/powersync/token");
+    const controller = new AbortController();
+    const tokenTimeout = setTimeout(() => controller.abort(), 5_000);
+    const res = await fetch("/api/powersync/token", { signal: controller.signal });
+    clearTimeout(tokenTimeout);
     if (res.ok) {
       const { token } = await res.json();
       // Decode JWT payload (base64url)
@@ -129,11 +152,11 @@ async function collectDiagnostics(
 
   // ps_oplog sample — check if rows arrived but were processed as REMOVEs
   try {
-    const oplogCount = await db.execute("SELECT COUNT(*) as cnt FROM ps_oplog");
+    const oplogCount = await safeExecute(db, "SELECT COUNT(*) as cnt FROM ps_oplog");
     const total = Number(oplogCount.rows?._array?.[0]?.cnt ?? 0);
     if (total > 0) {
       // Try to get a sample of recent ops
-      const sample = await db.execute("SELECT * FROM ps_oplog LIMIT 5");
+      const sample = await safeExecute(db, "SELECT * FROM ps_oplog LIMIT 5");
       const sampleRows = sample.rows?._array ?? [];
       diagnostics["Oplog Summary"] = {
         totalOps: total,
@@ -153,18 +176,18 @@ async function collectDiagnostics(
   // Sample queries — run the same queries the home/soldiers pages use
   try {
     const cycleId = selectedCycleId ?? "";
-    const squads = await db.execute(
+    const squads = await safeExecute(db,
       `SELECT sq.id, sq.name, p.name AS platoon_name FROM squads sq JOIN platoons p ON p.id = sq.platoon_id WHERE sq.platoon_id IN (SELECT id FROM platoons WHERE id IN (SELECT platoon_id FROM squads WHERE id IN (SELECT squad_id FROM soldiers WHERE cycle_id = ?))) LIMIT 10`,
       [cycleId]
     );
-    const soldiers = await db.execute(
+    const soldiers = await safeExecute(db,
       "SELECT COUNT(*) as cnt FROM soldiers WHERE cycle_id = ?",
       [cycleId]
     );
-    const allSquads = await db.execute("SELECT COUNT(*) as cnt FROM squads");
-    const allPlatoons = await db.execute("SELECT COUNT(*) as cnt FROM platoons");
+    const allSquads = await safeExecute(db, "SELECT COUNT(*) as cnt FROM squads");
+    const allPlatoons = await safeExecute(db, "SELECT COUNT(*) as cnt FROM platoons");
     // Show what cycle_ids soldiers actually have — helps diagnose stale data
-    const soldierCycles = await db.execute(
+    const soldierCycles = await safeExecute(db,
       "SELECT cycle_id, COUNT(*) as cnt FROM soldiers GROUP BY cycle_id LIMIT 10"
     );
 
@@ -290,6 +313,19 @@ async function collectDiagnostics(
     diagnostics["Startup Timeline"] = { error: String(e) };
   }
 
+  // Entry point — how was the app opened?
+  try {
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    diagnostics["Entry Point"] = {
+      currentUrl: window.location.href,
+      referrer: document.referrer || "none",
+      navigationType: nav?.type ?? "unknown",
+      startUrl: sessionStorage.getItem("tironet:entry-url") ?? "not captured",
+    };
+  } catch (e) {
+    diagnostics["Entry Point"] = { error: String(e) };
+  }
+
   // Boot-time state — captured by inline script in layout.tsx at earliest paint
   try {
     const bootRaw = sessionStorage.getItem("tironet:boot");
@@ -333,13 +369,13 @@ export default function SupportPage() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const db = usePowerSync();
-  const { data: session } = useSession();
-  const { selectedCycleId, selectedAssignment } = useCycle();
+  const { data: session, status: sessionStatus } = useSession();
+  const { selectedCycleId, selectedAssignment, isLoading: cycleIsLoading } = useCycle();
 
   async function handleSubmit() {
     setSending(true);
     try {
-      const diagnostics = await collectDiagnostics(db, session, selectedCycleId ?? null, selectedAssignment ?? null);
+      const diagnostics = await collectDiagnostics(db, session, sessionStatus, selectedCycleId ?? null, selectedAssignment ?? null, cycleIsLoading);
 
       const res = await fetch("/api/support", {
         method: "POST",
