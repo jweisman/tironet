@@ -93,7 +93,7 @@ export default function CalendarPage() {
 
   const eventsByDate = useMemo(() => groupEventsByDate(filteredEvents), [filteredEvents]);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
 
   // Month bounds from all events (not filtered — so navigation range stays stable)
   const { min: minMonth, max: maxMonth } = useMemo(

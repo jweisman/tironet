@@ -115,7 +115,7 @@ export function CalendarMobileView({
               <div
                 className={cn(
                   "w-8 h-8 flex items-center justify-center rounded-full text-sm",
-                  isToday && !isSelected && "font-bold text-primary",
+                  isToday && !isSelected && "font-bold text-primary bg-muted dark:bg-primary/35",
                   isSelected && "bg-primary text-primary-foreground font-bold",
                 )}
               >
