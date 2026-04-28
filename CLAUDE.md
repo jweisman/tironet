@@ -91,7 +91,7 @@ Streams then use `WHERE squad_id IN visible_squad_ids` or `WHERE platoon_id IN v
 - **`sslmode: disable`** must be set as a top-level field in `powersync.config.yaml` under the connection — NOT as a `?sslmode=disable` URL parameter. The pgwire library used by PowerSync ignores URL-embedded SSL params.
 - **MongoDB must run as a replica set** (`--replSet rs0`). Standalone MongoDB is not supported by PowerSync. After first launch, `rs.initiate()` must be run once manually (see README).
 - **PostgreSQL publication** must be created once: `CREATE PUBLICATION powersync FOR ALL TABLES`. Required for WAL logical replication.
-- **Docker Compose reads `.env`**, not `.env.local`. Next.js reads `.env.local`. Keep both files in sync for shared variables.
+- **Both Docker Compose and Next.js read `.env`** — a single `.env` file is sufficient for local development.
 - **`docker compose restart`** does not re-read `.env`. Use `docker compose up -d` to pick up env changes.
 - **`docker-compose.yml` `environment:` section is the source of truth** for what env vars reach the container. Variables in `.env` are only injected if explicitly listed there — `!env` in `powersync.config.yaml` reads from the container environment, not directly from `.env`.
 
@@ -1115,7 +1115,7 @@ Reminders fire N minutes before medical appointments or leave departures, based 
 
 **Preference changes:** When a user updates `reminderLeadMinutes` via `PATCH /api/push/preferences`, `rescheduleRemindersForUser(userId)` cancels all existing reminders and creates new ones based on the updated lead time.
 
-**Local development:** QStash local dev server runs in Docker Compose on port 8085 (`public.ecr.aws/upstash/qstash:latest`). The dev server prints its own token and signing keys on startup — use those values in `.env.local`. Set `QSTASH_URL=http://localhost:8085` and `APP_URL=http://host.docker.internal:3001` (3001 = Next.js dev port; the QStash container uses `host.docker.internal` to reach the host).
+**Local development:** QStash local dev server runs in Docker Compose on port 8085 (`public.ecr.aws/upstash/qstash:latest`). The dev server prints its own token and signing keys on startup — use those values in `.env`. Set `QSTASH_URL=http://localhost:8085` and `APP_URL=http://host.docker.internal:3001` (3001 = Next.js dev port; the QStash container uses `host.docker.internal` to reach the host).
 
 **Environment variables:**
 - `QSTASH_TOKEN` — API token (from QStash dev server logs for local, from Upstash dashboard for prod)

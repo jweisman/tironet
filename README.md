@@ -103,13 +103,12 @@ npm install
 ### 2. Configure environment variables
 
 ```bash
-cp .env.example .env        # Docker Compose reads .env
-cp .env.example .env.local  # Next.js reads .env.local
+cp .env.example .env
 ```
 
-Edit both files and fill in the values (see [Environment Variables](#environment-variables) below).
+Edit `.env` and fill in the values (see [Environment Variables](#environment-variables) below). Both Docker Compose and Next.js read `.env`, so a single file is sufficient for local development.
 
-> **Note:** Docker Compose reads `.env` (not `.env.local`). Next.js reads `.env.local`. Keep them in sync for variables shared between the app and the Docker services (e.g. `POWERSYNC_JWT_SECRET`). Running `docker compose up -d` after changing `.env` picks up the new values; `docker compose restart` does not.
+> **Note:** `docker compose restart` does not re-read `.env`. Use `docker compose up -d` to pick up env changes.
 
 ### 3. Start services
 
@@ -227,7 +226,7 @@ After running e2e tests, switch back to dev with a normal `docker compose up -d`
 
 ## Environment Variables
 
-Copy `.env.example` to both `.env` (Docker) and `.env.local` (Next.js) and fill in:
+Copy `.env.example` to `.env` and fill in:
 
 ```bash
 # PostgreSQL — host-accessible URL (used by Next.js / Prisma)
