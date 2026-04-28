@@ -135,7 +135,12 @@ export function TironetPowerSyncProvider({
     return () => {
       dispose();
       clearTimeout(syncTimeout);
-      localDb.disconnect().catch(() => {});
+      // Do NOT call localDb.disconnect() here. The DB is a module-level
+      // singleton — disconnecting during useEffect cleanup (HMR, StrictMode,
+      // or Safari tab suspension/resume) leaves OPFS file handles in a broken
+      // state, causing the next init() to deadlock on waitForReady().
+      // The DB persists for the lifetime of the page; cleanup only needs to
+      // remove listeners and timers.
     };
   }, []);
 

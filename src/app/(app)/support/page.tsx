@@ -96,8 +96,19 @@ async function collectDiagnostics(
     diagnostics["PowerSync"] = { error: String(e) };
   }
 
+  // If init() hasn't completed, all db.execute() calls will hang on waitForReady().
+  // Skip DB queries entirely — the PowerSync section above already captured db.ready.
+  const dbReady = (db as unknown as { ready?: boolean }).ready ?? false;
+  if (!dbReady) {
+    diagnostics["Table Row Counts"] = "skipped (db not ready)";
+    diagnostics["Sync Buckets"] = "skipped (db not ready)";
+    diagnostics["Oplog Summary"] = "skipped (db not ready)";
+    diagnostics["Sample Queries"] = "skipped (db not ready)";
+    // Skip to non-DB sections below
+  }
+
   // Table row counts
-  try {
+  if (dbReady) try {
     const tables = ["soldiers", "squads", "platoons", "companies", "cycles", "activity_types", "activities", "activity_reports", "requests", "request_actions"];
     const counts: Record<string, number> = {};
     for (const table of tables) {
@@ -114,7 +125,7 @@ async function collectDiagnostics(
   }
 
   // PowerSync buckets
-  try {
+  if (dbReady) try {
     const buckets = await safeExecute(db, "SELECT name, count_at_last, count_since_last FROM ps_buckets LIMIT 20");
     const rows = buckets.rows?._array ?? [];
     diagnostics["Sync Buckets"] = rows.length > 0
@@ -151,7 +162,7 @@ async function collectDiagnostics(
   }
 
   // ps_oplog sample — check if rows arrived but were processed as REMOVEs
-  try {
+  if (dbReady) try {
     const oplogCount = await safeExecute(db, "SELECT COUNT(*) as cnt FROM ps_oplog");
     const total = Number(oplogCount.rows?._array?.[0]?.cnt ?? 0);
     if (total > 0) {
@@ -174,7 +185,7 @@ async function collectDiagnostics(
   }
 
   // Sample queries — run the same queries the home/soldiers pages use
-  try {
+  if (dbReady) try {
     const cycleId = selectedCycleId ?? "";
     const squads = await safeExecute(db,
       `SELECT sq.id, sq.name, p.name AS platoon_name FROM squads sq JOIN platoons p ON p.id = sq.platoon_id WHERE sq.platoon_id IN (SELECT id FROM platoons WHERE id IN (SELECT platoon_id FROM squads WHERE id IN (SELECT squad_id FROM soldiers WHERE cycle_id = ?))) LIMIT 10`,
