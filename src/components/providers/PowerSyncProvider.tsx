@@ -60,20 +60,41 @@ export function TironetPowerSyncProvider({
 
     // init() opens the local DB and creates tables from the schema.
     // This is fast and works offline — no network needed.
+    // On iOS, JetSam can kill the PWA process while OPFS file handles are
+    // open. On relaunch, init() tries to acquire the stale locks and hangs
+    // forever. Race it against a 10s timeout — if it hangs, clear OPFS
+    // and reload (same recovery as corruption).
     console.log("[PowerSync] calling init()...");
     performance.mark("powersync-init-start");
-    localDb
-      .init()
-      .then(() => {
+    const INIT_TIMEOUT_MS = 10_000;
+    const initWithTimeout = Promise.race([
+      localDb.init(),
+      new Promise<"timeout">((resolve) =>
+        setTimeout(() => resolve("timeout"), INIT_TIMEOUT_MS)
+      ),
+    ]);
+    initWithTimeout
+      .then(async (result) => {
+        if (result === "timeout") {
+          console.error("[PowerSync] init() timed out after 10s — clearing OPFS and reloading");
+          Sentry.captureMessage("PowerSync init() timed out — OPFS lock likely stale from killed process", {
+            level: "error",
+            tags: { component: "powersync", phase: "init-timeout" },
+            extra: { userAgent: navigator.userAgent },
+          });
+          clearLocalDatabase(); // reloads the page
+          return;
+        }
+
         performance.mark("powersync-init-end");
         console.log("[PowerSync] init() resolved — DB open, local queries ready");
         setInitFailed(false);
+
         // Start sync — may fail offline, PowerSync retries automatically.
         console.log("[PowerSync] calling connect()...");
         performance.mark("powersync-connect-start");
-        return localDb.connect(connector);
-      })
-      .then(() => {
+        await localDb.connect(connector);
+
         performance.mark("powersync-connect-end");
         console.log("[PowerSync] connect() resolved — sync started");
         // Confirm successful rebuild after a DB clear

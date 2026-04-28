@@ -21,7 +21,7 @@ export function useGoBack(fallback: string) {
     if (hasAppHistory) {
       router.back();
     } else {
-      window.location.assign(fallback);
+      router.push(fallback);
     }
   }, [router, fallback]);
 }
