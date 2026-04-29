@@ -11,6 +11,8 @@ vi.mock("@/lib/db/prisma", () => ({
     platoon: { findMany: vi.fn() },
     request: { findMany: vi.fn() },
     activity: { findMany: vi.fn() },
+    squad: { findMany: vi.fn() },
+    soldier: { groupBy: vi.fn() },
   },
 }));
 
@@ -21,6 +23,8 @@ const mockCycleFindUnique = vi.mocked(prisma.cycle.findUnique);
 const mockPlatoonFindMany = vi.mocked(prisma.platoon.findMany);
 const mockRequestFindMany = vi.mocked(prisma.request.findMany);
 const mockActivityFindMany = vi.mocked(prisma.activity.findMany);
+const mockSquadFindMany = vi.mocked(prisma.squad.findMany);
+const mockSoldierGroupBy = vi.mocked(prisma.soldier.groupBy);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -76,6 +80,8 @@ describe("fetchDailyForum", () => {
     mockPlatoonFindMany.mockResolvedValue([basePlatoon] as never);
     mockRequestFindMany.mockResolvedValue([]);
     mockActivityFindMany.mockResolvedValue([]);
+    mockSquadFindMany.mockResolvedValue([{ id: "sq1", platoonId: "p1" }] as never);
+    mockSoldierGroupBy.mockResolvedValue([{ squadId: "sq1", _count: 2 }] as never);
   }
 
   it("returns null when cycle not found", async () => {
@@ -105,6 +111,8 @@ describe("fetchDailyForum", () => {
   it("groups open requests by type", async () => {
     mockCycleFindUnique.mockResolvedValue({ id: "cycle-1", name: "Test Cycle" } as never);
     mockPlatoonFindMany.mockResolvedValue([basePlatoon] as never);
+    mockSquadFindMany.mockResolvedValue([{ id: "sq1", platoonId: "p1" }] as never);
+    mockSoldierGroupBy.mockResolvedValue([{ squadId: "sq1", _count: 2 }] as never);
     // First call = open requests, second call = active requests
     mockRequestFindMany.mockResolvedValueOnce([
       {
@@ -166,6 +174,8 @@ describe("fetchDailyForum", () => {
   it("includes active approved requests (leave + medical) but not hardship", async () => {
     mockCycleFindUnique.mockResolvedValue({ id: "cycle-1", name: "Test Cycle" } as never);
     mockPlatoonFindMany.mockResolvedValue([basePlatoon] as never);
+    mockSquadFindMany.mockResolvedValue([{ id: "sq1", platoonId: "p1" }] as never);
+    mockSoldierGroupBy.mockResolvedValue([{ squadId: "sq1", _count: 2 }] as never);
     mockRequestFindMany.mockResolvedValueOnce([]); // open requests
     mockRequestFindMany.mockResolvedValueOnce([
       {
@@ -250,6 +260,8 @@ describe("fetchDailyForum", () => {
     mockCycleFindUnique.mockResolvedValue({ id: "cycle-1", name: "Test Cycle" } as never);
     mockPlatoonFindMany.mockResolvedValue([basePlatoon] as never);
     mockRequestFindMany.mockResolvedValue([]);
+    mockSquadFindMany.mockResolvedValue([{ id: "sq1", platoonId: "p1" }] as never);
+    mockSoldierGroupBy.mockResolvedValue([{ squadId: "sq1", _count: 2 }] as never);
 
     // First call = today's activities, second = tomorrow's, third = gap activities
     let callCount = 0;
@@ -267,8 +279,8 @@ describe("fetchDailyForum", () => {
             isRequired: true,
             activityType: { name: "Qualification", scoreConfig: null },
             reports: [
-              { soldierId: "s1", result: "completed", soldier: { status: "active", squad: { name: "Squad 1", platoon: { id: "p1", name: "Platoon 1", company: { name: "Company A" } } } } },
-              { soldierId: "s2", result: "skipped", soldier: { status: "active", squad: { name: "Squad 1", platoon: { id: "p1", name: "Platoon 1", company: { name: "Company A" } } } } },
+              { soldierId: "s1", result: "completed", failed: false, soldier: { status: "active", squad: { name: "Squad 1", platoon: { id: "p1", name: "Platoon 1", company: { name: "Company A" } } } } },
+              { soldierId: "s2", result: "skipped", failed: false, soldier: { status: "active", squad: { name: "Squad 1", platoon: { id: "p1", name: "Platoon 1", company: { name: "Company A" } } } } },
             ],
           },
         ];
@@ -279,9 +291,11 @@ describe("fetchDailyForum", () => {
     const result = await fetchDailyForum("cycle-1", ["p1"], "2026-04-07");
     const todayActs = result!.platoons[0].todayActivities;
     expect(todayActs).toHaveLength(1);
-    expect(todayActs[0].passedCount).toBe(1);
-    expect(todayActs[0].failedCount).toBe(1);
+    expect(todayActs[0].completedCount).toBe(1);
+    expect(todayActs[0].skippedCount).toBe(1);
+    expect(todayActs[0].failedCount).toBe(0);
     expect(todayActs[0].naCount).toBe(0);
+    expect(todayActs[0].missingCount).toBe(0);
     expect(todayActs[0].totalSoldiers).toBe(2);
   });
 
@@ -303,6 +317,8 @@ describe("fetchDailyForum", () => {
       ],
     }] as never);
     mockRequestFindMany.mockResolvedValue([]);
+    mockSquadFindMany.mockResolvedValue([{ id: "sq1", platoonId: "p1" }] as never);
+    mockSoldierGroupBy.mockResolvedValue([{ squadId: "sq1", _count: 3 }] as never);
 
     let callCount = 0;
     mockActivityFindMany.mockImplementation((() => {
@@ -350,6 +366,8 @@ describe("fetchDailyForum", () => {
     mockCycleFindUnique.mockResolvedValue({ id: "cycle-1", name: "Test Cycle" } as never);
     mockPlatoonFindMany.mockResolvedValue([basePlatoon] as never);
     mockRequestFindMany.mockResolvedValue([]);
+    mockSquadFindMany.mockResolvedValue([{ id: "sq1", platoonId: "p1" }] as never);
+    mockSoldierGroupBy.mockResolvedValue([{ squadId: "sq1", _count: 2 }] as never);
 
     let callCount = 0;
     mockActivityFindMany.mockImplementation((() => {
@@ -392,6 +410,8 @@ describe("fetchDailyForum", () => {
     ] as never);
     mockRequestFindMany.mockResolvedValue([]);
     mockActivityFindMany.mockResolvedValue([]);
+    mockSquadFindMany.mockResolvedValue([{ id: "sq1", platoonId: "p1" }] as never);
+    mockSoldierGroupBy.mockResolvedValue([{ squadId: "sq1", _count: 2 }] as never);
 
     const result = await fetchDailyForum("cycle-1", ["p1", "p2"], "2026-04-07");
     expect(result!.platoons).toHaveLength(2);
@@ -493,7 +513,7 @@ describe("renderDailyForumHtml", () => {
     expect(html).toContain("Cohen Avi");
     expect(html).toContain("Levy Dan");
     expect(html).toContain("Ben Yael");
-    expect(html).toContain("לא השתתף"); // skipped label
+    expect(html).toContain("לא ביצע"); // skipped label
     expect(html).toContain("נכשל"); // failed label
     expect(html).toContain("חסר"); // missing label
   });
@@ -512,9 +532,11 @@ describe("renderDailyForumHtml", () => {
               date: "2026-04-07",
               scoreLabels: [],
               scoreFormats: [] as ("number" | "time")[],
-              passedCount: 5,
+              completedCount: 5,
+              skippedCount: 0,
               failedCount: 2,
               naCount: 1,
+              missingCount: 0,
               totalSoldiers: 8,
               rows: [],
             },
@@ -524,8 +546,8 @@ describe("renderDailyForumHtml", () => {
     };
     const html = renderDailyForumHtml(dataWithActivities);
     expect(html).toContain("<svg");
-    expect(html).toContain("השתתף (5)");
-    expect(html).toContain("לא השתתף (2)");
+    expect(html).toContain("ביצע (5)");
+    expect(html).toContain("נכשל (2)");
   });
 
   it("shows empty state messages", () => {

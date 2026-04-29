@@ -27,16 +27,34 @@ function describeArc(cx: number, cy: number, r: number, startAngle: number, endA
   return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y} Z`;
 }
 
-export function renderPieSvg(passed: number, failed: number, na: number): string {
-  const total = passed + failed + na;
+export const PIE_COLORS = {
+  completed: "#22c55e", // green-500
+  skipped: "#f59e0b",   // amber-500
+  failed: "#ef4444",    // red-500
+  na: "#9ca3af",        // gray-400
+  missing: "#e5e7eb",   // gray-200
+};
+
+export interface PieData {
+  completed: number;
+  skipped: number;
+  failed: number;
+  na: number;
+  missing: number;
+}
+
+export function renderPieSvg(data: PieData): string {
+  const total = data.completed + data.skipped + data.failed + data.na + data.missing;
   if (total === 0) {
     return `<svg width="80" height="80" viewBox="0 0 120 120"><circle cx="60" cy="60" r="55" fill="#e5e7eb"/></svg>`;
   }
 
   const segments = [
-    { value: passed, color: "#22c55e" },
-    { value: failed, color: "#ef4444" },
-    { value: na, color: "#9ca3af" },
+    { value: data.completed, color: PIE_COLORS.completed },
+    { value: data.skipped, color: PIE_COLORS.skipped },
+    { value: data.failed, color: PIE_COLORS.failed },
+    { value: data.na, color: PIE_COLORS.na },
+    { value: data.missing, color: PIE_COLORS.missing },
   ].filter((s) => s.value > 0);
 
   if (segments.length === 1) {

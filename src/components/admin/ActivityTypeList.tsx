@@ -463,7 +463,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                         )}
                         {slot.threshold != null && slot.thresholdOperator && (
                           <span className="text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5">
-                            כישלון: {slot.thresholdOperator} {slot.threshold}
+                            נכשל אם {slot.thresholdOperator === ">" ? "גדול מ" : slot.thresholdOperator === ">=" ? "גדול או שווה ל" : slot.thresholdOperator === "<" ? "קטן מ" : "קטן או שווה ל"}{slot.threshold}
                           </span>
                         )}
                       </div>
@@ -484,7 +484,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                       onChange={(e) => setEditFailureThreshold(e.target.value)}
                       className="text-xs w-16 h-8"
                       inputMode="numeric"
-                      placeholder="1"
+                      placeholder="—"
                     />
                   </div>
                 )}
@@ -504,7 +504,7 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                       {(["completed", "skipped", "na"] as const).map((key) => (
                         <div key={key} className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground w-20 shrink-0 text-end">
-                            {key === "completed" ? "השתתף:" : key === "skipped" ? "לא השתתף:" : "לא רלוונטי:"}
+                            {key === "completed" ? "ביצע:" : key === "skipped" ? "לא ביצע:" : "לא רלוונטי:"}
                           </span>
                           <Input
                             placeholder={DEFAULT_RESULT_LABELS[key].label}

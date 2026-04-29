@@ -175,8 +175,8 @@ describe("POST /api/admin/activity-types", () => {
 
     const displayConfiguration = {
       results: {
-        passed: { label: "נוכח" },
-        failed: { label: "לא נוכח" },
+        completed: { label: "נוכח" },
+        skipped: { label: "לא נוכח" },
         na: { label: "פטור" },
       },
       note: { type: "list", options: ["קיר", "חבל", "זמן"] },
@@ -221,8 +221,8 @@ describe("POST /api/admin/activity-types", () => {
       icon: "Activity",
       displayConfiguration: {
         results: {
-          passed: { label: "" },
-          failed: { label: "לא נוכח" },
+          completed: { label: "" },
+          skipped: { label: "לא נוכח" },
           na: { label: "פטור" },
         },
       },

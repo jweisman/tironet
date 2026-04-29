@@ -19,8 +19,8 @@ export interface DisplayConfiguration {
 }
 
 export const DEFAULT_RESULT_LABELS: ResultLabels = {
-  completed: { label: "השתתף" },
-  skipped: { label: "לא השתתף" },
+  completed: { label: "ביצע" },
+  skipped: { label: "לא ביצע" },
   na: { label: "לא רלוונטי" },
 };
 

@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
             row.push("");
             for (let c = 0; c < scoreColCount; c++) row.push("");
           } else {
-            const resultLabel = report.result === "completed" ? "עבר" : report.result === "skipped" ? "לא השתתף" : report.result === "na" ? "לא רלוונטי" : "";
+            const resultLabel = report.result === "completed" ? "עבר" : report.result === "skipped" ? "לא ביצע" : report.result === "na" ? "לא רלוונטי" : "";
             row.push(resultLabel);
             if (report.result === "skipped" || report.failed) {
               failedActivities.push(ai);

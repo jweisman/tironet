@@ -7,6 +7,8 @@ import { requireAdmin } from "@/lib/api/admin-guard";
 const scoreSlotSchema = z.object({
   label: z.string().min(1),
   format: z.enum(["number", "time"]),
+  threshold: z.number().nullable().optional(),
+  thresholdOperator: z.enum([">", ">=", "<", "<="]).nullable().optional(),
 }).nullable();
 
 const scoreConfigSchema = z.object({
@@ -16,14 +18,15 @@ const scoreConfigSchema = z.object({
   score4: scoreSlotSchema,
   score5: scoreSlotSchema,
   score6: scoreSlotSchema,
+  failureThreshold: z.number().int().min(1).nullable().optional(),
 });
 
 const resultLabelSchema = z.object({ label: z.string().min(1) });
 
 const displayConfigSchema = z.object({
   results: z.object({
-    passed: resultLabelSchema,
-    failed: resultLabelSchema,
+    completed: resultLabelSchema,
+    skipped: resultLabelSchema,
     na: resultLabelSchema,
   }).optional(),
   note: z.object({

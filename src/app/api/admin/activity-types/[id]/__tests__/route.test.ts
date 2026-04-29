@@ -180,8 +180,8 @@ describe("PATCH /api/admin/activity-types/[id]", () => {
     adminSuccess();
     const displayConfiguration = {
       results: {
-        passed: { label: "נוכח" },
-        failed: { label: "לא נוכח" },
+        completed: { label: "נוכח" },
+        skipped: { label: "לא נוכח" },
         na: { label: "פטור" },
       },
     };

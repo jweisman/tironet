@@ -38,7 +38,7 @@ describe("getResultLabels", () => {
     };
     const labels = getResultLabels(config);
     expect(labels.completed.label).toBe("ביצע");
-    expect(labels.skipped.label).toBe("לא השתתף");
+    expect(labels.skipped.label).toBe("לא ביצע");
     expect(labels.na.label).toBe("לא רלוונטי");
   });
 });

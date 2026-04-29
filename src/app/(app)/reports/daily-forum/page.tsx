@@ -121,16 +121,12 @@ function TodayActivitySection({ activity }: { activity: TodayActivityItem }) {
 
       <div className="flex items-center gap-6">
         <PieChart
-          passed={activity.passedCount}
-          failed={activity.failedCount}
-          na={activity.naCount}
+          data={{ completed: activity.completedCount, skipped: activity.skippedCount, failed: activity.failedCount, na: activity.naCount, missing: activity.missingCount }}
           size={80}
         />
         <div className="space-y-1">
           <PieChartLegend
-            passed={activity.passedCount}
-            failed={activity.failedCount}
-            na={activity.naCount}
+            data={{ completed: activity.completedCount, skipped: activity.skippedCount, failed: activity.failedCount, na: activity.naCount, missing: activity.missingCount }}
             resultLabels={getResultLabels(activity.displayConfiguration)}
           />
           <p className="text-xs text-muted-foreground">

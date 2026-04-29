@@ -778,7 +778,7 @@ Unlike soldier/activity import, report import uses **user-defined column mapping
 - **No API route** — reports are written to the local PowerSync SQLite DB via `db.execute()`, matching the existing `saveReport` pattern. The connector handles upload automatically.
 - **Column mapping step:** After file upload, the user maps spreadsheet columns to report fields (personal number, result, note, and dynamic score columns based on activity type). Mappings are auto-detected from known Hebrew header names and persisted to `localStorage` keyed by `activityTypeId` (`tironet:report-mapping:${activityTypeId}`).
 - **Soldier lookup:** Soldiers are matched by `idNumber` (מספר אישי). The `SOLDIERS_QUERY` in the activity detail page fetches `id_number` for this purpose.
-- **Result values:** Accepts Hebrew (עבר/נכשל/לא רלוונטי and השתתף/לא השתתף), English (completed/skipped/na and legacy passed/failed), and numeric (1/0).
+- **Result values:** Accepts Hebrew (ביצע/לא ביצע/לא רלוונטי, עבר/נכשל, השתתף/לא השתתף), English (completed/skipped/na and legacy passed/failed), and numeric (1/0).
 - **Upsert behavior:** Existing reports are overwritten (same as manual edits). New reports are INSERTed with `crypto.randomUUID()`.
 
 ### Soldier bulk import
