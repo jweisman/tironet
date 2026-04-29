@@ -213,8 +213,49 @@ export async function GET(req: NextRequest) {
 
   const cycles = Object.entries(cycleMap).map(([id, name]) => ({ id, name }));
 
+  // Fetch commander events for users in scope
+  const userIds = Array.from(userMap.keys());
+  const eventWhere: Record<string, unknown> = { userId: { in: userIds } };
+  if (filterCycleId) eventWhere.cycleId = filterCycleId;
+
+  const commanderEvents = userIds.length > 0
+    ? await prisma.commanderEvent.findMany({
+        where: eventWhere,
+        select: {
+          id: true,
+          userId: true,
+          cycleId: true,
+          name: true,
+          description: true,
+          startDate: true,
+          endDate: true,
+        },
+        orderBy: { startDate: "asc" },
+      })
+    : [];
+
+  // Group events by userId
+  const eventsByUser = new Map<string, typeof commanderEvents>();
+  for (const ev of commanderEvents) {
+    if (!eventsByUser.has(ev.userId)) eventsByUser.set(ev.userId, []);
+    eventsByUser.get(ev.userId)!.push(ev);
+  }
+
+  // Annotate users with their events
+  const usersWithEvents = Array.from(userMap.values()).map((u) => ({
+    ...u,
+    commanderEvents: (eventsByUser.get(u.id) ?? []).map((ev) => ({
+      id: ev.id,
+      cycleId: ev.cycleId,
+      name: ev.name,
+      description: ev.description,
+      startDate: ev.startDate.toISOString().split("T")[0],
+      endDate: ev.endDate.toISOString().split("T")[0],
+    })),
+  }));
+
   return NextResponse.json({
-    users: Array.from(userMap.values()),
+    users: usersWithEvents,
     invitations: annotatedInvitations,
     structureByCycle,
     cycles,

@@ -499,3 +499,64 @@ export const calendarTourSteps: VersionedStep[] = [
     },
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Commanders page tour
+// ---------------------------------------------------------------------------
+export const usersTourSteps: VersionedStep[] = [
+  {
+    popover: {
+      title: "ניהול מפקדים",
+      description:
+        "כאן ניתן לצפות במפקדים הכפופים לכם, להזמין מפקדים חדשים ולנהל אירועי מפקדים.",
+    },
+  },
+  {
+    element: "[data-tour='users-invite']",
+    popover: {
+      title: "הזמנת מפקד",
+      description:
+        "לחצו כדי להזמין מפקד חדש — בחרו תפקיד, יחידה ופרטי התקשרות.",
+    },
+  },
+  {
+    element: "[data-tour='users-table']",
+    popover: {
+      title: "רשימת מפקדים",
+      description:
+        "כל המפקדים בהיררכיה שלכם — שם, פרטי קשר ושיבוץ.",
+    },
+  },
+  {
+    element: "[data-tour='users-edit']",
+    popover: {
+      title: "עריכת פרטי מפקד",
+      description:
+        "לחצו על העט כדי לעדכן שם, דרגה ופרטי קשר של מפקד.",
+    },
+  },
+  {
+    element: "[data-tour='users-add-event']",
+    popover: {
+      title: "הוספת אירוע",
+      description:
+        "לחצו על הלוח כדי להוסיף אירוע למפקד — חופשה, ביקור רופא וכדומה. האירוע יופיע בדף הבית ובלוח האירועים.",
+    },
+  },
+  {
+    element: "[data-tour='users-events']",
+    popover: {
+      title: "אירועי מפקד",
+      description:
+        "לחצו על החץ כדי לפתוח את רשימת האירועים של המפקד. ניתן לערוך ולמחוק אירועים.",
+    },
+  },
+  {
+    element: "[data-tour='users-invitations']",
+    popover: {
+      title: "הזמנות ממתינות",
+      description:
+        "הזמנות שנשלחו וטרם התקבלו. ניתן לשלוח מחדש, להעתיק קישור או לבטל.",
+    },
+  },
+];

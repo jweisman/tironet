@@ -7,6 +7,7 @@ export type {
   DailyForumData,
   PlatoonForumSection,
   OpenRequestItem,
+  CommanderEventItem,
   TodayActivityItem,
   TomorrowActivityItem,
   GapActivityItem,

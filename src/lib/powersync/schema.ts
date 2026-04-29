@@ -113,6 +113,17 @@ const request_actions = new Table({
   created_at: column.text,
 });
 
+const commander_events = new Table({
+  cycle_id: column.text,
+  user_id: column.text,
+  user_name: column.text,
+  platoon_id: column.text,
+  name: column.text,
+  description: column.text,
+  start_date: column.text,
+  end_date: column.text,
+});
+
 export const AppSchema = new Schema({
   cycles,
   companies,
@@ -124,6 +135,7 @@ export const AppSchema = new Schema({
   activity_reports,
   requests,
   request_actions,
+  commander_events,
 });
 
 export type Database = (typeof AppSchema)["types"];

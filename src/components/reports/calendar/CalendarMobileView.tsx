@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { DoorOpen, Stethoscope, Thermometer } from "lucide-react";
+import { DoorOpen, Stethoscope, Thermometer, CalendarClock } from "lucide-react";
 import { ActivityTypeIcon } from "@/components/activities/ActivityTypeIcon";
 import type { CalendarEvent, CalendarEventType, PlatoonColor } from "@/lib/calendar/events";
 import { EVENT_TYPE_LABELS, getEventHref } from "@/lib/calendar/events";
@@ -16,6 +16,7 @@ const REQUEST_TYPE_ICONS: Partial<
   leave: DoorOpen,
   medical_appointment: Stethoscope,
   sick_day: Thermometer,
+  commander_event: CalendarClock,
 };
 
 function pad(n: number): string {
@@ -150,12 +151,9 @@ export function CalendarMobileView({
           <div className="space-y-1">
             {selectedEvents.map((event) => {
               const color = getColor(event);
-              return (
-                <Link
-                  key={event.id}
-                  href={getEventHref(event)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors"
-                >
+              const href = getEventHref(event);
+              const content = (
+                <>
                   <div
                     className="w-1 self-stretch rounded-full shrink-0"
                     style={{ backgroundColor: color.hex }}
@@ -177,7 +175,23 @@ export function CalendarMobileView({
                       {event.platoonName && ` · ${event.platoonName}`}
                     </p>
                   </div>
+                </>
+              );
+              return href ? (
+                <Link
+                  key={event.id}
+                  href={href}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                >
+                  {content}
                 </Link>
+              ) : (
+                <div
+                  key={event.id}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                >
+                  {content}
+                </div>
               );
             })}
           </div>

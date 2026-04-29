@@ -39,6 +39,7 @@ model User {
   pushSubscriptions     PushSubscription[]
   notificationPreference NotificationPreference?
   userPreference         UserPreference?
+  commanderEvents        CommanderEvent[]
 
   @@map("users")
 }
@@ -101,6 +102,7 @@ model Cycle {
   soldiers         Soldier[]
   activities       Activity[]
   requests         Request[]
+  commanderEvents  CommanderEvent[]
 
   @@map("cycles")
 }
@@ -143,9 +145,10 @@ model Platoon {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  squads     Squad[]
-  activities Activity[]
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  squads          Squad[]
+  activities      Activity[]
+  commanderEvents CommanderEvent[]
 
   @@map("platoons")
 }
@@ -515,6 +518,32 @@ model ReportExportDefault {
 // ---------------------------------------------------------------------------
 // Scheduled reminders (QStash-backed)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Commander events
+// ---------------------------------------------------------------------------
+
+model CommanderEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId     String   @map("cycle_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  userName    String   @map("user_name")
+  platoonId   String   @map("platoon_id") @db.Uuid
+  name        String
+  description String?
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime @map("end_date") @db.Date
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  cycle   Cycle   @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platoon Platoon @relation(fields: [platoonId], references: [id], onDelete: Cascade)
+
+  @@index([cycleId, platoonId], name: "idx_commander_events_cycle_platoon")
+  @@index([userId], name: "idx_commander_events_user")
+  @@map("commander_events")
+}
 
 model ScheduledReminder {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

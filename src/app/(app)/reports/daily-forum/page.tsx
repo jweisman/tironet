@@ -308,6 +308,58 @@ function ForumContent({ data }: { data: DailyForumData }) {
         </div>
       </div>
 
+      {/* אירועי מפקדים */}
+      {(() => {
+        const totalCmdr = platoons.reduce((s, p) => s + (p.commanderEvents?.length ?? 0), 0);
+        return (
+          <div className="mb-6">
+            <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
+              אירועי מפקדים ({totalCmdr})
+            </h2>
+            {totalCmdr === 0 ? (
+              <p className="text-xs text-muted-foreground">אין אירועי מפקדים</p>
+            ) : (
+              platoons.map((p) => {
+                const events = p.commanderEvents ?? [];
+                if (events.length === 0) return null;
+                return (
+                  <div key={p.platoonId}>
+                    {multi && <PlatoonLabel platoon={p} />}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-border">
+                            <th className="text-start px-2 py-1.5 font-semibold">מפקד</th>
+                            <th className="text-start px-2 py-1.5 font-semibold">אירוע</th>
+                            <th className="text-start px-2 py-1.5 font-semibold">תאריכים</th>
+                            <th className="text-start px-2 py-1.5 font-semibold">תיאור</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {events.map((ev) => {
+                            const start = new Date(ev.startDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+                            const end = new Date(ev.endDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+                            const dateRange = ev.startDate === ev.endDate ? start : `${start} — ${end}`;
+                            return (
+                              <tr key={ev.id} className="border-b border-border">
+                                <td className="px-2 py-1.5">{ev.userName}</td>
+                                <td className="px-2 py-1.5">{ev.name}</td>
+                                <td className="px-2 py-1.5">{dateRange}</td>
+                                <td className="px-2 py-1.5 text-muted-foreground">{ev.description ?? ""}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        );
+      })()}
+
       {/* הספקים */}
       <div className="mb-6">
         <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">

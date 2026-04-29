@@ -646,6 +646,39 @@ Both the commanders page and admin users page show role and unit filter pills (o
 - **Tokens are never exposed in API responses.** All endpoints return `inviteUrl` (the full `/invite/{token}` URL) instead of the raw `token`. This applies to the admin list, admin refresh, hierarchy, and pending invitations endpoints.
 - **Phone-only invitation acceptance** requires the accepting user to have a matching phone number. Users without a phone set are rejected with `phone_mismatch` (403).
 
+## Commander Events (אירועי מפקדים)
+
+Time-bound events (leave, medical, etc.) for subordinate commanders — created by platoon/company commanders via the commanders page (#170). Simpler than the full request workflow: no approval chain, no status machine.
+
+### Data model
+
+`CommanderEvent` has `cycleId`, `userId` (the commander it's about), `userName` (denormalized), `platoonId` (denormalized from user's assignment for sync scoping), `name`, `description`, `startDate`, `endDate`. Company-level roles (instructor, medic, hardship coordinator) are not supported — only squad commanders and platoon sergeants.
+
+### API
+
+- `POST /api/commander-events` — creates event, resolves `platoonId` from target user's `UserCycleAssignment`
+- `PATCH /api/commander-events/[id]` — updates event fields
+- `DELETE /api/commander-events/[id]` — deletes event
+
+All endpoints verify the caller is a platoon/company commander with the target platoon in scope.
+
+### PowerSync sync
+
+Synced via `commander_events` stream scoped by `visible_platoon_ids` CTE. Squad commanders don't see these events (they have no pages that query this table).
+
+### Where commander events are surfaced
+
+| Surface | Condition | Implementation |
+|---|---|---|
+| **Commanders page** | CRUD under each user row | Events included in `/api/users/hierarchy` response |
+| **Home page** | Events active today | `CommanderEventsCallout` — PowerSync query, platoon/company commanders only |
+| **Calendar** | Each day in startDate–endDate range | New `commander_event` type in `CalendarEventType`, indigo color, `CalendarClock` icon |
+| **Daily Forum report** | Events active on report date | New "אירועי מפקדים" section after active requests, before הספקים |
+
+### Icon
+
+`CalendarClock` from lucide-react — used consistently across home page callout, calendar chips, and calendar PDF.
+
 ## Calendar (לוח אירועים)
 
 A top-level page (`/calendar`) showing a monthly calendar of activities, leave requests, medical appointments, and sick days. Available to all roles except hardship coordinators — including squad commanders (unlike reports, which are platoon+ only).
@@ -877,6 +910,24 @@ Next.js injects inline `<script>` tags for hydration data. Without `'unsafe-inli
 PowerSync runs on a different port (`localhost:8080`) than the Next.js dev server. `'self'` only covers the same origin (same port). Add `http://localhost:* ws://localhost:*` for local development, otherwise PowerSync WebSocket connections are silently blocked.
 
 ## UI Patterns
+
+### Match existing patterns before building new UI
+
+When adding a new component to an existing page (e.g. a new section on the home page, a new card in a list), **read the sibling components first** and replicate their structure exactly. Match: wrapper classes, header layout, card container styling, row structure, icon sizes, text sizes, and spacing. Do not invent a new visual style. Only deviate if the content genuinely requires different treatment.
+
+### Dialog button order (RTL)
+
+All dialog action button rows use `flex flex-row-reverse gap-2 justify-end`. In the DOM, the cancel button comes first and the primary (submit) button second. `flex-row-reverse` visually flips them so the primary button sits on the **start side** (right in RTL) and the cancel button appears to its left. Follow this pattern in every new dialog.
+
+### Form validation — JS-only, no browser `required`
+
+Never use the HTML `required` attribute on form inputs. Browser-native validation shows English tooltips that don't localize to Hebrew. Instead:
+
+1. **Required asterisk:** Use `<Label required>Field Name</Label>` — the `Label` component appends a red `*` via `text-destructive`.
+2. **JS validation in submit handler:** Check fields manually in the `handleSubmit` function. Set a `string | null` error state and `return` early on failure.
+3. **Error display:** `{error && <p className="text-sm text-destructive">{error}</p>}` — placed after all fields, before the button bar.
+4. **Field layout:** Each field wrapped in `<div className="space-y-1.5">` containing `Label` + input. Form uses `className="space-y-4"`.
+5. **Error state lifecycle:** Clear on dialog open/close and before each API call (`setError(null)`).
 
 ### Native date/datetime-local inputs — iOS Safari overflow fix
 

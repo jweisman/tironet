@@ -11,6 +11,7 @@ import {
   filtersToEventTypes,
   type RawActivity,
   type RawRequest,
+  type RawCommanderEventData,
   type CalendarEvent,
   type CalendarFilterCategory,
 } from "../events";
@@ -270,6 +271,10 @@ describe("getEventHref", () => {
   it("links sick days to /requests/:id", () => {
     expect(getEventHref(makeEvent({ type: "sick_day", sourceId: "xyz" }))).toBe("/requests/xyz");
   });
+
+  it("returns null for commander events", () => {
+    expect(getEventHref(makeEvent({ type: "commander_event", sourceId: "xyz" }))).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -353,7 +358,12 @@ describe("getPlatoonColorMap", () => {
 // ---------------------------------------------------------------------------
 
 describe("visibleTypesToFilters", () => {
-  it("maps all event types to 3 filters", () => {
+  it("maps all event types to 4 filters", () => {
+    const filters = visibleTypesToFilters(["activity", "leave", "medical_appointment", "sick_day", "commander_event"]);
+    expect(filters).toEqual(["activity", "leave", "medical", "commander_event"]);
+  });
+
+  it("maps soldier event types to 3 filters", () => {
     const filters = visibleTypesToFilters(["activity", "leave", "medical_appointment", "sick_day"]);
     expect(filters).toEqual(["activity", "leave", "medical"]);
   });
@@ -377,12 +387,72 @@ describe("filtersToEventTypes", () => {
     expect(types).toEqual(new Set(["medical_appointment", "sick_day"]));
   });
 
-  it("expands all filters", () => {
-    const types = filtersToEventTypes(new Set<CalendarFilterCategory>(["activity", "leave", "medical"]));
-    expect(types).toEqual(new Set(["activity", "leave", "medical_appointment", "sick_day"]));
+  it("expands all filters including commander_event", () => {
+    const types = filtersToEventTypes(new Set<CalendarFilterCategory>(["activity", "leave", "medical", "commander_event"]));
+    expect(types).toEqual(new Set(["activity", "leave", "medical_appointment", "sick_day", "commander_event"]));
   });
 
   it("returns empty set for no filters", () => {
     expect(filtersToEventTypes(new Set())).toEqual(new Set());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Commander events in buildCalendarEvents
+// ---------------------------------------------------------------------------
+
+describe("buildCalendarEvents — commander events", () => {
+  const range = { start: "2026-04-01", end: "2026-04-30" };
+
+  function makeCmdrEvent(overrides: Partial<RawCommanderEventData> = {}): RawCommanderEventData {
+    return {
+      id: "ce1",
+      userName: "כהן יוסי",
+      name: "חופשה",
+      startDate: "2026-04-10",
+      endDate: "2026-04-12",
+      platoonId: "p1",
+      platoonName: "מחלקה 1",
+      ...overrides,
+    };
+  }
+
+  it("expands commander event date range into individual days", () => {
+    const events = buildCalendarEvents([], [], range.start, range.end, [makeCmdrEvent()]);
+    expect(events).toHaveLength(3);
+    expect(events.map((e) => e.date)).toEqual(["2026-04-10", "2026-04-11", "2026-04-12"]);
+    expect(events[0]).toMatchObject({
+      type: "commander_event",
+      label: "כהן יוסי — חופשה",
+      platoonId: "p1",
+      sourceId: "ce1",
+    });
+  });
+
+  it("filters commander events outside date range", () => {
+    const events = buildCalendarEvents([], [], range.start, range.end, [
+      makeCmdrEvent({ startDate: "2026-05-01", endDate: "2026-05-03" }),
+    ]);
+    expect(events).toHaveLength(0);
+  });
+
+  it("handles single-day commander events", () => {
+    const events = buildCalendarEvents([], [], range.start, range.end, [
+      makeCmdrEvent({ startDate: "2026-04-15", endDate: "2026-04-15" }),
+    ]);
+    expect(events).toHaveLength(1);
+    expect(events[0].date).toBe("2026-04-15");
+  });
+
+  it("combines all event types", () => {
+    const events = buildCalendarEvents(
+      [{ id: "a1", name: "ירי", date: "2026-04-01", platoonId: "p1", platoonName: "מחלקה 1", activityTypeIcon: "target" }],
+      [],
+      range.start,
+      range.end,
+      [makeCmdrEvent({ startDate: "2026-04-01", endDate: "2026-04-01" })],
+    );
+    expect(events).toHaveLength(2);
+    expect(events.map((e) => e.type)).toEqual(["activity", "commander_event"]);
   });
 });

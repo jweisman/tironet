@@ -6,6 +6,7 @@ import {
   type CalendarEventType,
   type RawActivity,
   type RawRequest,
+  type RawCommanderEventData,
 } from "@/lib/calendar/events";
 import type { CalendarScope } from "@/lib/api/calendar-scope";
 
@@ -19,9 +20,11 @@ function getVisibleTypes(role: CalendarScope["role"]): CalendarEventType[] {
       return ["activity"];
     case "company_medic":
       return ["medical_appointment", "sick_day"];
-    default:
-      // squad_commander, platoon_commander, company_commander
+    case "squad_commander":
       return ["activity", "leave", "medical_appointment", "sick_day"];
+    default:
+      // platoon_commander, company_commander
+      return ["activity", "leave", "medical_appointment", "sick_day", "commander_event"];
   }
 }
 
@@ -137,7 +140,38 @@ export async function fetchCalendarData(
     }));
   }
 
-  const events = buildCalendarEvents(rawActivities, rawRequests, startDate, endDate);
+  // Fetch commander events (platoon/company commanders only)
+  let rawCommanderEvents: RawCommanderEventData[] = [];
+  if (visibleTypes.includes("commander_event")) {
+    const cmdrEvents = await prisma.commanderEvent.findMany({
+      where: {
+        cycleId,
+        platoonId: { in: scope.platoonIds },
+        startDate: { lte: new Date(endDate + "T23:59:59.999Z") },
+        endDate: { gte: new Date(startDate) },
+      },
+      select: {
+        id: true,
+        userName: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        platoonId: true,
+        platoon: { select: { name: true } },
+      },
+    });
+    rawCommanderEvents = cmdrEvents.map((ce) => ({
+      id: ce.id,
+      userName: ce.userName,
+      name: ce.name,
+      startDate: ce.startDate.toISOString().split("T")[0],
+      endDate: ce.endDate.toISOString().split("T")[0],
+      platoonId: ce.platoonId,
+      platoonName: ce.platoon.name,
+    }));
+  }
+
+  const events = buildCalendarEvents(rawActivities, rawRequests, startDate, endDate, rawCommanderEvents);
 
   return {
     cycleName: cycle.name,

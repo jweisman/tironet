@@ -28,6 +28,7 @@ const EVENT_TYPE_HEX: Record<CalendarEventType, { hex: string; hexBg: string; he
   leave: { hex: "#d97706", hexBg: "#fef3c7", hexBorder: "#fcd34d" },
   medical_appointment: { hex: "#e11d48", hexBg: "#ffe4e6", hexBorder: "#fda4af" },
   sick_day: { hex: "#7c3aed", hexBg: "#ede9fe", hexBorder: "#c4b5fd" },
+  commander_event: { hex: "#0d9488", hexBg: "#ccfbf1", hexBorder: "#5eead4" },
 };
 
 // ---------------------------------------------------------------------------
@@ -84,6 +85,7 @@ function lucideIconToSvg(iconName: string): string | null {
 const ICON_LEAVE = lucideIconToSvg("door-open") ?? "";
 const ICON_MEDICAL = lucideIconToSvg("stethoscope") ?? "";
 const ICON_SICK = lucideIconToSvg("thermometer") ?? "";
+const ICON_COMMANDER = lucideIconToSvg("calendar-clock") ?? "";
 const ICON_FALLBACK = lucideIconToSvg("clipboard-list") ?? "";
 
 // Cache for activity type icons
@@ -94,6 +96,7 @@ function getEventIcon(event: CalendarEvent): string {
     case "leave": return ICON_LEAVE;
     case "medical_appointment": return ICON_MEDICAL;
     case "sick_day": return ICON_SICK;
+    case "commander_event": return ICON_COMMANDER;
     case "activity": {
       if (!event.icon) return ICON_FALLBACK;
       let svg = activityIconCache.get(event.icon);

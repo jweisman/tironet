@@ -14,6 +14,7 @@ vi.mock("@/lib/db/prisma", () => ({
     activity: { findMany: vi.fn() },
     squad: { findMany: vi.fn() },
     soldier: { groupBy: vi.fn() },
+    commanderEvent: { findMany: vi.fn().mockResolvedValue([]) },
   },
 }));
 

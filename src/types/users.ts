@@ -10,6 +10,15 @@ export type UserAssignment = {
   cycle: { name: string; isActive: boolean };
 };
 
+export type CommanderEventSummary = {
+  id: string;
+  cycleId: string;
+  name: string;
+  description: string | null;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+};
+
 export type ManagedUser = {
   id: string;
   givenName: string;
@@ -19,6 +28,7 @@ export type ManagedUser = {
   rank: string | null;
   isAdmin: boolean;
   cycleAssignments: UserAssignment[];
+  commanderEvents?: CommanderEventSummary[];
 };
 
 export type ManagedInvitation = {

@@ -5,7 +5,7 @@ import { parseSickDays } from "@/lib/requests/sick-days";
 // Types
 // ---------------------------------------------------------------------------
 
-export type CalendarEventType = "activity" | "leave" | "medical_appointment" | "sick_day";
+export type CalendarEventType = "activity" | "leave" | "medical_appointment" | "sick_day" | "commander_event";
 
 export interface CalendarEvent {
   id: string;
@@ -58,6 +58,7 @@ export const EVENT_TYPE_COLORS: Record<CalendarEventType, PlatoonColor> = {
   leave: { bg: "bg-amber-100", text: "text-amber-800", border: "border-amber-300", hex: "#d97706", hexBg: "#fef3c7" },
   medical_appointment: { bg: "bg-rose-100", text: "text-rose-800", border: "border-rose-300", hex: "#e11d48", hexBg: "#ffe4e6" },
   sick_day: { bg: "bg-purple-100", text: "text-purple-800", border: "border-purple-300", hex: "#7c3aed", hexBg: "#ede9fe" },
+  commander_event: { bg: "bg-teal-100", text: "text-teal-800", border: "border-teal-300", hex: "#0d9488", hexBg: "#ccfbf1" },
 };
 
 export function getPlatoonColorMap(platoonIds: string[]): Map<string, PlatoonColor> {
@@ -77,18 +78,20 @@ export const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   leave: "יציאות",
   medical_appointment: "תורים רפואיים",
   sick_day: "ימי מחלה",
+  commander_event: "אירועי מפקדים",
 };
 
 // ---------------------------------------------------------------------------
 // Filter categories — groups event types for the toolbar
 // ---------------------------------------------------------------------------
 
-export type CalendarFilterCategory = "activity" | "leave" | "medical";
+export type CalendarFilterCategory = "activity" | "leave" | "medical" | "commander_event";
 
 export const FILTER_CATEGORY_LABELS: Record<CalendarFilterCategory, string> = {
   activity: "פעילויות",
   leave: "יציאות",
   medical: "רפואה",
+  commander_event: "אירועי מפקדים",
 };
 
 /** Map a filter category to the event types it controls */
@@ -96,6 +99,7 @@ export const FILTER_TO_EVENT_TYPES: Record<CalendarFilterCategory, CalendarEvent
   activity: ["activity"],
   leave: ["leave"],
   medical: ["medical_appointment", "sick_day"],
+  commander_event: ["commander_event"],
 };
 
 /** Derive filter categories from visible event types */
@@ -106,6 +110,7 @@ export function visibleTypesToFilters(visibleTypes: CalendarEventType[]): Calend
   if (visibleTypes.includes("medical_appointment") || visibleTypes.includes("sick_day")) {
     filters.push("medical");
   }
+  if (visibleTypes.includes("commander_event")) filters.push("commander_event");
   return filters;
 }
 
@@ -191,11 +196,22 @@ export interface RawRequest {
   platoonName: string;
 }
 
+export interface RawCommanderEventData {
+  id: string;
+  userName: string;
+  name: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  platoonId: string;
+  platoonName: string;
+}
+
 export function buildCalendarEvents(
   activities: RawActivity[],
   requests: RawRequest[],
   startDate: string,
   endDate: string,
+  commanderEvents?: RawCommanderEventData[],
 ): CalendarEvent[] {
   const events: CalendarEvent[] = [];
 
@@ -270,6 +286,24 @@ export function buildCalendarEvents(
     }
   }
 
+  // Commander events — expand date range into individual days
+  for (const ce of commanderEvents ?? []) {
+    const dates = expandLeaveDates(ce.startDate, ce.endDate);
+    for (const date of dates) {
+      if (date >= startDate && date <= endDate) {
+        events.push({
+          id: `cmdr-${ce.id}-${date}`,
+          date,
+          type: "commander_event",
+          label: `${ce.userName} — ${ce.name}`,
+          platoonId: ce.platoonId,
+          platoonName: ce.platoonName,
+          sourceId: ce.id,
+        });
+      }
+    }
+  }
+
   return events;
 }
 
@@ -277,10 +311,10 @@ export function buildCalendarEvents(
 // Event detail link
 // ---------------------------------------------------------------------------
 
-export function getEventHref(event: CalendarEvent): string {
-  return event.type === "activity"
-    ? `/activities/${event.sourceId}`
-    : `/requests/${event.sourceId}`;
+export function getEventHref(event: CalendarEvent): string | null {
+  if (event.type === "activity") return `/activities/${event.sourceId}`;
+  if (event.type === "commander_event") return null;
+  return `/requests/${event.sourceId}`;
 }
 
 // ---------------------------------------------------------------------------

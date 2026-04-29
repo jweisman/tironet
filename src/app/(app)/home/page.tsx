@@ -14,6 +14,7 @@ import { PlatoonSummaryCard } from "@/components/dashboard/PlatoonSummaryCard";
 import type { VisibleSections } from "@/components/dashboard/PlatoonSummaryCard";
 import { TodayActivities } from "@/components/dashboard/TodayActivities";
 import { ActiveRequestsCallout } from "@/components/dashboard/ActiveRequestsCallout";
+import { CommanderEventsCallout } from "@/components/dashboard/CommanderEventsCallout";
 import { BirthdayCallout } from "@/components/dashboard/BirthdayCallout";
 import type { SquadSummary } from "@/app/api/dashboard/route";
 import { effectiveRole, ROLE_LABELS } from "@/lib/auth/permissions";
@@ -393,7 +394,7 @@ export default function HomePage() {
 
   // Tour
   const { registerTour, unregisterTour } = useTourContext();
-  const { startTour } = useTour({ page: "home", steps: homeTourSteps, ready: !showLoading });
+  const { startTour } = useTour({ page: "home", steps: homeTourSteps, ready: !showLoading && squads.length > 0 });
   useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
 
   // Role-based section visibility (#99)
@@ -508,6 +509,11 @@ export default function HomePage() {
       {/* Active requests callout (#108) — not for instructor or hardship coordinator */}
       {selectedCycleId && rawRole !== "instructor" && rawRole !== "hardship_coordinator" && (
         <ActiveRequestsCallout cycleId={selectedCycleId} squadId={squadId} typeFilter={rawRole === "company_medic" ? "medical" : undefined} />
+      )}
+
+      {/* Commander events callout (#170) — platoon and company commanders only */}
+      {selectedCycleId && (role === "platoon_commander" || role === "company_commander") && (
+        <CommanderEventsCallout cycleId={selectedCycleId} />
       )}
 
       {/* Today's activities — not for medic, coordinator, or instructor */}

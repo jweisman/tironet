@@ -95,6 +95,15 @@ export interface GapActivityItem {
   displayConfiguration?: DisplayConfiguration | null;
 }
 
+export interface CommanderEventItem {
+  id: string;
+  userName: string;
+  name: string;
+  description: string | null;
+  startDate: string;
+  endDate: string;
+}
+
 export interface PlatoonForumSection {
   platoonId: string;
   platoonName: string;
@@ -108,6 +117,7 @@ export interface PlatoonForumSection {
     medical: OpenRequestItem[];
     leave: OpenRequestItem[];
   };
+  commanderEvents: CommanderEventItem[];
   todayActivities: TodayActivityItem[];
   tomorrowActivities: TomorrowActivityItem[];
   gaps: GapActivityItem[];
@@ -598,6 +608,41 @@ export async function fetchDailyForum(
   }
 
   // ---------------------------------------------------------------------------
+  // Commander events active on the report date
+  // ---------------------------------------------------------------------------
+  const cmdrEvents = await prisma.commanderEvent.findMany({
+    where: {
+      cycleId,
+      platoonId: { in: platoonIds },
+      startDate: { lte: new Date(today + "T23:59:59.999Z") },
+      endDate: { gte: new Date(today + "T00:00:00.000Z") },
+    },
+    select: {
+      id: true,
+      userName: true,
+      name: true,
+      description: true,
+      startDate: true,
+      endDate: true,
+      platoonId: true,
+    },
+    orderBy: { startDate: "asc" },
+  });
+
+  const cmdrByPlatoon = new Map<string, CommanderEventItem[]>();
+  for (const ev of cmdrEvents) {
+    if (!cmdrByPlatoon.has(ev.platoonId)) cmdrByPlatoon.set(ev.platoonId, []);
+    cmdrByPlatoon.get(ev.platoonId)!.push({
+      id: ev.id,
+      userName: ev.userName,
+      name: ev.name,
+      description: ev.description,
+      startDate: ev.startDate.toISOString().split("T")[0],
+      endDate: ev.endDate.toISOString().split("T")[0],
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Assemble per-platoon sections
   // ---------------------------------------------------------------------------
   const platoonSections: PlatoonForumSection[] = platoons.map((platoon) => ({
@@ -606,6 +651,7 @@ export async function fetchDailyForum(
     companyName: platoon.company.name,
     openRequests: requestsByPlatoon.get(platoon.id) ?? { medical: [], hardship: [], leave: [] },
     activeRequests: activeByPlatoon.get(platoon.id) ?? { medical: [], leave: [] },
+    commanderEvents: cmdrByPlatoon.get(platoon.id) ?? [],
     todayActivities: todayByPlatoon.get(platoon.id) ?? [],
     tomorrowActivities: tomorrowByPlatoon.get(platoon.id) ?? [],
     gaps: gapsByPlatoon.get(platoon.id) ?? [],
@@ -839,6 +885,22 @@ export function renderDailyForumHtml(data: DailyForumData): string {
       ].join("\n")
     : '<p class="no-data">אין בקשות פעילות</p>';
 
+  const totalCmdrEvents = data.platoons.reduce((s, p) => s + p.commanderEvents.length, 0);
+  const cmdrEventsHtml = totalCmdrEvents > 0
+    ? data.platoons
+        .filter((p) => p.commanderEvents.length > 0)
+        .map((p) => {
+          const rows = p.commanderEvents.map((ev) => {
+            const start = new Date(ev.startDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+            const end = new Date(ev.endDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+            const dateRange = ev.startDate === ev.endDate ? start : `${start} — ${end}`;
+            return `<tr><td>${escapeHtml(ev.userName)}</td><td>${escapeHtml(ev.name)}</td><td>${dateRange}</td><td>${ev.description ? escapeHtml(ev.description) : ""}</td></tr>`;
+          }).join("\n");
+          return `${platoonHeader(p)}<table><thead><tr><th>מפקד</th><th>אירוע</th><th>תאריכים</th><th>תיאור</th></tr></thead><tbody>${rows}</tbody></table>`;
+        })
+        .join("\n")
+    : '<p class="no-data">אין אירועי מפקדים</p>';
+
   const todayHtml = data.platoons.every((p) => p.todayActivities.length === 0)
     ? '<p class="no-data">אין פעילויות להיום</p>'
     : data.platoons
@@ -887,6 +949,11 @@ export function renderDailyForumHtml(data: DailyForumData): string {
         <h3 class="section-title">פעילות (${totalActive})</h3>
         ${activeHtml}
       </div>
+    </div>
+
+    <div class="group-block">
+      <h2 class="group-title">אירועי מפקדים (${totalCmdrEvents})</h2>
+      ${cmdrEventsHtml}
     </div>
 
     <div class="group-block">
