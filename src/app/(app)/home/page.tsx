@@ -370,15 +370,26 @@ export default function HomePage() {
     return parts.join(" > ");
   }, [role, rawSquads]);
 
-  // Platoon logo overrides company logo for platoon-level roles and below
+  // Platoon logo overrides company logo for platoon-level roles and below.
+  // Cached in sessionStorage to avoid flicker from default logo on reload.
   const logo = useMemo(() => {
+    const cacheKey = selectedAssignment ? `tironet:logo:${selectedAssignment.cycleId}:${selectedAssignment.unitId}` : null;
     const first = rawSquads?.[0];
-    if (!first) return null;
-    if (role === "squad_commander" || role === "platoon_commander") {
-      return first.platoon_logo ?? first.company_logo;
+    if (first) {
+      const resolved = (role === "squad_commander" || role === "platoon_commander")
+        ? (first.platoon_logo ?? first.company_logo)
+        : first.company_logo;
+      if (resolved && cacheKey) {
+        try { sessionStorage.setItem(cacheKey, resolved); } catch { /* quota */ }
+      }
+      return resolved;
     }
-    return first.company_logo;
-  }, [rawSquads, role]);
+    // Data not loaded yet — use cached value to prevent flicker
+    if (cacheKey) {
+      try { return sessionStorage.getItem(cacheKey); } catch { /* private browsing */ }
+    }
+    return null;
+  }, [rawSquads, role, selectedAssignment]);
 
   // Tour
   const { registerTour, unregisterTour } = useTourContext();
