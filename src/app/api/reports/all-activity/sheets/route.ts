@@ -23,6 +23,9 @@ export async function POST(request: NextRequest) {
   const typesParam = request.nextUrl.searchParams.get("activityTypeIds");
   const activityTypeIds = typesParam ? typesParam.split(",").filter(Boolean) : undefined;
   const afterDate = dateRangeToAfterDate(request.nextUrl.searchParams.get("dateRange"));
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const tomorrowStart = new Date(tomorrow.toISOString().split("T")[0] + "T00:00:00Z");
   const targetSpreadsheetId = request.nextUrl.searchParams.get("spreadsheetId");
 
   const { scope, error, user } = await getReportScope(cycleId);
@@ -107,7 +110,10 @@ export async function POST(request: NextRequest) {
                 cycleId,
                 platoonId: { in: scope!.platoonIds },
                 ...(activityTypeIds?.length ? { activityTypeId: { in: activityTypeIds } } : {}),
-                ...(afterDate ? { date: { gte: afterDate } } : {}),
+                date: {
+                  ...(afterDate ? { gte: afterDate } : {}),
+                  lt: tomorrowStart,
+                },
               },
             },
           },
@@ -127,7 +133,10 @@ export async function POST(request: NextRequest) {
       cycleId,
       platoonId: { in: scope!.platoonIds },
       ...(activityTypeIds?.length ? { activityTypeId: { in: activityTypeIds } } : {}),
-      ...(afterDate ? { date: { gte: afterDate } } : {}),
+      date: {
+        ...(afterDate ? { gte: afterDate } : {}),
+        lt: tomorrowStart,
+      },
     },
     include: {
       activityType: {

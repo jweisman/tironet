@@ -65,12 +65,19 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
   });
   if (!cycle) return null;
 
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const tomorrowStart = new Date(tomorrow.toISOString().split("T")[0] + "T00:00:00Z");
+
   const activities = await prisma.activity.findMany({
     where: {
       cycleId,
       platoonId: { in: platoonIds },
       ...(activityTypeIds && activityTypeIds.length > 0 ? { activityTypeId: { in: activityTypeIds } } : {}),
-      ...(afterDate ? { date: { gte: afterDate } } : {}),
+      date: {
+        ...(afterDate ? { gte: afterDate } : {}),
+        lt: tomorrowStart,
+      },
     },
     include: {
       activityType: { select: { name: true, scoreConfig: true, displayConfiguration: true } },
