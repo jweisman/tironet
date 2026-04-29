@@ -85,12 +85,16 @@ const ACTIVITIES_QUERY = `
     ) AS total_soldiers,
     (SELECT COUNT(*) FROM activity_reports ar
      JOIN soldiers s ON s.id = ar.soldier_id
-     WHERE ar.activity_id = a.id AND ar.result = 'completed'
-     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS passed_count,
+     WHERE ar.activity_id = a.id AND ar.result = 'completed' AND ar.failed = 0
+     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS completed_count,
     (SELECT COUNT(*) FROM activity_reports ar
      JOIN soldiers s ON s.id = ar.soldier_id
      WHERE ar.activity_id = a.id AND ar.result = 'skipped'
-     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS failed_count,
+     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS skipped_count,
+    (SELECT COUNT(*) FROM activity_reports ar
+     JOIN soldiers s ON s.id = ar.soldier_id
+     WHERE ar.activity_id = a.id AND ar.failed = 1
+     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS score_failed_count,
     (SELECT COUNT(*) FROM activity_reports ar
      JOIN soldiers s ON s.id = ar.soldier_id
      WHERE ar.activity_id = a.id AND ar.result = 'na'
@@ -121,12 +125,16 @@ interface RawActivity {
   activity_type_name: string; activity_type_icon: string;
   platoon_id: string; platoon_name: string; company_name: string;
   total_soldiers: number;
-  passed_count: number; failed_count: number; na_count: number; reported_count: number;
+  completed_count: number; skipped_count: number; score_failed_count: number; na_count: number; reported_count: number;
 }
 
 function mapActivity(raw: RawActivity): ActivitySummary {
-  const reported = Number(raw.reported_count ?? 0);
   const total = Number(raw.total_soldiers ?? 0);
+  const reported = Number(raw.reported_count ?? 0);
+  const completed = Number(raw.completed_count ?? 0);
+  const skipped = Number(raw.skipped_count ?? 0);
+  const failed = Number(raw.score_failed_count ?? 0);
+  const na = Number(raw.na_count ?? 0);
   return {
     id: raw.id,
     name: raw.name,
@@ -134,11 +142,7 @@ function mapActivity(raw: RawActivity): ActivitySummary {
     isRequired: Number(raw.is_required) === 1,
     activityType: { name: raw.activity_type_name, icon: raw.activity_type_icon },
     platoon: { id: raw.platoon_id, name: raw.platoon_name, companyName: raw.company_name },
-    passedCount: Number(raw.passed_count ?? 0),
-    failedCount: Number(raw.failed_count ?? 0),
-    naCount: Number(raw.na_count ?? 0),
-    missingCount: Math.max(0, total - reported),
-    totalSoldiers: total,
+    counts: { completed, skipped, failed, na, missing: Math.max(0, total - reported), total },
   };
 }
 
@@ -310,7 +314,7 @@ export default function ActivitiesPage() {
   const isCompleted = (a: ActivitySummary) => {
     const isPast = a.date.split("T")[0] < todayStr;
     if (!isPast) return false;
-    if (a.isRequired && (a.missingCount > 0 || a.failedCount > 0)) return false;
+    if (a.isRequired && (a.counts.missing > 0 || a.counts.skipped > 0 || a.counts.failed > 0)) return false;
     return true;
   };
 

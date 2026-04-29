@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { usePowerSync } from "@powersync/react";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BulkUpdateBar } from "./BulkUpdateBar";
+import { ActivityProgressBar, type ActivityCounts } from "./ActivityProgressBar";
 import { BulkImportReportsDialog } from "./BulkImportReportsDialog";
 import { ReportRow } from "./ReportRow";
 import { ActivityTypeIcon } from "./ActivityTypeIcon";
@@ -560,6 +561,23 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     0
   );
 
+  // Compute activity-level counts for the progress bar
+  const activityCounts = useMemo((): ActivityCounts => {
+    let completed = 0, skipped = 0, failed = 0, na = 0, missing = 0;
+    for (const squad of data.squads) {
+      for (const soldier of squad.soldiers) {
+        const r = reports.get(soldier.id);
+        if (!r || r.result === null) { missing++; continue; }
+        if (r.result === "completed" && r.failed) { failed++; }
+        else if (r.result === "completed") { completed++; }
+        else if (r.result === "skipped") { skipped++; }
+        else if (r.result === "na") { na++; }
+      }
+    }
+    const total = completed + skipped + failed + na + missing;
+    return { completed, skipped, failed, na, missing, total };
+  }, [data.squads, reports]);
+
   const getResultIcon = (result: ActivityResult | null, failed?: boolean) => {
     if (result === "completed" && failed) return <span className="text-red-600">✗</span>;
     if (result === "completed") return <span className="text-green-600">✓</span>;
@@ -621,6 +639,10 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             </div>
           )}
         </div>
+
+        {activityCounts.total > 0 && (
+          <ActivityProgressBar counts={activityCounts} />
+        )}
 
         <div className="flex items-center gap-2 flex-wrap">
           {gapsCount > 0 && (

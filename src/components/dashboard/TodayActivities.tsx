@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, CalendarDays, ChevronDown } from "lucide-react";
 import { useQuery } from "@powersync/react";
 import { ActivityTypeIcon } from "@/components/activities/ActivityTypeIcon";
-import { cn } from "@/lib/utils";
+import { ActivityProgressBar, type ActivityCounts } from "@/components/activities/ActivityProgressBar";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 const INITIAL_LIMIT = 4;
@@ -58,8 +58,8 @@ const TODAY_ACTIVITIES_QUERY = `
        AND s.squad_id IN (SELECT squad_id FROM scope WHERE platoon_id = a.platoon_id)
        AND s.status = 'active'
        AND s.cycle_id = (SELECT id FROM cycle)
-       AND ar.result = 'completed'
-    ) AS passed_count,
+       AND ar.result = 'completed' AND ar.failed = 0
+    ) AS completed_count,
     (SELECT COUNT(*)
      FROM activity_reports ar
      JOIN soldiers s ON s.id = ar.soldier_id
@@ -68,7 +68,16 @@ const TODAY_ACTIVITIES_QUERY = `
        AND s.status = 'active'
        AND s.cycle_id = (SELECT id FROM cycle)
        AND ar.result = 'skipped'
-    ) AS failed_count
+    ) AS skipped_count,
+    (SELECT COUNT(*)
+     FROM activity_reports ar
+     JOIN soldiers s ON s.id = ar.soldier_id
+     WHERE ar.activity_id = a.id
+       AND s.squad_id IN (SELECT squad_id FROM scope WHERE platoon_id = a.platoon_id)
+       AND s.status = 'active'
+       AND s.cycle_id = (SELECT id FROM cycle)
+       AND ar.failed = 1
+    ) AS score_failed_count
   FROM activities a
   JOIN activity_types at ON at.id = a.activity_type_id
   JOIN platoons p ON p.id = a.platoon_id
@@ -89,8 +98,9 @@ interface RawTodayActivity {
   platoon_id: string;
   total_soldiers: number;
   reported_count: number;
-  passed_count: number;
-  failed_count: number;
+  completed_count: number;
+  skipped_count: number;
+  score_failed_count: number;
 }
 
 interface TodayActivity {
@@ -101,12 +111,7 @@ interface TodayActivity {
   typeIcon: string;
   platoonName: string;
   platoonId: string;
-  totalSoldiers: number;
-  reportedCount: number;
-  passedCount: number;
-  failedCount: number;
-  naCount: number;
-  missingCount: number;
+  counts: ActivityCounts;
 }
 
 interface Props {
@@ -127,21 +132,24 @@ export function TodayActivities({ cycleId, squadId, showPlatoon = false }: Props
 
   const activities: TodayActivity[] = useMemo(
     () =>
-      (raw ?? []).map((r) => ({
-        id: r.id,
-        name: r.name,
-        isRequired: r.is_required === 1,
-        typeName: r.type_name,
-        typeIcon: r.type_icon,
-        platoonName: r.platoon_name,
-        platoonId: r.platoon_id,
-        totalSoldiers: Number(r.total_soldiers),
-        reportedCount: Number(r.reported_count),
-        passedCount: Number(r.passed_count),
-        failedCount: Number(r.failed_count),
-        naCount: Number(r.reported_count) - Number(r.passed_count) - Number(r.failed_count),
-        missingCount: Number(r.total_soldiers) - Number(r.reported_count),
-      })),
+      (raw ?? []).map((r) => {
+        const total = Number(r.total_soldiers);
+        const reported = Number(r.reported_count);
+        const completed = Number(r.completed_count);
+        const skipped = Number(r.skipped_count);
+        const failed = Number(r.score_failed_count);
+        const na = reported - completed - skipped - failed;
+        return {
+          id: r.id,
+          name: r.name,
+          isRequired: r.is_required === 1,
+          typeName: r.type_name,
+          typeIcon: r.type_icon,
+          platoonName: r.platoon_name,
+          platoonId: r.platoon_id,
+          counts: { completed, skipped, failed, na: Math.max(0, na), missing: Math.max(0, total - reported), total },
+        };
+      }),
     [raw]
   );
 
@@ -200,13 +208,6 @@ function TodayActivityCard({
   showPlatoon: boolean;
   onClick: () => void;
 }) {
-  const total = a.totalSoldiers || 1; // avoid division by zero
-  const passedPct = (a.passedCount / total) * 100;
-  const failedPct = (a.failedCount / total) * 100;
-  const naPct = (a.naCount / total) * 100;
-  const missingPct = (a.missingCount / total) * 100;
-  const isComplete = a.missingCount === 0 && a.failedCount === 0 && a.totalSoldiers > 0;
-
   return (
     <button
       type="button"
@@ -230,44 +231,7 @@ function TodayActivityCard({
       </div>
 
       {/* Stacked progress bar + fraction */}
-      <div className="flex items-center gap-3 w-full">
-        <div className="flex flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-          {passedPct > 0 && (
-            <div
-              className="h-full bg-green-500 dark:bg-green-400 transition-all duration-300"
-              style={{ width: `${passedPct}%` }}
-            />
-          )}
-          {failedPct > 0 && (
-            <div
-              className="h-full bg-red-500 dark:bg-red-400 transition-all duration-300"
-              style={{ width: `${failedPct}%` }}
-            />
-          )}
-          {naPct > 0 && (
-            <div
-              className="h-full bg-muted-foreground/30 transition-all duration-300"
-              style={{ width: `${naPct}%` }}
-            />
-          )}
-          {missingPct > 0 && (
-            <div
-              className="h-full bg-amber-400 dark:bg-amber-500 transition-all duration-300"
-              style={{ width: `${missingPct}%` }}
-            />
-          )}
-        </div>
-        <span
-          className={cn(
-            "text-xs font-bold tabular-nums shrink-0",
-            isComplete
-              ? "text-green-600 dark:text-green-400"
-              : "text-muted-foreground"
-          )}
-        >
-          {a.reportedCount}/{a.totalSoldiers}
-        </span>
-      </div>
+      <ActivityProgressBar counts={a.counts} />
     </button>
   );
 }

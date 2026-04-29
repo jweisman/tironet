@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ActivityTypeIcon } from "./ActivityTypeIcon";
+import { ActivityProgressBar, type ActivityCounts } from "./ActivityProgressBar";
 
 export interface ActivitySummary {
   id: string;
@@ -13,11 +14,7 @@ export interface ActivitySummary {
   isRequired: boolean;
   activityType: { name: string; icon: string };
   platoon: { id: string; name: string; companyName: string };
-  passedCount: number;
-  failedCount: number;
-  naCount: number;
-  missingCount: number;
-  totalSoldiers: number;
+  counts: ActivityCounts;
 }
 
 interface Props {
@@ -44,7 +41,8 @@ function formatDate(isoString: string): string {
 
 export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPress, dataTour, selectable, selected, onToggleSelect }: Props) {
   const isPast = activity.date.split("T")[0] < new Date().toISOString().split("T")[0];
-  const hasIssues = activity.isRequired && isPast && (activity.missingCount > 0 || activity.failedCount > 0);
+  const c = activity.counts;
+  const hasIssues = activity.isRequired && isPast && (c.missing > 0 || c.skipped > 0 || c.failed > 0);
 
   // Long-press detection for mobile
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,45 +131,22 @@ export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPre
       </div>
 
       {/* Sub-row */}
-      <div className="flex items-center gap-2 ps-12 flex-wrap">
+      <div className="flex flex-col gap-1.5 ps-12">
         {showPlatoon && (
           <span className="text-xs text-muted-foreground">
             {activity.platoon.companyName} / {activity.platoon.name}
           </span>
         )}
-
-        {/* Counts */}
-        <span
-          className={cn(
-            "text-xs font-medium",
-            activity.passedCount > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <ActivityProgressBar counts={c} />
+          </div>
+          {activity.isRequired && (
+            <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4 shrink-0">
+              חובה
+            </Badge>
           )}
-        >
-          ✓{activity.passedCount}
-        </span>
-        <span
-          className={cn(
-            "text-xs font-medium",
-            activity.failedCount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
-          )}
-        >
-          ✗{activity.failedCount}
-        </span>
-        <span
-          className={cn(
-            "text-xs font-medium",
-            activity.missingCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
-          )}
-        >
-          ⚠{activity.missingCount}
-        </span>
-
-        {/* Badges */}
-        {activity.isRequired && (
-          <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
-            חובה
-          </Badge>
-        )}
+        </div>
       </div>
     </button>
   );
