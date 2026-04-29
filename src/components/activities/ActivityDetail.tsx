@@ -306,7 +306,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
 
       // Recalculate failed when a grade changes
       if (GRADE_KEYS.includes(field as GradeKey)) {
-        const { failed } = calculateFailure(updated, activeScores, scoreConfig?.failureThreshold);
+        const { failed } = calculateFailure(updated as unknown as Record<string, number | null>, activeScores, scoreConfig?.failureThreshold);
         updated.failed = failed;
       }
 

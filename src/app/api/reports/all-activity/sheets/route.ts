@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
             select: {
               activityId: true,
               result: true,
+              failed: true,
               grade1: true,
               grade2: true,
               grade3: true,
