@@ -185,27 +185,36 @@ export async function isSignInAllowed(user: {
   id?: string;
   email?: string | null;
 }): Promise<boolean> {
-  console.log("[isSignInAllowed] checking user:", { id: user.id, email: user.email });
+  // Resolve the canonical DB user. During OAuth sign-in the callback may
+  // receive a profile-derived ID that doesn't match the DB, so we also
+  // look up by email as a fallback.
+  const email = user.email?.toLowerCase();
+  const dbUser = user.id
+    ? await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { id: true, phone: true, isAdmin: true },
+      })
+    : null;
+  const resolvedUser =
+    dbUser ??
+    (email
+      ? await prisma.user.findUnique({
+          where: { email },
+          select: { id: true, phone: true, isAdmin: true },
+        })
+      : null);
 
   // Allow users who already have a cycle assignment (returning users)
-  if (user.id) {
+  if (resolvedUser) {
     const hasAssignment = await prisma.userCycleAssignment.findFirst({
-      where: { userId: user.id },
+      where: { userId: resolvedUser.id },
       select: { id: true },
     });
     if (hasAssignment) return true;
   }
 
   // Allow users with a pending invitation matching their email or phone
-  const email = user.email?.toLowerCase();
-  const dbUser = user.id
-    ? await prisma.user.findUnique({
-        where: { id: user.id },
-        select: { phone: true },
-      })
-    : null;
-  const phone = dbUser?.phone;
-
+  const phone = resolvedUser?.phone;
   if (email || phone) {
     const invitation = await prisma.invitation.findFirst({
       where: {
@@ -222,16 +231,7 @@ export async function isSignInAllowed(user: {
   }
 
   // Allow admin users (they may not have cycle assignments)
-  if (user.id) {
-    const adminUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { isAdmin: true },
-    });
-    console.log("[isSignInAllowed] admin check:", { userId: user.id, isAdmin: adminUser?.isAdmin });
-    if (adminUser?.isAdmin) return true;
-  } else {
-    console.log("[isSignInAllowed] no user.id — skipping admin check");
-  }
+  if (resolvedUser?.isAdmin) return true;
 
   return false;
 }
@@ -455,11 +455,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
 
-    async signIn({ user, account }) {
-      console.log("[signIn] user:", { id: user?.id, email: user?.email, provider: account?.provider });
-      const allowed = user ? await isSignInAllowed(user) : false;
-      console.log("[signIn] allowed:", allowed);
-      if (allowed) return true;
+    async signIn({ user }) {
+      if (user && (await isSignInAllowed(user))) return true;
       return "/not-authorized";
     },
   },
