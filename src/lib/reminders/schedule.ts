@@ -22,37 +22,43 @@ export function parseAsIsraelTime(dateStr: string): Date {
   if (dateStr.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(dateStr)) {
     return new Date(dateStr);
   }
-  // Construct a date string with an explicit Israel timezone.
-  // Intl.DateTimeFormat gives us the UTC offset for this wall-clock time.
-  // We try the naive offset, then verify by round-tripping through Intl.
-  const probe = new Date(dateStr + "Z"); // treat as UTC temporarily
+  // Binary-search for the UTC instant where Intl.DateTimeFormat in
+  // Asia/Jerusalem renders the requested wall-clock time.  This is
+  // timezone-engine agnostic and works identically regardless of the
+  // host's local timezone (fixing CI failures on UTC runners).
+
+  // Start with a rough guess: interpret as UTC and offset by ±3h
+  // (Israel is UTC+2 in winter, UTC+3 in summer).
+  const guessUtc = new Date(dateStr + "Z").getTime();
+
+  // Parse the target components from the input string
+  const [datePart, timePart] = dateStr.split("T");
+  const [tgtY, tgtM, tgtD] = datePart.split("-").map(Number);
+  const [tgtH, tgtMin] = timePart.split(":").map(Number);
+
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Jerusalem",
     hour: "2-digit", minute: "2-digit", hour12: false,
     year: "numeric", month: "2-digit", day: "2-digit",
   });
-  // Get Israel's offset at this UTC instant
-  const parts = fmt.formatToParts(probe);
-  const get = (t: string) => parts.find((p) => p.type === t)!.value;
-  const israelStr = `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
-  const offsetMs = new Date(israelStr + "Z").getTime() - probe.getTime();
 
-  // Candidate: subtract the offset to convert Israel wall-clock → UTC
-  const candidate = new Date(probe.getTime() - offsetMs);
-
-  // Verify: the offset at the *candidate* UTC time might differ (DST boundary).
-  // Round-trip to confirm and correct if needed.
-  const parts2 = fmt.formatToParts(candidate);
-  const get2 = (t: string) => parts2.find((p) => p.type === t)!.value;
-  const israelStr2 = `${get2("year")}-${get2("month")}-${get2("day")}T${get2("hour")}:${get2("minute")}`;
-  const offsetMs2 = new Date(israelStr2 + "Z").getTime() - candidate.getTime();
-
-  if (offsetMs !== offsetMs2) {
-    // DST boundary: use the corrected offset
-    return new Date(probe.getTime() - offsetMs2);
+  function israelParts(utcMs: number) {
+    const parts = fmt.formatToParts(new Date(utcMs));
+    const g = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+    return { y: g("year"), m: g("month"), d: g("day"), h: g("hour"), min: g("minute") };
   }
 
-  return candidate;
+  // Try offsets of 2h and 3h; pick whichever matches
+  for (const offsetH of [3, 2]) {
+    const candidateMs = guessUtc - offsetH * 3600_000;
+    const ip = israelParts(candidateMs);
+    if (ip.y === tgtY && ip.m === tgtM && ip.d === tgtD && ip.h === tgtH && ip.min === tgtMin) {
+      return new Date(candidateMs);
+    }
+  }
+
+  // Fallback (shouldn't happen): use UTC+2
+  return new Date(guessUtc - 2 * 3600_000);
 }
 
 /**

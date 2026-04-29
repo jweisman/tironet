@@ -614,7 +614,7 @@ export default function SoldierDetailPage() {
                     <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
                   )}
                 </div>
-                <Badge variant="destructive" className="shrink-0 mt-0.5 text-xs">{getResultLabels(parseDisplayConfig(r.display_configuration)).failed.label}</Badge>
+                <Badge variant="destructive" className="shrink-0 mt-0.5 text-xs">{Number(r.failed) ? "נכשל" : getResultLabels(parseDisplayConfig(r.display_configuration)).skipped.label}</Badge>
               </Link>
             ))}
             {(missingRows ?? []).map((a) => (
