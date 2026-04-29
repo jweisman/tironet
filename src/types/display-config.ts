@@ -3,8 +3,8 @@ export interface ResultLabelConfig {
 }
 
 export interface ResultLabels {
-  passed: ResultLabelConfig;
-  failed: ResultLabelConfig;
+  completed: ResultLabelConfig;
+  skipped: ResultLabelConfig;
   na: ResultLabelConfig;
 }
 
@@ -19,8 +19,8 @@ export interface DisplayConfiguration {
 }
 
 export const DEFAULT_RESULT_LABELS: ResultLabels = {
-  passed: { label: "עבר" },
-  failed: { label: "נכשל" },
+  completed: { label: "השתתף" },
+  skipped: { label: "לא השתתף" },
   na: { label: "לא רלוונטי" },
 };
 
@@ -30,8 +30,8 @@ export const DEFAULT_RESULT_LABELS: ResultLabels = {
 export function getResultLabels(config: DisplayConfiguration | null | undefined): ResultLabels {
   if (!config?.results) return DEFAULT_RESULT_LABELS;
   return {
-    passed: config.results.passed ?? DEFAULT_RESULT_LABELS.passed,
-    failed: config.results.failed ?? DEFAULT_RESULT_LABELS.failed,
+    completed: config.results.completed ?? DEFAULT_RESULT_LABELS.completed,
+    skipped: config.results.skipped ?? DEFAULT_RESULT_LABELS.skipped,
     na: config.results.na ?? DEFAULT_RESULT_LABELS.na,
   };
 }

@@ -103,8 +103,8 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
     const scoreCount = activeScores.length;
 
     const activeReports = activity.reports.filter((r) => r.soldier.status === "active");
-    const passedCount = activeReports.filter((r) => r.result === "passed").length;
-    const failedCount = activeReports.filter((r) => r.result === "failed").length;
+    const passedCount = activeReports.filter((r) => r.result === "completed").length;
+    const failedCount = activeReports.filter((r) => r.result === "skipped").length;
     const naCount = activeReports.filter((r) => r.result === "na").length;
 
     // grades[scoreIndex][] per squad key
@@ -172,7 +172,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
     }
 
     const failedSoldiers: ActivitySummarySoldier[] = activeReports
-      .filter((r) => r.result === "failed" || r.result === "na")
+      .filter((r) => r.result === "skipped" || r.result === "na" || r.failed)
       .map((r) => ({
         name: `${r.soldier.familyName} ${r.soldier.givenName}`,
         squad: r.soldier.squad.name,
@@ -236,8 +236,8 @@ export function renderActivitySummaryHtml(
           ${pieSvg}
           <div>
             <div class="legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ${getResultLabels(activity.displayConfiguration).passed.label} (${activity.passedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).failed.label} (${activity.failedCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ${getResultLabels(activity.displayConfiguration).completed.label} (${activity.passedCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).skipped.label} (${activity.failedCount})</span>
               <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>
             </div>
             <p class="total-line">סה״כ ${hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}</p>
@@ -250,12 +250,12 @@ export function renderActivitySummaryHtml(
         </table>
         ` : '<p class="no-data">אין נתונים</p>'}
         ${activity.failedSoldiers.length > 0 ? `
-        <h3 style="font-size:12px;font-weight:700;margin:12px 0 6px 0;">${resultLabels.failed.label} / ${resultLabels.na.label}</h3>
+        <h3 style="font-size:12px;font-weight:700;margin:12px 0 6px 0;">${resultLabels.skipped.label} / ${resultLabels.na.label}</h3>
         <table>
           <thead><tr><th>חייל</th><th>כיתה</th><th>תוצאה</th><th>הערה</th></tr></thead>
           <tbody>${activity.failedSoldiers.map((s) => {
-            const rl = s.result === "failed" ? resultLabels.failed.label : resultLabels.na.label;
-            return `<tr><td>${s.name}</td><td>${s.squad}</td><td${s.result === "failed" ? ' style="color:#ef4444"' : ""}>${rl}</td><td>${s.note ?? "—"}</td></tr>`;
+            const rl = s.result === "skipped" ? resultLabels.skipped.label : s.result === "na" ? resultLabels.na.label : "נכשל";
+            return `<tr><td>${s.name}</td><td>${s.squad}</td><td${s.result !== "na" ? ' style="color:#ef4444"' : ""}>${rl}</td><td>${s.note ?? "—"}</td></tr>`;
           }).join("\n")}</tbody>
         </table>
         ` : ""}

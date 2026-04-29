@@ -6,6 +6,7 @@ import { parseGradeInput, formatGradeDisplay } from "@/lib/score-format";
 import type { ActivityResult } from "@/types";
 import type { GradeKey } from "./ActivityDetail";
 import type { ActiveScore } from "@/types/score-config";
+import { evaluateScore } from "@/types/score-config";
 import type { ResultLabels } from "@/types/display-config";
 
 interface ReportRowProps {
@@ -19,6 +20,7 @@ interface ReportRowProps {
   report: {
     id: string | null;
     result: ActivityResult | null;
+    failed: boolean;
     grade1: number | null;
     grade2: number | null;
     grade3: number | null;
@@ -57,6 +59,17 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash];
 }
 
+/** Return inline border style for a grade input based on threshold evaluation. */
+function getThresholdStyle(
+  value: number | null,
+  score: ActiveScore,
+): React.CSSProperties | undefined {
+  const result = evaluateScore(value, score.threshold, score.thresholdOperator);
+  if (!result) return undefined;
+  if (result === "passed") return { borderColor: "var(--color-green-500)", boxShadow: "0 0 0 1px var(--color-green-500)" };
+  return { borderColor: "var(--color-amber-500)", boxShadow: "0 0 0 1px var(--color-amber-500)" };
+}
+
 export const ReportRow = memo(function ReportRow({ soldier, report, activeScores, resultLabels, noteOptions, disabled = false, onChange }: ReportRowProps) {
   const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -68,13 +81,30 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
     onChange(soldier.id, "result", newResult);
   }
 
-  function handleGradeChange(gradeKey: GradeKey, format: "number" | "time", e: React.ChangeEvent<HTMLInputElement>) {
+  function handleGradeChange(gradeKey: GradeKey, format: "number" | "time", score: ActiveScore, e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
     const el = e.target;
     const trimmed = raw.trim();
-    const isInvalid = trimmed !== "" && parseGradeInput(raw, format) === null;
-    el.style.borderColor = isInvalid ? "var(--color-destructive)" : "";
-    el.style.boxShadow = isInvalid ? "0 0 0 1px var(--color-destructive)" : "";
+    const parsed = trimmed !== "" ? parseGradeInput(raw, format) : undefined;
+    const isInvalid = trimmed !== "" && parsed === null;
+
+    if (isInvalid) {
+      el.style.borderColor = "var(--color-destructive)";
+      el.style.boxShadow = "0 0 0 1px var(--color-destructive)";
+    } else {
+      // Apply threshold coloring for valid values
+      const thresholdResult = evaluateScore(parsed ?? null, score.threshold, score.thresholdOperator);
+      if (thresholdResult === "passed") {
+        el.style.borderColor = "var(--color-green-500)";
+        el.style.boxShadow = "0 0 0 1px var(--color-green-500)";
+      } else if (thresholdResult === "failed") {
+        el.style.borderColor = "var(--color-amber-500)";
+        el.style.boxShadow = "0 0 0 1px var(--color-amber-500)";
+      } else {
+        el.style.borderColor = "";
+        el.style.boxShadow = "";
+      }
+    }
 
     const existing = debounceRefs.current.get(gradeKey);
     if (existing) clearTimeout(existing);
@@ -117,10 +147,15 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
           )}
         </div>
 
-        {/* Name + rank */}
+        {/* Name + rank + failed indicator */}
         <div className="flex flex-col min-w-0 flex-1">
           <span className="text-sm font-medium truncate">
             {soldier.familyName} {soldier.givenName}
+            {report.failed && (
+              <span className="ms-1 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                נכשל
+              </span>
+            )}
           </span>
           {soldier.rank && (
             <span className="text-xs text-muted-foreground">{soldier.rank}</span>
@@ -131,27 +166,27 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
         <div className="flex gap-1 shrink-0">
           <button
             type="button"
-            onClick={() => handleResultClick("passed")}
+            onClick={() => handleResultClick("completed")}
             className={cn(
               "rounded-md px-2 py-1 text-xs font-semibold transition-colors border",
-              report.result === "passed"
+              report.result === "completed"
                 ? "bg-green-600 text-white border-green-600"
                 : "bg-transparent text-muted-foreground border-border hover:bg-green-50 hover:text-green-700 hover:border-green-200"
             )}
           >
-            {resultLabels.passed.label}
+            {resultLabels.completed.label}
           </button>
           <button
             type="button"
-            onClick={() => handleResultClick("failed")}
+            onClick={() => handleResultClick("skipped")}
             className={cn(
               "rounded-md px-2 py-1 text-xs font-semibold transition-colors border",
-              report.result === "failed"
-                ? "bg-red-600 text-white border-red-600"
-                : "bg-transparent text-muted-foreground border-border hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+              report.result === "skipped"
+                ? "bg-amber-600 text-white border-amber-600"
+                : "bg-transparent text-muted-foreground border-border hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200"
             )}
           >
-            {resultLabels.failed.label}
+            {resultLabels.skipped.label}
           </button>
           <button
             type="button"
@@ -177,15 +212,16 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
               type="text"
               inputMode={score.format === "time" ? "text" : "numeric"}
               defaultValue={formatGradeDisplay(report[score.gradeKey], score.format)}
-              onChange={(e) => handleGradeChange(score.gradeKey, score.format, e)}
+              onChange={(e) => handleGradeChange(score.gradeKey, score.format, score, e)}
               placeholder={score.label}
               aria-label={score.label}
               className="w-28 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              style={getThresholdStyle(report[score.gradeKey], score)}
               dir="ltr"
             />
           ))}
           {(() => {
-            const needsNote = report.result === "failed" && !report.note;
+            const needsNote = (report.result === "skipped" || report.failed) && !report.note;
             const noteHighlight = needsNote ? "border-red-400 ring-1 ring-red-300 placeholder:text-red-400" : "";
             return noteOptions && noteOptions.length > 0 ? (
               <select

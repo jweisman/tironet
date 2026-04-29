@@ -267,8 +267,8 @@ describe("fetchDailyForum", () => {
             isRequired: true,
             activityType: { name: "Qualification", scoreConfig: null },
             reports: [
-              { soldierId: "s1", result: "passed", soldier: { status: "active", squad: { name: "Squad 1", platoon: { id: "p1", name: "Platoon 1", company: { name: "Company A" } } } } },
-              { soldierId: "s2", result: "failed", soldier: { status: "active", squad: { name: "Squad 1", platoon: { id: "p1", name: "Platoon 1", company: { name: "Company A" } } } } },
+              { soldierId: "s1", result: "completed", soldier: { status: "active", squad: { name: "Squad 1", platoon: { id: "p1", name: "Platoon 1", company: { name: "Company A" } } } } },
+              { soldierId: "s2", result: "skipped", soldier: { status: "active", squad: { name: "Squad 1", platoon: { id: "p1", name: "Platoon 1", company: { name: "Company A" } } } } },
             ],
           },
         ];
@@ -285,9 +285,23 @@ describe("fetchDailyForum", () => {
     expect(todayActs[0].totalSoldiers).toBe(2);
   });
 
-  it("identifies gaps correctly (missing and failed)", async () => {
+  it("identifies gaps correctly (missing, skipped, and failed)", async () => {
     mockCycleFindUnique.mockResolvedValue({ id: "cycle-1", name: "Test Cycle" } as never);
-    mockPlatoonFindMany.mockResolvedValue([basePlatoon] as never);
+    mockPlatoonFindMany.mockResolvedValue([{
+      ...basePlatoon,
+      squads: [
+        {
+          id: "sq1",
+          name: "Squad 1",
+          sortOrder: 1,
+          soldiers: [
+            { id: "s1", givenName: "Avi", familyName: "Cohen" },
+            { id: "s2", givenName: "Dan", familyName: "Levy" },
+            { id: "s3", givenName: "Yael", familyName: "Ben" },
+          ],
+        },
+      ],
+    }] as never);
     mockRequestFindMany.mockResolvedValue([]);
 
     let callCount = 0;
@@ -305,8 +319,9 @@ describe("fetchDailyForum", () => {
             isRequired: true,
             activityType: { name: "Drill" },
             reports: [
-              // s1 has a failed report, s2 has no report (missing)
-              { soldierId: "s1", result: "failed" },
+              // s1 has a skipped report, s2 has no report (missing), s3 completed but failed
+              { soldierId: "s1", result: "skipped", failed: false },
+              { soldierId: "s3", result: "completed", failed: true },
             ],
           },
         ];
@@ -318,12 +333,15 @@ describe("fetchDailyForum", () => {
     const gaps = result!.platoons[0].gaps;
     expect(gaps).toHaveLength(1);
     expect(gaps[0].name).toBe("Past Activity");
-    expect(gaps[0].soldiers).toHaveLength(2);
+    expect(gaps[0].soldiers).toHaveLength(3);
 
+    const skipped = gaps[0].soldiers.find((s) => s.result === "skipped");
     const failed = gaps[0].soldiers.find((s) => s.result === "failed");
     const missing = gaps[0].soldiers.find((s) => s.result === "missing");
+    expect(skipped).toBeDefined();
+    expect(skipped!.name).toBe("Cohen Avi");
     expect(failed).toBeDefined();
-    expect(failed!.name).toBe("Cohen Avi");
+    expect(failed!.name).toBe("Ben Yael");
     expect(missing).toBeDefined();
     expect(missing!.name).toBe("Levy Dan");
   });
@@ -347,8 +365,8 @@ describe("fetchDailyForum", () => {
             isRequired: true,
             activityType: { name: "Drill" },
             reports: [
-              { soldierId: "s1", result: "passed" },
-              { soldierId: "s2", result: "passed" },
+              { soldierId: "s1", result: "completed", failed: false },
+              { soldierId: "s2", result: "completed", failed: false },
             ],
           },
         ];
@@ -436,7 +454,7 @@ describe("renderDailyForumHtml", () => {
           ...emptyData.platoons[0],
           platoonId: "p2",
           platoonName: "Platoon 2",
-          gaps: [{ id: "g2", name: "Activity 2", activityTypeName: "Type", date: "2026-04-20", soldiers: [{ name: "Soldier 2", result: "failed" as const }] }],
+          gaps: [{ id: "g2", name: "Activity 2", activityTypeName: "Type", date: "2026-04-20", soldiers: [{ name: "Soldier 2", result: "skipped" as const }] }],
         },
       ],
     };
@@ -462,8 +480,9 @@ describe("renderDailyForumHtml", () => {
               activityTypeName: "Qualification",
               date: "2026-04-05",
               soldiers: [
-                { name: "Cohen Avi", result: "failed" as const },
+                { name: "Cohen Avi", result: "skipped" as const },
                 { name: "Levy Dan", result: "missing" as const },
+                { name: "Ben Yael", result: "failed" as const },
               ],
             },
           ],
@@ -473,8 +492,10 @@ describe("renderDailyForumHtml", () => {
     const html = renderDailyForumHtml(dataWithGaps);
     expect(html).toContain("Cohen Avi");
     expect(html).toContain("Levy Dan");
-    expect(html).toContain("נכשל");
-    expect(html).toContain("חסר");
+    expect(html).toContain("Ben Yael");
+    expect(html).toContain("לא השתתף"); // skipped label
+    expect(html).toContain("נכשל"); // failed label
+    expect(html).toContain("חסר"); // missing label
   });
 
   it("renders pie chart SVG for today activities", () => {
@@ -503,8 +524,8 @@ describe("renderDailyForumHtml", () => {
     };
     const html = renderDailyForumHtml(dataWithActivities);
     expect(html).toContain("<svg");
-    expect(html).toContain("עבר (5)");
-    expect(html).toContain("נכשל (2)");
+    expect(html).toContain("השתתף (5)");
+    expect(html).toContain("לא השתתף (2)");
   });
 
   it("shows empty state messages", () => {

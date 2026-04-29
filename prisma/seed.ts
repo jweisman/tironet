@@ -9,7 +9,7 @@ const prisma = new PrismaClient({ adapter });
 
 const ACTIVITY_TYPES = [
   { name: "אימונים", icon: "dumbbell",     displayConfiguration: {
-      results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
+      results: { completed: { label: "ביצע" }, skipped: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
     },
   },
   {
@@ -27,7 +27,7 @@ const ACTIVITY_TYPES = [
     }
   },
   { name: "שיעורים", icon: "book-open",    displayConfiguration: {
-      results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
+      results: { completed: { label: "נוכח" }, skipped: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
     },
   },
   { name: "בוחנים", icon: "clipboard-check",    scoreConfig: {
@@ -39,22 +39,23 @@ const ACTIVITY_TYPES = [
     }
   },
   { name: "שיחות מפקד", icon: "message-circle",    displayConfiguration: {
-      results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
+      results: { completed: { label: "נוכח" }, skipped: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
     },
   },
   { name: "בחמ״ס", icon: "timer",    scoreConfig: {
-      score1: { label: "זמן", format: "time" }
+      score1: { label: "זמן", format: "time", threshold: 50, thresholdOperator: ">" },
+      failureThreshold: 1,
     },
     displayConfiguration: {
       note: { type: "list", options: ["קיר", "חבל", "זמן", "אחר"] },
     },
   },
   { name: "מסע", icon: "route",    displayConfiguration: {
-      results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
+      results: { completed: { label: "ביצע" }, skipped: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
     },
-  },    
+  },
   { name: "קרב מגע", icon: "hand",    displayConfiguration: {
-      results: { passed: { label: "ביצע" }, failed: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
+      results: { completed: { label: "ביצע" }, skipped: { label: "לא ביצע" }, na: { label: "לא רלוונטי" } },
     },
   },    
 ];

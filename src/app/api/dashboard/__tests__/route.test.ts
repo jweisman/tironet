@@ -104,10 +104,10 @@ describe("GET /api/dashboard", () => {
     ] as never);
 
     mockReportFindMany.mockResolvedValue([
-      { soldierId: "sol-1", activityId: "act-1", result: "passed" },
-      { soldierId: "sol-2", activityId: "act-1", result: "passed" },
+      { soldierId: "sol-1", activityId: "act-1", result: "completed", failed: false },
+      { soldierId: "sol-2", activityId: "act-1", result: "completed", failed: false },
       // act-2: sol-1 has report, sol-2 does not → gap
-      { soldierId: "sol-1", activityId: "act-2", result: "failed" },
+      { soldierId: "sol-1", activityId: "act-2", result: "skipped", failed: false },
     ] as never);
 
     mockAssignmentFindMany.mockResolvedValue([

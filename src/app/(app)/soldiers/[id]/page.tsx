@@ -103,7 +103,7 @@ const SOLDIER_QUERY = `
 
 const REPORTS_QUERY = `
   SELECT
-    ar.id, ar.result, ar.grade1, ar.grade2, ar.grade3, ar.grade4, ar.grade5, ar.grade6, ar.note,
+    ar.id, ar.result, ar.failed, ar.grade1, ar.grade2, ar.grade3, ar.grade4, ar.grade5, ar.grade6, ar.note,
     a.id   AS activity_id,
     a.name AS activity_name,
     a.date AS activity_date,
@@ -183,7 +183,7 @@ interface RawSoldier {
   squad_name: string; platoon_id: string; platoon_name: string;
 }
 interface RawReport {
-  id: string; result: string;
+  id: string; result: string; failed: number;
   grade1: number | null; grade2: number | null; grade3: number | null;
   grade4: number | null; grade5: number | null; grade6: number | null;
   note: string | null;
@@ -316,7 +316,7 @@ export default function SoldierDetailPage() {
 
   const todayStr = new Date().toISOString().split("T")[0];
   const failedReports = (reportRows ?? []).filter(
-    (r) => r.activity_status === "active" && Number(r.is_required) === 1 && r.result === "failed" && r.activity_date.split("T")[0] < todayStr
+    (r) => r.activity_status === "active" && Number(r.is_required) === 1 && (r.result === "skipped" || Number(r.failed) === 1) && r.activity_date.split("T")[0] < todayStr
   );
   const gapCount = failedReports.length + (missingRows ?? []).length;
 
@@ -656,7 +656,7 @@ export default function SoldierDetailPage() {
                 .map((s) => ({ label: s.label, format: s.format, grade: grades[parseInt(s.key.replace("score", "")) - 1] }))
                 .filter((a) => a.grade != null);
               const rl = getResultLabels(parseDisplayConfig(r.display_configuration));
-              const resultLabel = r.result === "passed" ? rl.passed.label : r.result === "failed" ? rl.failed.label : r.result === "na" ? rl.na.label : null;
+              const resultLabel = r.result === "completed" ? rl.completed.label : r.result === "skipped" ? rl.skipped.label : r.result === "na" ? rl.na.label : null;
               return (
                 <Link
                   key={r.id}
@@ -679,8 +679,8 @@ export default function SoldierDetailPage() {
                   </div>
                   {resultLabel && (
                     <Badge
-                      variant={r.result === "passed" ? "default" : r.result === "na" ? "secondary" : "destructive"}
-                      className={`shrink-0 mt-0.5 text-xs ${r.result === "passed" ? "bg-emerald-600" : ""}`}
+                      variant={r.result === "completed" && !Number(r.failed) ? "default" : r.result === "na" ? "secondary" : "destructive"}
+                      className={`shrink-0 mt-0.5 text-xs ${r.result === "completed" && !Number(r.failed) ? "bg-emerald-600" : ""}`}
                     >
                       {resultLabel}
                     </Badge>

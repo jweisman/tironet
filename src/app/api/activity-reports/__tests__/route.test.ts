@@ -82,7 +82,7 @@ describe("POST /api/activity-reports", () => {
   const validBody = {
     activityId: UUID_ACTIVITY,
     soldierId: UUID_SOLDIER,
-    result: "passed" as const,
+    result: "completed" as const,
   };
 
   it("returns 400 on invalid body", async () => {
@@ -187,7 +187,8 @@ describe("POST /api/activity-reports", () => {
       id: "report-1",
       activityId: validBody.activityId,
       soldierId: validBody.soldierId,
-      result: "passed",
+      result: "completed",
+      failed: false,
       grade1: null, grade2: null, grade3: null,
       grade4: null, grade5: null, grade6: null,
       note: null,
@@ -200,7 +201,7 @@ describe("POST /api/activity-reports", () => {
 
     const json = await res.json();
     expect(json.report.id).toBe("report-1");
-    expect(json.report.result).toBe("passed");
+    expect(json.report.result).toBe("completed");
   });
 
   it("passes client UUID to upsert create body", async () => {
@@ -225,7 +226,8 @@ describe("POST /api/activity-reports", () => {
       id: UUID_CLIENT,
       activityId: validBody.activityId,
       soldierId: validBody.soldierId,
-      result: "passed",
+      result: "completed",
+      failed: false,
       grade1: null, grade2: null, grade3: null,
       grade4: null, grade5: null, grade6: null,
       note: null,
@@ -268,7 +270,8 @@ describe("POST /api/activity-reports", () => {
       id: "report-2",
       activityId: validBody.activityId,
       soldierId: validBody.soldierId,
-      result: "failed",
+      result: "skipped",
+      failed: false,
       grade1: 65, grade2: null, grade3: null,
       grade4: null, grade5: null, grade6: null,
       note: "Needs improvement",
@@ -276,7 +279,7 @@ describe("POST /api/activity-reports", () => {
 
     const req = createMockRequest("POST", "/api/activity-reports", {
       ...validBody,
-      result: "failed",
+      result: "skipped",
       grade1: 65,
       note: "Needs improvement",
     });
@@ -298,7 +301,7 @@ describe("PATCH /api/activity-reports/[id]", () => {
     mockPrisma.activityReport.findUnique.mockResolvedValue(null as never);
 
     const req = createMockRequest("PATCH", "/api/activity-reports/r-999", {
-      result: "passed",
+      result: "completed",
     });
     const res = await PATCH(req, makeParams("r-999"));
     expect(res.status).toBe(404);
@@ -319,7 +322,7 @@ describe("PATCH /api/activity-reports/[id]", () => {
     });
 
     const req = createMockRequest("PATCH", "/api/activity-reports/r-1", {
-      result: "failed",
+      result: "skipped",
     });
     const res = await PATCH(req, makeParams("r-1"));
     expect(res.status).toBe(403);
@@ -362,14 +365,15 @@ describe("PATCH /api/activity-reports/[id]", () => {
 
     mockPrisma.activityReport.update.mockResolvedValue({
       id: "r-1",
-      result: "failed",
+      result: "skipped",
+      failed: false,
       grade1: 70, grade2: null, grade3: null,
       grade4: null, grade5: null, grade6: null,
       note: "Updated note",
     } as never);
 
     const req = createMockRequest("PATCH", "/api/activity-reports/r-1", {
-      result: "failed",
+      result: "skipped",
       grade1: 70,
       note: "Updated note",
     });
@@ -377,7 +381,7 @@ describe("PATCH /api/activity-reports/[id]", () => {
     expect(res.status).toBe(200);
 
     const json = await res.json();
-    expect(json.report.result).toBe("failed");
+    expect(json.report.result).toBe("skipped");
     expect(json.report.grade1).toBe(70);
     expect(json.report.note).toBe("Updated note");
   });

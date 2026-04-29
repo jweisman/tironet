@@ -101,6 +101,7 @@ export class TironetConnector implements PowerSyncBackendConnector {
               activityId: d.activity_id,
               soldierId: d.soldier_id,
               result: d.result,
+              failed: Boolean(d.failed),
               grade1: d.grade1,
               grade2: d.grade2,
               grade3: d.grade3,
@@ -127,10 +128,13 @@ export class TironetConnector implements PowerSyncBackendConnector {
                 soldierId = row.soldier_id as string;
               }
             }
-            await apiRequest(`/api/activity-reports/${id}`, "PATCH", {
+            const patchData: Record<string, unknown> = {
               ...opData,
               ...(activityId && soldierId ? { activityId, soldierId } : {}),
-            });
+            };
+            // PowerSync stores booleans as integers (0/1); convert for the API
+            if ("failed" in patchData) patchData.failed = Boolean(patchData.failed);
+            await apiRequest(`/api/activity-reports/${id}`, "PATCH", patchData);
           } else if (opType === UpdateType.DELETE) {
             await apiRequest(`/api/activity-reports/${id}`, "DELETE");
           }

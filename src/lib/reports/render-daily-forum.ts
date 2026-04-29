@@ -80,7 +80,7 @@ export interface TomorrowActivityItem {
 
 export interface GapSoldier {
   name: string;
-  result: "failed" | "missing";
+  result: "skipped" | "failed" | "missing";
 }
 
 export interface GapActivityItem {
@@ -393,8 +393,8 @@ export async function fetchDailyForum(
     const scoreCount = activeScores.length;
 
     const activeReports = activity.reports.filter((r) => r.soldier.status === "active");
-    const passedCount = activeReports.filter((r) => r.result === "passed").length;
-    const failedCount = activeReports.filter((r) => r.result === "failed").length;
+    const passedCount = activeReports.filter((r) => r.result === "completed").length;
+    const failedCount = activeReports.filter((r) => r.result === "skipped").length;
     const naCount = activeReports.filter((r) => r.result === "na").length;
 
     // Squad-level score averages
@@ -517,7 +517,7 @@ export async function fetchDailyForum(
     include: {
       activityType: { select: { name: true, displayConfiguration: true } },
       reports: {
-        select: { soldierId: true, result: true },
+        select: { soldierId: true, result: true, failed: true },
       },
     },
     orderBy: { date: "desc" },
@@ -529,17 +529,19 @@ export async function fetchDailyForum(
     const soldierMap = platoonSoldierMap.get(platoonId);
     if (!soldierMap) continue;
 
-    const reportMap = new Map<string, string>();
+    const reportMap = new Map<string, { result: string; failed: boolean }>();
     for (const report of activity.reports) {
-      reportMap.set(report.soldierId, report.result);
+      reportMap.set(report.soldierId, { result: report.result, failed: report.failed });
     }
 
     const gapSoldiers: GapSoldier[] = [];
     for (const [soldierId, info] of soldierMap) {
-      const result = reportMap.get(soldierId);
-      if (!result) {
+      const report = reportMap.get(soldierId);
+      if (!report) {
         gapSoldiers.push({ name: info.name, result: "missing" });
-      } else if (result === "failed") {
+      } else if (report.result === "skipped") {
+        gapSoldiers.push({ name: info.name, result: "skipped" });
+      } else if (report.failed) {
         gapSoldiers.push({ name: info.name, result: "failed" });
       }
     }
@@ -676,8 +678,8 @@ function renderTodayActivitiesHtml(activities: TodayActivityItem[]): string {
           ${pieSvg}
           <div>
             <div class="legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ${getResultLabels(activity.displayConfiguration).passed.label} (${activity.passedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).failed.label} (${activity.failedCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ${getResultLabels(activity.displayConfiguration).completed.label} (${activity.passedCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).skipped.label} (${activity.failedCount})</span>
               <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>
             </div>
             <p class="total-line">סה״כ ${hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}</p>
@@ -717,11 +719,16 @@ function renderGapsHtml(gaps: GapActivityItem[]): string {
 
   return gaps.map((gap) => {
     const dateStr = new Date(gap.date).toLocaleDateString("he-IL");
-    const failedLabel = getResultLabels(gap.displayConfiguration).failed.label;
+    const resultLabels = getResultLabels(gap.displayConfiguration);
     const soldierRows = gap.soldiers.map((s) => {
-      const badge = s.result === "failed"
-        ? `<span class="badge badge-failed">${failedLabel}</span>`
-        : '<span class="badge badge-missing">חסר</span>';
+      let badge: string;
+      if (s.result === "skipped") {
+        badge = `<span class="badge badge-failed">${resultLabels.skipped.label}</span>`;
+      } else if (s.result === "failed") {
+        badge = '<span class="badge badge-failed">נכשל</span>';
+      } else {
+        badge = '<span class="badge badge-missing">חסר</span>';
+      }
       return `<tr><td>${escapeHtml(s.name)}</td><td>${badge}</td></tr>`;
     }).join("\n");
 

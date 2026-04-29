@@ -82,7 +82,7 @@ streams:
   activity_reports:
     auto_subscribe: true
     query: >
-      SELECT id, activity_id, soldier_id, result,
+      SELECT id, activity_id, soldier_id, result, failed,
              grade1, grade2, grade3, grade4, grade5, grade6, note
       FROM activity_reports
       WHERE activity_id IN (

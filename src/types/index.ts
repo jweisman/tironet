@@ -18,7 +18,7 @@ export type SoldierStatus = "active" | "transferred" | "dropped" | "injured";
 
 export type ActivityStatus = "draft" | "active";
 
-export type ActivityResult = "passed" | "failed" | "na";
+export type ActivityResult = "completed" | "skipped" | "na";
 
 export type RequestType = "leave" | "medical" | "hardship";
 
@@ -59,5 +59,5 @@ export interface Gap {
   soldierName: string;
   activityId: string;
   activityName: string;
-  result: "failed" | null; // null = missing
+  result: "skipped" | "failed" | null; // null = missing, "skipped" = didn't participate, "failed" = score-based failure
 }

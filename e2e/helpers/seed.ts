@@ -143,7 +143,7 @@ async function seed() {
       {
         id: IDS.activityTypeLessons, name: "Lessons", icon: "BookOpen",
         displayConfiguration: {
-          results: { passed: { label: "נוכח" }, failed: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
+          results: { completed: { label: "נוכח" }, skipped: { label: "לא נוכח" }, na: { label: "לא רלוונטי" } },
         },
       },
     ],
@@ -173,9 +173,9 @@ async function seed() {
 
   await prisma.activityReport.createMany({
     data: [
-      { activityId: IDS.activity1, soldierId: IDS.soldier1, result: "passed", updatedByUserId: IDS.platoonCmdUser },
-      { activityId: IDS.activity1, soldierId: IDS.soldier2, result: "failed", updatedByUserId: IDS.platoonCmdUser },
-      { activityId: IDS.activity2, soldierId: IDS.soldier1, result: "passed", updatedByUserId: IDS.platoonCmdUser },
+      { activityId: IDS.activity1, soldierId: IDS.soldier1, result: "completed", failed: false, updatedByUserId: IDS.platoonCmdUser },
+      { activityId: IDS.activity1, soldierId: IDS.soldier2, result: "skipped", failed: false, updatedByUserId: IDS.platoonCmdUser },
+      { activityId: IDS.activity2, soldierId: IDS.soldier1, result: "completed", failed: false, updatedByUserId: IDS.platoonCmdUser },
     ],
   });
 

@@ -93,15 +93,15 @@ export async function GET(request: NextRequest) {
             soldierId: { in: allSoldierIds },
             activityId: { in: activityIds },
           },
-          select: { soldierId: true, activityId: true, result: true },
+          select: { soldierId: true, activityId: true, result: true, failed: true },
         })
       : [];
 
-  // Build report lookup: activityId → Map<soldierId, result>
-  const reportMap = new Map<string, Map<string, string>>();
+  // Build report lookup: activityId → Map<soldierId, { result, failed }>
+  const reportMap = new Map<string, Map<string, { result: string; failed: boolean }>>();
   for (const r of reports) {
     if (!reportMap.has(r.activityId)) reportMap.set(r.activityId, new Map());
-    reportMap.get(r.activityId)!.set(r.soldierId, r.result);
+    reportMap.get(r.activityId)!.set(r.soldierId, { result: r.result, failed: r.failed });
   }
 
   // Fetch squad commanders from DB assignments
@@ -172,22 +172,22 @@ export async function GET(request: NextRequest) {
       const activityGaps: { id: string; name: string; gapCount: number }[] = [];
 
       for (const activity of platoonActivities) {
-        const actReports = reportMap.get(activity.id) ?? new Map<string, string>();
+        const actReports = reportMap.get(activity.id) ?? new Map<string, { result: string; failed: boolean }>();
         let actMissing = 0;
-        let actGap = 0; // missing + failed
+        let actGap = 0; // missing + skipped + failed
 
         for (const soldierId of soldierIds) {
-          const result = actReports.get(soldierId);
-          if (!result) {
+          const report = actReports.get(soldierId);
+          if (!report) {
             // No report = missing
             actMissing++;
             actGap++;
             soldiersWithGapSet.add(soldierId);
-          } else if (result === "failed") {
+          } else if (report.result === "skipped" || report.failed) {
             actGap++;
             soldiersWithGapSet.add(soldierId);
           }
-          // "passed" and "na" are not gaps
+          // "completed" (not failed) and "na" are not gaps
         }
 
         // Activity is "reported" if every soldier has some report (no missing)

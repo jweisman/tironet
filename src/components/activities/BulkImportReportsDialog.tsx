@@ -3,7 +3,8 @@
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { parseGradeInput, formatGradeDisplay } from "@/lib/score-format";
-import type { ActiveScore } from "@/types/score-config";
+import type { ActiveScore, ScoreConfig } from "@/types/score-config";
+import { calculateFailure } from "@/types/score-config";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -44,6 +45,7 @@ interface Props {
   activityId: string;
   activityTypeId: string;
   activeScores: ActiveScore[];
+  scoreConfig: ScoreConfig | null;
   soldiers: SoldierInfo[];
   existingReports: Map<string, SoldierReport>;
   resultLabels: ResultLabels;
@@ -77,22 +79,28 @@ const UNMAPPED = -1;
 
 const RESULT_MAP: Record<string, ActivityResult> = {
   // Hebrew
-  "עבר": "passed",
-  "עברה": "passed",
-  "נכשל": "failed",
-  "נכשלה": "failed",
+  "עבר": "completed",
+  "עברה": "completed",
+  "השתתף": "completed",
+  "השתתפה": "completed",
+  "נכשל": "skipped",
+  "נכשלה": "skipped",
+  "לא השתתף": "skipped",
+  "לא השתתפה": "skipped",
   "לא רלוונטי": "na",
   'לא רלו': "na",
   // English
-  "passed": "passed",
-  "pass": "passed",
-  "failed": "failed",
-  "fail": "failed",
+  "passed": "completed",
+  "pass": "completed",
+  "completed": "completed",
+  "failed": "skipped",
+  "fail": "skipped",
+  "skipped": "skipped",
   "na": "na",
   "n/a": "na",
   // Numeric
-  "1": "passed",
-  "0": "failed",
+  "1": "completed",
+  "0": "skipped",
 };
 
 // Known Hebrew field names for auto-detection
@@ -287,6 +295,7 @@ export function BulkImportReportsDialog({
   activityId,
   activityTypeId,
   activeScores,
+  scoreConfig,
   soldiers,
   existingReports,
   resultLabels,
@@ -311,8 +320,8 @@ export function BulkImportReportsDialog({
   const resultMap = useMemo(() => {
     const map = { ...RESULT_MAP };
     // Add custom labels as valid import values (case-insensitive handled during lookup)
-    map[resultLabels.passed.label] = "passed";
-    map[resultLabels.failed.label] = "failed";
+    map[resultLabels.completed.label] = "completed";
+    map[resultLabels.skipped.label] = "skipped";
     map[resultLabels.na.label] = "na";
     return map;
   }, [resultLabels]);
@@ -433,15 +442,22 @@ export function BulkImportReportsDialog({
         if (!row.soldierId) continue;
 
         const existing = existingReports.get(row.soldierId);
-        const report: SoldierReport = {
-          id: existing?.id ?? null,
-          result: row.result ?? existing?.result ?? null,
+        const grades = {
           grade1: row.grades[0] ?? existing?.grade1 ?? null,
           grade2: row.grades[1] ?? existing?.grade2 ?? null,
           grade3: row.grades[2] ?? existing?.grade3 ?? null,
           grade4: row.grades[3] ?? existing?.grade4 ?? null,
           grade5: row.grades[4] ?? existing?.grade5 ?? null,
           grade6: row.grades[5] ?? existing?.grade6 ?? null,
+        };
+        const { failed } = calculateFailure(
+          grades, activeScores, scoreConfig?.failureThreshold,
+        );
+        const report: SoldierReport = {
+          id: existing?.id ?? null,
+          result: row.result ?? existing?.result ?? null,
+          failed,
+          ...grades,
           note: row.note ?? existing?.note ?? null,
         };
         updatedReports.set(row.soldierId, report);
@@ -510,7 +526,7 @@ export function BulkImportReportsDialog({
 
               {/* Result */}
               <MappingSelect
-                label={`תוצאה (${resultLabels.passed.label}/${resultLabels.failed.label}/${resultLabels.na.label})`}
+                label={`תוצאה (${resultLabels.completed.label}/${resultLabels.skipped.label}/${resultLabels.na.label})`}
                 value={mapping.result}
                 options={columnOptions}
                 onChange={(v) => updateMapping("result", v)}
@@ -596,10 +612,10 @@ export function BulkImportReportsDialog({
                           {row.soldierName ?? "—"}
                         </td>
                         <td className="px-2 py-1.5 text-muted-foreground">
-                          {row.result === "passed"
-                            ? resultLabels.passed.label
-                            : row.result === "failed"
-                              ? resultLabels.failed.label
+                          {row.result === "completed"
+                            ? resultLabels.completed.label
+                            : row.result === "skipped"
+                              ? resultLabels.skipped.label
                               : row.result === "na"
                                 ? resultLabels.na.label
                                 : "—"}

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { ResultLabels } from "@/types/display-config";
 
 interface Props {
-  onBulkUpdate: (result: "passed" | "failed" | "na") => void;
+  onBulkUpdate: (result: "completed" | "skipped" | "na") => void;
   loading?: boolean;
   resultLabels: ResultLabels;
 }
@@ -17,26 +17,26 @@ export function BulkUpdateBar({ onBulkUpdate, loading = false, resultLabels }: P
         <button
           type="button"
           disabled={loading}
-          onClick={() => onBulkUpdate("passed")}
+          onClick={() => onBulkUpdate("completed")}
           className={cn(
             "rounded-md px-3 py-1 text-xs font-semibold transition-colors border",
             "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 active:bg-green-200",
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
-          {resultLabels.passed.label} ✓
+          {resultLabels.completed.label} ✓
         </button>
         <button
           type="button"
           disabled={loading}
-          onClick={() => onBulkUpdate("failed")}
+          onClick={() => onBulkUpdate("skipped")}
           className={cn(
             "rounded-md px-3 py-1 text-xs font-semibold transition-colors border",
-            "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 active:bg-red-200",
+            "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 active:bg-amber-200",
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
-          {resultLabels.failed.label} ✗
+          {resultLabels.skipped.label} ✗
         </button>
         <button
           type="button"

@@ -85,11 +85,11 @@ const ACTIVITIES_QUERY = `
     ) AS total_soldiers,
     (SELECT COUNT(*) FROM activity_reports ar
      JOIN soldiers s ON s.id = ar.soldier_id
-     WHERE ar.activity_id = a.id AND ar.result = 'passed'
+     WHERE ar.activity_id = a.id AND ar.result = 'completed'
      AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS passed_count,
     (SELECT COUNT(*) FROM activity_reports ar
      JOIN soldiers s ON s.id = ar.soldier_id
-     WHERE ar.activity_id = a.id AND ar.result = 'failed'
+     WHERE ar.activity_id = a.id AND ar.result = 'skipped'
      AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS failed_count,
     (SELECT COUNT(*) FROM activity_reports ar
      JOIN soldiers s ON s.id = ar.soldier_id

@@ -284,8 +284,8 @@ enum ActivityStatus {
 }
 
 enum ActivityResult {
-  passed
-  failed
+  completed
+  skipped
   na
 }
 
@@ -334,6 +334,7 @@ model ActivityReport {
   activityId      String         @map("activity_id") @db.Uuid
   soldierId       String         @map("soldier_id") @db.Uuid
   result          ActivityResult
+  failed          Boolean        @default(false)
   grade1          Decimal?       @db.Decimal
   grade2          Decimal?       @db.Decimal
   grade3          Decimal?       @db.Decimal
