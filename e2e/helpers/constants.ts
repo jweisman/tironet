@@ -1,49 +1,8 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-/** Well-known IDs so tests can reference them directly. */
-export const IDS = {
-  adminUser: "e2e00000-0000-4000-8000-000000000001",
-  platoonCmdUser: "e2e00000-0000-4000-8000-000000000002",
-  squadCmdUser: "e2e00000-0000-4000-8000-000000000003",
-
-  cycle: "e2e00000-0000-4000-8000-000000000010",
-  company: "e2e00000-0000-4000-8000-000000000020",
-  platoon1: "e2e00000-0000-4000-8000-000000000030",
-  platoon2: "e2e00000-0000-4000-8000-000000000031",
-  squadA: "e2e00000-0000-4000-8000-000000000040",
-  squadB: "e2e00000-0000-4000-8000-000000000041",
-  squadC: "e2e00000-0000-4000-8000-000000000042",
-
-  activityTypeShooting: "e2e00000-0000-4000-8000-000000000050",
-  activityTypeNav: "e2e00000-0000-4000-8000-000000000051",
-
-  activity1: "e2e00000-0000-4000-8000-000000000060",
-  activity2: "e2e00000-0000-4000-8000-000000000061",
-  activityDraft: "e2e00000-0000-4000-8000-000000000062",
-  activityP2: "e2e00000-0000-4000-8000-000000000063",
-
-  soldier1: "e2e00000-0000-4000-8000-000000000070",
-  soldier2: "e2e00000-0000-4000-8000-000000000071",
-  soldier3: "e2e00000-0000-4000-8000-000000000072",
-  soldier4: "e2e00000-0000-4000-8000-000000000073",
-  soldier5: "e2e00000-0000-4000-8000-000000000074",
-  soldier6: "e2e00000-0000-4000-8000-000000000075",
-  soldier7: "e2e00000-0000-4000-8000-000000000076",
-
-  requestLeave: "e2e00000-0000-4000-8000-000000000090",
-  requestMedical: "e2e00000-0000-4000-8000-000000000091",
-
-  invitation: "e2e00000-0000-4000-8000-000000000080",
-  expiredInvitation: "e2e00000-0000-4000-8000-000000000081",
-};
-
-export const EMAILS = {
-  admin: "admin-e2e@test.com",
-  platoonCmd: "platoon-e2e@test.com",
-  squadCmd: "squad-e2e@test.com",
-  invitee: "new-e2e@test.com",
-};
+// Re-export shared seed data so existing e2e imports keep working
+export { IDS, EMAILS } from "../../prisma/seed-data";
 
 /**
  * Read invitation tokens written by the seed script.

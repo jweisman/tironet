@@ -185,6 +185,8 @@ export async function isSignInAllowed(user: {
   id?: string;
   email?: string | null;
 }): Promise<boolean> {
+  console.log("[isSignInAllowed] checking user:", { id: user.id, email: user.email });
+
   // Allow users who already have a cycle assignment (returning users)
   if (user.id) {
     const hasAssignment = await prisma.userCycleAssignment.findFirst({
@@ -225,7 +227,10 @@ export async function isSignInAllowed(user: {
       where: { id: user.id },
       select: { isAdmin: true },
     });
+    console.log("[isSignInAllowed] admin check:", { userId: user.id, isAdmin: adminUser?.isAdmin });
     if (adminUser?.isAdmin) return true;
+  } else {
+    console.log("[isSignInAllowed] no user.id — skipping admin check");
   }
 
   return false;
@@ -450,8 +455,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
 
-    async signIn({ user }) {
-      if (user && (await isSignInAllowed(user))) return true;
+    async signIn({ user, account }) {
+      console.log("[signIn] user:", { id: user?.id, email: user?.email, provider: account?.provider });
+      const allowed = user ? await isSignInAllowed(user) : false;
+      console.log("[signIn] allowed:", allowed);
+      if (allowed) return true;
       return "/not-authorized";
     },
   },
