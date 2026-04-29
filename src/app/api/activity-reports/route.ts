@@ -12,7 +12,8 @@ const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   activityId: z.string().uuid(),
   soldierId: z.string().uuid(),
-  result: z.enum(["passed", "failed", "na"]),
+  result: z.enum(["completed", "skipped", "na"]),
+  failed: z.boolean().optional(),
   grade1: gradeSchema,
   grade2: gradeSchema,
   grade3: gradeSchema,
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { id: clientId, activityId, soldierId, result, grade1, grade2, grade3, grade4, grade5, grade6, note } = parsed.data;
+  const { id: clientId, activityId, soldierId, result, failed, grade1, grade2, grade3, grade4, grade5, grade6, note } = parsed.data;
 
   // Find the activity to get cycleId
   const activity = await prisma.activity.findUnique({
@@ -93,12 +94,14 @@ export async function POST(request: NextRequest) {
       activityId,
       soldierId,
       result,
+      failed: failed ?? false,
       ...grades,
       note: note ?? null,
       updatedByUserId: sessionUser.id,
     },
     update: {
       result,
+      failed: failed ?? undefined,
       ...mergeGrades,
       note: note ?? undefined,
       updatedByUserId: sessionUser.id,

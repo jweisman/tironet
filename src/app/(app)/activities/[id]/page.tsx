@@ -52,7 +52,7 @@ const SOLDIERS_QUERY = `
 `;
 
 const REPORTS_QUERY = `
-  SELECT id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note
+  SELECT id, soldier_id, result, failed, grade1, grade2, grade3, grade4, grade5, grade6, note
   FROM activity_reports
   WHERE activity_id = ?
 `;
@@ -72,7 +72,7 @@ interface RawSoldier {
   id_number: string | null;
 }
 interface RawReport {
-  id: string; soldier_id: string; result: string;
+  id: string; soldier_id: string; result: string; failed: number;
   grade1: number | null; grade2: number | null; grade3: number | null;
   grade4: number | null; grade5: number | null; grade6: number | null;
   note: string | null;
@@ -169,6 +169,7 @@ export default function ActivityPage() {
                 ? {
                     id: report.id,
                     result: report.result as ActivityResult,
+                    failed: Number(report.failed) === 1,
                     grade1: report.grade1 != null ? Number(report.grade1) : null,
                     grade2: report.grade2 != null ? Number(report.grade2) : null,
                     grade3: report.grade3 != null ? Number(report.grade3) : null,
@@ -177,7 +178,7 @@ export default function ActivityPage() {
                     grade6: report.grade6 != null ? Number(report.grade6) : null,
                     note: report.note,
                   }
-                : { id: null, result: null, grade1: null, grade2: null, grade3: null, grade4: null, grade5: null, grade6: null, note: null },
+                : { id: null, result: null, failed: false, grade1: null, grade2: null, grade3: null, grade4: null, grade5: null, grade6: null, note: null },
             };
           });
 
@@ -204,6 +205,7 @@ export default function ActivityPage() {
         name: activity.activity_type_name,
         icon: activity.activity_type_icon,
         activeScores,
+        scoreConfig,
         displayConfiguration: displayConfig,
       },
       platoon: {

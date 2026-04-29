@@ -58,7 +58,7 @@ const TODAY_ACTIVITIES_QUERY = `
        AND s.squad_id IN (SELECT squad_id FROM scope WHERE platoon_id = a.platoon_id)
        AND s.status = 'active'
        AND s.cycle_id = (SELECT id FROM cycle)
-       AND ar.result = 'passed'
+       AND ar.result = 'completed'
     ) AS passed_count,
     (SELECT COUNT(*)
      FROM activity_reports ar
@@ -67,7 +67,7 @@ const TODAY_ACTIVITIES_QUERY = `
        AND s.squad_id IN (SELECT squad_id FROM scope WHERE platoon_id = a.platoon_id)
        AND s.status = 'active'
        AND s.cycle_id = (SELECT id FROM cycle)
-       AND ar.result = 'failed'
+       AND ar.result = 'skipped'
     ) AS failed_count
   FROM activities a
   JOIN activity_types at ON at.id = a.activity_type_id

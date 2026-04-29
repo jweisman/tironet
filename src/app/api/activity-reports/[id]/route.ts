@@ -11,7 +11,8 @@ const patchSchema = z.object({
   // client-generated UUID that lost the upsert race on the server).
   activityId: z.string().uuid().optional(),
   soldierId: z.string().uuid().optional(),
-  result: z.enum(["passed", "failed", "na"]).optional(),
+  result: z.enum(["completed", "skipped", "na"]).optional(),
+  failed: z.boolean().optional(),
   grade1: gradeSchema,
   grade2: gradeSchema,
   grade3: gradeSchema,
@@ -84,6 +85,7 @@ export async function PATCH(
     if (k in parsed.data) updateData[k] = parsed.data[k] ?? null;
   }
   if ("note" in parsed.data) updateData.note = parsed.data.note ?? null;
+  if (parsed.data.failed !== undefined) updateData.failed = parsed.data.failed;
 
   const updated = await prisma.activityReport.update({
     where: { id: report.id },

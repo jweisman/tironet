@@ -22,8 +22,8 @@ describe("getResultLabels", () => {
   it("returns custom labels", () => {
     const config = {
       results: {
-        passed: { label: "נוכח" },
-        failed: { label: "לא נוכח" },
+        completed: { label: "נוכח" },
+        skipped: { label: "לא נוכח" },
         na: { label: "פטור" },
       },
     };
@@ -33,12 +33,12 @@ describe("getResultLabels", () => {
   it("fills in defaults for missing keys", () => {
     const config = {
       results: {
-        passed: { label: "ביצע" },
+        completed: { label: "ביצע" },
       },
     };
     const labels = getResultLabels(config);
-    expect(labels.passed.label).toBe("ביצע");
-    expect(labels.failed.label).toBe("נכשל");
+    expect(labels.completed.label).toBe("ביצע");
+    expect(labels.skipped.label).toBe("לא ביצע");
     expect(labels.na.label).toBe("לא רלוונטי");
   });
 });
@@ -80,15 +80,15 @@ describe("parseDisplayConfig", () => {
   it("parses valid JSON", () => {
     const json = JSON.stringify({
       results: {
-        passed: { label: "נוכח" },
-        failed: { label: "לא נוכח" },
+        completed: { label: "נוכח" },
+        skipped: { label: "לא נוכח" },
         na: { label: "פטור" },
       },
       note: { type: "list", options: ["א", "ב"] },
     });
     const config = parseDisplayConfig(json);
     expect(config).not.toBeNull();
-    expect(config!.results!.passed!.label).toBe("נוכח");
+    expect(config!.results!.completed!.label).toBe("נוכח");
     expect(config!.note!.options).toEqual(["א", "ב"]);
   });
 });

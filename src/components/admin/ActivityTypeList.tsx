@@ -57,6 +57,8 @@ type Props = {
 interface EditScoreSlot {
   label: string;
   format: "number" | "time";
+  threshold: string;
+  thresholdOperator: ">" | ">=" | "<" | "<=" | "";
 }
 
 function LucideIcon({ name, className }: { name: string; className?: string }) {
@@ -88,10 +90,11 @@ export default function ActivityTypeList({ initialTypes }: Props) {
   const [editName, setEditName] = useState("");
   const [editIcon, setEditIcon] = useState("");
   const [editScores, setEditScores] = useState<EditScoreSlot[]>(
-    Array.from({ length: 6 }, () => ({ label: "", format: "number" as const }))
+    Array.from({ length: 6 }, () => ({ label: "", format: "number" as const, threshold: "", thresholdOperator: "" as const }))
   );
+  const [editFailureThreshold, setEditFailureThreshold] = useState("");
   const [scoresExpandedId, setScoresExpandedId] = useState<string | null>(null);
-  const [editResultLabels, setEditResultLabels] = useState({ passed: "", failed: "", na: "" });
+  const [editResultLabels, setEditResultLabels] = useState({ completed: "", skipped: "", na: "" });
   const [editNoteOptions, setEditNoteOptions] = useState<string[]>([]);
   const [editExportCategory, setEditExportCategory] = useState<ExportCategory | "">("");
   const [loading, setLoading] = useState(false);
@@ -104,13 +107,16 @@ export default function ActivityTypeList({ initialTypes }: Props) {
     setEditScores(
       SCORE_KEYS.map((k) => {
         const slot = config?.[k];
-        return slot ? { label: slot.label, format: slot.format ?? "number" } : { label: "", format: "number" as const };
+        return slot
+          ? { label: slot.label, format: slot.format ?? "number", threshold: slot.threshold != null ? String(slot.threshold) : "", thresholdOperator: slot.thresholdOperator ?? "" }
+          : { label: "", format: "number" as const, threshold: "", thresholdOperator: "" as const };
       })
     );
+    setEditFailureThreshold(config?.failureThreshold != null ? String(config.failureThreshold) : "");
     const labels = getResultLabels(type.displayConfiguration);
     setEditResultLabels({
-      passed: labels.passed.label,
-      failed: labels.failed.label,
+      completed: labels.completed.label,
+      skipped: labels.skipped.label,
       na: labels.na.label,
     });
     const noteOpts = getNoteOptions(type.displayConfiguration);
@@ -123,26 +129,38 @@ export default function ActivityTypeList({ initialTypes }: Props) {
     const config = {} as ScoreConfig;
     SCORE_KEYS.forEach((k, i) => {
       const slot = scores[i];
-      config[k] = slot.label.trim() ? { label: slot.label.trim(), format: slot.format } : null;
+      if (!slot.label.trim()) {
+        config[k] = null;
+      } else {
+        config[k] = {
+          label: slot.label.trim(),
+          format: slot.format,
+          ...(slot.threshold.trim() && slot.thresholdOperator
+            ? { threshold: Number(slot.threshold), thresholdOperator: slot.thresholdOperator }
+            : {}),
+        };
+      }
     });
+    const ft = editFailureThreshold.trim();
+    if (ft) config.failureThreshold = Number(ft);
     return config;
   }
 
   function buildDisplayConfig(): DisplayConfiguration | null {
-    const passed = editResultLabels.passed.trim();
-    const failed = editResultLabels.failed.trim();
+    const completed = editResultLabels.completed.trim();
+    const skipped = editResultLabels.skipped.trim();
     const na = editResultLabels.na.trim();
     const isDefault =
-      passed === DEFAULT_RESULT_LABELS.passed.label &&
-      failed === DEFAULT_RESULT_LABELS.failed.label &&
+      completed === DEFAULT_RESULT_LABELS.completed.label &&
+      skipped === DEFAULT_RESULT_LABELS.skipped.label &&
       na === DEFAULT_RESULT_LABELS.na.label;
     const filteredOptions = editNoteOptions.map((o) => o.trim()).filter(Boolean);
     if (isDefault && filteredOptions.length === 0) return null;
     const config: DisplayConfiguration = {};
     if (!isDefault) {
       config.results = {
-        passed: { label: passed || DEFAULT_RESULT_LABELS.passed.label },
-        failed: { label: failed || DEFAULT_RESULT_LABELS.failed.label },
+        completed: { label: completed || DEFAULT_RESULT_LABELS.completed.label },
+        skipped: { label: skipped || DEFAULT_RESULT_LABELS.skipped.label },
         na: { label: na || DEFAULT_RESULT_LABELS.na.label },
       };
     }
@@ -398,6 +416,37 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                               <SelectItem value="time">זמן (M:SS)</SelectItem>
                             </SelectContent>
                           </Select>
+                          {editScores[i].label.trim() && (
+                            <>
+                              <select
+                                value={editScores[i].thresholdOperator}
+                                onChange={(e) => setEditScores((prev) => {
+                                  const next = [...prev];
+                                  next[i] = { ...next[i], thresholdOperator: e.target.value as EditScoreSlot["thresholdOperator"] };
+                                  return next;
+                                })}
+                                className="rounded-md border border-border bg-background px-1.5 py-1 text-xs h-8 w-14"
+                                aria-label="אופרטור סף"
+                              >
+                                <option value="">—</option>
+                                <option value=">">&gt;</option>
+                                <option value=">=">&gt;=</option>
+                                <option value="<">&lt;</option>
+                                <option value="<=">&lt;=</option>
+                              </select>
+                              <Input
+                                placeholder="סף"
+                                value={editScores[i].threshold}
+                                onChange={(e) => setEditScores((prev) => {
+                                  const next = [...prev];
+                                  next[i] = { ...next[i], threshold: e.target.value };
+                                  return next;
+                                })}
+                                className="text-xs w-16 h-8"
+                                inputMode="numeric"
+                              />
+                            </>
+                          )}
                         </div>
                       );
                     }
@@ -412,6 +461,11 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                             M:SS
                           </span>
                         )}
+                        {slot.threshold != null && slot.thresholdOperator && (
+                          <span className="text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+                            נכשל אם {slot.thresholdOperator === ">" ? "גדול מ" : slot.thresholdOperator === ">=" ? "גדול או שווה ל" : slot.thresholdOperator === "<" ? "קטן מ" : "קטן או שווה ל"}{slot.threshold}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <span key={key} className="text-xs text-muted-foreground/50 px-2 py-1 block">
@@ -421,15 +475,36 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                   })}
                 </div>
 
+                {/* Failure threshold (edit mode only, shown when any score has a threshold) */}
+                {editingId === type.id && editScores.some((s) => s.label.trim() && s.threshold.trim() && s.thresholdOperator) && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="text-xs text-muted-foreground shrink-0">מספר ציונים כושלים לסימון ככישלון:</span>
+                    <Input
+                      value={editFailureThreshold}
+                      onChange={(e) => setEditFailureThreshold(e.target.value)}
+                      className="text-xs w-16 h-8"
+                      inputMode="numeric"
+                      placeholder="—"
+                    />
+                  </div>
+                )}
+
+                {/* View mode: show failure threshold if configured */}
+                {editingId !== type.id && type.scoreConfig?.failureThreshold && (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    סף כישלון: {type.scoreConfig.failureThreshold} ציונים כושלים
+                  </p>
+                )}
+
                 {/* Display configuration section */}
                 <div className="border-t pt-3 space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground">תצוגת תוצאות</p>
                   {editingId === type.id ? (
                     <div className="space-y-2">
-                      {(["passed", "failed", "na"] as const).map((key) => (
+                      {(["completed", "skipped", "na"] as const).map((key) => (
                         <div key={key} className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground w-16 shrink-0 text-end">
-                            {key === "passed" ? "עבר:" : key === "failed" ? "נכשל:" : "לא רלוונטי:"}
+                          <span className="text-xs text-muted-foreground w-20 shrink-0 text-end">
+                            {key === "completed" ? "ביצע:" : key === "skipped" ? "לא ביצע:" : "לא רלוונטי:"}
                           </span>
                           <Input
                             placeholder={DEFAULT_RESULT_LABELS[key].label}
@@ -487,16 +562,16 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                         const labels = getResultLabels(type.displayConfiguration);
                         const noteOpts = getNoteOptions(type.displayConfiguration);
                         const isDefault =
-                          labels.passed.label === DEFAULT_RESULT_LABELS.passed.label &&
-                          labels.failed.label === DEFAULT_RESULT_LABELS.failed.label &&
+                          labels.completed.label === DEFAULT_RESULT_LABELS.completed.label &&
+                          labels.skipped.label === DEFAULT_RESULT_LABELS.skipped.label &&
                           labels.na.label === DEFAULT_RESULT_LABELS.na.label;
                         return (
                           <>
                             {isDefault ? (
-                              <p className="text-xs text-muted-foreground/50">ברירת מחדל (עבר / נכשל / לא רלוונטי)</p>
+                              <p className="text-xs text-muted-foreground/50">ברירת מחדל ({DEFAULT_RESULT_LABELS.completed.label} / {DEFAULT_RESULT_LABELS.skipped.label} / {DEFAULT_RESULT_LABELS.na.label})</p>
                             ) : (
                               <div className="flex flex-wrap gap-1.5">
-                                {(["passed", "failed", "na"] as const).map((key) => (
+                                {(["completed", "skipped", "na"] as const).map((key) => (
                                   <span key={key} className="text-xs bg-background border rounded px-2 py-1">
                                     {labels[key].label}
                                   </span>

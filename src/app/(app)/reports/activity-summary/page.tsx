@@ -148,16 +148,12 @@ export default function ActivitySummaryPage() {
               {/* Pie chart + legend */}
               <div className="flex items-center gap-6">
                 <PieChart
-                  passed={activity.passedCount}
-                  failed={activity.failedCount}
-                  na={activity.naCount}
+                  data={{ completed: activity.completedCount, skipped: activity.skippedCount, failed: activity.failedCount, na: activity.naCount, missing: activity.missingCount }}
                   size={100}
                 />
                 <div className="space-y-2">
                   <PieChartLegend
-                    passed={activity.passedCount}
-                    failed={activity.failedCount}
-                    na={activity.naCount}
+                    data={{ completed: activity.completedCount, skipped: activity.skippedCount, failed: activity.failedCount, na: activity.naCount, missing: activity.missingCount }}
                     resultLabels={getResultLabels(activity.displayConfiguration)}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -219,7 +215,7 @@ export default function ActivitySummaryPage() {
               {activity.failedSoldiers && activity.failedSoldiers.length > 0 && (
                 <div className="overflow-x-auto">
                   <h3 className="text-sm font-semibold mb-2">
-                    {getResultLabels(activity.displayConfiguration).failed.label} / {getResultLabels(activity.displayConfiguration).na.label}
+                    {getResultLabels(activity.displayConfiguration).skipped.label} / {getResultLabels(activity.displayConfiguration).na.label}
                   </h3>
                   <table className="w-full text-sm border-collapse">
                     <thead>
@@ -233,12 +229,12 @@ export default function ActivitySummaryPage() {
                     <tbody>
                       {activity.failedSoldiers.map((s, i) => {
                         const labels = getResultLabels(activity.displayConfiguration);
-                        const resultLabel = s.result === "failed" ? labels.failed.label : labels.na.label;
+                        const resultLabel = s.result === "skipped" ? labels.skipped.label : s.result === "na" ? labels.na.label : "נכשל";
                         return (
                           <tr key={i} className="border-b border-border">
                             <td className="px-3 py-2">{s.name}</td>
                             <td className="px-3 py-2">{s.squad}</td>
-                            <td className={cn("px-3 py-2", s.result === "failed" && "text-destructive")}>{resultLabel}</td>
+                            <td className={cn("px-3 py-2", s.result !== "na" && "text-destructive")}>{resultLabel}</td>
                             <td className="px-3 py-2 text-muted-foreground">{s.note ?? "—"}</td>
                           </tr>
                         );

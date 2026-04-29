@@ -119,14 +119,15 @@ export async function GET(req: NextRequest) {
       id: true,
       platoonId: true,
       reports: {
-        select: { soldierId: true, result: true },
+        select: { soldierId: true, result: true, failed: true },
       },
     },
   });
 
   // Build map: platoonId → Set of activity IDs
-  // For each soldier: count activities where no report or result === 'failed'
-  type ReportMap = Map<string, "passed" | "failed" | "na">;
+  // For each soldier: count activities where no report or result === 'skipped' or failed
+  type ReportEntry = { result: string; failed: boolean };
+  type ReportMap = Map<string, ReportEntry>;
   const activityByPlatoon = new Map<string, { id: string; reports: ReportMap }[]>();
   for (const act of activities) {
     if (!activityByPlatoon.has(act.platoonId)) {
@@ -134,7 +135,7 @@ export async function GET(req: NextRequest) {
     }
     const reportMap: ReportMap = new Map();
     for (const r of act.reports) {
-      reportMap.set(r.soldierId, r.result as "passed" | "failed" | "na");
+      reportMap.set(r.soldierId, { result: r.result, failed: r.failed });
     }
     activityByPlatoon.get(act.platoonId)!.push({ id: act.id, reports: reportMap });
   }
@@ -143,8 +144,8 @@ export async function GET(req: NextRequest) {
     const acts = activityByPlatoon.get(platoonId) ?? [];
     let count = 0;
     for (const act of acts) {
-      const result = act.reports.get(soldierId);
-      if (!result || result === "failed") count++;
+      const report = act.reports.get(soldierId);
+      if (!report || report.result === "skipped" || report.failed) count++;
     }
     return count;
   }

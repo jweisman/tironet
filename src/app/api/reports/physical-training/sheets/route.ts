@@ -455,7 +455,7 @@ function buildPlatoonSheet(
         stats.withReport++;
 
         const rowIdx = HEADER_ROWS + i;
-        if (report.result === "passed") {
+        if (report.result === "completed") {
           passedCount++;
           stats.passed++;
           row[col] = "ביצע מלא";
@@ -464,7 +464,7 @@ function buildPlatoonSheet(
           row[col] = "חייל לא פעיל";
           coloredCells.push([rowIdx, col, "yellow"]);
         } else {
-          // failed — use note if available, default to "ביצע חלקי"
+          // skipped — use note if available, default to "ביצע חלקי"
           stats.failed++;
           row[col] = report.note || "ביצע חלקי";
           coloredCells.push([rowIdx, col, "yellow"]);

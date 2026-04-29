@@ -223,6 +223,24 @@ await db.execute(
 
 Writes are **instant and optimistic** — no network round-trip, no loading state needed. `useQuery` on the same table reacts immediately. Update local component state manually when `useState` holds a derived copy (e.g. `reports` Map in `ActivityDetail`).
 
+### Result vs failure separation (#181)
+
+`ActivityResult` has three values: `completed` (soldier participated), `skipped` (didn't participate), `na` (not applicable). A separate `failed` boolean on `ActivityReport` indicates score-based failure, calculated automatically from score thresholds.
+
+**Score thresholds:** Each `ScoreSlot` in `scoreConfig` has optional `threshold` (number) and `thresholdOperator` (`>`, `>=`, `<`, `<=`). The operator defines the **failing** condition (e.g., `>` means fail if score > threshold — used for time scores where lower is better). `scoreConfig.failureThreshold` (number) controls how many individually-failed scores mark the report as failed (e.g., 1 = any single score failure).
+
+**`calculateFailure()`** in `src/types/score-config.ts` is the pure function that evaluates grades against thresholds. Returns `{ failed: boolean, scoreResults: Map<gradeKey, "passed"|"failed"|null> }`. Call it from `handleReportChange` when a grade changes, and from `BulkImportReportsDialog` before writing imported reports.
+
+**Concurrency:** `failed` is always updated atomically with the grade that triggered it — same SQL UPDATE, same PowerSync CRUD op, same server PATCH. This preserves the field-level merge pattern. The server trusts the client's `failed` value (accepted race for concurrent edits with failureThreshold > 1).
+
+**Gap definition:** missing report OR `result === "skipped"` OR `failed === true`. Three visual states: missing (no report), skipped (didn't participate), failed (score-based failure).
+
+**UI coloring:**
+- Completed button: green. Skipped button: amber. NA button: gray.
+- Grade input borders: green if passes threshold, amber if fails threshold, red for invalid input.
+- Failed badge: red "נכשל" badge next to soldier name when `report.failed === true`.
+- Note highlight: red border when result is skipped OR report is failed (suggests adding a reason).
+
 ### Concurrent activity report editing
 
 Multiple commanders (e.g. squad commander + platoon sergeant) can edit the same soldier's report simultaneously. The design prevents lost updates at every layer:
@@ -709,16 +727,16 @@ One sheet per platoon. 13 columns per week (Sun-Fri = 6 days × 2 slots + Sat = 
 **Activity columns (E+):** Each activity maps to a day slot (2 per weekday, 1 for Sat). Activities are assigned to slots in date order.
 
 **Cell value mapping:**
-- `result=passed` → "ביצע מלא" (green background)
-- `result=failed` with note → note text (yellow background)
-- `result=failed` without note → "ביצע חלקי" (yellow background)
+- `result=completed` → "ביצע מלא" (green background)
+- `result=skipped` with note → note text (yellow background)
+- `result=skipped` without note → "ביצע חלקי" (yellow background)
 - `result=na` → "חייל לא פעיל" (yellow background)
 - No report → empty cell
 
 **Summary rows (5 rows after soldiers):**
 1. מצבה פעילה — soldiers with any report for that activity
-2. סה"כ משתתפים — passed count (option A: same as row 4)
-3. לא ביצעו — failed count
+2. סה"כ משתתפים — completed count (option A: same as row 4)
+3. לא ביצעו — skipped count
 4. סה"כ משתתפים מלא — passed count
 5. אחוז משתתפים מלא — passed / active roster as percentage
 
@@ -760,7 +778,7 @@ Unlike soldier/activity import, report import uses **user-defined column mapping
 - **No API route** — reports are written to the local PowerSync SQLite DB via `db.execute()`, matching the existing `saveReport` pattern. The connector handles upload automatically.
 - **Column mapping step:** After file upload, the user maps spreadsheet columns to report fields (personal number, result, note, and dynamic score columns based on activity type). Mappings are auto-detected from known Hebrew header names and persisted to `localStorage` keyed by `activityTypeId` (`tironet:report-mapping:${activityTypeId}`).
 - **Soldier lookup:** Soldiers are matched by `idNumber` (מספר אישי). The `SOLDIERS_QUERY` in the activity detail page fetches `id_number` for this purpose.
-- **Result values:** Accepts Hebrew (עבר/נכשל/לא רלוונטי), English (passed/failed/na), and numeric (1/0).
+- **Result values:** Accepts Hebrew (ביצע/לא ביצע/לא רלוונטי, עבר/נכשל, השתתף/לא השתתף), English (completed/skipped/na and legacy passed/failed), and numeric (1/0).
 - **Upsert behavior:** Existing reports are overwritten (same as manual edits). New reports are INSERTed with `crypto.randomUUID()`.
 
 ### Soldier bulk import

@@ -14,6 +14,7 @@ import { fetchAttendance, STATUS_LABELS as ATTENDANCE_STATUS_LABELS } from "@/li
 import {
   escapeHtml,
   renderPieSvg,
+  PIE_COLORS,
   formatDateTime,
   formatDate,
   TYPE_LABELS,
@@ -63,9 +64,11 @@ export interface TodayActivityItem {
   date: string;
   scoreLabels: string[];
   scoreFormats: ("number" | "time")[];
-  passedCount: number;
+  completedCount: number;
+  skippedCount: number;
   failedCount: number;
   naCount: number;
+  missingCount: number;
   totalSoldiers: number;
   rows: ActivitySummaryRow[];
   displayConfiguration?: DisplayConfiguration | null;
@@ -80,7 +83,7 @@ export interface TomorrowActivityItem {
 
 export interface GapSoldier {
   name: string;
-  result: "failed" | "missing";
+  result: "skipped" | "failed" | "missing";
 }
 
 export interface GapActivityItem {
@@ -380,6 +383,36 @@ export async function fetchDailyForum(
     orderBy: { date: "asc" },
   });
 
+  // Count active soldiers per platoon (for missing report calculation)
+  const soldierCountsByPlatoon = new Map<string, number>();
+  {
+    const counts = await prisma.soldier.groupBy({
+      by: ["squadId"],
+      where: { cycleId, status: "active", squad: { platoonId: { in: platoonIds } } },
+      _count: true,
+    });
+    // Map squad→platoon
+    const squadPlatoonMap = new Map<string, string>();
+    for (const activity of todayActivities) {
+      for (const report of activity.reports) {
+        const sq = report.soldier.squad;
+        if ("platoon" in sq && sq.platoon) {
+          squadPlatoonMap.set(sq.name, activity.platoonId);
+        }
+      }
+    }
+    // Simpler: query squads directly
+    const squads = await prisma.squad.findMany({
+      where: { platoonId: { in: platoonIds } },
+      select: { id: true, platoonId: true },
+    });
+    const sqToPlatoon = new Map(squads.map((s) => [s.id, s.platoonId]));
+    for (const c of counts) {
+      const pId = sqToPlatoon.get(c.squadId);
+      if (pId) soldierCountsByPlatoon.set(pId, (soldierCountsByPlatoon.get(pId) ?? 0) + c._count);
+    }
+  }
+
   // Group today's activities by platoon and compute summaries
   const todayByPlatoon = new Map<string, TodayActivityItem[]>();
   for (const activity of todayActivities) {
@@ -393,9 +426,12 @@ export async function fetchDailyForum(
     const scoreCount = activeScores.length;
 
     const activeReports = activity.reports.filter((r) => r.soldier.status === "active");
-    const passedCount = activeReports.filter((r) => r.result === "passed").length;
-    const failedCount = activeReports.filter((r) => r.result === "failed").length;
+    const completedCount = activeReports.filter((r) => r.result === "completed" && !r.failed).length;
+    const skippedCount = activeReports.filter((r) => r.result === "skipped").length;
+    const failedCount = activeReports.filter((r) => r.result === "completed" && r.failed).length;
     const naCount = activeReports.filter((r) => r.result === "na").length;
+    const totalActiveSoldiers = soldierCountsByPlatoon.get(activity.platoonId) ?? activeReports.length;
+    const missingCount = Math.max(0, totalActiveSoldiers - activeReports.length);
 
     // Squad-level score averages
     const squadMap = new Map<string, { company: string; platoon: string; squad: string; grades: number[][] }>();
@@ -469,10 +505,12 @@ export async function fetchDailyForum(
       date: activity.date.toISOString().split("T")[0],
       scoreLabels,
       scoreFormats,
-      passedCount,
+      completedCount,
+      skippedCount,
       failedCount,
       naCount,
-      totalSoldiers: activeReports.length,
+      missingCount,
+      totalSoldiers: totalActiveSoldiers,
       rows: mergedRows,
       displayConfiguration: activity.activityType.displayConfiguration as DisplayConfiguration | null,
     });
@@ -517,7 +555,7 @@ export async function fetchDailyForum(
     include: {
       activityType: { select: { name: true, displayConfiguration: true } },
       reports: {
-        select: { soldierId: true, result: true },
+        select: { soldierId: true, result: true, failed: true },
       },
     },
     orderBy: { date: "desc" },
@@ -529,17 +567,19 @@ export async function fetchDailyForum(
     const soldierMap = platoonSoldierMap.get(platoonId);
     if (!soldierMap) continue;
 
-    const reportMap = new Map<string, string>();
+    const reportMap = new Map<string, { result: string; failed: boolean }>();
     for (const report of activity.reports) {
-      reportMap.set(report.soldierId, report.result);
+      reportMap.set(report.soldierId, { result: report.result, failed: report.failed });
     }
 
     const gapSoldiers: GapSoldier[] = [];
     for (const [soldierId, info] of soldierMap) {
-      const result = reportMap.get(soldierId);
-      if (!result) {
+      const report = reportMap.get(soldierId);
+      if (!report) {
         gapSoldiers.push({ name: info.name, result: "missing" });
-      } else if (result === "failed") {
+      } else if (report.result === "skipped") {
+        gapSoldiers.push({ name: info.name, result: "skipped" });
+      } else if (report.failed) {
         gapSoldiers.push({ name: info.name, result: "failed" });
       }
     }
@@ -655,7 +695,8 @@ function renderTodayActivitiesHtml(activities: TodayActivityItem[]): string {
   if (activities.length === 0) return '<p class="no-data">אין פעילויות להיום</p>';
 
   return activities.map((activity) => {
-    const pieSvg = renderPieSvg(activity.passedCount, activity.failedCount, activity.naCount);
+    const pieData = { completed: activity.completedCount, skipped: activity.skippedCount, failed: activity.failedCount, na: activity.naCount, missing: activity.missingCount };
+    const pieSvg = renderPieSvg(pieData);
     const scoreHeaders = activity.scoreLabels.map((l) => `<th>${escapeHtml(l)}</th>`).join("");
 
     const tableRows = activity.rows.map((row) => {
@@ -676,9 +717,11 @@ function renderTodayActivitiesHtml(activities: TodayActivityItem[]): string {
           ${pieSvg}
           <div>
             <div class="legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ${getResultLabels(activity.displayConfiguration).passed.label} (${activity.passedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).failed.label} (${activity.failedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.completed}"></span> ${getResultLabels(activity.displayConfiguration).completed.label} (${activity.completedCount})</span>
+              ${activity.skippedCount > 0 ? `<span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.skipped}"></span> ${getResultLabels(activity.displayConfiguration).skipped.label} (${activity.skippedCount})</span>` : ""}
+              ${activity.failedCount > 0 ? `<span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.failed}"></span> נכשל (${activity.failedCount})</span>` : ""}
+              ${activity.naCount > 0 ? `<span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.na}"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>` : ""}
+              ${activity.missingCount > 0 ? `<span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.missing}"></span> ללא דיווח (${activity.missingCount})</span>` : ""}
             </div>
             <p class="total-line">סה״כ ${hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}</p>
           </div>
@@ -717,11 +760,16 @@ function renderGapsHtml(gaps: GapActivityItem[]): string {
 
   return gaps.map((gap) => {
     const dateStr = new Date(gap.date).toLocaleDateString("he-IL");
-    const failedLabel = getResultLabels(gap.displayConfiguration).failed.label;
+    const resultLabels = getResultLabels(gap.displayConfiguration);
     const soldierRows = gap.soldiers.map((s) => {
-      const badge = s.result === "failed"
-        ? `<span class="badge badge-failed">${failedLabel}</span>`
-        : '<span class="badge badge-missing">חסר</span>';
+      let badge: string;
+      if (s.result === "skipped") {
+        badge = `<span class="badge badge-failed">${resultLabels.skipped.label}</span>`;
+      } else if (s.result === "failed") {
+        badge = '<span class="badge badge-failed">נכשל</span>';
+      } else {
+        badge = '<span class="badge badge-missing">חסר</span>';
+      }
       return `<tr><td>${escapeHtml(s.name)}</td><td>${badge}</td></tr>`;
     }).join("\n");
 

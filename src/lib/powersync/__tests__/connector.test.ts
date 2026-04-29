@@ -229,6 +229,7 @@ describe("TironetConnector", () => {
           activityId: "act-1",
           soldierId: "sol-1",
           result: "passed",
+          failed: false,
           grade1: 85,
           grade2: null,
           grade3: null,

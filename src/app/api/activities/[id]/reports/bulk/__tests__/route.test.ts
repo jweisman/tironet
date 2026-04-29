@@ -67,7 +67,7 @@ describe("POST /api/activities/[id]/reports/bulk", () => {
     const req = createMockRequest(
       "POST",
       "/api/activities/act-1/reports/bulk",
-      { result: "passed", soldierIds: [UUID_SOLDIER_1] }
+      { result: "completed", soldierIds: [UUID_SOLDIER_1] }
     );
     const res = await POST(req, makeParams("act-1"));
     expect(res.status).toBe(404);
@@ -88,7 +88,7 @@ describe("POST /api/activities/[id]/reports/bulk", () => {
     const req = createMockRequest(
       "POST",
       "/api/activities/act-1/reports/bulk",
-      { result: "passed", soldierIds: [UUID_SOLDIER_1] }
+      { result: "completed", soldierIds: [UUID_SOLDIER_1] }
     );
     const res = await POST(req, makeParams("act-1"));
     expect(res.status).toBe(401);
@@ -139,7 +139,7 @@ describe("POST /api/activities/[id]/reports/bulk", () => {
       "POST",
       "/api/activities/act-1/reports/bulk",
       {
-        result: "passed",
+        result: "completed",
         soldierIds: [UUID_SOLDIER_1, UUID_SOLDIER_2],
       }
     );
@@ -178,7 +178,7 @@ describe("POST /api/activities/[id]/reports/bulk", () => {
       "POST",
       "/api/activities/act-1/reports/bulk",
       {
-        result: "passed",
+        result: "completed",
         soldierIds: [UUID_SOLDIER_1],
       }
     );
@@ -220,7 +220,7 @@ describe("POST /api/activities/[id]/reports/bulk", () => {
       "POST",
       "/api/activities/act-1/reports/bulk",
       {
-        result: "passed",
+        result: "completed",
         soldierIds: [UUID_SOLDIER_1, UUID_SOLDIER_2],
       }
     );
@@ -237,7 +237,7 @@ describe("POST /api/activities/[id]/reports/bulk", () => {
           expect.objectContaining({
             activityId: "act-1",
             soldierId: UUID_SOLDIER_2,
-            result: "passed",
+            result: "completed",
           }),
         ],
         skipDuplicates: true,

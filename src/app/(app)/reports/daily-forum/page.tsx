@@ -121,16 +121,12 @@ function TodayActivitySection({ activity }: { activity: TodayActivityItem }) {
 
       <div className="flex items-center gap-6">
         <PieChart
-          passed={activity.passedCount}
-          failed={activity.failedCount}
-          na={activity.naCount}
+          data={{ completed: activity.completedCount, skipped: activity.skippedCount, failed: activity.failedCount, na: activity.naCount, missing: activity.missingCount }}
           size={80}
         />
         <div className="space-y-1">
           <PieChartLegend
-            passed={activity.passedCount}
-            failed={activity.failedCount}
-            na={activity.naCount}
+            data={{ completed: activity.completedCount, skipped: activity.skippedCount, failed: activity.failedCount, na: activity.naCount, missing: activity.missingCount }}
             resultLabels={getResultLabels(activity.displayConfiguration)}
           />
           <p className="text-xs text-muted-foreground">
@@ -211,8 +207,10 @@ function GapSection({ gap }: { gap: GapActivityItem }) {
               <tr key={i} className="border-b border-border">
                 <td className="px-2 py-1">{s.name}</td>
                 <td className="px-2 py-1">
-                  {s.result === "failed" ? (
-                    <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">{getResultLabels(gap.displayConfiguration).failed.label}</span>
+                  {s.result === "skipped" ? (
+                    <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">{getResultLabels(gap.displayConfiguration).skipped.label}</span>
+                  ) : s.result === "failed" ? (
+                    <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">נכשל</span>
                   ) : (
                     <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">חסר</span>
                   )}

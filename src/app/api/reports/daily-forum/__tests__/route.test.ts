@@ -12,6 +12,8 @@ vi.mock("@/lib/db/prisma", () => ({
     platoon: { findMany: vi.fn() },
     request: { findMany: vi.fn() },
     activity: { findMany: vi.fn() },
+    squad: { findMany: vi.fn() },
+    soldier: { groupBy: vi.fn() },
   },
 }));
 
@@ -114,6 +116,8 @@ describe("GET /api/reports/daily-forum", () => {
     ] as never);
     vi.mocked(prisma.request.findMany).mockResolvedValue([]);
     vi.mocked(prisma.activity.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.squad.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.soldier.groupBy).mockResolvedValue([] as never);
 
     const req = createMockRequest("GET", "/api/reports/daily-forum", undefined, {
       cycleId: "cycle-1",
@@ -161,6 +165,8 @@ describe("GET /api/reports/daily-forum", () => {
     ] as never);
     vi.mocked(prisma.request.findMany).mockResolvedValue([]);
     vi.mocked(prisma.activity.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.squad.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.soldier.groupBy).mockResolvedValue([] as never);
 
     const req = createMockRequest("GET", "/api/reports/daily-forum", undefined, {
       cycleId: "cycle-1",

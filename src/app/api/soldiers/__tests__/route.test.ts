@@ -460,15 +460,15 @@ describe("GET /api/soldiers — gap counts", () => {
         id: "act-1",
         platoonId: PLATOON,
         reports: [
-          { soldierId: "s1", result: "passed" },
-          { soldierId: "s2", result: "failed" },
+          { soldierId: "s1", result: "completed", failed: false },
+          { soldierId: "s2", result: "skipped", failed: false },
         ],
       },
       {
         id: "act-2",
         platoonId: PLATOON,
         reports: [
-          { soldierId: "s1", result: "passed" },
+          { soldierId: "s1", result: "completed", failed: false },
           // s2 has no report for act-2
         ],
       },

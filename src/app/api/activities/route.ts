@@ -76,8 +76,8 @@ export async function GET(request: NextRequest) {
     const scopedReports = scopedSoldierIds
       ? activity.reports.filter((r) => scopedSoldierIds!.has(r.soldierId))
       : activity.reports;
-    const passedCount = scopedReports.filter((r) => r.result === "passed").length;
-    const failedCount = scopedReports.filter((r) => r.result === "failed").length;
+    const passedCount = scopedReports.filter((r) => r.result === "completed").length;
+    const failedCount = scopedReports.filter((r) => r.result === "skipped").length;
     const naCount = scopedReports.filter((r) => r.result === "na").length;
     const missingCount = Math.max(0, totalSoldiers - passedCount - failedCount - naCount);
 

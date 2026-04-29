@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { SessionUser } from "@/types";
 
 const bulkSchema = z.object({
-  result: z.enum(["passed", "failed", "na"]),
+  result: z.enum(["completed", "skipped", "na"]),
   soldierIds: z.array(z.string().uuid()).min(1),
 });
 

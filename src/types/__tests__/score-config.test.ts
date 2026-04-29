@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   getActiveScores,
   parseScoreConfig,
+  evaluateScore,
+  calculateFailure,
   type ScoreConfig,
+  type ActiveScore,
 } from "../score-config";
 
 // ---------------------------------------------------------------------------
@@ -37,8 +40,8 @@ describe("getActiveScores", () => {
     };
     const result = getActiveScores(config);
     expect(result).toEqual([
-      { key: "score1", gradeKey: "grade1", label: "Speed", format: "time" },
-      { key: "score3", gradeKey: "grade3", label: "Accuracy", format: "number" },
+      { key: "score1", gradeKey: "grade1", label: "Speed", format: "time", threshold: null, thresholdOperator: null },
+      { key: "score3", gradeKey: "grade3", label: "Accuracy", format: "number", threshold: null, thresholdOperator: null },
     ]);
   });
 
@@ -110,5 +113,149 @@ describe("parseScoreConfig", () => {
     };
     const result = parseScoreConfig(JSON.stringify(config));
     expect(result).toEqual(config);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateScore
+// ---------------------------------------------------------------------------
+
+describe("evaluateScore", () => {
+  it("returns null when value is null", () => {
+    expect(evaluateScore(null, 50, "<")).toBeNull();
+  });
+
+  it("returns null when threshold is null", () => {
+    expect(evaluateScore(75, null, "<")).toBeNull();
+  });
+
+  it("returns null when operator is null", () => {
+    expect(evaluateScore(75, 50, null)).toBeNull();
+  });
+
+  it("returns null when operator is undefined", () => {
+    expect(evaluateScore(75, 50, undefined)).toBeNull();
+  });
+
+  it('">" operator: fails when value exceeds threshold', () => {
+    expect(evaluateScore(60, 50, ">")).toBe("failed");
+  });
+
+  it('">" operator: passes when value equals threshold', () => {
+    expect(evaluateScore(50, 50, ">")).toBe("passed");
+  });
+
+  it('">" operator: passes when value is below threshold', () => {
+    expect(evaluateScore(40, 50, ">")).toBe("passed");
+  });
+
+  it('">=" operator: fails when value equals threshold', () => {
+    expect(evaluateScore(50, 50, ">=")).toBe("failed");
+  });
+
+  it('">=" operator: passes when value is below threshold', () => {
+    expect(evaluateScore(49, 50, ">=")).toBe("passed");
+  });
+
+  it('"<" operator: fails when value is below threshold', () => {
+    expect(evaluateScore(40, 50, "<")).toBe("failed");
+  });
+
+  it('"<" operator: passes when value equals threshold', () => {
+    expect(evaluateScore(50, 50, "<")).toBe("passed");
+  });
+
+  it('"<" operator: passes when value exceeds threshold', () => {
+    expect(evaluateScore(60, 50, "<")).toBe("passed");
+  });
+
+  it('"<=" operator: fails when value equals threshold', () => {
+    expect(evaluateScore(50, 50, "<=")).toBe("failed");
+  });
+
+  it('"<=" operator: passes when value exceeds threshold', () => {
+    expect(evaluateScore(51, 50, "<=")).toBe("passed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// calculateFailure
+// ---------------------------------------------------------------------------
+
+describe("calculateFailure", () => {
+  const makeScore = (
+    gradeKey: string,
+    threshold: number | null,
+    operator: ">" | ">=" | "<" | "<=" | null,
+  ): ActiveScore => ({
+    key: `score${gradeKey.replace("grade", "")}` as ActiveScore["key"],
+    gradeKey: gradeKey as ActiveScore["gradeKey"],
+    label: `Score ${gradeKey}`,
+    format: "number",
+    threshold,
+    thresholdOperator: operator,
+  });
+
+  it("returns failed=false when failureThreshold is null (skips evaluation)", () => {
+    const scores = [makeScore("grade1", 50, "<")];
+    const result = calculateFailure({ grade1: 30 }, scores, null);
+    expect(result.failed).toBe(false);
+    // Skips score evaluation entirely — scoreResults is empty
+    expect(result.scoreResults.size).toBe(0);
+  });
+
+  it("returns failed=false when failureThreshold is undefined", () => {
+    const scores = [makeScore("grade1", 50, "<")];
+    const result = calculateFailure({ grade1: 30 }, scores, undefined);
+    expect(result.failed).toBe(false);
+  });
+
+  it("returns failed=true with single failure and failureThreshold=1", () => {
+    const scores = [makeScore("grade1", 50, "<")];
+    const result = calculateFailure({ grade1: 30 }, scores, 1);
+    expect(result.failed).toBe(true);
+    expect(result.scoreResults.get("grade1")).toBe("failed");
+  });
+
+  it("returns failed=false when score passes and failureThreshold=1", () => {
+    const scores = [makeScore("grade1", 50, "<")];
+    const result = calculateFailure({ grade1: 80 }, scores, 1);
+    expect(result.failed).toBe(false);
+    expect(result.scoreResults.get("grade1")).toBe("passed");
+  });
+
+  it("returns failed=true when failures meet failureThreshold=2", () => {
+    const scores = [
+      makeScore("grade1", 50, "<"),
+      makeScore("grade2", 100, ">"),
+    ];
+    const result = calculateFailure({ grade1: 30, grade2: 150 }, scores, 2);
+    expect(result.failed).toBe(true);
+    expect(result.scoreResults.get("grade1")).toBe("failed");
+    expect(result.scoreResults.get("grade2")).toBe("failed");
+  });
+
+  it("returns failed=false when only one failure with failureThreshold=2", () => {
+    const scores = [
+      makeScore("grade1", 50, "<"),
+      makeScore("grade2", 100, ">"),
+    ];
+    const result = calculateFailure({ grade1: 30, grade2: 80 }, scores, 2);
+    expect(result.failed).toBe(false);
+    expect(result.scoreResults.get("grade1")).toBe("failed");
+    expect(result.scoreResults.get("grade2")).toBe("passed");
+  });
+
+  it("null grade is not counted as failure", () => {
+    const scores = [makeScore("grade1", 50, "<")];
+    const result = calculateFailure({ grade1: null }, scores, 1);
+    expect(result.failed).toBe(false);
+    expect(result.scoreResults.get("grade1")).toBeNull();
+  });
+
+  it("handles empty active scores", () => {
+    const result = calculateFailure({ grade1: 50 }, [], 1);
+    expect(result.failed).toBe(false);
+    expect(result.scoreResults.size).toBe(0);
   });
 });

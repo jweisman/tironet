@@ -4,7 +4,7 @@ import { getActiveScores } from "@/types/score-config";
 import type { DisplayConfiguration } from "@/types/display-config";
 import { getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
-import { renderPieSvg } from "@/lib/reports/html-helpers";
+import { renderPieSvg, PIE_COLORS } from "@/lib/reports/html-helpers";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 // ---------------------------------------------------------------------------
@@ -33,9 +33,11 @@ export interface ActivitySummaryItem {
   date: string;
   scoreLabels: string[];
   scoreFormats: ("number" | "time")[];
-  passedCount: number;
+  completedCount: number;
+  skippedCount: number;
   failedCount: number;
   naCount: number;
+  missingCount: number;
   totalSoldiers: number;
   rows: ActivitySummaryRow[];
   failedSoldiers: ActivitySummarySoldier[];
@@ -95,6 +97,25 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
     orderBy: { date: "desc" },
   });
 
+  // Count active soldiers per platoon (for missing report calculation)
+  const soldierCountsByPlatoon = new Map<string, number>();
+  {
+    const squads = await prisma.squad.findMany({
+      where: { platoonId: { in: platoonIds } },
+      select: { id: true, platoonId: true },
+    });
+    const sqToPlatoon = new Map(squads.map((s) => [s.id, s.platoonId]));
+    const counts = await prisma.soldier.groupBy({
+      by: ["squadId"],
+      where: { cycleId, status: "active", squadId: { in: squads.map((s) => s.id) } },
+      _count: true,
+    });
+    for (const c of counts) {
+      const pId = sqToPlatoon.get(c.squadId);
+      if (pId) soldierCountsByPlatoon.set(pId, (soldierCountsByPlatoon.get(pId) ?? 0) + c._count);
+    }
+  }
+
   const result: ActivitySummaryItem[] = activities.map((activity) => {
     const at = activity.activityType;
     const activeScores = getActiveScores(at.scoreConfig as ScoreConfig | null);
@@ -103,9 +124,12 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
     const scoreCount = activeScores.length;
 
     const activeReports = activity.reports.filter((r) => r.soldier.status === "active");
-    const passedCount = activeReports.filter((r) => r.result === "passed").length;
-    const failedCount = activeReports.filter((r) => r.result === "failed").length;
+    const completedCount = activeReports.filter((r) => r.result === "completed" && !r.failed).length;
+    const skippedCount = activeReports.filter((r) => r.result === "skipped").length;
+    const failedCount = activeReports.filter((r) => r.result === "completed" && r.failed).length;
     const naCount = activeReports.filter((r) => r.result === "na").length;
+    const totalActiveSoldiers = soldierCountsByPlatoon.get(activity.platoonId) ?? activeReports.length;
+    const missingCount = Math.max(0, totalActiveSoldiers - activeReports.length);
 
     // grades[scoreIndex][] per squad key
     const squadMap = new Map<string, { company: string; platoon: string; squad: string; grades: number[][] }>();
@@ -172,7 +196,7 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
     }
 
     const failedSoldiers: ActivitySummarySoldier[] = activeReports
-      .filter((r) => r.result === "failed" || r.result === "na")
+      .filter((r) => r.result === "skipped" || r.result === "na" || r.failed)
       .map((r) => ({
         name: `${r.soldier.familyName} ${r.soldier.givenName}`,
         squad: r.soldier.squad.name,
@@ -188,8 +212,8 @@ export async function fetchActivitySummary(cycleId: string, platoonIds: string[]
       date: activity.date.toISOString().split("T")[0],
       scoreLabels,
       scoreFormats,
-      passedCount, failedCount, naCount,
-      totalSoldiers: activeReports.length,
+      completedCount, skippedCount, failedCount, naCount, missingCount,
+      totalSoldiers: totalActiveSoldiers,
       rows: mergedRows,
       failedSoldiers,
       displayConfiguration: at.displayConfiguration as DisplayConfiguration | null,
@@ -212,7 +236,8 @@ export function renderActivitySummaryHtml(
   });
 
   const activitiesHtml = data.activities.map((activity) => {
-    const pieSvg = renderPieSvg(activity.passedCount, activity.failedCount, activity.naCount);
+    const pieData = { completed: activity.completedCount, skipped: activity.skippedCount, failed: activity.failedCount, na: activity.naCount, missing: activity.missingCount };
+    const pieSvg = renderPieSvg(pieData);
     const labels = activity.scoreLabels;
 
     const resultLabels = getResultLabels(activity.displayConfiguration);
@@ -236,9 +261,11 @@ export function renderActivitySummaryHtml(
           ${pieSvg}
           <div>
             <div class="legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ${getResultLabels(activity.displayConfiguration).passed.label} (${activity.passedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> ${getResultLabels(activity.displayConfiguration).failed.label} (${activity.failedCount})</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#9ca3af"></span> ${getResultLabels(activity.displayConfiguration).na.label} (${activity.naCount})</span>
+              <span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.completed}"></span> ${resultLabels.completed.label} (${activity.completedCount})</span>
+              ${activity.skippedCount > 0 ? `<span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.skipped}"></span> ${resultLabels.skipped.label} (${activity.skippedCount})</span>` : ""}
+              ${activity.failedCount > 0 ? `<span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.failed}"></span> נכשל (${activity.failedCount})</span>` : ""}
+              ${activity.naCount > 0 ? `<span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.na}"></span> ${resultLabels.na.label} (${activity.naCount})</span>` : ""}
+              ${activity.missingCount > 0 ? `<span class="legend-item"><span class="legend-dot" style="background:${PIE_COLORS.missing}"></span> ללא דיווח (${activity.missingCount})</span>` : ""}
             </div>
             <p class="total-line">סה״כ ${hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}</p>
           </div>
@@ -250,12 +277,12 @@ export function renderActivitySummaryHtml(
         </table>
         ` : '<p class="no-data">אין נתונים</p>'}
         ${activity.failedSoldiers.length > 0 ? `
-        <h3 style="font-size:12px;font-weight:700;margin:12px 0 6px 0;">${resultLabels.failed.label} / ${resultLabels.na.label}</h3>
+        <h3 style="font-size:12px;font-weight:700;margin:12px 0 6px 0;">${resultLabels.skipped.label} / ${resultLabels.na.label}</h3>
         <table>
           <thead><tr><th>חייל</th><th>כיתה</th><th>תוצאה</th><th>הערה</th></tr></thead>
           <tbody>${activity.failedSoldiers.map((s) => {
-            const rl = s.result === "failed" ? resultLabels.failed.label : resultLabels.na.label;
-            return `<tr><td>${s.name}</td><td>${s.squad}</td><td${s.result === "failed" ? ' style="color:#ef4444"' : ""}>${rl}</td><td>${s.note ?? "—"}</td></tr>`;
+            const rl = s.result === "skipped" ? resultLabels.skipped.label : s.result === "na" ? resultLabels.na.label : "נכשל";
+            return `<tr><td>${s.name}</td><td>${s.squad}</td><td${s.result !== "na" ? ' style="color:#ef4444"' : ""}>${rl}</td><td>${s.note ?? "—"}</td></tr>`;
           }).join("\n")}</tbody>
         </table>
         ` : ""}

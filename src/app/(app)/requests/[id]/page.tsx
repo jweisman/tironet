@@ -487,7 +487,12 @@ export default function RequestDetailPage() {
       <div data-tour="request-details" className="rounded-xl border border-border bg-card p-4 space-y-1">
         <h2 className="text-sm font-semibold text-muted-foreground mb-2">פרטי הבקשה</h2>
 
-        <DetailRow label="תיאור" value={raw.description || "—"} />
+        {raw.description ? (
+          <div className="py-2 border-b border-border">
+            <span className="text-sm text-muted-foreground">תיאור</span>
+            <p className="text-sm font-medium mt-1 whitespace-pre-wrap">{raw.description}</p>
+          </div>
+        ) : null}
         <DetailRow label="מחלקה" value={raw.platoon_name} />
 
         {/* Leave-specific */}

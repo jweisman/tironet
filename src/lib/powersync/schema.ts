@@ -70,6 +70,7 @@ const activity_reports = new Table({
   activity_id: column.text,
   soldier_id: column.text,
   result: column.text,
+  failed: column.integer,
   grade1: column.real,
   grade2: column.real,
   grade3: column.real,

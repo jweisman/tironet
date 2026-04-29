@@ -85,7 +85,7 @@ const SOLDIERS_QUERY = `
           )
           OR EXISTS (
             SELECT 1 FROM activity_reports ar
-            WHERE ar.activity_id = a.id AND ar.soldier_id = s.id AND ar.result = 'failed'
+            WHERE ar.activity_id = a.id AND ar.soldier_id = s.id AND (ar.result = 'skipped' OR ar.failed = 1)
           )
         )
     ) AS gap_count,

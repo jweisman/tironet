@@ -105,7 +105,7 @@ const fullActivity = {
       },
     ],
   },
-  reports: [{ id: "r1", soldierId: "s1", result: "passed", grade1: null, grade2: null, grade3: null, grade4: null, grade5: null, grade6: null, note: null }],
+  reports: [{ id: "r1", soldierId: "s1", result: "completed", failed: false, grade1: null, grade2: null, grade3: null, grade4: null, grade5: null, grade6: null, note: null }],
 };
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ describe("GET /api/activities/[id]", () => {
     expect(json.squads).toHaveLength(2);
     expect(json.canEditMetadata).toBe(true);
     expect(json.canEditReports).toBe(true);
-    expect(json.squads[0].soldiers[0].report.result).toBe("passed");
+    expect(json.squads[0].soldiers[0].report.result).toBe("completed");
     expect(json.squads[1].soldiers[0].report.result).toBeNull();
   });
 

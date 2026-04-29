@@ -30,7 +30,8 @@ import { BulkImportReportsDialog } from "./BulkImportReportsDialog";
 import { ReportRow } from "./ReportRow";
 import { ActivityTypeIcon } from "./ActivityTypeIcon";
 import type { ActivityResult } from "@/types";
-import type { ActiveScore } from "@/types/score-config";
+import type { ActiveScore, ScoreConfig } from "@/types/score-config";
+import { calculateFailure } from "@/types/score-config";
 import type { DisplayConfiguration } from "@/types/display-config";
 import { getResultLabels, getNoteOptions } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
@@ -47,6 +48,7 @@ export const GRADE_KEYS: GradeKey[] = ["grade1", "grade2", "grade3", "grade4", "
 export interface SoldierReport {
   id: string | null;
   result: ActivityResult | null;
+  failed: boolean;
   grade1: number | null;
   grade2: number | null;
   grade3: number | null;
@@ -57,7 +59,7 @@ export interface SoldierReport {
 }
 
 export const EMPTY_REPORT: SoldierReport = {
-  id: null, result: null,
+  id: null, result: null, failed: false,
   grade1: null, grade2: null, grade3: null,
   grade4: null, grade5: null, grade6: null,
   note: null,
@@ -86,7 +88,7 @@ export interface ActivityDetailData {
   name: string;
   date: string;
   isRequired: boolean;
-  activityType: { id: string; name: string; icon: string; activeScores: ActiveScore[]; displayConfiguration?: DisplayConfiguration | null };
+  activityType: { id: string; name: string; icon: string; activeScores: ActiveScore[]; scoreConfig?: ScoreConfig | null; displayConfiguration?: DisplayConfiguration | null };
   platoon: { id: string; name: string; companyName: string };
   role: string;
   canEditMetadata: boolean;
@@ -136,6 +138,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
 
   const activeScores = data.activityType.activeScores;
+  const scoreConfig = data.activityType.scoreConfig ?? null;
   const resultLabels = getResultLabels(data.activityType.displayConfiguration);
   const noteOptions = getNoteOptions(data.activityType.displayConfiguration);
 
@@ -254,20 +257,28 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           );
           if (exists) {
             if (changedField) {
-              await db.execute(
-                `UPDATE activity_reports SET ${changedField} = ?, activity_id = ?, soldier_id = ? WHERE id = ?`,
-                [report[changedField], data.id, soldierId, rowId]
-              );
+              if (GRADE_KEYS.includes(changedField as GradeKey)) {
+                // Grade change: update grade + failed atomically
+                await db.execute(
+                  `UPDATE activity_reports SET ${changedField} = ?, failed = ?, activity_id = ?, soldier_id = ? WHERE id = ?`,
+                  [report[changedField], report.failed ? 1 : 0, data.id, soldierId, rowId]
+                );
+              } else {
+                await db.execute(
+                  `UPDATE activity_reports SET ${changedField} = ?, activity_id = ?, soldier_id = ? WHERE id = ?`,
+                  [report[changedField], data.id, soldierId, rowId]
+                );
+              }
             } else {
               await db.execute(
-                "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
-                [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, rowId]
+                "UPDATE activity_reports SET result = ?, failed = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
+                [report.result, report.failed ? 1 : 0, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, rowId]
               );
             }
           } else {
             await db.execute(
-              "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-              [rowId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
+              "INSERT INTO activity_reports (id, activity_id, soldier_id, result, failed, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              [rowId, data.id, soldierId, report.result, report.failed ? 1 : 0, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
             );
           }
           if (!report.id) {
@@ -292,6 +303,12 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
       // the code below runs.
       const current = reportsRef.current.get(soldierId) ?? EMPTY_REPORT;
       const updated: SoldierReport = { ...current, [field]: value };
+
+      // Recalculate failed when a grade changes
+      if (GRADE_KEYS.includes(field as GradeKey)) {
+        const { failed } = calculateFailure(updated as unknown as Record<string, number | null>, activeScores, scoreConfig?.failureThreshold);
+        updated.failed = failed;
+      }
 
       // Update React state (pure — no side effects inside the updater).
       setReports((prev) => {
@@ -355,17 +372,17 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         for (const { soldierId, report } of targets) {
           if (report.id) {
             await tx.execute(
-              "UPDATE activity_reports SET result = ? WHERE id = ?",
+              "UPDATE activity_reports SET result = ?, failed = 0 WHERE id = ?",
               [result, report.id]
             );
-            updates.set(soldierId, { ...report, result });
+            updates.set(soldierId, { ...report, result, failed: false });
           } else {
             const newId = newIds.get(soldierId)!;
             await tx.execute(
-              "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              "INSERT INTO activity_reports (id, activity_id, soldier_id, result, failed, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)",
               [newId, data.id, soldierId, result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
             );
-            updates.set(soldierId, { ...report, result, id: newId });
+            updates.set(soldierId, { ...report, result, failed: false, id: newId });
           }
         }
       });
@@ -401,15 +418,15 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
       for (const [soldierId, report] of imported) {
         if (report.id) {
           await tx.execute(
-            "UPDATE activity_reports SET result = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
-            [report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, report.id]
+            "UPDATE activity_reports SET result = ?, failed = ?, grade1 = ?, grade2 = ?, grade3 = ?, grade4 = ?, grade5 = ?, grade6 = ?, note = ? WHERE id = ?",
+            [report.result, report.failed ? 1 : 0, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note, report.id]
           );
           updates.set(soldierId, report);
         } else if (report.result !== null) {
           const newId = newIds.get(soldierId)!;
           await tx.execute(
-            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [newId, data.id, soldierId, report.result, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
+            "INSERT INTO activity_reports (id, activity_id, soldier_id, result, failed, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [newId, data.id, soldierId, report.result, report.failed ? 1 : 0, report.grade1, report.grade2, report.grade3, report.grade4, report.grade5, report.grade6, report.note]
           );
           updates.set(soldierId, { ...report, id: newId });
         }
@@ -498,7 +515,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     const today = new Date().toISOString().split("T")[0];
     if (activityDate >= today) return false;
     const r = reports.get(soldierId);
-    return !r || r.result === null || r.result === "failed";
+    return !r || r.result === null || r.result === "skipped" || r.failed === true;
   };
 
   const gapsCount = data.squads.reduce(
@@ -506,9 +523,10 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     0
   );
 
-  const getResultIcon = (result: ActivityResult | null) => {
-    if (result === "passed") return <span className="text-green-600">✓</span>;
-    if (result === "failed") return <span className="text-red-600">✗</span>;
+  const getResultIcon = (result: ActivityResult | null, failed?: boolean) => {
+    if (result === "completed" && failed) return <span className="text-red-600">✗</span>;
+    if (result === "completed") return <span className="text-green-600">✓</span>;
+    if (result === "skipped") return <span className="text-amber-600">✗</span>;
     if (result === "na") return <span className="text-muted-foreground">—</span>;
     return <span className="text-muted-foreground/30">·</span>;
   };
@@ -718,7 +736,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                           <div className="shrink-0 mx-2" style={{ width: activeScores.length * 40 }} />
                         )}
                         <div className="shrink-0 text-base w-6 text-center">
-                          {getResultIcon(report.result)}
+                          {getResultIcon(report.result, report.failed)}
                         </div>
                       </div>
                       {report.note && (
@@ -745,6 +763,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           activityId={data.id}
           activityTypeId={data.activityType.id}
           activeScores={activeScores}
+          scoreConfig={scoreConfig}
           soldiers={data.squads
             .filter((sq) => sq.canEdit)
             .flatMap((sq) =>

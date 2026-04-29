@@ -120,8 +120,8 @@ describe("GET /api/activities", () => {
         company: { name: "Company Alpha" },
       },
       reports: [
-        { result: "passed", soldierId: "s1" },
-        { result: "failed", soldierId: "s2" },
+        { result: "completed", soldierId: "s1" },
+        { result: "skipped", soldierId: "s2" },
       ],
     };
 
@@ -162,8 +162,8 @@ describe("GET /api/activities", () => {
         company: { name: "Company Alpha" },
       },
       reports: [
-        { result: "passed", soldierId: "s1" },
-        { result: "passed", soldierId: "s3" }, // s3 not in squad
+        { result: "completed", soldierId: "s1" },
+        { result: "completed", soldierId: "s3" }, // s3 not in squad
       ],
     };
 
