@@ -260,7 +260,7 @@ async function sendActiveRequestNotifications(
     if (r.type === "medical") {
       const appts = parseMedicalAppointments(r.medicalAppointments as string | null);
       const days = parseSickDays(r.sickDays as string | null);
-      return appts.some((a) => a.date === targetDate) || days.some((d) => d.date === targetDate);
+      return appts.some((a) => a.date.split("T")[0] === targetDate) || days.some((d) => d.date.split("T")[0] === targetDate);
     }
     return false;
   });
