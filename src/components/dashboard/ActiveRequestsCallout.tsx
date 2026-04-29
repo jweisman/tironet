@@ -78,6 +78,7 @@ interface ActiveRequest {
   soldierName: string;
   squadName: string;
   detail: string;
+  sortKey: string; // timed events sort before all-day events
 }
 
 function formatShortDate(iso: string): string {
@@ -106,6 +107,24 @@ function getTodayDetail(type: string, raw: RawActiveRequest, today: string): str
     return null;
   }
   return null;
+}
+
+/** Sort key: timed events by their time, all-day events (sick days, dateless leave) last. */
+function todaySortKey(r: RawActiveRequest, today: string): string {
+  if (r.type === "leave") {
+    const dep = r.departure_at;
+    if (dep && dep.includes("T") && !dep.endsWith("T00:00:00.000Z") && dep.split("T")[0] <= today) {
+      return dep; // has time → sort by it
+    }
+    return `${today}T99:99`; // all-day
+  }
+  if (r.type === "medical") {
+    const appts = parseMedicalAppointments(r.medical_appointments);
+    const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
+    if (todayAppt && todayAppt.date.includes("T")) return todayAppt.date;
+    return `${today}T99:99`; // sick day or date-only appointment
+  }
+  return `${today}T99:99`;
 }
 
 interface Props {
@@ -137,11 +156,9 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
         soldierName: r.soldier_name,
         squadName: r.squad_name,
         detail: getTodayDetail(r.type, r, today) ?? "",
+        sortKey: todaySortKey(r, today),
       }))
-      .sort((a, b) => {
-        const order: Record<string, number> = { leave: 0, medical: 1 };
-        return (order[a.type] ?? 2) - (order[b.type] ?? 2);
-      });
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [raw]);
 
   const [expanded, setExpanded] = useState(false);

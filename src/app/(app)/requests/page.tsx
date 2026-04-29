@@ -105,22 +105,46 @@ function isActiveRequest(r: RequestSummary, today: string): boolean {
   return isRequestActive(r, today);
 }
 
-/** Sort key for active requests: soonest relevant date first. */
-function activeRequestSortDate(r: RequestSummary): string {
+/**
+ * Sort key for active requests: soonest relevant date first,
+ * timed events before all-day events on the same day.
+ * Returns [dateKey, fullSortKey] — dateKey for grouping, fullSortKey for ordering.
+ */
+function activeRequestSortKeys(r: RequestSummary): [string, string] {
   if (r.type === "leave") {
-    return r.departureAt?.split("T")[0] ?? r.returnAt?.split("T")[0] ?? "9999";
+    const dep = r.departureAt ?? r.returnAt;
+    if (!dep) return ["9999", "9999"];
+    const dateKey = dep.split("T")[0];
+    // Leave departures have a time component — use it for within-day ordering
+    const hasTime = dep.includes("T") && !dep.endsWith("T00:00:00.000Z");
+    return [dateKey, hasTime ? dep : `${dateKey}T99:99`];
   }
   if (r.type === "medical") {
     const today = new Date().toISOString().split("T")[0];
     const appts = parseMedicalAppointments(r.medicalAppointments);
     const days = parseSickDays(r.sickDays);
-    const nextAppt = appts.find((a) => a.date.split("T")[0] >= today)?.date.split("T")[0];
-    const nextDay = days.find((d) => d.date >= today)?.date;
-    // Return the earlier of the two
-    if (nextAppt && nextDay) return nextAppt < nextDay ? nextAppt : nextDay;
-    return nextAppt ?? nextDay ?? "9999";
+    const nextAppt = appts.find((a) => a.date.split("T")[0] >= today);
+    const nextDay = days.find((d) => d.date >= today);
+    const apptDate = nextAppt?.date.split("T")[0];
+    const dayDate = nextDay?.date;
+    // Pick the earlier date; timed appointments sort before all-day sick days
+    const apptSort = nextAppt ? (nextAppt.date.includes("T") ? nextAppt.date : `${apptDate}T99:99`) : null;
+    const daySort = dayDate ? `${dayDate}T99:99` : null;
+    if (apptSort && daySort) {
+      return apptSort < daySort
+        ? [apptDate!, apptSort]
+        : [dayDate!, daySort];
+    }
+    if (apptSort) return [apptDate!, apptSort];
+    if (daySort) return [dayDate!, daySort];
+    return ["9999", "9999"];
   }
-  return "9999";
+  return ["9999", "9999"];
+}
+
+/** Date key for grouping active requests by day. */
+function activeRequestSortDate(r: RequestSummary): string {
+  return activeRequestSortKeys(r)[0];
 }
 
 function formatShortDate(iso: string): string {
@@ -284,7 +308,7 @@ export default function RequestsPage() {
     () =>
       allRequests
         .filter((r) => isActiveRequest(r, today) && (filterType === "all" || r.type === filterType))
-        .sort((a, b) => activeRequestSortDate(a).localeCompare(activeRequestSortDate(b))),
+        .sort((a, b) => activeRequestSortKeys(a)[1].localeCompare(activeRequestSortKeys(b)[1])),
     [allRequests, filterType, today],
   );
 
