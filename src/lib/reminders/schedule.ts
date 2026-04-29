@@ -38,7 +38,8 @@ export function parseAsIsraelTime(dateStr: string): Date {
 
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Jerusalem",
-    hour: "2-digit", minute: "2-digit", hour12: false,
+    hourCycle: "h23",
+    hour: "2-digit", minute: "2-digit",
     year: "numeric", month: "2-digit", day: "2-digit",
   });
 
