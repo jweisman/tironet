@@ -15,7 +15,7 @@ import {
 } from "@/components/activities/ActivityDetail";
 import type { ActivityResult, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
-import { parseScoreConfig, getActiveScores } from "@/types/score-config";
+import { parseScoreConfig, getActiveScores, calculateFailure } from "@/types/score-config";
 import { parseDisplayConfig } from "@/types/display-config";
 
 // ---------------------------------------------------------------------------
@@ -139,6 +139,10 @@ export default function ActivityPage() {
     const reportsMap = new Map<string, RawReport>();
     for (const r of reportsRows ?? []) reportsMap.set(r.soldier_id, r);
 
+    const scoreConfig = parseScoreConfig(activity.score_config);
+    const activeScores = getActiveScores(scoreConfig);
+    const displayConfig = parseDisplayConfig(activity.display_configuration);
+
     const squadId = activityAssignment?.unitType === "squad" ? activityAssignment.unitId : null;
 
     const squads = (squadsRows ?? [])
@@ -166,18 +170,28 @@ export default function ActivityPage() {
               status: s.status,
               idNumber: s.id_number,
               report: report
-                ? {
-                    id: report.id,
-                    result: report.result as ActivityResult,
-                    failed: Number(report.failed) === 1,
-                    grade1: report.grade1 != null ? Number(report.grade1) : null,
-                    grade2: report.grade2 != null ? Number(report.grade2) : null,
-                    grade3: report.grade3 != null ? Number(report.grade3) : null,
-                    grade4: report.grade4 != null ? Number(report.grade4) : null,
-                    grade5: report.grade5 != null ? Number(report.grade5) : null,
-                    grade6: report.grade6 != null ? Number(report.grade6) : null,
-                    note: report.note,
-                  }
+                ? (() => {
+                    const grades = {
+                      grade1: report.grade1 != null ? Number(report.grade1) : null,
+                      grade2: report.grade2 != null ? Number(report.grade2) : null,
+                      grade3: report.grade3 != null ? Number(report.grade3) : null,
+                      grade4: report.grade4 != null ? Number(report.grade4) : null,
+                      grade5: report.grade5 != null ? Number(report.grade5) : null,
+                      grade6: report.grade6 != null ? Number(report.grade6) : null,
+                    };
+                    // Recalculate failed on first display from current scores + thresholds.
+                    // No failureThreshold → failed is always false (no auto-failure configured).
+                    const failed = scoreConfig?.failureThreshold
+                      ? calculateFailure(grades, activeScores, scoreConfig.failureThreshold).failed
+                      : false;
+                    return {
+                      id: report.id,
+                      result: report.result as ActivityResult,
+                      failed,
+                      ...grades,
+                      note: report.note,
+                    };
+                  })()
                 : { id: null, result: null, failed: false, grade1: null, grade2: null, grade3: null, grade4: null, grade5: null, grade6: null, note: null },
             };
           });
@@ -190,10 +204,6 @@ export default function ActivityPage() {
       role === "company_commander" ||
       role === "instructor";
     const canEditReports = role !== "";
-
-    const scoreConfig = parseScoreConfig(activity.score_config);
-    const activeScores = getActiveScores(scoreConfig);
-    const displayConfig = parseDisplayConfig(activity.display_configuration);
 
     return {
       id: activity.id,

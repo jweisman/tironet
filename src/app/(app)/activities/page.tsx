@@ -206,7 +206,7 @@ export default function ActivitiesPage() {
     sessionStorage.setItem("activities:filter", f);
   }
 
-  const [sortMode, setSortMode] = useState<SortMode>("date-asc");
+  const [sortMode, setSortMode] = useState<SortMode>("date-desc");
   const [sortOpen, setSortOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);

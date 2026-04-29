@@ -388,15 +388,17 @@ export const activityDetailTourSteps: VersionedStep[] = [
     element: "[data-tour='activity-edit-reports']",
     popover: {
       title: "עריכת דיווח",
-      description: "לחצו כדי לדווח על כל חייל — תוצאה, ציונים והערות. בסיום לחצו ׳סיים עריכה׳.",
+      description: "סמנו השתתפות (ביצע/לא ביצע) והזינו ציונים. כשלונות מסומנים אוטומטית לפי סף שהוגדר בסוג הפעילות.",
     },
+    version: 2,
   },
   {
     element: "[data-tour='activity-gaps-filter']",
     popover: {
       title: "סינון פערים",
-      description: "הציגו רק חיילים עם פערים — חסרי דיווח או שנכשלו.",
+      description: "הציגו רק חיילים עם פערים — חסרי דיווח, לא ביצעו, או נכשלו בציונים.",
     },
+    version: 2,
   },
   {
     element: "[data-tour='activity-soldier-row']",

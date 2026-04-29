@@ -229,7 +229,9 @@ Writes are **instant and optimistic** — no network round-trip, no loading stat
 
 **Score thresholds:** Each `ScoreSlot` in `scoreConfig` has optional `threshold` (number) and `thresholdOperator` (`>`, `>=`, `<`, `<=`). The operator defines the **failing** condition (e.g., `>` means fail if score > threshold — used for time scores where lower is better). `scoreConfig.failureThreshold` (number) controls how many individually-failed scores mark the report as failed (e.g., 1 = any single score failure).
 
-**`calculateFailure()`** in `src/types/score-config.ts` is the pure function that evaluates grades against thresholds. Returns `{ failed: boolean, scoreResults: Map<gradeKey, "passed"|"failed"|null> }`. Call it from `handleReportChange` when a grade changes, and from `BulkImportReportsDialog` before writing imported reports.
+**`calculateFailure()`** in `src/types/score-config.ts` is the pure function that evaluates grades against thresholds. Returns `{ failed: boolean, scoreResults: Map<gradeKey, "passed"|"failed"|null> }`. Called from: `handleReportChange` (on grade change), `BulkImportReportsDialog` (before import), and the first-display recalculation (see below).
+
+**First-display recalculation:** The activity detail page (`/activities/[id]/page.tsx`) recalculates `failed` from current grades + thresholds in its `useMemo` — this ensures correct display regardless of what's stored. A separate one-shot `useEffect` in `ActivityDetail` (`syncFailedToSQLite`) reads the stored values from SQLite, diffs against the calculation, and writes back any mismatches. This converges the DB on first view without affecting the display (which is already correct from the `useMemo`). When no `failureThreshold` is configured, `failed` is always `false`.
 
 **Concurrency:** `failed` is always updated atomically with the grade that triggered it — same SQL UPDATE, same PowerSync CRUD op, same server PATCH. This preserves the field-level merge pattern. The server trusts the client's `failed` value (accepted race for concurrent edits with failureThreshold > 1).
 

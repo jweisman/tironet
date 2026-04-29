@@ -107,6 +107,36 @@ interface ActivityType {
   icon: string;
 }
 
+/** One-shot: read reports from SQLite, recalculate `failed`, write back diffs. */
+async function syncFailedToSQLite(
+  db: { getAll: <T>(sql: string, params?: unknown[]) => Promise<T[]>; writeTransaction: (fn: (tx: { execute: (sql: string, params?: unknown[]) => Promise<unknown> }) => Promise<void>) => Promise<void> },
+  activityId: string,
+  activeScores: ActiveScore[],
+  failureThreshold: number | null | undefined,
+) {
+  const rows = await db.getAll<{ id: string; failed: number; grade1: number | null; grade2: number | null; grade3: number | null; grade4: number | null; grade5: number | null; grade6: number | null }>(
+    "SELECT id, failed, grade1, grade2, grade3, grade4, grade5, grade6 FROM activity_reports WHERE activity_id = ?",
+    [activityId],
+  );
+
+  const stale: { id: string; failed: boolean }[] = [];
+  for (const row of rows) {
+    const expected = failureThreshold
+      ? calculateFailure(row as unknown as Record<string, number | null>, activeScores, failureThreshold).failed
+      : false;
+    if (expected !== (Number(row.failed) === 1)) {
+      stale.push({ id: row.id, failed: expected });
+    }
+  }
+  if (stale.length === 0) return;
+
+  await db.writeTransaction(async (tx) => {
+    for (const { id, failed } of stale) {
+      await tx.execute("UPDATE activity_reports SET failed = ? WHERE id = ?", [failed ? 1 : 0, id]);
+    }
+  });
+}
+
 function formatDate(isoString: string): string {
   const dateStr = isoString.split("T")[0];
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -196,6 +226,13 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
       return changed ? { ...prev, squads: mergedSquads } : prev;
     });
   }, [initialData]);
+
+  // One-shot write-back on mount: read reports from SQLite, recalculate
+  // `failed` from current scores + thresholds, write back any diffs.
+  const failureThreshold = scoreConfig?.failureThreshold;
+  useEffect(() => {
+    syncFailedToSQLite(db, data.id, activeScores, failureThreshold);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Metadata edit state
   const [metaName, setMetaName] = useState(data.name);
