@@ -124,7 +124,7 @@ function addNewBadge(step: DriveStep): DriveStep {
 
 export function useTour({ page, steps, config, ready = true }: UseTourOptions) {
   const driverRef = useRef<ReturnType<typeof driver> | null>(null);
-  const { showTour } = useUserPreferences();
+  const { showTour, loaded: prefsLoaded } = useUserPreferences();
 
   const maxVersion = getMaxVersion(steps);
 
@@ -208,6 +208,7 @@ export function useTour({ page, steps, config, ready = true }: UseTourOptions) {
   // - Gated by showTour user preference and `ready` flag
   useEffect(() => {
     if (!ready) return; // page data not loaded yet
+    if (!prefsLoaded) return; // wait for server preference before deciding
     const storedVersion = getSeenVersion(page);
     if (storedVersion >= maxVersion) return; // already seen everything
     if (!showTour) return; // user opted out of auto-tours
@@ -252,7 +253,7 @@ export function useTour({ page, steps, config, ready = true }: UseTourOptions) {
       observer.disconnect();
       clearTimeout(timeout);
     };
-  }, [page, steps, maxVersion, showTour, ready, buildFullDriver, buildNewStepsDriver]);
+  }, [page, steps, maxVersion, showTour, prefsLoaded, ready, buildFullDriver, buildNewStepsDriver]);
 
   // Cleanup on unmount
   useEffect(() => {

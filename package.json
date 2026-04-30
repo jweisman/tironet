@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed-test": "tsx scripts/seed-test.ts",
     "db:migrate": "prisma migrate dev && npx prisma generate",
     "db:studio": "prisma studio",
     "make-admin": "tsx scripts/make-admin.ts",
