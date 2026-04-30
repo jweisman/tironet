@@ -80,6 +80,7 @@ interface ActiveRequest {
   detail: string;
   sortKey: string; // timed events sort before all-day events
   imminent: boolean; // time is within the next hour
+  past: boolean; // timed event has already passed
 }
 
 /** Returns true when the ISO datetime is within the next 60 minutes. */
@@ -135,6 +136,28 @@ function isImminentRequest(r: RawActiveRequest, today: string, now: Date): boole
   return false;
 }
 
+/** Returns true when the request's timed event for today has already passed. */
+function isPastRequest(r: RawActiveRequest, today: string, now: Date): boolean {
+  if (r.type === "leave") {
+    if (r.departure_at && r.departure_at.split("T")[0] === today) {
+      return isTimedAndPast(r.departure_at, now);
+    }
+    return false;
+  }
+  if (r.type === "medical") {
+    const appts = parseMedicalAppointments(r.medical_appointments);
+    const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
+    if (todayAppt) return isTimedAndPast(todayAppt.date, now);
+    return false;
+  }
+  return false;
+}
+
+function isTimedAndPast(iso: string, now: Date): boolean {
+  if (!iso.includes("T") || iso.endsWith("T00:00:00.000Z")) return false;
+  return new Date(iso).getTime() <= now.getTime();
+}
+
 /** Sort key: timed events by their time, all-day events (sick days, dateless leave) last. */
 function todaySortKey(r: RawActiveRequest, today: string): string {
   if (r.type === "leave") {
@@ -185,6 +208,7 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
         detail: getTodayDetail(r.type, r, today) ?? "",
         sortKey: todaySortKey(r, today),
         imminent: isImminentRequest(r, today, now),
+        past: isPastRequest(r, today, now),
       }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [raw, typeFilter]);
@@ -215,7 +239,7 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
               key={r.id}
               type="button"
               onClick={() => router.push(`/requests/${r.id}`)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-start transition-colors hover:bg-muted/50 active:bg-muted ${r.imminent ? "bg-violet-100 dark:bg-violet-950/30" : ""}`}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-start transition-colors hover:bg-muted/50 active:bg-muted ${r.imminent ? "bg-violet-100 dark:bg-violet-950/30" : ""} ${r.past ? "opacity-50" : ""}`}
             >
               <Icon size={16} className="shrink-0 text-muted-foreground" />
               <div className="flex-1 min-w-0">
