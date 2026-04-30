@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TRANSPORTATION_LABELS } from "@/lib/requests/constants";
-import { leaveDepartureLimits, leaveReturnLimits } from "@/lib/requests/date-limits";
 import type { Transportation } from "@/types";
 
 interface Props {
@@ -113,8 +112,6 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
             step={900}
             value={departureAt}
             onChange={(e) => setDepartureAt(e.target.value)}
-            min={leaveDepartureLimits().min}
-            max={leaveDepartureLimits().max}
             dir="ltr"
             lang="he"
           />
@@ -127,8 +124,6 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
             step={900}
             value={returnAt}
             onChange={(e) => setReturnAt(e.target.value)}
-            min={departureAt || leaveReturnLimits().min}
-            max={leaveReturnLimits().max}
             dir="ltr"
             lang="he"
           />
