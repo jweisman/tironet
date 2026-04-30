@@ -43,9 +43,13 @@ export function TironetPowerSyncProvider({
     // This catches corruption during sync (downloadError) without polling.
     const dispose = localDb.registerListener({
       statusChanged: (status) => {
-        if (isCorruptError(status.dataFlowStatus?.downloadError)) {
+        const dlErr = status.dataFlowStatus?.downloadError;
+        if (dlErr) {
+          const msg = (dlErr as { message?: string }).message ?? String(dlErr);
+          console.error("[PowerSync] downloadError:", msg);
+        }
+        if (isCorruptError(dlErr)) {
           console.error("[PowerSync] DB corruption detected via status change");
-          const dlErr = status.dataFlowStatus!.downloadError;
           Sentry.captureMessage(
             `DB corruption detected: ${(dlErr as { message?: string }).message ?? String(dlErr)}`,
             {

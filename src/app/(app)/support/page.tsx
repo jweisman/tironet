@@ -478,7 +478,7 @@ const STATE_LABELS: Record<SyncState, { label: string; color: string }> = {
 };
 
 function SyncStatusSection() {
-  const { state, lastSyncedAt } = useSyncStatus();
+  const { state, lastSyncedAt, errorMessage } = useSyncStatus();
   const { label, color } = STATE_LABELS[state];
   const isError = state === "error";
 
@@ -508,6 +508,12 @@ function SyncStatusSection() {
           <span className="text-xs text-muted-foreground">סנכרון אחרון</span>
           <span className="text-xs">{lastSyncLabel}</span>
         </div>
+        {errorMessage && (
+          <div className="pt-1 border-t border-border">
+            <span className="text-xs text-muted-foreground">שגיאה</span>
+            <p className="text-xs text-red-600 dark:text-red-400 font-mono break-all mt-0.5">{errorMessage}</p>
+          </div>
+        )}
       </div>
 
       {/* Reset option — expanded by default on error, collapsible otherwise */}

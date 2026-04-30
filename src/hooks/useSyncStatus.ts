@@ -20,7 +20,7 @@ export type SyncState = "initializing" | "synced" | "syncing" | "stale" | "error
  * After the first connection, disconnects are debounced by 2s to avoid
  * brief yellow flashes during WebSocket reconnects.
  */
-export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefined } {
+export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefined; errorMessage: string | null } {
   const status = useSafeStatus();
   const connected = status.connected ?? false;
   const downloading = status.dataFlowStatus?.downloading ?? false;
@@ -28,10 +28,12 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
   const lastSyncedAt = status.lastSyncedAt;
 
   // Track whether PowerSync has connected at least once this session.
-  // This is a ref (not persisted) — resets on every page load.
-  const hasConnectedThisSession = useRef(false);
-  if (connected) {
-    hasConnectedThisSession.current = true;
+  // Derived from `connected` via useState initializer + lazy update so
+  // the value is available during render (refs can't be read during render
+  // per React Compiler rules) and without setState-in-effect lint issues.
+  const [hasConnectedThisSession, setHasConnectedThisSession] = useState(connected);
+  if (connected && !hasConnectedThisSession) {
+    setHasConnectedThisSession(true);
   }
 
   // Debounce connected → disconnected transitions by 2s
@@ -74,7 +76,7 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
 
   if (isCorrupt) {
     state = "error";
-  } else if (!hasConnectedThisSession.current) {
+  } else if (!hasConnectedThisSession) {
     // Haven't connected yet this session — grey until first connection.
     state = "initializing";
   } else if (debouncedConnected && downloading) {
@@ -88,5 +90,5 @@ export function useSyncStatus(): { state: SyncState; lastSyncedAt: Date | undefi
     state = "initializing";
   }
 
-  return { state, lastSyncedAt };
+  return { state, lastSyncedAt, errorMessage: errorMessage || null };
 }
