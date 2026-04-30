@@ -408,7 +408,7 @@ describe("buildCalendarEvents — commander events", () => {
     return {
       id: "ce1",
       userName: "כהן יוסי",
-      name: "חופשה",
+      type: "leave",
       startDate: "2026-04-10",
       endDate: "2026-04-12",
       platoonId: "p1",
@@ -423,7 +423,8 @@ describe("buildCalendarEvents — commander events", () => {
     expect(events.map((e) => e.date)).toEqual(["2026-04-10", "2026-04-11", "2026-04-12"]);
     expect(events[0]).toMatchObject({
       type: "commander_event",
-      label: "כהן יוסי — חופשה",
+      label: "כהן יוסי",
+      icon: "DoorOpen",
       platoonId: "p1",
       sourceId: "ce1",
     });

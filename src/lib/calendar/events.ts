@@ -199,12 +199,17 @@ export interface RawRequest {
 export interface RawCommanderEventData {
   id: string;
   userName: string;
-  name: string;
+  type: string; // "leave" | "medical"
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   platoonId: string;
   platoonName: string;
 }
+
+const CMDR_EVENT_ICON: Record<string, string> = {
+  leave: "DoorOpen",
+  medical: "Stethoscope",
+};
 
 export function buildCalendarEvents(
   activities: RawActivity[],
@@ -295,9 +300,10 @@ export function buildCalendarEvents(
           id: `cmdr-${ce.id}-${date}`,
           date,
           type: "commander_event",
-          label: `${ce.userName} — ${ce.name}`,
+          label: ce.userName,
           platoonId: ce.platoonId,
           platoonName: ce.platoonName,
+          icon: CMDR_EVENT_ICON[ce.type] ?? null,
           sourceId: ce.id,
         });
       }

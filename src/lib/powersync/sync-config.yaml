@@ -116,7 +116,7 @@ streams:
   commander_events:
     auto_subscribe: true
     query: >
-      SELECT id, cycle_id, user_id, user_name, platoon_id, name,
+      SELECT id, cycle_id, user_id, user_name, platoon_id, type,
              description, start_date, end_date
       FROM commander_events
       WHERE cycle_id IN auth.parameter('cycle_ids')

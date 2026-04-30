@@ -225,7 +225,7 @@ export async function GET(req: NextRequest) {
           id: true,
           userId: true,
           cycleId: true,
-          name: true,
+          type: true,
           description: true,
           startDate: true,
           endDate: true,
@@ -247,7 +247,7 @@ export async function GET(req: NextRequest) {
     commanderEvents: (eventsByUser.get(u.id) ?? []).map((ev) => ({
       id: ev.id,
       cycleId: ev.cycleId,
-      name: ev.name,
+      type: ev.type,
       description: ev.description,
       startDate: ev.startDate.toISOString().split("T")[0],
       endDate: ev.endDate.toISOString().split("T")[0],

@@ -98,11 +98,16 @@ export interface GapActivityItem {
 export interface CommanderEventItem {
   id: string;
   userName: string;
-  name: string;
+  type: string;
   description: string | null;
   startDate: string;
   endDate: string;
 }
+
+const CMDR_EVENT_TYPE_LABELS: Record<string, string> = {
+  leave: "יציאה",
+  medical: "רפואה",
+};
 
 export interface PlatoonForumSection {
   platoonId: string;
@@ -620,7 +625,7 @@ export async function fetchDailyForum(
     select: {
       id: true,
       userName: true,
-      name: true,
+      type: true,
       description: true,
       startDate: true,
       endDate: true,
@@ -635,7 +640,7 @@ export async function fetchDailyForum(
     cmdrByPlatoon.get(ev.platoonId)!.push({
       id: ev.id,
       userName: ev.userName,
-      name: ev.name,
+      type: ev.type,
       description: ev.description,
       startDate: ev.startDate.toISOString().split("T")[0],
       endDate: ev.endDate.toISOString().split("T")[0],
@@ -894,9 +899,9 @@ export function renderDailyForumHtml(data: DailyForumData): string {
             const start = new Date(ev.startDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
             const end = new Date(ev.endDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
             const dateRange = ev.startDate === ev.endDate ? start : `${start} — ${end}`;
-            return `<tr><td>${escapeHtml(ev.userName)}</td><td>${escapeHtml(ev.name)}</td><td>${dateRange}</td><td>${ev.description ? escapeHtml(ev.description) : ""}</td></tr>`;
+            return `<tr><td>${escapeHtml(ev.userName)}</td><td>${escapeHtml(CMDR_EVENT_TYPE_LABELS[ev.type] ?? ev.type)}</td><td>${dateRange}</td><td>${ev.description ? escapeHtml(ev.description) : ""}</td></tr>`;
           }).join("\n");
-          return `${platoonHeader(p)}<table><thead><tr><th>מפקד</th><th>אירוע</th><th>תאריכים</th><th>תיאור</th></tr></thead><tbody>${rows}</tbody></table>`;
+          return `${platoonHeader(p)}<table><thead><tr><th>מפקד</th><th>סוג</th><th>תאריכים</th><th>תיאור</th></tr></thead><tbody>${rows}</tbody></table>`;
         })
         .join("\n")
     : '<p class="no-data">אין אירועי מפקדים</p>';

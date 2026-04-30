@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { UserPlus, Pencil, CalendarPlus, CalendarClock, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { UserPlus, Pencil, CalendarPlus, Trash2, ChevronDown, ChevronUp, DoorOpen, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,16 @@ import { toIsraeliDisplay } from "@/lib/phone";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type { Role } from "@/types";
 import type { ManagedUser, ManagedInvitation, UnitStructure, CommanderEventSummary } from "@/types/users";
+
+const CMDR_EVENT_TYPE_LABELS: Record<string, string> = {
+  leave: "יציאה",
+  medical: "רפואה",
+};
+
+const CMDR_EVENT_TYPE_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  leave: DoorOpen,
+  medical: Stethoscope,
+};
 
 type Props = {
   initialUsers: ManagedUser[];
@@ -78,12 +88,12 @@ export function CommanderUsersPanel({
   async function handleSaveEvent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const name = (form.get("name") as string).trim();
+    const type = form.get("type") as string;
     const description = (form.get("description") as string).trim() || undefined;
     const startDate = form.get("startDate") as string;
     const endDate = (form.get("endDate") as string) || startDate;
 
-    if (!name) { setEventError("יש להזין שם אירוע"); return; }
+    if (!type) { setEventError("יש לבחור סוג אירוע"); return; }
     if (!startDate) { setEventError("יש לבחור תאריך"); return; }
     if (endDate < startDate) { setEventError("תאריך הסיום חייב להיות אחרי תאריך ההתחלה"); return; }
 
@@ -94,7 +104,7 @@ export function CommanderUsersPanel({
         const res = await fetch(`/api/commander-events/${editingEvent.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description: description ?? null, startDate, endDate }),
+          body: JSON.stringify({ type, description: description ?? null, startDate, endDate }),
         });
         if (!res.ok) throw new Error("Failed to update");
         toast.success("האירוע עודכן");
@@ -102,7 +112,7 @@ export function CommanderUsersPanel({
         const res = await fetch("/api/commander-events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cycleId, userId: eventDialogUserId, name, description, startDate, endDate }),
+          body: JSON.stringify({ cycleId, userId: eventDialogUserId, type, description, startDate, endDate }),
         });
         if (!res.ok) throw new Error("Failed to create");
         toast.success("האירוע נוצר");
@@ -339,14 +349,16 @@ export function CommanderUsersPanel({
                         <tr className="!border-t-0">
                           <td colSpan={4} className="p-3">
                             <div className="me-8 ms-6 rounded-lg bg-muted/40 border border-border/50 px-3 py-2 space-y-2">
-                              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
-                                <CalendarClock className="w-3 h-3" />
+                              <div className="text-[11px] text-muted-foreground font-medium">
                                 אירועים
                               </div>
-                              {events.map((ev) => (
+                              {events.map((ev) => {
+                                const EvIcon = CMDR_EVENT_TYPE_ICONS[ev.type];
+                                return (
                                 <div key={ev.id} className="flex items-center gap-2 text-xs">
+                                  {EvIcon && <EvIcon size={14} className="shrink-0 text-muted-foreground" />}
                                   <div className="flex-1 min-w-0">
-                                    <span className="font-medium">{ev.name}</span>
+                                    <span className="font-medium">{CMDR_EVENT_TYPE_LABELS[ev.type] ?? ev.type}</span>
                                     <span className="text-muted-foreground">
                                       {" · "}
                                       {new Date(ev.startDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" })}
@@ -373,7 +385,8 @@ export function CommanderUsersPanel({
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </td>
                         </tr>
@@ -423,15 +436,17 @@ export function CommanderUsersPanel({
             </DialogHeader>
             <form onSubmit={handleSaveEvent} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="event-name" required>שם האירוע</Label>
-                <input
-                  id="event-name"
-                  name="name"
-                  type="text"
-                  defaultValue={editingEvent?.name ?? ""}
+                <Label htmlFor="event-type" required>סוג</Label>
+                <select
+                  id="event-type"
+                  name="type"
+                  defaultValue={editingEvent?.type ?? ""}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="חופשה, ביקור רופא..."
-                />
+                >
+                  <option value="" disabled>בחר סוג</option>
+                  <option value="leave">יציאה</option>
+                  <option value="medical">רפואה</option>
+                </select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="event-description">תיאור</Label>

@@ -118,7 +118,7 @@ const commander_events = new Table({
   user_id: column.text,
   user_name: column.text,
   platoon_id: column.text,
-  name: column.text,
+  type: column.text,
   description: column.text,
   start_date: column.text,
   end_date: column.text,

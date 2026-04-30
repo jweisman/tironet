@@ -330,7 +330,7 @@ function ForumContent({ data }: { data: DailyForumData }) {
                         <thead>
                           <tr className="border-b-2 border-border">
                             <th className="text-start px-2 py-1.5 font-semibold">מפקד</th>
-                            <th className="text-start px-2 py-1.5 font-semibold">אירוע</th>
+                            <th className="text-start px-2 py-1.5 font-semibold">סוג</th>
                             <th className="text-start px-2 py-1.5 font-semibold">תאריכים</th>
                             <th className="text-start px-2 py-1.5 font-semibold">תיאור</th>
                           </tr>
@@ -343,7 +343,7 @@ function ForumContent({ data }: { data: DailyForumData }) {
                             return (
                               <tr key={ev.id} className="border-b border-border">
                                 <td className="px-2 py-1.5">{ev.userName}</td>
-                                <td className="px-2 py-1.5">{ev.name}</td>
+                                <td className="px-2 py-1.5">{{ leave: "יציאה", medical: "רפואה" }[ev.type] ?? ev.type}</td>
                                 <td className="px-2 py-1.5">{dateRange}</td>
                                 <td className="px-2 py-1.5 text-muted-foreground">{ev.description ?? ""}</td>
                               </tr>

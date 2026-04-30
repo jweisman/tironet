@@ -159,7 +159,7 @@ export function CalendarMobileView({
                     style={{ backgroundColor: color.hex }}
                   />
                   <div className="shrink-0" style={{ color: color.hex }}>
-                    {event.type === "activity" && event.icon ? (
+                    {(event.type === "activity" || event.type === "commander_event") && event.icon ? (
                       <ActivityTypeIcon icon={event.icon} name={event.label} size={18} />
                     ) : (
                       (() => {

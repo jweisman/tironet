@@ -13,7 +13,7 @@ export type UserAssignment = {
 export type CommanderEventSummary = {
   id: string;
   cycleId: string;
-  name: string;
+  type: "leave" | "medical";
   description: string | null;
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD

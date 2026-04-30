@@ -529,7 +529,7 @@ model CommanderEvent {
   userId      String   @map("user_id") @db.Uuid
   userName    String   @map("user_name")
   platoonId   String   @map("platoon_id") @db.Uuid
-  name        String
+  type        String   // "leave" or "medical"
   description String?
   startDate   DateTime @map("start_date") @db.Date
   endDate     DateTime @map("end_date") @db.Date

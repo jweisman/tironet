@@ -2,8 +2,18 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, ChevronLeft } from "lucide-react";
+import { ChevronLeft, DoorOpen, Stethoscope } from "lucide-react";
 import { useQuery } from "@powersync/react";
+
+const CMDR_EVENT_TYPE_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  leave: DoorOpen,
+  medical: Stethoscope,
+};
+
+const CMDR_EVENT_TYPE_LABELS: Record<string, string> = {
+  leave: "יציאה",
+  medical: "רפואה",
+};
 
 // ---------------------------------------------------------------------------
 // Query: all commander events active today in scope
@@ -12,7 +22,7 @@ import { useQuery } from "@powersync/react";
 
 const COMMANDER_EVENTS_QUERY = `
   SELECT
-    ce.id, ce.user_id, ce.user_name, ce.name, ce.start_date, ce.end_date, ce.description
+    ce.id, ce.user_id, ce.user_name, ce.type, ce.start_date, ce.end_date, ce.description
   FROM commander_events ce
   WHERE ce.cycle_id = ?
     AND ce.start_date <= ?
@@ -24,7 +34,7 @@ interface RawCommanderEvent {
   id: string;
   user_id: string;
   user_name: string;
-  name: string;
+  type: string;
   start_date: string;
   end_date: string;
   description: string | null;
@@ -47,7 +57,7 @@ export function CommanderEventsCallout({ cycleId }: { cycleId: string }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <CalendarClock size={14} className="text-muted-foreground" />
+        <DoorOpen size={14} className="text-muted-foreground" />
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           אירועי מפקדים היום
         </h2>
@@ -56,6 +66,7 @@ export function CommanderEventsCallout({ cycleId }: { cycleId: string }) {
       </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
         {events.map((ev) => {
+          const Icon = CMDR_EVENT_TYPE_ICONS[ev.type];
           const startDisplay = new Date(ev.start_date + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
           const endDisplay = new Date(ev.end_date + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
           const dateRange = ev.start_date === ev.end_date ? startDisplay : `${startDisplay} — ${endDisplay}`;
@@ -67,11 +78,11 @@ export function CommanderEventsCallout({ cycleId }: { cycleId: string }) {
               onClick={() => router.push(`/users?expand=${ev.user_id}`)}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-start transition-colors hover:bg-muted/50 active:bg-muted"
             >
-              <CalendarClock size={16} className="shrink-0 text-muted-foreground" />
+              {Icon && <Icon size={16} className="shrink-0 text-muted-foreground" />}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
                   {ev.user_name}
-                  <span className="text-muted-foreground font-normal"> · {ev.name}</span>
+                  <span className="text-muted-foreground font-normal"> · {CMDR_EVENT_TYPE_LABELS[ev.type] ?? ev.type}</span>
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {dateRange}

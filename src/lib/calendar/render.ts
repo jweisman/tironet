@@ -96,9 +96,9 @@ function getEventIcon(event: CalendarEvent): string {
     case "leave": return ICON_LEAVE;
     case "medical_appointment": return ICON_MEDICAL;
     case "sick_day": return ICON_SICK;
-    case "commander_event": return ICON_COMMANDER;
+    case "commander_event":
     case "activity": {
-      if (!event.icon) return ICON_FALLBACK;
+      if (!event.icon) return event.type === "commander_event" ? ICON_COMMANDER : ICON_FALLBACK;
       let svg = activityIconCache.get(event.icon);
       if (svg === undefined) {
         svg = lucideIconToSvg(event.icon) ?? ICON_FALLBACK;

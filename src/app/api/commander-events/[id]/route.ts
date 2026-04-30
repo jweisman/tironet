@@ -6,7 +6,7 @@ import { effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 
 const UpdateSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
+  type: z.enum(["leave", "medical"]).optional(),
   description: z.string().max(1000).nullable().optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -60,7 +60,7 @@ export async function PATCH(
   }
 
   const data: Record<string, unknown> = {};
-  if (parsed.data.name !== undefined) data.name = parsed.data.name;
+  if (parsed.data.type !== undefined) data.type = parsed.data.type;
   if (parsed.data.description !== undefined) data.description = parsed.data.description;
   if (parsed.data.startDate !== undefined) data.startDate = new Date(parsed.data.startDate + "T00:00:00.000Z");
   if (parsed.data.endDate !== undefined) data.endDate = new Date(parsed.data.endDate + "T00:00:00.000Z");

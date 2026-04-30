@@ -153,7 +153,7 @@ export async function fetchCalendarData(
       select: {
         id: true,
         userName: true,
-        name: true,
+        type: true,
         startDate: true,
         endDate: true,
         platoonId: true,
@@ -163,7 +163,7 @@ export async function fetchCalendarData(
     rawCommanderEvents = cmdrEvents.map((ce) => ({
       id: ce.id,
       userName: ce.userName,
-      name: ce.name,
+      type: ce.type,
       startDate: ce.startDate.toISOString().split("T")[0],
       endDate: ce.endDate.toISOString().split("T")[0],
       platoonId: ce.platoonId,

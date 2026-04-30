@@ -35,7 +35,7 @@ export function CalendarEventChip({ type, label, color, activityIcon, href }: Ca
     href && "hover:opacity-80 transition-opacity",
   );
 
-  const iconEl = type === "activity" && activityIcon ? (
+  const iconEl = (type === "activity" || type === "commander_event") && activityIcon ? (
     <ActivityTypeIcon icon={activityIcon} name={label} size={10} className="shrink-0" />
   ) : (
     (() => {

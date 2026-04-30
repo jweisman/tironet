@@ -5,10 +5,12 @@ import { auth } from "@/lib/auth/auth";
 import { effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 
+const COMMANDER_EVENT_TYPES = ["leave", "medical"] as const;
+
 const CreateSchema = z.object({
   cycleId: z.string().uuid(),
   userId: z.string().uuid(),
-  name: z.string().min(1).max(200),
+  type: z.enum(COMMANDER_EVENT_TYPES),
   description: z.string().max(1000).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { cycleId, userId, name, description, startDate } = parsed.data;
+  const { cycleId, userId, type, description, startDate } = parsed.data;
   const endDate = parsed.data.endDate ?? startDate;
 
   if (endDate < startDate) {
@@ -125,7 +127,7 @@ export async function POST(req: NextRequest) {
       userId,
       userName: `${targetUser.familyName} ${targetUser.givenName}`,
       platoonId,
-      name,
+      type,
       description: description ?? null,
       startDate: new Date(startDate + "T00:00:00.000Z"),
       endDate: new Date(endDate + "T00:00:00.000Z"),
