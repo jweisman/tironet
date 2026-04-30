@@ -224,7 +224,8 @@ export class TironetConnector implements PowerSyncBackendConnector {
             cycle_id: "cycleId", squad_id: "squadId",
             given_name: "givenName", family_name: "familyName",
             id_number: "idNumber", civilian_id: "civilianId", profile_image: "profileImage",
-            emergency_phone: "emergencyPhone", date_of_birth: "dateOfBirth",
+            emergency_phone: "emergencyPhone", emergency_contact_name: "emergencyContactName",
+            emergency_contact_relationship: "emergencyContactRelationship", date_of_birth: "dateOfBirth",
           };
           function mapSoldierData(d: Record<string, unknown>) {
             const body: Record<string, unknown> = {};

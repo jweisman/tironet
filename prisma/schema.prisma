@@ -259,6 +259,8 @@ model Soldier {
   profileImage   String?       @map("profile_image")
   phone          String?
   emergencyPhone String?       @map("emergency_phone")
+  emergencyContactName         String?       @map("emergency_contact_name")
+  emergencyContactRelationship String?       @map("emergency_contact_relationship")
   street         String?
   apt            String?
   city           String?

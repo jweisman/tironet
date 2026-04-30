@@ -17,6 +17,8 @@ const patchSchema = z.object({
   profileImage: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   emergencyPhone: z.string().nullable().optional(),
+  emergencyContactName: z.string().nullable().optional(),
+  emergencyContactRelationship: z.string().nullable().optional(),
   street: z.string().nullable().optional(),
   apt: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
@@ -263,6 +265,8 @@ export async function PATCH(
       updateData.emergencyPhone = null;
     }
   }
+  if (parsed.data.emergencyContactName !== undefined) updateData.emergencyContactName = parsed.data.emergencyContactName;
+  if (parsed.data.emergencyContactRelationship !== undefined) updateData.emergencyContactRelationship = parsed.data.emergencyContactRelationship;
   if (parsed.data.street !== undefined) updateData.street = parsed.data.street;
   if (parsed.data.apt !== undefined) updateData.apt = parsed.data.apt;
   if (parsed.data.city !== undefined) updateData.city = parsed.data.city;

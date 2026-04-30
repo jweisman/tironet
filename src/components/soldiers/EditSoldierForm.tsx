@@ -18,6 +18,15 @@ import { toIsraeliDisplay } from "@/lib/phone";
 const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
 import type { SoldierStatus } from "@/types";
 
+const RELATIONSHIP_OPTIONS = [
+  { value: "mother", label: "אמא" },
+  { value: "father", label: "אבא" },
+  { value: "sibling", label: "אח/אחות" },
+  { value: "spouse", label: "בן/בת זוג" },
+  { value: "friend", label: "חבר/ה" },
+  { value: "other", label: "אחר" },
+] as const;
+
 interface SoldierData {
   id: string;
   givenName: string;
@@ -29,6 +38,8 @@ interface SoldierData {
   profileImage: string | null;
   phone: string | null;
   emergencyPhone: string | null;
+  emergencyContactName: string | null;
+  emergencyContactRelationship: string | null;
   street: string | null;
   apt: string | null;
   city: string | null;
@@ -51,6 +62,8 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
   const [status, setStatus] = useState<SoldierStatus>(soldier.status);
   const [phone, setPhone] = useState(soldier.phone ? toIsraeliDisplay(soldier.phone) : "");
   const [emergencyPhone, setEmergencyPhone] = useState(soldier.emergencyPhone ? toIsraeliDisplay(soldier.emergencyPhone) : "");
+  const [emergencyContactName, setEmergencyContactName] = useState(soldier.emergencyContactName ?? "");
+  const [emergencyContactRelationship, setEmergencyContactRelationship] = useState(soldier.emergencyContactRelationship ?? "");
   const [street, setStreet] = useState(soldier.street ?? "");
   const [apt, setApt] = useState(soldier.apt ?? "");
   const [city, setCity] = useState(soldier.city ?? "");
@@ -86,6 +99,8 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
           profileImage: imageBase64,
           phone: phone.trim() || null,
           emergencyPhone: emergencyPhone.trim() || null,
+          emergencyContactName: emergencyContactName.trim() || null,
+          emergencyContactRelationship: emergencyContactRelationship || null,
           street: street.trim() || null,
           apt: apt.trim() || null,
           city: city.trim() || null,
@@ -109,6 +124,8 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {/* פרטים אישיים */}
+      <h3 className="text-sm font-semibold text-muted-foreground pt-1">פרטים אישיים</h3>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="edit-given" required>שם פרטי</Label>
@@ -257,29 +274,18 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-phone">טלפון</Label>
-          <Input
-            id="edit-phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="לדוגמה: 050-1234567"
-            dir="ltr"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-emergency-phone">טלפון חירום</Label>
-          <Input
-            id="edit-emergency-phone"
-            type="tel"
-            value={emergencyPhone}
-            onChange={(e) => setEmergencyPhone(e.target.value)}
-            placeholder="לדוגמה: 050-9876543"
-            dir="ltr"
-          />
-        </div>
+      {/* פרטי קשר */}
+      <h3 className="text-sm font-semibold text-muted-foreground pt-1">פרטי קשר</h3>
+      <div className="space-y-1.5">
+        <Label htmlFor="edit-phone">טלפון</Label>
+        <Input
+          id="edit-phone"
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="לדוגמה: 050-1234567"
+          dir="ltr"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -322,6 +328,52 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
           rows={3}
           className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         />
+      </div>
+
+      {/* איש קשר לחירום */}
+      <h3 className="text-sm font-semibold text-muted-foreground pt-1">איש קשר לחירום</h3>
+      <div className="space-y-1.5">
+        <Label htmlFor="edit-emergency-phone">טלפון חירום</Label>
+        <Input
+          id="edit-emergency-phone"
+          type="tel"
+          value={emergencyPhone}
+          onChange={(e) => setEmergencyPhone(e.target.value)}
+          placeholder="לדוגמה: 050-9876543"
+          dir="ltr"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-emergency-name">שם איש קשר</Label>
+          <Input
+            id="edit-emergency-name"
+            value={emergencyContactName}
+            onChange={(e) => setEmergencyContactName(e.target.value)}
+            placeholder="שם מלא"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>קרבה</Label>
+          <Select
+            value={emergencyContactRelationship}
+            onValueChange={(v) => setEmergencyContactRelationship(!v || v === "__none__" ? "" : v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="בחר קרבה">
+                {RELATIONSHIP_OPTIONS.find((o) => o.value === emergencyContactRelationship)?.label ?? "בחר קרבה"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">ללא</SelectItem>
+              {RELATIONSHIP_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

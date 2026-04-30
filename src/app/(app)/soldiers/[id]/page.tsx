@@ -43,6 +43,15 @@ import { formatGradeDisplay } from "@/lib/score-format";
 // Constants
 // ---------------------------------------------------------------------------
 
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  mother: "אמא",
+  father: "אבא",
+  sibling: "אח/אחות",
+  spouse: "בן/בת זוג",
+  friend: "חבר/ה",
+  other: "אחר",
+};
+
 const STATUS_LABEL: Record<SoldierStatus, string> = {
   active: "פעיל",
   transferred: "הועבר",
@@ -92,6 +101,7 @@ const SOLDIER_QUERY = `
   SELECT
     s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
     s.id_number, s.civilian_id, s.cycle_id, s.squad_id, s.phone, s.emergency_phone,
+    s.emergency_contact_name, s.emergency_contact_relationship,
     s.street, s.apt, s.city, s.notes, s.date_of_birth,
     sq.name AS squad_name, sq.platoon_id,
     p.id AS platoon_id, p.name AS platoon_name
@@ -177,6 +187,7 @@ interface RawSoldier {
   id: string; given_name: string; family_name: string;
   id_number: string | null; civilian_id: string | null; rank: string | null; status: string; profile_image: string | null;
   phone: string | null; emergency_phone: string | null;
+  emergency_contact_name: string | null; emergency_contact_relationship: string | null;
   street: string | null; apt: string | null; city: string | null; notes: string | null;
   date_of_birth: string | null;
   cycle_id: string; squad_id: string;
@@ -307,6 +318,8 @@ export default function SoldierDetailPage() {
     profileImage: raw.profile_image,
     phone: raw.phone,
     emergencyPhone: raw.emergency_phone,
+    emergencyContactName: raw.emergency_contact_name,
+    emergencyContactRelationship: raw.emergency_contact_relationship,
     street: raw.street,
     apt: raw.apt,
     city: raw.city,
@@ -463,7 +476,7 @@ export default function SoldierDetailPage() {
         </div>
 
         {/* Contact info & notes */}
-        {(raw.phone || raw.emergency_phone || raw.street || raw.city || raw.notes) && (
+        {(raw.phone || raw.street || raw.city || raw.notes) && (
           <div className="border-t border-border pt-3 space-y-1.5 text-sm">
             {raw.phone && (
               <div className="flex items-center gap-2">
@@ -478,12 +491,6 @@ export default function SoldierDetailPage() {
                 >
                   <MessageCircle size={16} />
                 </a>
-              </div>
-            )}
-            {raw.emergency_phone && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">טלפון חירום:</span>
-                <a href={`tel:${raw.emergency_phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.emergency_phone)}</a>
               </div>
             )}
             {(raw.street || raw.city) && (
@@ -505,6 +512,25 @@ export default function SoldierDetailPage() {
               <div className="flex items-start gap-2">
                 <span className="text-muted-foreground shrink-0">הערות:</span>
                 <span className="whitespace-pre-wrap">{raw.notes}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Emergency contact */}
+        {(raw.emergency_phone || raw.emergency_contact_name) && (
+          <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+            <span className="text-xs font-semibold text-muted-foreground">איש קשר לחירום</span>
+            {raw.emergency_contact_name && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">שם:</span>
+                <span>{raw.emergency_contact_name}{raw.emergency_contact_relationship ? ` (${RELATIONSHIP_LABELS[raw.emergency_contact_relationship] ?? raw.emergency_contact_relationship})` : ""}</span>
+              </div>
+            )}
+            {raw.emergency_phone && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">טלפון:</span>
+                <a href={`tel:${raw.emergency_phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.emergency_phone)}</a>
               </div>
             )}
           </div>
