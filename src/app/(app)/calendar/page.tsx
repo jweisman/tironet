@@ -21,11 +21,11 @@ import {
   getMonthBounds,
 } from "@/lib/calendar/events";
 import type { PlatoonColor } from "@/lib/calendar/events";
-import { CalendarGrid } from "@/components/reports/calendar/CalendarGrid";
-import { CalendarToolbar } from "@/components/reports/calendar/CalendarToolbar";
-import { CalendarLegend } from "@/components/reports/calendar/CalendarLegend";
-import { CalendarMobileView } from "@/components/reports/calendar/CalendarMobileView";
-import { MonthNav } from "@/components/reports/calendar/MonthNav";
+import { CalendarGrid } from "@/components/calendar/CalendarGrid";
+import { CalendarToolbar } from "@/components/calendar/CalendarToolbar";
+import { CalendarLegend } from "@/components/calendar/CalendarLegend";
+import { CalendarMobileView } from "@/components/calendar/CalendarMobileView";
+import { MonthNav } from "@/components/calendar/MonthNav";
 
 export default function CalendarPage() {
   const { selectedCycleId, isLoading: cycleLoading } = useCycle();
