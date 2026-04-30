@@ -66,7 +66,7 @@ export default async function InvitePage({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="flex-1 flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-bold">טירונט</h1>
@@ -137,7 +137,7 @@ export default async function InvitePage({
 
 function InviteError({ message }: { message: string }) {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="flex-1 flex items-center justify-center p-4">
       <div className="text-center space-y-3">
         <h1 className="text-xl font-bold">טירונט</h1>
         <p className="text-muted-foreground">{message}</p>

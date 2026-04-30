@@ -19,9 +19,11 @@ export default function PublicLayout({
   }, []);
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <InstallPrompt />
-      {children}
-    </>
+      <div className="flex-1 flex flex-col">
+        {children}
+      </div>
+    </div>
   );
 }

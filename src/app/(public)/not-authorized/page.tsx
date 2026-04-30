@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 export default function NotAuthorizedPage() {
   const t = useTranslations("auth");
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-6">
+    <main className="flex flex-1 items-center justify-center bg-background p-6">
       <div className="max-w-sm text-center space-y-4">
         <h1 className="text-2xl font-bold">{t("notAuthorized")}</h1>
         <p className="text-muted-foreground">{t("notAuthorizedDesc")}</p>

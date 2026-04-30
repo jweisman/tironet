@@ -96,7 +96,7 @@ function LoginForm() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-6">
+    <main className="flex flex-1 items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <SoldierLogo className="h-28 w-auto mx-auto mb-4 text-[#273617] dark:text-[#7C9A6D]" />
