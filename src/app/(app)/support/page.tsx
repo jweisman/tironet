@@ -214,6 +214,80 @@ async function collectDiagnostics(
     diagnostics["Sample Queries"] = { error: String(e) };
   }
 
+  // Push Notifications — browser-side state
+  try {
+    const pushSupported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    const pushDiag: Record<string, unknown> = {
+      supported: pushSupported,
+      permission: pushSupported ? Notification.permission : "unsupported",
+    };
+
+    if (pushSupported) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+        || ("standalone" in navigator && (navigator as unknown as { standalone: boolean }).standalone);
+      pushDiag.iosRequiresInstall = isIOS && !isStandalone;
+
+      // Check for active PushManager subscription
+      try {
+        const reg = await navigator.serviceWorker?.getRegistration();
+        if (reg) {
+          const sub = await reg.pushManager.getSubscription();
+          pushDiag.hasActiveSubscription = !!sub;
+          if (sub) {
+            pushDiag.subscriptionEndpointDomain = new URL(sub.endpoint).hostname;
+            pushDiag.subscriptionExpirationTime = sub.expirationTime
+              ? new Date(sub.expirationTime).toISOString()
+              : null;
+          }
+        } else {
+          pushDiag.hasActiveSubscription = false;
+          pushDiag.noServiceWorkerRegistration = true;
+        }
+      } catch (e) {
+        pushDiag.subscriptionCheckError = String(e);
+      }
+    }
+
+    // Server-side subscription and preference data
+    try {
+      const controller = new AbortController();
+      const pushTimeout = setTimeout(() => controller.abort(), 5_000);
+      const res = await fetch("/api/push/diagnostics", { signal: controller.signal });
+      clearTimeout(pushTimeout);
+      if (res.ok) {
+        const serverData = await res.json();
+        pushDiag.serverSubscriptionCount = serverData.subscriptions?.length ?? 0;
+        pushDiag.serverSubscriptions = serverData.subscriptions;
+        pushDiag.serverPreferences = serverData.preferences;
+
+        // Flag mismatch: browser has subscription but none on server, or vice versa
+        if (pushDiag.hasActiveSubscription && serverData.subscriptions?.length === 0) {
+          pushDiag.mismatch = "browser has subscription but server has none";
+        } else if (!pushDiag.hasActiveSubscription && serverData.subscriptions?.length > 0) {
+          pushDiag.mismatch = "server has subscriptions but browser has none";
+        } else if (
+          pushDiag.hasActiveSubscription &&
+          pushDiag.subscriptionEndpointDomain &&
+          serverData.subscriptions?.length > 0 &&
+          !serverData.subscriptions.some(
+            (s: { endpointDomain: string }) => s.endpointDomain === pushDiag.subscriptionEndpointDomain,
+          )
+        ) {
+          pushDiag.mismatch = "browser endpoint domain does not match any server subscription";
+        }
+      } else {
+        pushDiag.serverFetchError = `HTTP ${res.status}`;
+      }
+    } catch (e) {
+      pushDiag.serverFetchError = String(e);
+    }
+
+    diagnostics["Push Notifications"] = pushDiag;
+  } catch (e) {
+    diagnostics["Push Notifications"] = { error: String(e) };
+  }
+
   // Service worker
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
