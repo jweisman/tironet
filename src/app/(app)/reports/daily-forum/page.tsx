@@ -253,23 +253,25 @@ function ForumContent({ data }: { data: DailyForumData }) {
         <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
           סיכום נוכחות
         </h2>
-        {data.attendance.length === 0 ? (
-          <p className="text-xs text-muted-foreground">אין נתונים</p>
-        ) : (
-          data.attendance.map((p) => (
-            <div key={p.platoonName} className="mb-4">
-              {data.attendance.length > 1 && (
-                <div className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-1 mt-2">
-                  {p.platoonName} ({p.presentCount}/{p.totalCount})
-                </div>
-              )}
-              {data.attendance.length === 1 && (
-                <p className="text-sm font-semibold mb-2">נוכחים: {p.presentCount}/{p.totalCount}</p>
-              )}
-              <AttendanceTable rows={p.absent} showSquad />
-            </div>
-          ))
-        )}
+        <div className="ps-4">
+          {data.attendance.length === 0 ? (
+            <p className="text-xs text-muted-foreground">אין נתונים</p>
+          ) : (
+            data.attendance.map((p) => (
+              <div key={p.platoonName} className="mb-4">
+                {data.attendance.length > 1 && (
+                  <div className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-1 mt-2">
+                    {p.platoonName} ({p.presentCount}/{p.totalCount})
+                  </div>
+                )}
+                {data.attendance.length === 1 && (
+                  <p className="text-sm font-semibold mb-2">נוכחים: {p.presentCount}/{p.totalCount}</p>
+                )}
+                <AttendanceTable rows={p.absent} showSquad />
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* בקשות */}
@@ -278,34 +280,50 @@ function ForumContent({ data }: { data: DailyForumData }) {
           בקשות
         </h2>
 
-        <div className="mb-5">
-          <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
-            ממתינות ({totalOpen})
-          </h3>
-          {totalOpen === 0 ? (
-            <p className="text-xs text-muted-foreground">אין בקשות ממתינות</p>
-          ) : (
-            <>
-              <RequestTypePlatoons title="רפואה" platoons={platoons} getRequests={(p) => p.openRequests.medical} multi={multi} />
-              <RequestTypePlatoons title='ת"ש' platoons={platoons} getRequests={(p) => p.openRequests.hardship} multi={multi} />
-              <RequestTypePlatoons title="יציאה" platoons={platoons} getRequests={(p) => p.openRequests.leave} multi={multi} />
-            </>
-          )}
-        </div>
+        {(() => {
+          const openTypes = [
+            { title: "רפואה", get: (p: PlatoonForumSection) => p.openRequests.medical },
+            { title: 'ת"ש', get: (p: PlatoonForumSection) => p.openRequests.hardship },
+            { title: "יציאה", get: (p: PlatoonForumSection) => p.openRequests.leave },
+          ].filter((t) => platoons.some((p) => t.get(p).length > 0));
+          const collapseType = openTypes.length === 1;
+          return (
+            <div className="mb-5 ps-4">
+              <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
+                ממתינות{collapseType && openTypes[0] ? ` — ${openTypes[0].title}` : ""} ({totalOpen})
+              </h3>
+              {totalOpen === 0 ? (
+                <p className="text-xs text-muted-foreground">אין בקשות ממתינות</p>
+              ) : (
+                openTypes.map((t) => (
+                  <RequestTypePlatoons key={t.title} title={collapseType ? "" : t.title} platoons={platoons} getRequests={t.get} multi={multi} />
+                ))
+              )}
+            </div>
+          );
+        })()}
 
-        <div className="mb-5">
-          <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
-            פעילות ({totalActive})
-          </h3>
-          {totalActive === 0 ? (
-            <p className="text-xs text-muted-foreground">אין בקשות פעילות</p>
-          ) : (
-            <>
-              <RequestTypePlatoons title="רפואה" platoons={platoons} getRequests={(p) => p.activeRequests.medical} multi={multi} highlightDates />
-              <RequestTypePlatoons title="יציאה" platoons={platoons} getRequests={(p) => p.activeRequests.leave} multi={multi} highlightDates />
-            </>
-          )}
-        </div>
+        {(() => {
+          const activeTypes = [
+            { title: "רפואה", get: (p: PlatoonForumSection) => p.activeRequests.medical },
+            { title: "יציאה", get: (p: PlatoonForumSection) => p.activeRequests.leave },
+          ].filter((t) => platoons.some((p) => t.get(p).length > 0));
+          const collapseType = activeTypes.length === 1;
+          return (
+            <div className="mb-5 ps-4">
+              <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
+                פעילות{collapseType && activeTypes[0] ? ` — ${activeTypes[0].title}` : ""} ({totalActive})
+              </h3>
+              {totalActive === 0 ? (
+                <p className="text-xs text-muted-foreground">אין בקשות פעילות</p>
+              ) : (
+                activeTypes.map((t) => (
+                  <RequestTypePlatoons key={t.title} title={collapseType ? "" : t.title} platoons={platoons} getRequests={t.get} multi={multi} highlightDates />
+                ))
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* אירועי מפקדים */}
@@ -316,46 +334,48 @@ function ForumContent({ data }: { data: DailyForumData }) {
             <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
               אירועי מפקדים ({totalCmdr})
             </h2>
-            {totalCmdr === 0 ? (
-              <p className="text-xs text-muted-foreground">אין אירועי מפקדים</p>
-            ) : (
-              platoons.map((p) => {
-                const events = p.commanderEvents ?? [];
-                if (events.length === 0) return null;
-                return (
-                  <div key={p.platoonId}>
-                    {multi && <PlatoonLabel platoon={p} />}
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm border-collapse">
-                        <thead>
-                          <tr className="border-b-2 border-border">
-                            <th className="text-start px-2 py-1.5 font-semibold">מפקד</th>
-                            <th className="text-start px-2 py-1.5 font-semibold">סוג</th>
-                            <th className="text-start px-2 py-1.5 font-semibold">תאריכים</th>
-                            <th className="text-start px-2 py-1.5 font-semibold">תיאור</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {events.map((ev) => {
-                            const start = new Date(ev.startDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
-                            const end = new Date(ev.endDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
-                            const dateRange = ev.startDate === ev.endDate ? start : `${start} — ${end}`;
-                            return (
-                              <tr key={ev.id} className="border-b border-border">
-                                <td className="px-2 py-1.5">{ev.userName}</td>
-                                <td className="px-2 py-1.5">{{ leave: "יציאה", medical: "רפואה" }[ev.type] ?? ev.type}</td>
-                                <td className="px-2 py-1.5">{dateRange}</td>
-                                <td className="px-2 py-1.5 text-muted-foreground">{ev.description ?? ""}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+            <div className="ps-4">
+              {totalCmdr === 0 ? (
+                <p className="text-xs text-muted-foreground">אין אירועי מפקדים</p>
+              ) : (
+                platoons.map((p) => {
+                  const events = p.commanderEvents ?? [];
+                  if (events.length === 0) return null;
+                  return (
+                    <div key={p.platoonId}>
+                      {multi && <PlatoonLabel platoon={p} />}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="border-b-2 border-border">
+                              <th className="text-start px-2 py-1.5 font-semibold">מפקד</th>
+                              <th className="text-start px-2 py-1.5 font-semibold">סוג</th>
+                              <th className="text-start px-2 py-1.5 font-semibold">תאריכים</th>
+                              <th className="text-start px-2 py-1.5 font-semibold">תיאור</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {events.map((ev) => {
+                              const start = new Date(ev.startDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+                              const end = new Date(ev.endDate + "T12:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+                              const dateRange = ev.startDate === ev.endDate ? start : `${start} — ${end}`;
+                              return (
+                                <tr key={ev.id} className="border-b border-border">
+                                  <td className="px-2 py-1.5">{ev.userName}</td>
+                                  <td className="px-2 py-1.5">{{ leave: "יציאה", medical: "רפואה" }[ev.type] ?? ev.type}</td>
+                                  <td className="px-2 py-1.5">{dateRange}</td>
+                                  <td className="px-2 py-1.5 text-muted-foreground">{ev.description ?? ""}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         );
       })()}
@@ -366,7 +386,7 @@ function ForumContent({ data }: { data: DailyForumData }) {
           הספקים
         </h2>
 
-        <div className="mb-5">
+        <div className="mb-5 ps-4">
           <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
             פעילויות היום
           </h3>
@@ -387,7 +407,7 @@ function ForumContent({ data }: { data: DailyForumData }) {
           )}
         </div>
 
-        <div>
+        <div className="ps-4">
           <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
             פעילויות מחר
           </h3>
@@ -437,7 +457,7 @@ function ForumContent({ data }: { data: DailyForumData }) {
         <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
           תכנון מול ביצוע
         </h2>
-        <div>
+        <div className="ps-4">
           <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
             פערים
           </h3>
@@ -474,10 +494,12 @@ function RequestTypePlatoons({
   if (all.length === 0) return null;
 
   return (
-    <div className="mb-3">
-      <div className="text-xs font-semibold bg-muted px-2 py-1 rounded mb-1">
-        {title} ({all.length})
-      </div>
+    <div className={cn("mb-3", title && "ps-3")}>
+      {title && (
+        <div className="text-xs font-semibold border-r-2 border-muted-foreground/40 px-2 py-1 mb-1 text-muted-foreground">
+          {title} ({all.length})
+        </div>
+      )}
       {platoons.map((p) => {
         const reqs = getRequests(p);
         if (reqs.length === 0) return null;

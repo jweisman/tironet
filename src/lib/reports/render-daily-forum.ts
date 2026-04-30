@@ -736,7 +736,7 @@ function renderRequestTypeSection(title: string, requests: OpenRequestItem[], op
 
   return `
     <div class="type-group">
-      <div class="type-header">${escapeHtml(title)} (${requests.length})</div>
+      ${title ? `<div class="type-header">${escapeHtml(title)} (${requests.length})</div>` : ""}
       ${cards}
     </div>
   `;
@@ -874,20 +874,25 @@ export function renderDailyForumHtml(data: DailyForumData): string {
   }
 
   const totalOpen = data.platoons.reduce((s, p) => s + p.openRequests.medical.length + p.openRequests.hardship.length + p.openRequests.leave.length, 0);
+  // Count how many request types have data — collapse type header when only one
+  const openTypes = [
+    { title: "רפואה", get: (p: PlatoonForumSection) => p.openRequests.medical },
+    { title: 'ת"ש', get: (p: PlatoonForumSection) => p.openRequests.hardship },
+    { title: "יציאה", get: (p: PlatoonForumSection) => p.openRequests.leave },
+  ].filter((t) => data.platoons.some((p) => t.get(p).length > 0));
+  const collapseOpenType = openTypes.length === 1;
   const openHtml = totalOpen > 0
-    ? [
-        renderTypePlatoons("רפואה", (p) => p.openRequests.medical),
-        renderTypePlatoons('ת"ש', (p) => p.openRequests.hardship),
-        renderTypePlatoons("יציאה", (p) => p.openRequests.leave),
-      ].join("\n")
+    ? openTypes.map((t) => renderTypePlatoons(collapseOpenType ? "" : t.title, t.get)).join("\n")
     : '<p class="no-data">אין בקשות ממתינות</p>';
 
   const totalActive = data.platoons.reduce((s, p) => s + p.activeRequests.medical.length + p.activeRequests.leave.length, 0);
+  const activeTypes = [
+    { title: "רפואה", get: (p: PlatoonForumSection) => p.activeRequests.medical },
+    { title: "יציאה", get: (p: PlatoonForumSection) => p.activeRequests.leave },
+  ].filter((t) => data.platoons.some((p) => t.get(p).length > 0));
+  const collapseActiveType = activeTypes.length === 1;
   const activeHtml = totalActive > 0
-    ? [
-        renderTypePlatoons("רפואה", (p) => p.activeRequests.medical, { highlightDates: true }),
-        renderTypePlatoons("יציאה", (p) => p.activeRequests.leave, { highlightDates: true }),
-      ].join("\n")
+    ? activeTypes.map((t) => renderTypePlatoons(collapseActiveType ? "" : t.title, t.get, { highlightDates: true })).join("\n")
     : '<p class="no-data">אין בקשות פעילות</p>';
 
   const totalCmdrEvents = data.platoons.reduce((s, p) => s + p.commanderEvents.length, 0);
@@ -930,6 +935,7 @@ export function renderDailyForumHtml(data: DailyForumData): string {
   const platoonsHtml = `
     <div class="group-block">
       <h2 class="group-title">סיכום נוכחות</h2>
+      <div class="group-content">
       ${data.attendance.length === 0 ? '<p class="no-data">אין נתונים</p>' : data.attendance.map((p) => {
         const absentRows = p.absent.length > 0
           ? `<table><thead><tr><th>חייל</th><th>כיתה</th><th>סטטוס</th><th>סיבה</th></tr></thead><tbody>${
@@ -941,24 +947,25 @@ export function renderDailyForumHtml(data: DailyForumData): string {
           ${absentRows}
         `;
       }).join("\n")}
+      </div>
     </div>
 
     <div class="group-block">
       <h2 class="group-title">בקשות</h2>
       <div class="section-block">
-        <h3 class="section-title">ממתינות (${totalOpen})</h3>
+        <h3 class="section-title">ממתינות${collapseOpenType && openTypes[0] ? ` — ${openTypes[0].title}` : ""} (${totalOpen})</h3>
         ${openHtml}
       </div>
 
       <div class="section-block">
-        <h3 class="section-title">פעילות (${totalActive})</h3>
+        <h3 class="section-title">פעילות${collapseActiveType && activeTypes[0] ? ` — ${activeTypes[0].title}` : ""} (${totalActive})</h3>
         ${activeHtml}
       </div>
     </div>
 
     <div class="group-block">
       <h2 class="group-title">אירועי מפקדים (${totalCmdrEvents})</h2>
-      ${cmdrEventsHtml}
+      <div class="group-content">${cmdrEventsHtml}</div>
     </div>
 
     <div class="group-block">
@@ -1034,7 +1041,8 @@ export function renderDailyForumHtml(data: DailyForumData): string {
       margin-bottom: 12px;
       border-right: 4px solid #333;
     }
-    .section-block { margin-bottom: 20px; }
+    .group-content { padding-right: 20px; }
+    .section-block { margin-bottom: 20px; padding-right: 20px; }
     .section-title {
       font-size: 13px;
       font-weight: 700;
@@ -1043,13 +1051,14 @@ export function renderDailyForumHtml(data: DailyForumData): string {
       margin-bottom: 10px;
     }
     /* Requests */
-    .type-group { margin-bottom: 12px; }
+    .type-group { margin-bottom: 12px; padding-right: 16px; }
     .type-header {
       font-size: 11px;
       font-weight: 600;
-      background: #f0f0f0;
+      border-right: 2px solid #999;
       padding: 3px 8px;
       margin-bottom: 4px;
+      color: #444;
     }
     .request-card {
       border-bottom: 1px solid #ddd;
@@ -1125,7 +1134,7 @@ ${DETAIL_COLUMNS_CSS}
     .gap-date { font-size: 10px; color: #666; font-weight: 400; }
     .gap-count { font-size: 10px; color: #ef4444; font-weight: 600; margin-right: 8px; }
     .gap-table { width: auto; min-width: 200px; }
-    .no-data { font-size: 11px; color: #999; }
+    .no-data { font-size: 11px; color: #999; padding-right: 20px; }
   </style>
 </head>
 <body>
