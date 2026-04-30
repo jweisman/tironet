@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Send, CheckCircle, Loader2, RefreshCw } from "lucide-react";
+import { Send, CheckCircle, Loader2, RefreshCw, Bell } from "lucide-react";
 import { clearLocalDatabase } from "@/lib/powersync/clear-local-db";
 import { useSyncStatus, type SyncState } from "@/hooks/useSyncStatus";
 import { Button } from "@/components/ui/button";
@@ -236,6 +236,7 @@ async function collectDiagnostics(
           pushDiag.hasActiveSubscription = !!sub;
           if (sub) {
             pushDiag.subscriptionEndpointDomain = new URL(sub.endpoint).hostname;
+            pushDiag.subscriptionEndpointSuffix = sub.endpoint.slice(-16);
             pushDiag.subscriptionExpirationTime = sub.expirationTime
               ? new Date(sub.expirationTime).toISOString()
               : null;
@@ -260,8 +261,9 @@ async function collectDiagnostics(
         pushDiag.serverSubscriptionCount = serverData.subscriptions?.length ?? 0;
         // Flatten subscriptions to readable strings (avoid [object Object])
         if (serverData.subscriptions?.length > 0) {
-          serverData.subscriptions.forEach((s: { endpointDomain: string; createdAt: string }, i: number) => {
-            pushDiag[`serverSub${i + 1}`] = `${s.endpointDomain} (${new Date(s.createdAt).toLocaleDateString("he-IL")})`;
+          serverData.subscriptions.forEach((s: { endpointDomain: string; endpointSuffix: string; createdAt: string }, i: number) => {
+            const matchTag = pushDiag.subscriptionEndpointSuffix === s.endpointSuffix ? " [MATCH]" : "";
+            pushDiag[`serverSub${i + 1}`] = `…${s.endpointSuffix} (${new Date(s.createdAt).toLocaleDateString("he-IL")})${matchTag}`;
           });
         }
         // Flatten preferences into individual keys
@@ -276,20 +278,20 @@ async function collectDiagnostics(
           pushDiag.serverPreferences = "none (no preference row)";
         }
 
-        // Flag mismatch: browser has subscription but none on server, or vice versa
+        // Flag mismatch: compare actual endpoints, not just domains
         if (pushDiag.hasActiveSubscription && serverData.subscriptions?.length === 0) {
-          pushDiag.mismatch = "browser has subscription but server has none";
+          pushDiag.mismatch = "browser has subscription but server has none — resubscribe";
         } else if (!pushDiag.hasActiveSubscription && serverData.subscriptions?.length > 0) {
-          pushDiag.mismatch = "server has subscriptions but browser has none";
+          pushDiag.mismatch = "server has subscriptions but browser has none — stale server records";
         } else if (
           pushDiag.hasActiveSubscription &&
-          pushDiag.subscriptionEndpointDomain &&
+          pushDiag.subscriptionEndpointSuffix &&
           serverData.subscriptions?.length > 0 &&
           !serverData.subscriptions.some(
-            (s: { endpointDomain: string }) => s.endpointDomain === pushDiag.subscriptionEndpointDomain,
+            (s: { endpointSuffix: string }) => s.endpointSuffix === pushDiag.subscriptionEndpointSuffix,
           )
         ) {
-          pushDiag.mismatch = "browser endpoint domain does not match any server subscription";
+          pushDiag.mismatch = "browser endpoint not found on server — notifications go to stale endpoints";
         }
       } else {
         pushDiag.serverFetchError = `HTTP ${res.status}`;
@@ -553,7 +555,72 @@ export default function SupportPage() {
         הדיווח כולל מידע טכני על המכשיר, הדפדפן, ומצב הסנכרון — ללא מידע אישי על חיילים.
       </p>
 
+      <TestNotificationSection />
       <SyncStatusSection />
+    </div>
+  );
+}
+
+function TestNotificationSection() {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleTest = useCallback(async () => {
+    setTesting(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ success: false, message: data.error ?? `HTTP ${res.status}` });
+        return;
+      }
+      if (data.subscriptionsFound === 0) {
+        setResult({ success: false, message: "לא נמצאו מנויים — יש להפעיל התראות בעמוד הפרופיל" });
+      } else if (data.sent > 0) {
+        setResult({ success: true, message: `נשלח בהצלחה ל-${data.sent} מכשירים${data.staleRemoved > 0 ? ` (${data.staleRemoved} מנויים ישנים הוסרו)` : ""}` });
+      } else if (data.staleRemoved > 0) {
+        setResult({ success: false, message: `כל ${data.staleRemoved} המנויים היו לא תקינים והוסרו — יש לכבות ולהדליק מחדש התראות בפרופיל` });
+      } else {
+        setResult({ success: false, message: `שליחה נכשלה (${data.failed} שגיאות)` });
+      }
+    } catch {
+      setResult({ success: false, message: "שגיאת רשת — נסה שוב" });
+    } finally {
+      setTesting(false);
+    }
+  }, []);
+
+  return (
+    <div className="border-t pt-6 mt-6 space-y-3">
+      <h2 className="text-sm font-medium">בדיקת התראות</h2>
+      <p className="text-xs text-muted-foreground">
+        שלח הודעת בדיקה למכשיר זה כדי לוודא שהתראות מגיעות.
+      </p>
+      <Button
+        variant="outline"
+        onClick={handleTest}
+        disabled={testing}
+        className="w-full"
+        size="sm"
+      >
+        {testing ? (
+          <>
+            <Loader2 size={14} className="animate-spin me-2" />
+            שולח...
+          </>
+        ) : (
+          <>
+            <Bell size={14} className="me-2" />
+            שלח הודעת בדיקה
+          </>
+        )}
+      </Button>
+      {result && (
+        <p className={`text-xs ${result.success ? "text-emerald-600" : "text-red-600"}`}>
+          {result.message}
+        </p>
+      )}
     </div>
   );
 }
