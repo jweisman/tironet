@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronLeft, ClipboardList } from "lucide-react";
+import { ChevronDown, ChevronLeft, ClipboardList, Clock } from "lucide-react";
 
 const INITIAL_LIMIT = 3;
 import { useQuery } from "@powersync/react";
@@ -79,6 +79,15 @@ interface ActiveRequest {
   squadName: string;
   detail: string;
   sortKey: string; // timed events sort before all-day events
+  imminent: boolean; // time is within the next hour
+}
+
+/** Returns true when the ISO datetime is within the next 60 minutes. */
+function isWithinNextHour(iso: string, now: Date): boolean {
+  if (!iso.includes("T") || iso.endsWith("T00:00:00.000Z")) return false;
+  const t = new Date(iso).getTime();
+  const n = now.getTime();
+  return t > n && t - n <= 60 * 60 * 1000;
 }
 
 function formatShortDate(iso: string): string {
@@ -107,6 +116,23 @@ function getTodayDetail(type: string, raw: RawActiveRequest, today: string): str
     return null;
   }
   return null;
+}
+
+/** Returns true when the request has a timed event starting within the next hour. */
+function isImminentRequest(r: RawActiveRequest, today: string, now: Date): boolean {
+  if (r.type === "leave") {
+    if (r.departure_at && r.departure_at.split("T")[0] === today) {
+      return isWithinNextHour(r.departure_at, now);
+    }
+    return false;
+  }
+  if (r.type === "medical") {
+    const appts = parseMedicalAppointments(r.medical_appointments);
+    const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
+    if (todayAppt) return isWithinNextHour(todayAppt.date, now);
+    return false;
+  }
+  return false;
 }
 
 /** Sort key: timed events by their time, all-day events (sick days, dateless leave) last. */
@@ -146,7 +172,8 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
   );
 
   const requests: ActiveRequest[] = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
     return (raw ?? [])
       .filter((r) => isActiveToday(r, today))
       .filter((r) => !typeFilter || r.type === typeFilter)
@@ -157,9 +184,10 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
         squadName: r.squad_name,
         detail: getTodayDetail(r.type, r, today) ?? "",
         sortKey: todaySortKey(r, today),
+        imminent: isImminentRequest(r, today, now),
       }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  }, [raw]);
+  }, [raw, typeFilter]);
 
   const [expanded, setExpanded] = useState(false);
 
@@ -187,7 +215,7 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
               key={r.id}
               type="button"
               onClick={() => router.push(`/requests/${r.id}`)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-start transition-colors hover:bg-muted/50 active:bg-muted"
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-start transition-colors hover:bg-muted/50 active:bg-muted ${r.imminent ? "bg-violet-100 dark:bg-violet-950/30" : ""}`}
             >
               <Icon size={16} className="shrink-0 text-muted-foreground" />
               <div className="flex-1 min-w-0">
@@ -203,6 +231,12 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
                   </p>
                 )}
               </div>
+              {r.imminent && (
+                <span className="shrink-0 flex items-center gap-1 text-[11px] font-medium text-violet-700 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/50 px-1.5 py-0.5 rounded-full">
+                  <Clock size={10} />
+                  בקרוב
+                </span>
+              )}
               <ChevronLeft
                 size={12}
                 className="shrink-0 text-muted-foreground/40"

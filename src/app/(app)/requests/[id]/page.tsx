@@ -221,7 +221,7 @@ export default function RequestDetailPage() {
 
   // Tour
   const { registerTour, unregisterTour } = useTourContext();
-  const { startTour } = useTour({ page: "request-detail", steps: requestDetailTourSteps });
+  const { startTour } = useTour({ page: "request-detail", steps: requestDetailTourSteps, ready: !!raw && (actionRows?.length ?? 0) > 0 });
   useEffect(() => { registerTour(startTour); return unregisterTour; }, [registerTour, unregisterTour, startTour]);
 
   if (!raw && showConnectionError) {

@@ -493,7 +493,7 @@ function SyncStatusSection() {
 
   const lastSyncLabel = lastSyncedAt
     ? lastSyncedAt.toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })
-    : "לא סונכרן";
+    : state === "initializing" ? "מהסנכרון הקודם" : "לא סונכרן";
 
   return (
     <div className="border-t pt-6 mt-6 space-y-3">

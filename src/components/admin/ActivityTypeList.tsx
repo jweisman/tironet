@@ -318,11 +318,9 @@ export default function ActivityTypeList({ initialTypes }: Props) {
                 <>
                   <div className="flex-1 min-w-0">
                     <span className="font-medium">{type.name}</span>
-                    {activeScoreCount(type) > 1 && (
-                      <span className="text-xs text-muted-foreground ms-2">
-                        {activeScoreCount(type)} ציונים
-                      </span>
-                    )}
+                    <span className="text-xs text-muted-foreground ms-2">
+                      {activeScoreCount(type) === 0 ? "ללא ציונים" : activeScoreCount(type) === 1 ? "ציון 1" : `${activeScoreCount(type)} ציונים`}
+                    </span>
                   </div>
                   <Badge variant={type.isActive ? "default" : "secondary"}>
                     {type.isActive ? "פעיל" : "לא פעיל"}
