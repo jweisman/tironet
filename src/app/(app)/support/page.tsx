@@ -258,8 +258,23 @@ async function collectDiagnostics(
       if (res.ok) {
         const serverData = await res.json();
         pushDiag.serverSubscriptionCount = serverData.subscriptions?.length ?? 0;
-        pushDiag.serverSubscriptions = serverData.subscriptions;
-        pushDiag.serverPreferences = serverData.preferences;
+        // Flatten subscriptions to readable strings (avoid [object Object])
+        if (serverData.subscriptions?.length > 0) {
+          serverData.subscriptions.forEach((s: { endpointDomain: string; createdAt: string }, i: number) => {
+            pushDiag[`serverSub${i + 1}`] = `${s.endpointDomain} (${new Date(s.createdAt).toLocaleDateString("he-IL")})`;
+          });
+        }
+        // Flatten preferences into individual keys
+        if (serverData.preferences) {
+          const p = serverData.preferences;
+          pushDiag.prefDailyTasks = p.dailyTasksEnabled;
+          pushDiag.prefRequestAssignment = p.requestAssignmentEnabled;
+          pushDiag.prefActiveRequests = p.activeRequestsEnabled;
+          pushDiag.prefNewAppointment = p.newAppointmentEnabled;
+          pushDiag.prefReminderMinutes = p.reminderLeadMinutes ?? "disabled";
+        } else {
+          pushDiag.serverPreferences = "none (no preference row)";
+        }
 
         // Flag mismatch: browser has subscription but none on server, or vice versa
         if (pushDiag.hasActiveSubscription && serverData.subscriptions?.length === 0) {
