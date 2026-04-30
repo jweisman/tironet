@@ -152,6 +152,7 @@ export async function fetchCalendarData(
       },
       select: {
         id: true,
+        userId: true,
         userName: true,
         type: true,
         startDate: true,
@@ -162,6 +163,7 @@ export async function fetchCalendarData(
     });
     rawCommanderEvents = cmdrEvents.map((ce) => ({
       id: ce.id,
+      userId: ce.userId,
       userName: ce.userName,
       type: ce.type,
       startDate: ce.startDate.toISOString().split("T")[0],

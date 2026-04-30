@@ -18,6 +18,8 @@ export interface CalendarEvent {
   icon?: string | null;
   /** Original activity or request UUID — used for linking to detail pages */
   sourceId: string;
+  /** User ID for commander events — used for linking to /users?expand=userId */
+  userId?: string;
 }
 
 export interface CalendarData {
@@ -198,6 +200,7 @@ export interface RawRequest {
 
 export interface RawCommanderEventData {
   id: string;
+  userId: string;
   userName: string;
   type: string; // "leave" | "medical"
   startDate: string; // YYYY-MM-DD
@@ -305,6 +308,7 @@ export function buildCalendarEvents(
           platoonName: ce.platoonName,
           icon: CMDR_EVENT_ICON[ce.type] ?? null,
           sourceId: ce.id,
+          userId: ce.userId,
         });
       }
     }
@@ -319,7 +323,7 @@ export function buildCalendarEvents(
 
 export function getEventHref(event: CalendarEvent): string | null {
   if (event.type === "activity") return `/activities/${event.sourceId}`;
-  if (event.type === "commander_event") return null;
+  if (event.type === "commander_event") return event.userId ? `/users?expand=${event.userId}` : null;
   return `/requests/${event.sourceId}`;
 }
 
