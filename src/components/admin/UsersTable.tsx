@@ -97,12 +97,16 @@ export function UsersTable({
   // Compute available filter options
   const roleSet = new Set(users.flatMap((u) => u.cycleAssignments.map((a) => a.role)));
 
-  // Platoon-level unit filters from structure (not squad-level)
-  const platoonMap = new Map<string, string>();
+  // Platoon-level unit filters from structure (not squad-level).
+  // Group by display name so platoons with the same name across cycles
+  // merge into a single filter pill.
   const allCompanies = Object.values(structureByCycle).flat();
+  const platoonsByLabel = new Map<string, string[]>(); // label → platoon IDs
   for (const co of allCompanies) {
     for (const pl of co.platoons) {
-      platoonMap.set(pl.id, allCompanies.length > 1 ? `${co.name} / ${pl.name}` : pl.name);
+      const label = allCompanies.length > 1 ? `${co.name} / ${pl.name}` : pl.name;
+      if (!platoonsByLabel.has(label)) platoonsByLabel.set(label, []);
+      platoonsByLabel.get(label)!.push(pl.id);
     }
   }
   const squadToPlatoon = new Map<string, string>();
@@ -115,7 +119,7 @@ export function UsersTable({
   }
 
   const showRoleFilter = roleSet.size > 1;
-  const showUnitFilter = platoonMap.size > 1;
+  const showUnitFilter = platoonsByLabel.size > 1;
   const showFilters = users.length > 5 && (showRoleFilter || showUnitFilter);
 
   function assignmentPlatoonId(a: { unitType: string; unitId: string }): string | null {
@@ -127,7 +131,10 @@ export function UsersTable({
   const filteredUsers = users.filter((u) => {
     if (!filterRole && !filterUnitName) return true;
     if (filterRole && !u.cycleAssignments.some((a) => a.role === filterRole)) return false;
-    if (filterUnitName && !u.cycleAssignments.some((a) => assignmentPlatoonId(a) === filterUnitName)) return false;
+    if (filterUnitName) {
+      const matchIds = platoonsByLabel.get(filterUnitName) ?? [];
+      if (!u.cycleAssignments.some((a) => { const pid = assignmentPlatoonId(a); return pid != null && matchIds.includes(pid); })) return false;
+    }
     return true;
   });
 
@@ -191,17 +198,17 @@ export function UsersTable({
             )}
             {showUnitFilter && (
               <div className="flex gap-2 flex-wrap">
-                {Array.from(platoonMap.entries()).map(([id, name]) => (
+                {Array.from(platoonsByLabel.keys()).map((label) => (
                   <button
-                    key={id}
-                    onClick={() => setFilterUnitName(filterUnitName === id ? null : id)}
+                    key={label}
+                    onClick={() => setFilterUnitName(filterUnitName === label ? null : label)}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      filterUnitName === id
+                      filterUnitName === label
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background border-border hover:bg-muted"
                     }`}
                   >
-                    {name}
+                    {label}
                   </button>
                 ))}
               </div>
