@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { ArrowRight, Check, X, Bell, Plus, ThumbsUp, ThumbsDown, Forward, MessageSquare, Pencil, Trash2, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
@@ -416,32 +417,18 @@ export default function RequestDetailPage() {
 
       {/* Header card */}
       <div data-tour="request-header" className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <RequestTypeIcon type={requestType} size={20} urgent={isRequestOpen({ status: raw.status, type: raw.type, departureAt: raw.departure_at, returnAt: raw.return_at, medicalAppointments: raw.medical_appointments }) && isRequestUrgent({ type: raw.type, urgent: raw.urgent, specialConditions: raw.special_conditions })} />
-            </span>
-            <div>
-              <h1 className="text-lg font-bold">{REQUEST_TYPE_LABELS[requestType]}</h1>
-              <p className="text-sm text-muted-foreground">
-                {raw.soldier_family_name} {raw.soldier_given_name} · {raw.platoon_name} / {raw.squad_name}
-              </p>
-              {(raw.soldier_id_number || raw.soldier_civilian_id) && (
-                <p className="text-xs text-muted-foreground">
-                  {raw.soldier_id_number && `מ.א. ${raw.soldier_id_number}`}
-                  {raw.soldier_id_number && raw.soldier_civilian_id && " · "}
-                  {raw.soldier_civilian_id && `מ.ז. ${raw.soldier_civilian_id}`}
-                </p>
-              )}
-            </div>
-          </div>
+        {/* Row 1: Type icon + label + action buttons */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Badge variant={REQUEST_STATUS_VARIANT[requestStatus]}>
-              {REQUEST_STATUS_LABELS[requestStatus]}
-            </Badge>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+              <RequestTypeIcon type={requestType} size={16} urgent={isRequestOpen({ status: raw.status, type: raw.type, departureAt: raw.departure_at, returnAt: raw.return_at, medicalAppointments: raw.medical_appointments }) && isRequestUrgent({ type: raw.type, urgent: raw.urgent, specialConditions: raw.special_conditions })} />
+            </span>
+            <span className="text-sm font-medium text-muted-foreground">{REQUEST_TYPE_LABELS[requestType]}</span>
             {raw.urgent ? (
               <Badge variant="destructive">דחוף</Badge>
             ) : null}
+          </div>
+          <div className="flex items-center gap-2">
             {canDelete && (
               <Button variant="outline" size="icon" className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setConfirmDeleteOpen(true)} aria-label="מחק בקשה">
                 <Trash2 size={14} />
@@ -454,6 +441,25 @@ export default function RequestDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Row 2: Soldier name (linked) + status badge */}
+        <div className="flex items-center justify-between">
+          <Link href={`/soldiers/${raw.soldier_id}`}>
+            <h1 className="text-lg font-bold hover:text-primary transition-colors">
+              {raw.soldier_family_name} {raw.soldier_given_name}
+            </h1>
+          </Link>
+          <Badge variant={REQUEST_STATUS_VARIANT[requestStatus]}>
+            {REQUEST_STATUS_LABELS[requestStatus]}
+          </Badge>
+        </div>
+
+        {/* Row 3: Unit details */}
+        <p className="text-sm text-muted-foreground">
+          {raw.platoon_name} / {raw.squad_name}
+          {raw.soldier_id_number && ` · מ.א. ${raw.soldier_id_number}`}
+          {raw.soldier_civilian_id && ` · מ.ז. ${raw.soldier_civilian_id}`}
+        </p>
 
         {/* Assignment indicator */}
         {assignedRole && (
@@ -493,7 +499,6 @@ export default function RequestDetailPage() {
             <p className="text-sm font-medium mt-1 whitespace-pre-wrap">{raw.description}</p>
           </div>
         ) : null}
-        <DetailRow label="מחלקה" value={raw.platoon_name} />
 
         {/* Leave-specific */}
         {requestType === "leave" && (
