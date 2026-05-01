@@ -21,6 +21,7 @@ import type { SickDay } from "@/lib/requests/sick-days";
 import { AppointmentListEditor } from "./AppointmentListEditor";
 import { SickDayRangeEditor } from "./SickDayRangeEditor";
 import type { SickDayRange } from "./SickDayRangeEditor";
+import { leaveDepartureLimits, leaveReturnLimits, paramedicDateLimits } from "@/lib/requests/date-limits";
 import type { RequestType, Transportation, Role } from "@/types";
 
 /** Format a Date as a `datetime-local` input value (YYYY-MM-DDTHH:MM). */
@@ -344,6 +345,8 @@ export function CreateRequestForm({
                 step={900}
                 value={departureAt}
                 onChange={(e) => setDepartureAt(e.target.value)}
+                min={leaveDepartureLimits().min}
+                max={leaveDepartureLimits().max}
                 dir="ltr"
                 lang="he"
               />
@@ -356,6 +359,8 @@ export function CreateRequestForm({
                 step={900}
                 value={returnAt}
                 onChange={(e) => setReturnAt(e.target.value)}
+                min={departureAt || leaveReturnLimits().min}
+                max={leaveReturnLimits().max}
                 dir="ltr"
                 lang="he"
               />
@@ -397,6 +402,8 @@ export function CreateRequestForm({
               type="date"
               value={paramedicDate}
               onChange={(e) => setParamedicDate(e.target.value)}
+              min={paramedicDateLimits().min}
+              max={paramedicDateLimits().max}
               dir="ltr"
               lang="he"
               style={paramedicDate ? undefined : { color: "transparent" }}

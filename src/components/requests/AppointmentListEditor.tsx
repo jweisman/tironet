@@ -4,6 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
+import { appointmentDateLimits } from "@/lib/requests/date-limits";
 
 interface Props {
   value: MedicalAppointment[];
@@ -49,6 +50,8 @@ export function AppointmentListEditor({ value, onChange }: Props) {
                 step={300}
                 value={appt.date}
                 onChange={(e) => update(appt.id, "date", e.target.value)}
+                min={appointmentDateLimits().min}
+                max={appointmentDateLimits().max}
                 dir="ltr"
                 lang="he"
                 className="w-full min-w-0"
