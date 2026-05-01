@@ -131,16 +131,16 @@ export function filtersToEventTypes(enabledFilters: Set<CalendarFilterCategory>)
 // Date helpers
 // ---------------------------------------------------------------------------
 
-/** Get the 3-month window: first day of current month to last day of month+2 */
+/** Get the 3-month window: previous month, current month, next month */
 export function getThreeMonthRange(baseDate?: string): { startDate: string; endDate: string; months: { year: number; month: number }[] } {
   const base = baseDate ? new Date(baseDate + "T12:00:00") : new Date();
   const year = base.getFullYear();
   const month = base.getMonth(); // 0-indexed
 
   const months: { year: number; month: number }[] = [];
-  for (let i = 0; i < 3; i++) {
-    const m = month + i;
-    months.push({ year: year + Math.floor(m / 12), month: m % 12 });
+  for (let i = -1; i <= 1; i++) {
+    const m = month + i + 12; // +12 to keep modulo positive
+    months.push({ year: year + Math.floor((month + i) / 12), month: m % 12 });
   }
 
   const startDate = `${months[0].year}-${String(months[0].month + 1).padStart(2, "0")}-01`;
