@@ -919,15 +919,26 @@ When adding a new component to an existing page (e.g. a new section on the home 
 
 All dialog action button rows use `flex flex-row-reverse gap-2 justify-end`. In the DOM, the cancel button comes first and the primary (submit) button second. `flex-row-reverse` visually flips them so the primary button sits on the **start side** (right in RTL) and the cancel button appears to its left. Follow this pattern in every new dialog.
 
-### Form validation — JS-only, no browser `required`
+### Form validation — JS-only, no browser constraint attributes
 
-Never use the HTML `required` attribute on form inputs. Browser-native validation shows English tooltips that don't localize to Hebrew. Instead:
+Never use HTML constraint attributes (`required`, `min`, `max`, `pattern`, `minlength`, `maxlength`, `step`) on form inputs. Browser-native validation shows English tooltips that don't localize to Hebrew. The `step` attribute on `datetime-local` inputs is especially problematic — it causes the browser to reject valid dates that don't fall on a step boundary. Instead:
 
-1. **Required asterisk:** Use `<Label required>Field Name</Label>` — the `Label` component appends a red `*` via `text-destructive`.
-2. **JS validation in submit handler:** Check fields manually in the `handleSubmit` function. Set a `string | null` error state and `return` early on failure.
-3. **Error display:** `{error && <p className="text-sm text-destructive">{error}</p>}` — placed after all fields, before the button bar.
-4. **Field layout:** Each field wrapped in `<div className="space-y-1.5">` containing `Label` + input. Form uses `className="space-y-4"`.
-5. **Error state lifecycle:** Clear on dialog open/close and before each API call (`setError(null)`).
+1. **`noValidate` on all `<form>` tags:** Always use `<form onSubmit={handleSubmit} noValidate>` to disable browser-native constraint validation entirely. Without this, the browser validates `datetime-local` inputs on submit even without explicit constraint attributes.
+2. **Required asterisk:** Use `<Label required>Field Name</Label>` — the `Label` component appends a red `*` via `text-destructive`.
+3. **JS validation in submit handler:** Check fields manually in the `handleSubmit` function. Set a `string | null` error state and `return` early on failure. For inline save actions (e.g. detail page sections), use `toast.error()` instead of error state.
+4. **Error display:** `{error && <p className="text-sm text-destructive">{error}</p>}` — placed after all fields, before the button bar.
+5. **Field layout:** Each field wrapped in `<div className="space-y-1.5">` containing `Label` + input. Form uses `className="space-y-4"`.
+6. **Error state lifecycle:** Clear on dialog open/close and before each API call (`setError(null)`).
+7. **Date range validators:** `src/lib/requests/date-limits.ts` exports per-field validators (e.g. `validateLeaveDeparture`, `validateAppointmentDate`) that return a Hebrew error string or `null`. Use these in submit handlers, not HTML attributes.
+
+**Exception:** `min` on the sick-day "to" date field is kept (`min={range.from}`) because it constrains one field relative to another field's value (not an absolute boundary).
+
+### Date/datetime-local input default values
+
+Browsers render `datetime-local` inputs with the current date/time even when `value=""`, making empty fields look populated. Two patterns depending on whether the field is optional or required:
+
+- **Required/committed fields** (e.g. appointment date after clicking "add"): set a real default value like the next round hour. This avoids ambiguity and prevents the browser from showing a phantom value the user didn't choose. See `defaultDatetime()` in `AppointmentListEditor.tsx`.
+- **Optional fields** (e.g. paramedic date, sick day from/to): use `style={value ? undefined : { color: "transparent" }}` to visually hide the browser's placeholder date. The field appears empty until the user explicitly picks a date.
 
 ### Native date/datetime-local inputs — iOS Safari overflow fix
 

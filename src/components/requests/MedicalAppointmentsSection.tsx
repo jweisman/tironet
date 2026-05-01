@@ -5,6 +5,7 @@ import { usePowerSync } from "@powersync/react";
 import { Check, X, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
+import { validateAppointmentDate } from "@/lib/requests/date-limits";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import { AppointmentListEditor } from "./AppointmentListEditor";
 
@@ -20,6 +21,7 @@ export function MedicalAppointmentsSection({ requestId, medicalAppointmentsJson,
 
   const [editing, setEditing] = useState(false);
   const [editList, setEditList] = useState<MedicalAppointment[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   function startEditing() {
     setEditList(
@@ -40,6 +42,11 @@ export function MedicalAppointmentsSection({ requestId, medicalAppointmentsJson,
     const valid = editList
       .filter((a) => a.date)
       .map((a) => a.date.includes("T") ? { ...a, date: new Date(a.date).toISOString() } : a);
+    for (const a of editList) {
+      const validationErr = validateAppointmentDate(a.date);
+      if (validationErr) { setError(validationErr); return; }
+    }
+    setError(null);
     try {
       await db.execute(
         `UPDATE requests SET medical_appointments = ?, updated_at = ? WHERE id = ?`,
@@ -82,6 +89,7 @@ export function MedicalAppointmentsSection({ requestId, medicalAppointmentsJson,
       ) : (
         <div className="space-y-2 mt-2">
           <AppointmentListEditor value={editList} onChange={setEditList} />
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex gap-1.5 pt-1">
             <button
               type="button"

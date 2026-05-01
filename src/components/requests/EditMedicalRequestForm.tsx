@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { validateParamedicDate } from "@/lib/requests/date-limits";
 
 interface Props {
   request: {
@@ -29,6 +30,8 @@ export function EditMedicalRequestForm({ request, onSuccess, onCancel }: Props) 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const paramErr = validateParamedicDate(paramedicDate);
+    if (paramErr) { setError(paramErr); return; }
     setSaving(true);
     setError(null);
     try {
@@ -51,7 +54,7 @@ export function EditMedicalRequestForm({ request, onSuccess, onCancel }: Props) 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="edit-desc">תיאור</Label>
         <textarea

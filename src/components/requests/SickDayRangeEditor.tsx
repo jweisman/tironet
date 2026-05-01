@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { SickDay } from "@/lib/requests/sick-days";
-import { sickDayLimits } from "@/lib/requests/date-limits";
 
 export interface SickDayRange {
   id: string;
@@ -78,8 +77,6 @@ export function SickDayRangeEditor({ days, onDeleteDay, ranges, onRangesChange }
                 onChange={(e) =>
                   onRangesChange(ranges.map((r) => (r.id === range.id ? { ...r, from: e.target.value } : r)))
                 }
-                min={sickDayLimits().min}
-                max={sickDayLimits().max}
                 dir="ltr"
                 lang="he"
                 className="w-full min-w-0"
@@ -94,8 +91,7 @@ export function SickDayRangeEditor({ days, onDeleteDay, ranges, onRangesChange }
                 onChange={(e) =>
                   onRangesChange(ranges.map((r) => (r.id === range.id ? { ...r, to: e.target.value } : r)))
                 }
-                min={range.from || sickDayLimits().min}
-                max={sickDayLimits().max}
+                min={range.from || undefined}
                 dir="ltr"
                 lang="he"
                 className="w-full min-w-0"

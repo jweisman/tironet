@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TRANSPORTATION_LABELS } from "@/lib/requests/constants";
-import { leaveDepartureLimits, leaveReturnLimits } from "@/lib/requests/date-limits";
+import { validateLeaveDeparture, validateLeaveReturn } from "@/lib/requests/date-limits";
 import type { Transportation } from "@/types";
 
 interface Props {
@@ -56,6 +56,10 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
       setError("שעת היציאה חייבת להיות לפני שעת החזרה");
       return;
     }
+    const depErr = validateLeaveDeparture(departureAt);
+    if (depErr) { setError(depErr); return; }
+    const retErr = validateLeaveReturn(returnAt, departureAt);
+    if (retErr) { setError(retErr); return; }
 
     setSaving(true);
     setError(null);
@@ -81,7 +85,7 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="edit-desc">תיאור</Label>
         <textarea
@@ -110,11 +114,9 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
           <Input
             id="edit-departure"
             type="datetime-local"
-            step={900}
+
             value={departureAt}
             onChange={(e) => setDepartureAt(e.target.value)}
-            min={leaveDepartureLimits().min}
-            max={leaveDepartureLimits().max}
             dir="ltr"
             lang="he"
           />
@@ -124,11 +126,9 @@ export function EditLeaveRequestForm({ request, onSuccess, onCancel }: Props) {
           <Input
             id="edit-return"
             type="datetime-local"
-            step={900}
+
             value={returnAt}
             onChange={(e) => setReturnAt(e.target.value)}
-            min={departureAt || leaveReturnLimits().min}
-            max={leaveReturnLimits().max}
             dir="ltr"
             lang="he"
           />
