@@ -116,8 +116,6 @@ export function AddSoldierForm({
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      {/* פרטים אישיים */}
-      <h3 className="text-sm font-semibold text-muted-foreground pt-1">פרטים אישיים</h3>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="soldier-given" required>שם פרטי</Label>
@@ -217,10 +215,6 @@ export function AddSoldierForm({
         />
       </div>
 
-      {/* שיבוץ */}
-      {(showPlatoonSelector || showSquadSelector) && (
-        <h3 className="text-sm font-semibold text-muted-foreground pt-1">שיבוץ</h3>
-      )}
       {showPlatoonSelector && (
         <div className="space-y-1.5">
           <Label>מחלקה</Label>

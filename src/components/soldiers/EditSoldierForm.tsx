@@ -18,7 +18,7 @@ import { toIsraeliDisplay } from "@/lib/phone";
 const ImageCropDialog = dynamic(() => import("@/components/ImageCropDialog").then(m => m.ImageCropDialog));
 import type { SoldierStatus } from "@/types";
 
-const RELATIONSHIP_OPTIONS = [
+export const RELATIONSHIP_OPTIONS = [
   { value: "mother", label: "אמא" },
   { value: "father", label: "אבא" },
   { value: "sibling", label: "אח/אחות" },
@@ -27,7 +27,7 @@ const RELATIONSHIP_OPTIONS = [
   { value: "other", label: "אחר" },
 ] as const;
 
-interface SoldierData {
+export interface SoldierData {
   id: string;
   givenName: string;
   familyName: string;
@@ -47,34 +47,26 @@ interface SoldierData {
   dateOfBirth: string | null;
 }
 
-interface Props {
+// ---------------------------------------------------------------------------
+// Personal details form (name, IDs, rank, status, DOB, photo)
+// ---------------------------------------------------------------------------
+
+interface PersonalProps {
   soldier: SoldierData;
   onSuccess: (updated: SoldierData) => void;
   onCancel: () => void;
 }
 
-export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
+export function EditPersonalForm({ soldier, onSuccess, onCancel }: PersonalProps) {
   const [givenName, setGivenName] = useState(soldier.givenName);
   const [familyName, setFamilyName] = useState(soldier.familyName);
   const [idNumber, setIdNumber] = useState(soldier.idNumber ?? "");
   const [civilianId, setCivilianId] = useState(soldier.civilianId ?? "");
   const [rank, setRank] = useState(soldier.rank ?? "");
   const [status, setStatus] = useState<SoldierStatus>(soldier.status);
-  const [phone, setPhone] = useState(soldier.phone ? toIsraeliDisplay(soldier.phone) : "");
-  const [emergencyPhone, setEmergencyPhone] = useState(soldier.emergencyPhone ? toIsraeliDisplay(soldier.emergencyPhone) : "");
-  const [emergencyContactName, setEmergencyContactName] = useState(soldier.emergencyContactName ?? "");
-  const [emergencyContactRelationship, setEmergencyContactRelationship] = useState(soldier.emergencyContactRelationship ?? "");
-  const [street, setStreet] = useState(soldier.street ?? "");
-  const [apt, setApt] = useState(soldier.apt ?? "");
-  const [city, setCity] = useState(soldier.city ?? "");
-  const [notes, setNotes] = useState(soldier.notes ?? "");
   const [dateOfBirth, setDateOfBirth] = useState(soldier.dateOfBirth ?? "");
-  const [imagePreview, setImagePreview] = useState<string | null>(
-    soldier.profileImage
-  );
-  const [imageBase64, setImageBase64] = useState<string | null>(
-    soldier.profileImage
-  );
+  const [imagePreview, setImagePreview] = useState<string | null>(soldier.profileImage);
+  const [imageBase64, setImageBase64] = useState<string | null>(soldier.profileImage);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,14 +89,6 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
           rank: rank || null,
           status,
           profileImage: imageBase64,
-          phone: phone.trim() || null,
-          emergencyPhone: emergencyPhone.trim() || null,
-          emergencyContactName: emergencyContactName.trim() || null,
-          emergencyContactRelationship: emergencyContactRelationship || null,
-          street: street.trim() || null,
-          apt: apt.trim() || null,
-          city: city.trim() || null,
-          notes: notes.trim() || null,
           dateOfBirth: dateOfBirth || null,
         }),
       });
@@ -124,8 +108,6 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      {/* פרטים אישיים */}
-      <h3 className="text-sm font-semibold text-muted-foreground pt-1">פרטים אישיים</h3>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="edit-given" required>שם פרטי</Label>
@@ -274,8 +256,91 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
         </div>
       </div>
 
-      {/* פרטי קשר */}
-      <h3 className="text-sm font-semibold text-muted-foreground pt-1">פרטי קשר</h3>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <div className="flex flex-row-reverse gap-2 justify-end pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={loading}
+        >
+          ביטול
+        </Button>
+        <Button
+          type="submit"
+          disabled={loading || !givenName.trim() || !familyName.trim()}
+        >
+          {loading ? "שומר..." : "שמור שינויים"}
+        </Button>
+      </div>
+
+      <ImageCropDialog
+        file={pendingFile}
+        onConfirm={(base64) => {
+          setPendingFile(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          setImagePreview(base64);
+          setImageBase64(base64);
+        }}
+        onCancel={() => {
+          setPendingFile(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }}
+      />
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Contact & address form (phone, street, apt, city)
+// ---------------------------------------------------------------------------
+
+interface ContactProps {
+  soldier: SoldierData;
+  onSuccess: (updated: SoldierData) => void;
+  onCancel: () => void;
+}
+
+export function EditContactForm({ soldier, onSuccess, onCancel }: ContactProps) {
+  const [phone, setPhone] = useState(soldier.phone ? toIsraeliDisplay(soldier.phone) : "");
+  const [street, setStreet] = useState(soldier.street ?? "");
+  const [apt, setApt] = useState(soldier.apt ?? "");
+  const [city, setCity] = useState(soldier.city ?? "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/soldiers/${soldier.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: phone.trim() || null,
+          street: street.trim() || null,
+          apt: apt.trim() || null,
+          city: city.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "שגיאה בעדכון פרטי קשר");
+        return;
+      }
+      const updated = await res.json();
+      onSuccess(updated);
+    } catch {
+      setError("שגיאה בעדכון פרטי קשר");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="edit-phone">טלפון</Label>
         <Input
@@ -318,6 +383,66 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
         />
       </div>
 
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <div className="flex flex-row-reverse gap-2 justify-end pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={loading}
+        >
+          ביטול
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? "שומר..." : "שמור שינויים"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Notes form
+// ---------------------------------------------------------------------------
+
+interface NotesProps {
+  soldier: SoldierData;
+  onSuccess: (updated: SoldierData) => void;
+  onCancel: () => void;
+}
+
+export function EditNotesForm({ soldier, onSuccess, onCancel }: NotesProps) {
+  const [notes, setNotes] = useState(soldier.notes ?? "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/soldiers/${soldier.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: notes.trim() || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "שגיאה בעדכון הערות");
+        return;
+      }
+      const updated = await res.json();
+      onSuccess(updated);
+    } catch {
+      setError("שגיאה בעדכון הערות");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="edit-notes">הערות</Label>
         <textarea
@@ -330,8 +455,72 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
         />
       </div>
 
-      {/* איש קשר לחירום */}
-      <h3 className="text-sm font-semibold text-muted-foreground pt-1">איש קשר לחירום</h3>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <div className="flex flex-row-reverse gap-2 justify-end pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={loading}
+        >
+          ביטול
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? "שומר..." : "שמור שינויים"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Emergency contact form (phone, name, relationship)
+// ---------------------------------------------------------------------------
+
+interface EmergencyProps {
+  soldier: SoldierData;
+  onSuccess: (updated: SoldierData) => void;
+  onCancel: () => void;
+}
+
+export function EditEmergencyContactForm({ soldier, onSuccess, onCancel }: EmergencyProps) {
+  const [emergencyPhone, setEmergencyPhone] = useState(soldier.emergencyPhone ? toIsraeliDisplay(soldier.emergencyPhone) : "");
+  const [emergencyContactName, setEmergencyContactName] = useState(soldier.emergencyContactName ?? "");
+  const [emergencyContactRelationship, setEmergencyContactRelationship] = useState(soldier.emergencyContactRelationship ?? "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/soldiers/${soldier.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emergencyPhone: emergencyPhone.trim() || null,
+          emergencyContactName: emergencyContactName.trim() || null,
+          emergencyContactRelationship: emergencyContactRelationship || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "שגיאה בעדכון איש קשר לחירום");
+        return;
+      }
+      const updated = await res.json();
+      onSuccess(updated);
+    } catch {
+      setError("שגיאה בעדכון איש קשר לחירום");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="edit-emergency-phone">טלפון חירום</Label>
         <Input
@@ -387,27 +576,10 @@ export function EditSoldierForm({ soldier, onSuccess, onCancel }: Props) {
         >
           ביטול
         </Button>
-        <Button
-          type="submit"
-          disabled={loading || !givenName.trim() || !familyName.trim()}
-        >
+        <Button type="submit" disabled={loading}>
           {loading ? "שומר..." : "שמור שינויים"}
         </Button>
       </div>
-
-      <ImageCropDialog
-        file={pendingFile}
-        onConfirm={(base64) => {
-          setPendingFile(null);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setImagePreview(base64);
-          setImageBase64(base64);
-        }}
-        onCancel={() => {
-          setPendingFile(null);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        }}
-      />
     </form>
   );
 }

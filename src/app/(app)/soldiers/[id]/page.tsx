@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EditSoldierForm } from "@/components/soldiers/EditSoldierForm";
+import { EditPersonalForm, EditContactForm, EditNotesForm, EditEmergencyContactForm } from "@/components/soldiers/EditSoldierForm";
 import { CreateRequestForm } from "@/components/requests/CreateRequestForm";
 import {
   REQUEST_TYPE_LABELS,
@@ -229,7 +229,10 @@ export default function SoldierDetailPage() {
     }
   }, []);
 
-  const [editOpen, setEditOpen] = useState(false);
+  const [editPersonalOpen, setEditPersonalOpen] = useState(false);
+  const [editContactOpen, setEditContactOpen] = useState(false);
+  const [editNotesOpen, setEditNotesOpen] = useState(false);
+  const [editEmergencyOpen, setEditEmergencyOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -406,27 +409,12 @@ export default function SoldierDetailPage() {
 
           {/* Info */}
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h1 className="text-lg font-bold leading-tight">
-                  {raw.family_name} {raw.given_name}
-                </h1>
-                {raw.rank && (
-                  <p className="text-sm text-muted-foreground">{raw.rank}</p>
-                )}
-                {raw.id_number && (
-                  <p className="text-sm text-muted-foreground">מ.א. {raw.id_number}</p>
-                )}
-                {raw.civilian_id && (
-                  <p className="text-sm text-muted-foreground">מ.ז. {raw.civilian_id}</p>
-                )}
-                {raw.date_of_birth && (
-                  <p className="text-sm text-muted-foreground">
-                    ת.לידה {new Date(raw.date_of_birth).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" })}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5">
+            {/* Row 1: Edit buttons + Name */}
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-lg font-bold leading-tight">
+                {raw.family_name} {raw.given_name}
+              </h1>
+              <div className="flex items-center gap-1.5 shrink-0">
                 {canDelete && (
                   <Button
                     variant="outline"
@@ -443,98 +431,151 @@ export default function SoldierDetailPage() {
                   variant="outline"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setEditOpen(true)}
-                  aria-label="ערוך פרטי חייל"
+                  onClick={() => setEditPersonalOpen(true)}
+                  aria-label="ערוך פרטים אישיים"
                 >
                   <Pencil size={14} />
                 </Button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge
-                variant={statusVariant}
-                className={
-                  raw.status === "injured"
-                    ? "bg-amber-100 text-amber-800 border-amber-200"
-                    : ""
-                }
-              >
-                {STATUS_LABEL[raw.status as SoldierStatus]}
-              </Badge>
-              {hasSpecialConditions && (
-                <Badge className="bg-purple-100 text-purple-800 border-purple-200">
-                  ת&quot;ש מיוחד
+            {/* Row 2: Details + Status badge */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-0.5">
+                <p className="text-sm text-muted-foreground">
+                  {raw.platoon_name} / {raw.squad_name}
+                  {raw.rank && ` · ${raw.rank}`}
+                </p>
+                {raw.id_number && (
+                  <p className="text-sm text-muted-foreground">מ.א. {raw.id_number}</p>
+                )}
+                {raw.civilian_id && (
+                  <p className="text-sm text-muted-foreground">מ.ז. {raw.civilian_id}</p>
+                )}
+                {raw.date_of_birth && (
+                  <p className="text-sm text-muted-foreground">
+                    ת.לידה {new Date(raw.date_of_birth).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" })}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Badge
+                  variant={statusVariant}
+                  className={
+                    raw.status === "injured"
+                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                      : ""
+                  }
+                >
+                  {STATUS_LABEL[raw.status as SoldierStatus]}
                 </Badge>
-              )}
+                {hasSpecialConditions && (
+                  <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                    ת&quot;ש מיוחד
+                  </Badge>
+                )}
+              </div>
             </div>
-
-            <p className="text-sm text-muted-foreground">
-              {raw.platoon_name} / {raw.squad_name}
-            </p>
           </div>
         </div>
 
         {/* Contact info & notes */}
-        {(raw.phone || raw.street || raw.city || raw.notes) && (
-          <div className="border-t border-border pt-3 space-y-1.5 text-sm">
-            {raw.phone && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">טלפון:</span>
-                <a href={`tel:${raw.phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.phone)}</a>
-                <a
-                  href={`https://wa.me/${raw.phone.replace("+", "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-emerald-600 hover:text-emerald-700 transition-colors"
-                  aria-label="שלח הודעת WhatsApp"
-                >
-                  <MessageCircle size={16} />
-                </a>
-              </div>
-            )}
-            {(raw.street || raw.city) && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">כתובת:</span>
-                <span>{[raw.street, raw.apt ? `דירה ${raw.apt}` : null, raw.city].filter(Boolean).join(", ")}</span>
-                <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent([raw.street, raw.city].filter(Boolean).join(", "))}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:text-blue-600 transition-colors"
-                  aria-label="נווט לכתובת"
-                >
-                  <Navigation size={16} />
-                </a>
-              </div>
-            )}
-            {raw.notes && (
-              <div className="flex items-start gap-2">
-                <span className="text-muted-foreground shrink-0">הערות:</span>
-                <span className="whitespace-pre-wrap">{raw.notes}</span>
-              </div>
-            )}
+        <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">פרטי קשר</span>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1"
+              onClick={() => setEditContactOpen(true)}
+              aria-label="ערוך פרטי קשר"
+            >
+              <Pencil size={12} />
+            </button>
           </div>
-        )}
+          {raw.phone && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">טלפון:</span>
+              <a href={`tel:${raw.phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.phone)}</a>
+              <a
+                href={`https://wa.me/${raw.phone.replace("+", "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-600 hover:text-emerald-700 transition-colors"
+                aria-label="שלח הודעת WhatsApp"
+              >
+                <MessageCircle size={16} />
+              </a>
+            </div>
+          )}
+          {(raw.street || raw.city) && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">כתובת:</span>
+              <span>{[raw.street, raw.apt ? `דירה ${raw.apt}` : null, raw.city].filter(Boolean).join(", ")}</span>
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent([raw.street, raw.city].filter(Boolean).join(", "))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-600 transition-colors"
+                aria-label="נווט לכתובת"
+              >
+                <Navigation size={16} />
+              </a>
+            </div>
+          )}
+          {!raw.phone && !raw.street && !raw.city && (
+            <p className="text-muted-foreground text-xs">לא הוזנו פרטי קשר</p>
+          )}
+        </div>
+
+        {/* Notes */}
+        <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">הערות</span>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1"
+              onClick={() => setEditNotesOpen(true)}
+              aria-label="ערוך הערות"
+            >
+              <Pencil size={12} />
+            </button>
+          </div>
+          {raw.notes ? (
+            <p className="whitespace-pre-wrap">{raw.notes}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs">אין הערות</p>
+          )}
+        </div>
 
         {/* Emergency contact */}
-        {(raw.emergency_phone || raw.emergency_contact_name) && (
-          <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+        <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+          <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">איש קשר לחירום</span>
-            {raw.emergency_contact_name && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">שם:</span>
-                <span>{raw.emergency_contact_name}{raw.emergency_contact_relationship ? ` (${RELATIONSHIP_LABELS[raw.emergency_contact_relationship] ?? raw.emergency_contact_relationship})` : ""}</span>
-              </div>
-            )}
-            {raw.emergency_phone && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">טלפון:</span>
-                <a href={`tel:${raw.emergency_phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.emergency_phone)}</a>
-              </div>
-            )}
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1"
+              onClick={() => setEditEmergencyOpen(true)}
+              aria-label="ערוך איש קשר לחירום"
+            >
+              <Pencil size={12} />
+            </button>
           </div>
-        )}
+          {raw.emergency_contact_name && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">שם:</span>
+              <span>{raw.emergency_contact_name}{raw.emergency_contact_relationship ? ` (${RELATIONSHIP_LABELS[raw.emergency_contact_relationship] ?? raw.emergency_contact_relationship})` : ""}</span>
+            </div>
+          )}
+          {raw.emergency_phone && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">טלפון:</span>
+              <a href={`tel:${raw.emergency_phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.emergency_phone)}</a>
+            </div>
+          )}
+          {!raw.emergency_phone && !raw.emergency_contact_name && (
+            <p className="text-muted-foreground text-xs">לא הוזן איש קשר לחירום</p>
+          )}
+        </div>
       </div>
 
       {/* Requests section */}
@@ -790,16 +831,58 @@ export default function SoldierDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      {/* Edit Personal Dialog */}
+      <Dialog open={editPersonalOpen} onOpenChange={setEditPersonalOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>עריכת פרטי חייל</DialogTitle>
+            <DialogTitle>פרטים אישיים</DialogTitle>
           </DialogHeader>
-          <EditSoldierForm
+          <EditPersonalForm
             soldier={soldier}
-            onSuccess={() => { setEditOpen(false); toast.success("החייל עודכן בהצלחה"); }}
-            onCancel={() => setEditOpen(false)}
+            onSuccess={() => { setEditPersonalOpen(false); toast.success("הפרטים עודכנו בהצלחה"); }}
+            onCancel={() => setEditPersonalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Contact Dialog */}
+      <Dialog open={editContactOpen} onOpenChange={setEditContactOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>פרטי קשר</DialogTitle>
+          </DialogHeader>
+          <EditContactForm
+            soldier={soldier}
+            onSuccess={() => { setEditContactOpen(false); toast.success("פרטי הקשר עודכנו בהצלחה"); }}
+            onCancel={() => setEditContactOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Notes Dialog */}
+      <Dialog open={editNotesOpen} onOpenChange={setEditNotesOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>הערות</DialogTitle>
+          </DialogHeader>
+          <EditNotesForm
+            soldier={soldier}
+            onSuccess={() => { setEditNotesOpen(false); toast.success("ההערות עודכנו בהצלחה"); }}
+            onCancel={() => setEditNotesOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Emergency Contact Dialog */}
+      <Dialog open={editEmergencyOpen} onOpenChange={setEditEmergencyOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>איש קשר לחירום</DialogTitle>
+          </DialogHeader>
+          <EditEmergencyContactForm
+            soldier={soldier}
+            onSuccess={() => { setEditEmergencyOpen(false); toast.success("איש הקשר לחירום עודכן בהצלחה"); }}
+            onCancel={() => setEditEmergencyOpen(false)}
           />
         </DialogContent>
       </Dialog>
