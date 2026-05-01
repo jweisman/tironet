@@ -31,8 +31,9 @@ export async function GET() {
 
     return NextResponse.json({
       subscriptions: subscriptions.map((s) => ({
-        // Only expose the domain — the full endpoint is sensitive
         endpointDomain: new URL(s.endpoint).hostname,
+        // Last 16 chars of endpoint for matching against the browser subscription
+        endpointSuffix: s.endpoint.slice(-16),
         createdAt: s.createdAt.toISOString(),
       })),
       preferences: preferences

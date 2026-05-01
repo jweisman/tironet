@@ -9,6 +9,7 @@ import { parseSickDays, expandSickDayRange } from "@/lib/requests/sick-days";
 import type { SickDay } from "@/lib/requests/sick-days";
 import { SickDayRangeEditor } from "./SickDayRangeEditor";
 import type { SickDayRange } from "./SickDayRangeEditor";
+import { validateSickDay, validateSickDayEnd } from "@/lib/requests/date-limits";
 
 interface Props {
   requestId: string;
@@ -23,6 +24,7 @@ export function SickDaysSection({ requestId, sickDaysJson, canEdit }: Props) {
 
   const [editing, setEditing] = useState(false);
   const [ranges, setRanges] = useState<SickDayRange[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   async function saveDays(updated: SickDay[]) {
     const sorted = [...updated].sort((a, b) => a.date.localeCompare(b.date));
@@ -47,6 +49,13 @@ export function SickDaysSection({ requestId, sickDaysJson, canEdit }: Props) {
   }
 
   async function saveAndClose() {
+    for (const range of ranges) {
+      const fromErr = validateSickDay(range.from);
+      if (fromErr) { setError(fromErr); return; }
+      const toErr = range.to ? validateSickDayEnd(range.to, range.from) : null;
+      if (toErr) { setError(toErr); return; }
+    }
+    setError(null);
     const existing = new Set(days.map((d) => d.date));
     const newDays: SickDay[] = [];
     for (const range of ranges) {
@@ -104,6 +113,7 @@ export function SickDaysSection({ requestId, sickDaysJson, canEdit }: Props) {
             ranges={ranges}
             onRangesChange={setRanges}
           />
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex gap-1.5 pt-1">
             <button
               type="button"

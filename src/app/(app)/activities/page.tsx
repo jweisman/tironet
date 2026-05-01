@@ -67,48 +67,49 @@ const SORT_LABELS: Record<SortMode, string> = {
 // SQL queries (PowerSync local SQLite)
 // ---------------------------------------------------------------------------
 
-// squad_id param: pass the squad's ID to scope counts to that squad,
-// or '' to include all soldiers/reports in the platoon (for platoon/company/admin roles).
 const ACTIVITIES_QUERY = `
-  WITH sf AS (SELECT ? AS squad_id)
   SELECT
     a.id, a.name, a.date, a.status, a.is_required,
     at.name AS activity_type_name, at.icon AS activity_type_icon,
     p.id AS platoon_id, p.name AS platoon_name,
-    c.name AS company_name,
-    (
-      SELECT COUNT(*) FROM soldiers s
-      JOIN squads sq ON sq.id = s.squad_id
-      WHERE sq.platoon_id = a.platoon_id
-        AND s.status = 'active' AND s.cycle_id = a.cycle_id
-        AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))
-    ) AS total_soldiers,
-    (SELECT COUNT(*) FROM activity_reports ar
-     JOIN soldiers s ON s.id = ar.soldier_id
-     WHERE ar.activity_id = a.id AND ar.result = 'completed' AND ar.failed = 0
-     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS completed_count,
-    (SELECT COUNT(*) FROM activity_reports ar
-     JOIN soldiers s ON s.id = ar.soldier_id
-     WHERE ar.activity_id = a.id AND ar.result = 'skipped'
-     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS skipped_count,
-    (SELECT COUNT(*) FROM activity_reports ar
-     JOIN soldiers s ON s.id = ar.soldier_id
-     WHERE ar.activity_id = a.id AND ar.failed = 1
-     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS score_failed_count,
-    (SELECT COUNT(*) FROM activity_reports ar
-     JOIN soldiers s ON s.id = ar.soldier_id
-     WHERE ar.activity_id = a.id AND ar.result = 'na'
-     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS na_count,
-    (SELECT COUNT(*) FROM activity_reports ar
-     JOIN soldiers s ON s.id = ar.soldier_id
-     WHERE ar.activity_id = a.id
-     AND ((SELECT squad_id FROM sf) = '' OR s.squad_id = (SELECT squad_id FROM sf))) AS reported_count
+    c.name AS company_name
   FROM activities a
   JOIN activity_types at ON at.id = a.activity_type_id
   JOIN platoons p ON p.id = a.platoon_id
   JOIN companies c ON c.id = p.company_id
   WHERE a.cycle_id = ?
   ORDER BY a.date DESC
+`;
+
+// Report counts as a single aggregation query with conditional sums,
+// instead of 5 correlated subqueries per activity row.
+// squad_id param: pass the squad's ID to scope counts to that squad,
+// or '' to include all soldiers/reports in the platoon.
+const REPORT_COUNTS_QUERY = `
+  SELECT ar.activity_id,
+    COUNT(*) AS reported_count,
+    SUM(CASE WHEN ar.result = 'completed' AND ar.failed = 0 THEN 1 ELSE 0 END) AS completed_count,
+    SUM(CASE WHEN ar.result = 'skipped' THEN 1 ELSE 0 END) AS skipped_count,
+    SUM(CASE WHEN ar.failed = 1 THEN 1 ELSE 0 END) AS score_failed_count,
+    SUM(CASE WHEN ar.result = 'na' THEN 1 ELSE 0 END) AS na_count
+  FROM activity_reports ar
+  JOIN activities a ON a.id = ar.activity_id
+  JOIN soldiers s ON s.id = ar.soldier_id
+  WHERE a.cycle_id = ?
+    AND (? = '' OR s.squad_id = ?)
+  GROUP BY ar.activity_id
+`;
+
+// Active soldier count per platoon as a single aggregation query,
+// instead of a correlated subquery per activity row.
+const SOLDIER_COUNTS_QUERY = `
+  SELECT sq.platoon_id, COUNT(*) AS total_soldiers
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  WHERE s.status = 'active'
+    AND s.cycle_id = ?
+    AND (? = '' OR s.squad_id = ?)
+  GROUP BY sq.platoon_id
 `;
 
 const COMPANY_PLATOONS_QUERY = `
@@ -124,17 +125,29 @@ interface RawActivity {
   is_required: number;
   activity_type_name: string; activity_type_icon: string;
   platoon_id: string; platoon_name: string; company_name: string;
-  total_soldiers: number;
-  completed_count: number; skipped_count: number; score_failed_count: number; na_count: number; reported_count: number;
 }
 
-function mapActivity(raw: RawActivity): ActivitySummary {
-  const total = Number(raw.total_soldiers ?? 0);
-  const reported = Number(raw.reported_count ?? 0);
-  const completed = Number(raw.completed_count ?? 0);
-  const skipped = Number(raw.skipped_count ?? 0);
-  const failed = Number(raw.score_failed_count ?? 0);
-  const na = Number(raw.na_count ?? 0);
+interface RawReportCounts {
+  activity_id: string;
+  reported_count: number;
+  completed_count: number;
+  skipped_count: number;
+  score_failed_count: number;
+  na_count: number;
+}
+
+interface RawSoldierCounts {
+  platoon_id: string;
+  total_soldiers: number;
+}
+
+function mapActivity(raw: RawActivity, reportCounts: RawReportCounts | undefined, totalSoldiers: number): ActivitySummary {
+  const total = totalSoldiers;
+  const reported = Number(reportCounts?.reported_count ?? 0);
+  const completed = Number(reportCounts?.completed_count ?? 0);
+  const skipped = Number(reportCounts?.skipped_count ?? 0);
+  const failed = Number(reportCounts?.score_failed_count ?? 0);
+  const na = Number(reportCounts?.na_count ?? 0);
   return {
     id: raw.id,
     name: raw.name,
@@ -175,8 +188,12 @@ export default function ActivitiesPage() {
   // -------- PowerSync queries --------
   // Squad commanders see only their squad's counts; everyone else gets platoon-wide counts (squadId = '').
   const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
-  const queryParams = useMemo(() => [squadId, selectedCycleId ?? ""], [squadId, selectedCycleId]);
-  const { data: rawActivities, isLoading: activitiesLoading } = useQuery<RawActivity>(ACTIVITIES_QUERY, queryParams);
+  const cycleId = selectedCycleId ?? "";
+  const activityParams = useMemo(() => [cycleId], [cycleId]);
+  const countsParams = useMemo(() => [cycleId, squadId, squadId], [cycleId, squadId]);
+  const { data: rawActivities, isLoading: activitiesLoading } = useQuery<RawActivity>(ACTIVITIES_QUERY, activityParams);
+  const { data: rawReportCounts } = useQuery<RawReportCounts>(REPORT_COUNTS_QUERY, countsParams);
+  const { data: rawSoldierCounts } = useQuery<RawSoldierCounts>(SOLDIER_COUNTS_QUERY, countsParams);
   const { showLoading, showConnectionError } = useSyncReady(
     (rawActivities ?? []).length > 0,
     activitiesLoading
@@ -189,10 +206,19 @@ export default function ActivitiesPage() {
     platoonParams
   );
 
-  const allActivities: ActivitySummary[] = useMemo(
-    () => (rawActivities ?? []).map(mapActivity),
-    [rawActivities]
-  );
+  const allActivities: ActivitySummary[] = useMemo(() => {
+    const reportMap = new Map<string, RawReportCounts>();
+    for (const rc of rawReportCounts ?? []) {
+      reportMap.set(rc.activity_id, rc);
+    }
+    const soldierMap = new Map<string, number>();
+    for (const sc of rawSoldierCounts ?? []) {
+      soldierMap.set(sc.platoon_id, Number(sc.total_soldiers));
+    }
+    return (rawActivities ?? []).map((a) =>
+      mapActivity(a, reportMap.get(a.id), soldierMap.get(a.platoon_id) ?? 0)
+    );
+  }, [rawActivities, rawReportCounts, rawSoldierCounts]);
 
   // -------- UI state --------
   // URL params take priority (deep links), then sessionStorage (back navigation), then default

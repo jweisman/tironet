@@ -26,26 +26,47 @@ export interface PushPayload {
   url: string;
 }
 
+export interface PushSendResult {
+  subscriptionsFound: number;
+  sent: number;
+  staleRemoved: number;
+  failed: number;
+  details: Array<{
+    endpointSuffix: string;
+    status: "sent" | "stale_removed" | "failed";
+    statusCode?: number;
+    error?: string;
+  }>;
+}
+
 /**
  * Send a push notification to all subscriptions for a given user.
  * Automatically removes stale/expired subscriptions (410 Gone, 404).
+ * Returns detailed results for diagnostics.
  */
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
-): Promise<void> {
-  if (!ensureVapidConfigured()) return;
+): Promise<PushSendResult> {
+  const emptyResult: PushSendResult = { subscriptionsFound: 0, sent: 0, staleRemoved: 0, failed: 0, details: [] };
+
+  if (!ensureVapidConfigured()) return emptyResult;
 
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
   });
 
-  if (subscriptions.length === 0) return;
+  if (subscriptions.length === 0) {
+    console.log(`[push] no subscriptions for user ${userId}`);
+    return emptyResult;
+  }
 
   const body = JSON.stringify(payload);
+  const result: PushSendResult = { subscriptionsFound: subscriptions.length, sent: 0, staleRemoved: 0, failed: 0, details: [] };
 
   const results = await Promise.allSettled(
     subscriptions.map(async (sub) => {
+      const suffix = sub.endpoint.slice(-16);
       try {
         await webpush.sendNotification(
           {
@@ -54,20 +75,30 @@ export async function sendPushToUser(
           },
           body,
         );
+        result.sent++;
+        result.details.push({ endpointSuffix: suffix, status: "sent" });
       } catch (err: unknown) {
         const statusCode = (err as { statusCode?: number }).statusCode;
         // 403, 404, or 410 = subscription is no longer valid — delete it.
         // Apple's push service returns 403 for expired/revoked subscriptions.
         if (statusCode === 403 || statusCode === 404 || statusCode === 410) {
+          console.log(`[push] removing stale subscription (${statusCode}) for user ${userId}: …${suffix}`);
           await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+          result.staleRemoved++;
+          result.details.push({ endpointSuffix: suffix, status: "stale_removed", statusCode });
+        } else {
+          result.failed++;
+          result.details.push({ endpointSuffix: suffix, status: "failed", statusCode, error: String(err) });
         }
         throw err;
       }
     }),
   );
 
-  // Log failures (non-stale) for debugging but don't throw — notification
-  // delivery is best-effort.
+  // Log summary for debugging
+  console.log(`[push] user ${userId}: ${result.sent} sent, ${result.staleRemoved} stale, ${result.failed} failed (of ${subscriptions.length})`);
+
+  // Log non-stale failures
   for (const r of results) {
     if (r.status === "rejected") {
       const statusCode = (r.reason as { statusCode?: number }).statusCode;
@@ -76,6 +107,8 @@ export async function sendPushToUser(
       }
     }
   }
+
+  return result;
 }
 
 /**
@@ -87,7 +120,10 @@ export async function sendPushToUsers(
   payload: PushPayload,
   preferenceField: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled" | "newAppointmentEnabled",
 ): Promise<void> {
-  if (userIds.length === 0) return;
+  if (userIds.length === 0) {
+    console.log(`[push] sendPushToUsers called with empty userIds for ${preferenceField}`);
+    return;
+  }
 
   // Load preferences for all target users in one query.
   const prefs = await prisma.notificationPreference.findMany({
@@ -99,6 +135,12 @@ export async function sendPushToUsers(
 
   // Users without a preference row default to enabled (opt-out model).
   const eligibleUserIds = userIds.filter((id) => prefMap.get(id) !== false);
+  const skippedByPref = userIds.length - eligibleUserIds.length;
+  if (skippedByPref > 0) {
+    console.log(`[push] ${skippedByPref}/${userIds.length} users opted out of ${preferenceField}`);
+  }
+
+  console.log(`[push] sending "${payload.title}" to ${eligibleUserIds.length} users (${preferenceField})`);
 
   await Promise.allSettled(
     eligibleUserIds.map((id) => sendPushToUser(id, payload)),

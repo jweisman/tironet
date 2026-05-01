@@ -21,7 +21,7 @@ import type { SickDay } from "@/lib/requests/sick-days";
 import { AppointmentListEditor } from "./AppointmentListEditor";
 import { SickDayRangeEditor } from "./SickDayRangeEditor";
 import type { SickDayRange } from "./SickDayRangeEditor";
-import { leaveDepartureLimits, leaveReturnLimits, paramedicDateLimits } from "@/lib/requests/date-limits";
+import { validateLeaveDeparture, validateLeaveReturn, validateAppointmentDate, validateParamedicDate, validateSickDay, validateSickDayEnd } from "@/lib/requests/date-limits";
 import type { RequestType, Transportation, Role } from "@/types";
 
 /** Format a Date as a `datetime-local` input value (YYYY-MM-DDTHH:MM). */
@@ -179,6 +179,28 @@ export function CreateRequestForm({
       return;
     }
 
+    // Date range validation
+    if (requestType === "leave") {
+      const depErr = validateLeaveDeparture(departureAt);
+      if (depErr) { setError(depErr); return; }
+      const retErr = validateLeaveReturn(returnAt, departureAt);
+      if (retErr) { setError(retErr); return; }
+    }
+    if (requestType === "medical") {
+      const paramErr = validateParamedicDate(paramedicDate);
+      if (paramErr) { setError(paramErr); return; }
+      for (const appt of appointments) {
+        const apptErr = validateAppointmentDate(appt.date);
+        if (apptErr) { setError(apptErr); return; }
+      }
+      for (const range of sickDayRanges) {
+        const fromErr = validateSickDay(range.from);
+        if (fromErr) { setError(fromErr); return; }
+        const toErr = range.to ? validateSickDayEnd(range.to, range.from) : null;
+        if (toErr) { setError(toErr); return; }
+      }
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -264,7 +286,7 @@ export function CreateRequestForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       {/* Squad selector (medic only) */}
       {isCompanyRole && !preselectedSoldierId && (
         <div className="space-y-1.5">
@@ -342,11 +364,9 @@ export function CreateRequestForm({
               <Input
                 id="req-departure"
                 type="datetime-local"
-                step={900}
+
                 value={departureAt}
                 onChange={(e) => setDepartureAt(e.target.value)}
-                min={leaveDepartureLimits().min}
-                max={leaveDepartureLimits().max}
                 dir="ltr"
                 lang="he"
               />
@@ -356,11 +376,9 @@ export function CreateRequestForm({
               <Input
                 id="req-return"
                 type="datetime-local"
-                step={900}
+
                 value={returnAt}
                 onChange={(e) => setReturnAt(e.target.value)}
-                min={departureAt || leaveReturnLimits().min}
-                max={leaveReturnLimits().max}
                 dir="ltr"
                 lang="he"
               />
@@ -402,8 +420,6 @@ export function CreateRequestForm({
               type="date"
               value={paramedicDate}
               onChange={(e) => setParamedicDate(e.target.value)}
-              min={paramedicDateLimits().min}
-              max={paramedicDateLimits().max}
               dir="ltr"
               lang="he"
               style={paramedicDate ? undefined : { color: "transparent" }}

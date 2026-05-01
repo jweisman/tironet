@@ -26,6 +26,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Cache Docker images to avoid Docker Hub rate limits (toomanyrequests).
+      # The cache key includes a hash of docker-compose.yml so it invalidates
+      # when image versions change.
+      - name: Cache Docker images
+        id: docker-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-images.tar
+          key: docker-images-${{ hashFiles('docker-compose.yml') }}
+
+      - name: Load cached Docker images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/docker-images.tar
+
       # Start Docker services immediately — they initialize in the background
       # while npm/Playwright/Next.js start up below.
       - name: Start Docker services
@@ -35,6 +49,16 @@ jobs:
           PS_JWT_SECRET_B64URL: Y2ktdGVzdC1qd3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch
           PS_JWT_AUDIENCE: http://localhost:8080
           PS_MONGODB_URI: mongodb://mongo:27017/powersync_e2e
+
+      - name: Save Docker images to cache
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        run: >
+          docker save -o /tmp/docker-images.tar
+          postgres:16-alpine
+          mailhog/mailhog:latest
+          mongo:7
+          journeyapps/powersync-service:latest
+          public.ecr.aws/upstash/qstash:latest
 
       - uses: actions/setup-node@v4
         with:

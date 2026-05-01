@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, SlidersHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useCycle } from "@/contexts/CycleContext";
 import { useTour } from "@/hooks/useTour";
@@ -21,11 +22,11 @@ import {
   getMonthBounds,
 } from "@/lib/calendar/events";
 import type { PlatoonColor } from "@/lib/calendar/events";
-import { CalendarGrid } from "@/components/reports/calendar/CalendarGrid";
-import { CalendarToolbar } from "@/components/reports/calendar/CalendarToolbar";
-import { CalendarLegend } from "@/components/reports/calendar/CalendarLegend";
-import { CalendarMobileView } from "@/components/reports/calendar/CalendarMobileView";
-import { MonthNav } from "@/components/reports/calendar/MonthNav";
+import { CalendarGrid } from "@/components/calendar/CalendarGrid";
+import { CalendarToolbar } from "@/components/calendar/CalendarToolbar";
+import { CalendarLegend } from "@/components/calendar/CalendarLegend";
+import { CalendarMobileView } from "@/components/calendar/CalendarMobileView";
+import { MonthNav } from "@/components/calendar/MonthNav";
 
 export default function CalendarPage() {
   const { selectedCycleId, isLoading: cycleLoading } = useCycle();
@@ -46,6 +47,7 @@ export default function CalendarPage() {
   // Filters
   const [selectedPlatoonId, setSelectedPlatoonId] = useState<string>("all");
   const [enabledFilters, setEnabledFilters] = useState<Set<CalendarFilterCategory>>(new Set());
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Fetch data
   useEffect(() => {
@@ -81,6 +83,11 @@ export default function CalendarPage() {
     () => filtersToEventTypes(enabledFilters),
     [enabledFilters],
   );
+
+  // Count active filters for the mobile badge
+  const activeFilterCount =
+    visibleFilters.filter((f) => !enabledFilters.has(f)).length +
+    (isMultiPlatoon && selectedPlatoonId !== "all" ? 1 : 0);
 
   const filteredEvents = useMemo(() => {
     if (!data) return [];
@@ -187,6 +194,28 @@ export default function CalendarPage() {
       <div className="sticky top-0 z-20 bg-background border-b border-border px-4 pt-3 pb-2">
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-bold flex-1">לוח אירועים</h1>
+          {/* Mobile filter toggle — in header to save vertical space */}
+          {!loading && data && (
+            <button
+              type="button"
+              data-tour="calendar-filters"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              className={cn(
+                "relative md:hidden flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                mobileFiltersOpen
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground",
+              )}
+            >
+              <SlidersHorizontal size={15} />
+              <span>סינון</span>
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1.5 -left-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             type="button"
             data-tour="calendar-export"
@@ -220,8 +249,35 @@ export default function CalendarPage() {
 
         {!loading && data && (
           <>
-            {/* Toolbar */}
-            <div data-tour="calendar-filters">
+            {/* Mobile: collapsible filter panel */}
+            {mobileFiltersOpen && (
+              <div className="md:hidden space-y-3">
+                <CalendarToolbar
+                  platoons={data.platoons}
+                  selectedPlatoonId={selectedPlatoonId}
+                  onPlatoonChange={setSelectedPlatoonId}
+                  visibleFilters={visibleFilters}
+                  enabledFilters={enabledFilters}
+                  onToggleFilter={handleToggleFilter}
+                  showPlatoonFilter={isMultiPlatoon}
+                />
+                {isMultiPlatoon && selectedPlatoonId === "all" ? (
+                  <CalendarLegend
+                    mode="platoon"
+                    platoons={data.platoons}
+                    colorMap={platoonColorMap}
+                  />
+                ) : (
+                  <CalendarLegend
+                    mode="type"
+                    visibleTypes={Array.from(enabledEventTypes)}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Desktop: always-visible toolbar + legend */}
+            <div className="hidden md:block space-y-4" data-tour="calendar-filters-desktop">
               <CalendarToolbar
                 platoons={data.platoons}
                 selectedPlatoonId={selectedPlatoonId}
@@ -231,21 +287,19 @@ export default function CalendarPage() {
                 onToggleFilter={handleToggleFilter}
                 showPlatoonFilter={isMultiPlatoon}
               />
+              {isMultiPlatoon && selectedPlatoonId === "all" ? (
+                <CalendarLegend
+                  mode="platoon"
+                  platoons={data.platoons}
+                  colorMap={platoonColorMap}
+                />
+              ) : (
+                <CalendarLegend
+                  mode="type"
+                  visibleTypes={Array.from(enabledEventTypes)}
+                />
+              )}
             </div>
-
-            {/* Legend */}
-            {isMultiPlatoon && selectedPlatoonId === "all" ? (
-              <CalendarLegend
-                mode="platoon"
-                platoons={data.platoons}
-                colorMap={platoonColorMap}
-              />
-            ) : (
-              <CalendarLegend
-                mode="type"
-                visibleTypes={Array.from(enabledEventTypes)}
-              />
-            )}
 
             {/* Month navigation — shared between mobile and desktop */}
             <div data-tour="calendar-month-nav">

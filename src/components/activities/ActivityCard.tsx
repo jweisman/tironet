@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { memo, useRef, useCallback } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,7 @@ function formatDate(isoString: string): string {
   });
 }
 
-export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPress, dataTour, selectable, selected, onToggleSelect }: Props) {
+export const ActivityCard = memo(function ActivityCard({ activity, showPlatoon = false, onClick, onLongPress, dataTour, selectable, selected, onToggleSelect }: Props) {
   const isPast = activity.date.split("T")[0] < new Date().toISOString().split("T")[0];
   const c = activity.counts;
   const hasIssues = activity.isRequired && isPast && (c.missing > 0 || c.skipped > 0 || c.failed > 0);
@@ -150,4 +150,4 @@ export function ActivityCard({ activity, showPlatoon = false, onClick, onLongPre
       </div>
     </button>
   );
-}
+});

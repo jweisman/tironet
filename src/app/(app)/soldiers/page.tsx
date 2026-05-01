@@ -69,36 +69,36 @@ const STATUS_FILTERS: StatusFilter[] = [
 const SOLDIERS_QUERY = `
   SELECT
     s.id, s.given_name, s.family_name, s.id_number, s.civilian_id, s.rank, s.status, s.profile_image, s.phone,
-    s.squad_id,
-    (
-      SELECT COUNT(*)
-      FROM activities a
-      WHERE a.platoon_id = (SELECT platoon_id FROM squads WHERE id = s.squad_id)
-        AND a.cycle_id = s.cycle_id
-        AND a.is_required = 1
-        AND a.status = 'active'
-        AND a.date < DATE('now')
-        AND (
-          NOT EXISTS (
-            SELECT 1 FROM activity_reports ar
-            WHERE ar.activity_id = a.id AND ar.soldier_id = s.id
-          )
-          OR EXISTS (
-            SELECT 1 FROM activity_reports ar
-            WHERE ar.activity_id = a.id AND ar.soldier_id = s.id AND (ar.result = 'skipped' OR ar.failed = 1)
-          )
-        )
-    ) AS gap_count,
-    (
-      SELECT COUNT(*)
-      FROM requests r
-      WHERE r.soldier_id = s.id
-        AND r.cycle_id = s.cycle_id
-        AND r.status = 'open'
-    ) AS open_request_count
+    s.squad_id
   FROM soldiers s
   WHERE s.cycle_id = ?
   ORDER BY s.family_name ASC, s.given_name ASC
+`;
+
+// Gap count as a single aggregation query instead of a correlated subquery per soldier.
+// Counts activities where the soldier has no report, a skipped report, or a failed report.
+const GAP_COUNT_QUERY = `
+  SELECT s.id AS soldier_id, COUNT(DISTINCT a.id) AS gap_count
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  JOIN activities a ON a.platoon_id = sq.platoon_id
+    AND a.cycle_id = s.cycle_id
+    AND a.is_required = 1
+    AND a.status = 'active'
+    AND a.date < DATE('now')
+  LEFT JOIN activity_reports ar ON ar.activity_id = a.id AND ar.soldier_id = s.id
+  WHERE s.cycle_id = ?
+    AND (ar.id IS NULL OR ar.result = 'skipped' OR ar.failed = 1)
+  GROUP BY s.id
+`;
+
+// Open request count as a single aggregation query instead of a correlated subquery per soldier.
+const OPEN_REQUEST_COUNT_QUERY = `
+  SELECT r.soldier_id, COUNT(*) AS open_request_count
+  FROM requests r
+  WHERE r.cycle_id = ?
+    AND r.status = 'open'
+  GROUP BY r.soldier_id
 `;
 
 // Open requests = active (approved + date criteria) OR in-progress (status open)
@@ -170,7 +170,15 @@ interface RawSoldier {
   profile_image: string | null;
   phone: string | null;
   squad_id: string;
+}
+
+interface RawGapCount {
+  soldier_id: string;
   gap_count: number;
+}
+
+interface RawOpenRequestCount {
+  soldier_id: string;
   open_request_count: number;
 }
 
@@ -181,7 +189,7 @@ interface RawSquad {
   platoon_name: string;
 }
 
-function mapSoldier(raw: RawSoldier, approvedRequests: { type: RequestType; urgent: boolean }[]): SoldierSummary {
+function mapSoldier(raw: RawSoldier, approvedRequests: { type: RequestType; urgent: boolean }[], gapCount: number, openRequestCount: number): SoldierSummary {
   return {
     id: raw.id,
     givenName: raw.given_name,
@@ -192,8 +200,8 @@ function mapSoldier(raw: RawSoldier, approvedRequests: { type: RequestType; urge
     status: raw.status as SoldierStatus,
     profileImage: raw.profile_image ?? null,
     phone: raw.phone ?? null,
-    gapCount: Number(raw.gap_count ?? 0),
-    openRequestCount: Number(raw.open_request_count ?? 0),
+    gapCount,
+    openRequestCount,
     approvedRequests,
   };
 }
@@ -217,6 +225,8 @@ export default function SoldiersPage() {
   const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
   const { data: rawOpenRequests } = useQuery<RawOpenRequest>(OPEN_REQUESTS_QUERY, queryParams);
   const { data: rawHardshipRequests } = useQuery<RawHardshipRequest>(HARDSHIP_REQUESTS_QUERY, queryParams);
+  const { data: rawGapCounts } = useQuery<RawGapCount>(GAP_COUNT_QUERY, queryParams);
+  const { data: rawOpenRequestCounts } = useQuery<RawOpenRequestCount>(OPEN_REQUEST_COUNT_QUERY, queryParams);
   const { showLoading, showConnectionError } = useSyncReady(
     (rawSoldiers ?? []).length > 0,
     soldiersLoading
@@ -253,6 +263,18 @@ export default function SoldiersPage() {
       else approvedMap.set(hr.soldier_id, [entry]);
     }
 
+    // Build soldier → gap count map
+    const gapMap = new Map<string, number>();
+    for (const g of rawGapCounts ?? []) {
+      gapMap.set(g.soldier_id, Number(g.gap_count));
+    }
+
+    // Build soldier → open request count map
+    const openReqMap = new Map<string, number>();
+    for (const r of rawOpenRequestCounts ?? []) {
+      openReqMap.set(r.soldier_id, Number(r.open_request_count));
+    }
+
     const squadMap = new Map<string, SquadData>();
     for (const sq of rawSquads ?? []) {
       squadMap.set(sq.id, {
@@ -265,7 +287,7 @@ export default function SoldiersPage() {
     }
     for (const s of rawSoldiers ?? []) {
       const squad = squadMap.get(s.squad_id);
-      if (squad) squad.soldiers.push(mapSoldier(s, approvedMap.get(s.id) ?? []));
+      if (squad) squad.soldiers.push(mapSoldier(s, approvedMap.get(s.id) ?? [], gapMap.get(s.id) ?? 0, openReqMap.get(s.id) ?? 0));
     }
     let squads = Array.from(squadMap.values()).filter((sq) => sq.soldiers.length > 0);
     // Squad commanders see only their own squad
@@ -273,7 +295,7 @@ export default function SoldiersPage() {
       squads = squads.filter((sq) => sq.id === selectedAssignment.unitId);
     }
     return squads;
-  }, [rawSoldiers, rawSquads, rawOpenRequests, rawHardshipRequests, role, selectedAssignment?.unitId]);
+  }, [rawSoldiers, rawSquads, rawOpenRequests, rawHardshipRequests, rawGapCounts, rawOpenRequestCounts, role, selectedAssignment?.unitId]);
 
   const existingIdNumbers = useMemo(() => {
     const set = new Set<string>();

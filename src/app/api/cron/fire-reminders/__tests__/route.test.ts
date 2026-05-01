@@ -28,7 +28,7 @@ const mockSendPush = vi.mocked(sendPushToUser);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSendPush.mockResolvedValue(undefined);
+  mockSendPush.mockResolvedValue({ subscriptionsFound: 0, sent: 0, staleRemoved: 0, failed: 0, details: [] });
   mockUpdate.mockResolvedValue({} as never);
 });
 

@@ -313,8 +313,8 @@ describe("getMonthBounds", () => {
 // ---------------------------------------------------------------------------
 
 describe("getThreeMonthRange", () => {
-  it("returns 3 months starting from the given date", () => {
-    const result = getThreeMonthRange("2026-04-15");
+  it("returns previous, current, and next month", () => {
+    const result = getThreeMonthRange("2026-05-15");
     expect(result.months).toEqual([
       { year: 2026, month: 3 }, // April
       { year: 2026, month: 4 }, // May
@@ -324,8 +324,19 @@ describe("getThreeMonthRange", () => {
     expect(result.endDate).toBe("2026-06-30");
   });
 
-  it("handles year boundary", () => {
-    const result = getThreeMonthRange("2026-11-01");
+  it("handles year boundary going back", () => {
+    const result = getThreeMonthRange("2027-01-10");
+    expect(result.months).toEqual([
+      { year: 2026, month: 11 }, // December
+      { year: 2027, month: 0 },  // January
+      { year: 2027, month: 1 },  // February
+    ]);
+    expect(result.startDate).toBe("2026-12-01");
+    expect(result.endDate).toBe("2027-02-28");
+  });
+
+  it("handles year boundary going forward", () => {
+    const result = getThreeMonthRange("2026-12-01");
     expect(result.months).toEqual([
       { year: 2026, month: 10 }, // November
       { year: 2026, month: 11 }, // December

@@ -4,7 +4,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
-import { appointmentDateLimits } from "@/lib/requests/date-limits";
 
 interface Props {
   value: MedicalAppointment[];
@@ -16,9 +15,16 @@ interface Props {
  * appointment plus an "add" button. Used by both the create form and
  * the detail-page MedicalAppointmentsSection.
  */
+function defaultDatetime(): string {
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0); // next round hour
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function AppointmentListEditor({ value, onChange }: Props) {
   function add() {
-    onChange([...value, { id: crypto.randomUUID(), date: "", place: "", type: "" }]);
+    onChange([...value, { id: crypto.randomUUID(), date: defaultDatetime(), place: "", type: "" }]);
   }
 
   function remove(id: string) {
@@ -47,11 +53,8 @@ export function AppointmentListEditor({ value, onChange }: Props) {
               <Label className="text-xs">תאריך ושעה</Label>
               <Input
                 type="datetime-local"
-                step={300}
                 value={appt.date}
                 onChange={(e) => update(appt.id, "date", e.target.value)}
-                min={appointmentDateLimits().min}
-                max={appointmentDateLimits().max}
                 dir="ltr"
                 lang="he"
                 className="w-full min-w-0"
