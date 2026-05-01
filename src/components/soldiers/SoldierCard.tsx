@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { RequestTypeIcon } from "@/components/requests/RequestTypeIcon";
@@ -63,7 +64,7 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash];
 }
 
-export function SoldierCard({ soldier, onClick, dataTour }: Props) {
+export const SoldierCard = memo(function SoldierCard({ soldier, onClick, dataTour }: Props) {
   const initials =
     (soldier.givenName[0] ?? "") + (soldier.familyName[0] ?? "");
   const colorClass = getAvatarColor(soldier.givenName + soldier.familyName);
@@ -136,4 +137,4 @@ export function SoldierCard({ soldier, onClick, dataTour }: Props) {
       </div>
     </button>
   );
-}
+});

@@ -102,64 +102,7 @@ const SQUADS_QUERY = `
     p.name  AS platoon_name,
     c.name  AS company_name,
     c.logo  AS company_logo,
-    p.logo  AS platoon_logo,
-
-    (SELECT COUNT(*)
-     FROM soldiers s
-     WHERE s.squad_id = sq.id AND s.status = 'active'
-       AND s.cycle_id = (SELECT id FROM cycle)
-    ) AS soldier_count,
-
-    (SELECT COUNT(DISTINCT s.id)
-     FROM soldiers s
-     WHERE s.squad_id = sq.id AND s.status = 'active'
-       AND s.cycle_id = (SELECT id FROM cycle)
-       AND EXISTS (
-         SELECT 1 FROM activities a
-         WHERE a.platoon_id = sq.platoon_id
-           AND a.cycle_id = (SELECT id FROM cycle)
-           AND a.status = 'active' AND a.is_required = 1
-           AND a.date < DATE('now')
-           AND (
-             NOT EXISTS (SELECT 1 FROM activity_reports ar
-                         WHERE ar.activity_id = a.id AND ar.soldier_id = s.id)
-             OR EXISTS  (SELECT 1 FROM activity_reports ar
-                         WHERE ar.activity_id = a.id AND ar.soldier_id = s.id
-                           AND (ar.result = 'skipped' OR ar.failed = 1))
-           )
-       )
-    ) AS soldiers_with_gaps,
-
-    (SELECT COUNT(*)
-     FROM activities a
-     WHERE a.platoon_id = sq.platoon_id
-       AND a.cycle_id = (SELECT id FROM cycle)
-       AND a.status = 'active' AND a.is_required = 1
-       AND a.date < DATE('now')
-       AND NOT EXISTS (
-         SELECT 1 FROM soldiers s
-         WHERE s.squad_id = sq.id AND s.status = 'active'
-           AND s.cycle_id = (SELECT id FROM cycle)
-           AND NOT EXISTS (SELECT 1 FROM activity_reports ar
-                           WHERE ar.activity_id = a.id AND ar.soldier_id = s.id)
-       )
-    ) AS reported_activities,
-
-    (SELECT COUNT(*)
-     FROM activities a
-     WHERE a.platoon_id = sq.platoon_id
-       AND a.cycle_id = (SELECT id FROM cycle)
-       AND a.status = 'active' AND a.is_required = 1
-       AND a.date < DATE('now')
-       AND EXISTS (
-         SELECT 1 FROM soldiers s
-         WHERE s.squad_id = sq.id AND s.status = 'active'
-           AND s.cycle_id = (SELECT id FROM cycle)
-           AND NOT EXISTS (SELECT 1 FROM activity_reports ar
-                           WHERE ar.activity_id = a.id AND ar.soldier_id = s.id)
-       )
-    ) AS missing_report_activities
-
+    p.logo  AS platoon_logo
   FROM squads sq
   JOIN platoons p ON p.id = sq.platoon_id
   JOIN companies c ON c.id = p.company_id
@@ -167,48 +110,89 @@ const SQUADS_QUERY = `
   ORDER BY p.sort_order ASC, p.name ASC, sq.sort_order ASC, sq.name ASC
 `;
 
-// Returns one row per (squad, activity) gap — avoids json_group_array.
-// JS groups these into topGapActivities (top 3 per squad) after the query.
-// Params: [cycleId, squadId]
-const TOP_GAPS_QUERY = `
-  WITH
-    cycle AS (SELECT ? AS id),
-    sf    AS (SELECT ? AS squad_id),
-    scope AS (
-      SELECT sq2.id AS squad_id
-      FROM squads sq2
-      JOIN platoons p2 ON p2.id = sq2.platoon_id
-      JOIN companies c  ON c.id  = p2.company_id
-      WHERE c.cycle_id = (SELECT id FROM cycle)
-        AND ((SELECT squad_id FROM sf) = '' OR sq2.id = (SELECT squad_id FROM sf))
-    )
-  SELECT g.squad_id, g.activity_id, g.activity_name, g.gap_count
-  FROM (
-    SELECT
-      sq.id   AS squad_id,
-      a.id    AS activity_id,
-      a.name  AS activity_name,
-      (SELECT COUNT(*)
-       FROM soldiers s
-       WHERE s.squad_id = sq.id AND s.status = 'active'
-         AND s.cycle_id = (SELECT id FROM cycle)
-         AND (
-           NOT EXISTS (SELECT 1 FROM activity_reports ar
-                       WHERE ar.activity_id = a.id AND ar.soldier_id = s.id)
-           OR EXISTS  (SELECT 1 FROM activity_reports ar
-                       WHERE ar.activity_id = a.id AND ar.soldier_id = s.id
-                         AND (ar.result = 'skipped' OR ar.failed = 1))
-         )
-      ) AS gap_count
-    FROM squads sq
-    JOIN activities a ON a.platoon_id = sq.platoon_id
-      AND a.status = 'active' AND a.is_required = 1
-      AND a.cycle_id = (SELECT id FROM cycle)
-      AND a.date < DATE('now')
-    WHERE sq.id IN (SELECT squad_id FROM scope)
-  ) g
-  WHERE g.gap_count > 0
-  ORDER BY g.squad_id, g.gap_count DESC
+// Active soldier count per squad. Params: [cycleId, squadId, squadId]
+const SQUAD_SOLDIER_COUNTS_QUERY = `
+  SELECT s.squad_id, COUNT(*) AS soldier_count
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  JOIN platoons p ON p.id = sq.platoon_id
+  JOIN companies c ON c.id = p.company_id
+  WHERE s.status = 'active'
+    AND c.cycle_id = ?
+    AND (? = '' OR s.squad_id = ?)
+  GROUP BY s.squad_id
+`;
+
+// Soldiers with gaps per squad: soldiers who have at least one required past
+// activity with a missing, skipped, or failed report.
+// Params: [cycleId, squadId, squadId]
+const SOLDIERS_WITH_GAPS_QUERY = `
+  SELECT s.squad_id, COUNT(DISTINCT s.id) AS soldiers_with_gaps
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  JOIN platoons p ON p.id = sq.platoon_id
+  JOIN companies c ON c.id = p.company_id
+  JOIN activities a ON a.platoon_id = sq.platoon_id
+    AND a.cycle_id = c.cycle_id
+    AND a.status = 'active' AND a.is_required = 1
+    AND a.date < DATE('now')
+  LEFT JOIN activity_reports ar ON ar.activity_id = a.id AND ar.soldier_id = s.id
+  WHERE s.status = 'active'
+    AND c.cycle_id = ?
+    AND (? = '' OR s.squad_id = ?)
+    AND (ar.id IS NULL OR ar.result = 'skipped' OR ar.failed = 1)
+  GROUP BY s.squad_id
+`;
+
+// Per-squad activity report completeness: for each (squad, activity), count
+// soldiers who are missing a report. An activity is "reported" if missing = 0,
+// "missing" if missing > 0.
+// Params: [cycleId, squadId, squadId]
+const ACTIVITY_COMPLETENESS_QUERY = `
+  SELECT
+    s.squad_id,
+    a.id AS activity_id,
+    SUM(CASE WHEN ar.id IS NULL THEN 1 ELSE 0 END) AS missing_count
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  JOIN platoons p ON p.id = sq.platoon_id
+  JOIN companies c ON c.id = p.company_id
+  JOIN activities a ON a.platoon_id = sq.platoon_id
+    AND a.cycle_id = c.cycle_id
+    AND a.status = 'active' AND a.is_required = 1
+    AND a.date < DATE('now')
+  LEFT JOIN activity_reports ar ON ar.activity_id = a.id AND ar.soldier_id = s.id
+  WHERE s.status = 'active'
+    AND c.cycle_id = ?
+    AND (? = '' OR s.squad_id = ?)
+  GROUP BY s.squad_id, a.id
+`;
+
+// Gap counts per (squad, activity) — replaces correlated subquery in TOP_GAPS_QUERY.
+// Counts soldiers with missing, skipped, or failed reports per activity.
+// Params: [cycleId, squadId, squadId]
+const GAP_COUNTS_QUERY = `
+  SELECT
+    s.squad_id,
+    a.id AS activity_id,
+    a.name AS activity_name,
+    COUNT(*) AS gap_count
+  FROM soldiers s
+  JOIN squads sq ON sq.id = s.squad_id
+  JOIN platoons p ON p.id = sq.platoon_id
+  JOIN companies c ON c.id = p.company_id
+  JOIN activities a ON a.platoon_id = sq.platoon_id
+    AND a.cycle_id = c.cycle_id
+    AND a.status = 'active' AND a.is_required = 1
+    AND a.date < DATE('now')
+  LEFT JOIN activity_reports ar ON ar.activity_id = a.id AND ar.soldier_id = s.id
+  WHERE s.status = 'active'
+    AND c.cycle_id = ?
+    AND (? = '' OR s.squad_id = ?)
+    AND (ar.id IS NULL OR ar.result = 'skipped' OR ar.failed = 1)
+  GROUP BY s.squad_id, a.id
+  HAVING gap_count > 0
+  ORDER BY s.squad_id, gap_count DESC
 `;
 
 // Per-squad request rows — fetched individually so we can apply isRequestActive()
@@ -243,8 +227,18 @@ interface RawSquad {
   squad_id: string; squad_name: string;
   platoon_id: string; platoon_name: string;
   company_name: string; company_logo: string | null; platoon_logo: string | null;
-  soldier_count: number; soldiers_with_gaps: number;
-  reported_activities: number; missing_report_activities: number;
+}
+interface RawSquadSoldierCount {
+  squad_id: string; soldier_count: number;
+}
+interface RawSoldiersWithGaps {
+  squad_id: string; soldiers_with_gaps: number;
+}
+interface RawActivityCompleteness {
+  squad_id: string; activity_id: string; missing_count: number;
+}
+interface RawGapCount {
+  squad_id: string; activity_id: string; activity_name: string; gap_count: number;
 }
 interface RawSquadRequest {
   squad_id: string;
@@ -253,9 +247,6 @@ interface RawSquadRequest {
   departure_at: string | null;
   return_at: string | null;
   medical_appointments: string | null;
-}
-interface RawTopGap {
-  squad_id: string; activity_id: string; activity_name: string; gap_count: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -287,13 +278,21 @@ export default function HomePage() {
   const role = rawRole ? effectiveRole(rawRole as Role) : "";
   const squadId = role === "squad_commander" ? (selectedAssignment?.unitId ?? "") : "";
 
+  const cycleId = selectedCycleId ?? "";
   const queryParams = useMemo(
-    () => [selectedCycleId ?? "", squadId],
-    [selectedCycleId, squadId]
+    () => [cycleId, squadId],
+    [cycleId, squadId]
+  );
+  const countsParams = useMemo(
+    () => [cycleId, squadId, squadId],
+    [cycleId, squadId]
   );
 
   const { data: rawSquads, isLoading: squadsLoading } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
-  const { data: rawTopGaps } = useQuery<RawTopGap>(TOP_GAPS_QUERY, queryParams);
+  const { data: rawSoldierCounts } = useQuery<RawSquadSoldierCount>(SQUAD_SOLDIER_COUNTS_QUERY, countsParams);
+  const { data: rawSoldiersWithGaps } = useQuery<RawSoldiersWithGaps>(SOLDIERS_WITH_GAPS_QUERY, countsParams);
+  const { data: rawActivityCompleteness } = useQuery<RawActivityCompleteness>(ACTIVITY_COMPLETENESS_QUERY, countsParams);
+  const { data: rawGapCounts } = useQuery<RawGapCount>(GAP_COUNTS_QUERY, countsParams);
   const { data: rawSquadRequests } = useQuery<RawSquadRequest>(REQUESTS_QUERY, queryParams);
 
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(
@@ -301,10 +300,10 @@ export default function HomePage() {
     squadsLoading
   );
 
-  // Build top-3-gaps map per squad from flat rows (avoids json_group_array)
+  // Build top-3-gaps map per squad from flat rows
   const topGapsMap = useMemo(() => {
     const map = new Map<string, { id: string; name: string; gapCount: number }[]>();
-    for (const row of rawTopGaps ?? []) {
+    for (const row of rawGapCounts ?? []) {
       if (!map.has(row.squad_id)) map.set(row.squad_id, []);
       const list = map.get(row.squad_id)!;
       if (list.length < 3) {
@@ -312,7 +311,7 @@ export default function HomePage() {
       }
     }
     return map;
-  }, [rawTopGaps]);
+  }, [rawGapCounts]);
 
   // Build request counts map per squad — apply isRequestActive() client-side
   const requestsMap = useMemo(() => {
@@ -337,6 +336,34 @@ export default function HomePage() {
     return map;
   }, [rawSquadRequests]);
 
+  // Build activity completeness maps per squad
+  const { reportedMap, missingMap } = useMemo(() => {
+    const reported = new Map<string, number>();
+    const missing = new Map<string, number>();
+    for (const row of rawActivityCompleteness ?? []) {
+      const m = Number(row.missing_count);
+      if (m === 0) {
+        reported.set(row.squad_id, (reported.get(row.squad_id) ?? 0) + 1);
+      } else {
+        missing.set(row.squad_id, (missing.get(row.squad_id) ?? 0) + 1);
+      }
+    }
+    return { reportedMap: reported, missingMap: missing };
+  }, [rawActivityCompleteness]);
+
+  // Build soldier counts and gaps maps
+  const soldierCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of rawSoldierCounts ?? []) map.set(row.squad_id, Number(row.soldier_count));
+    return map;
+  }, [rawSoldierCounts]);
+
+  const soldiersWithGapsMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of rawSoldiersWithGaps ?? []) map.set(row.squad_id, Number(row.soldiers_with_gaps));
+    return map;
+  }, [rawSoldiersWithGaps]);
+
   const squads: SquadSummary[] = useMemo(
     () =>
       (rawSquads ?? []).map((raw) => ({
@@ -345,15 +372,15 @@ export default function HomePage() {
         platoonId: raw.platoon_id,
         platoonName: raw.platoon_name,
         commanders: [], // UserCycleAssignment is not synced to local SQLite
-        soldierCount: Number(raw.soldier_count),
-        soldiersWithGaps: Number(raw.soldiers_with_gaps),
-        reportedActivities: Number(raw.reported_activities),
-        missingReportActivities: Number(raw.missing_report_activities),
+        soldierCount: soldierCountMap.get(raw.squad_id) ?? 0,
+        soldiersWithGaps: soldiersWithGapsMap.get(raw.squad_id) ?? 0,
+        reportedActivities: reportedMap.get(raw.squad_id) ?? 0,
+        missingReportActivities: missingMap.get(raw.squad_id) ?? 0,
         approvedRequests: requestsMap.get(raw.squad_id)?.approved ?? 0,
         inProgressRequests: requestsMap.get(raw.squad_id)?.inProgress ?? 0,
         topGapActivities: topGapsMap.get(raw.squad_id) ?? [],
       })),
-    [rawSquads, topGapsMap, requestsMap]
+    [rawSquads, soldierCountMap, soldiersWithGapsMap, reportedMap, missingMap, topGapsMap, requestsMap]
   );
 
   // Build unit path: company > platoon > squad (depending on role)
