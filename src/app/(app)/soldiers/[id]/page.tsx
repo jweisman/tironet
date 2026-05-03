@@ -40,7 +40,7 @@ import { isRequestActive, isRequestOpen, isRequestUrgent } from "@/lib/requests/
 import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
-import { parseScoreConfig, getActiveScores } from "@/types/score-config";
+import { parseScoreConfig, getActiveScores, evaluateScore } from "@/types/score-config";
 import { parseDisplayConfig, getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 
@@ -260,6 +260,7 @@ export default function SoldierDetailPage() {
   const [requestTypeMenuOpen, setRequestTypeMenuOpen] = useState(false);
   const [createRequestType, setCreateRequestType] = useState<RequestType | null>(null);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
+  const [showAllActivities, setShowAllActivities] = useState(false);
   const { selectedCycleId, selectedAssignment } = useCycle();
   const rawUserRole = (selectedAssignment?.role ?? "") as Role | "";
   const userRole = rawUserRole ? effectiveRole(rawUserRole) : "";
@@ -705,33 +706,60 @@ export default function SoldierDetailPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-card divide-y divide-border overflow-hidden">
-            {failedReports.map((r) => (
-              <Link
-                key={r.id}
-                href={`/activities/${r.activity_id}?gaps=1`}
-                className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex-1 min-w-0 space-y-0.5">
-                  <p className="text-sm font-medium">{r.activity_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.activity_type_name} · {formatDate(r.activity_date)}
-                  </p>
-                  {(() => {
-                    const scores = getActiveScores(parseScoreConfig(r.score_config));
-                    const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
-                    const withValues = scores
-                      .map((s) => ({ label: s.label, format: s.format, grade: grades[parseInt(s.key.replace("score", "")) - 1] }))
-                      .filter((a) => a.grade != null);
-                    if (withValues.length === 0) return null;
-                    return <p className="text-xs text-muted-foreground">{withValues.map((a) => `${a.label}: ${formatGradeDisplay(a.grade, a.format)}`).join(" · ")}</p>;
-                  })()}
-                  {r.note && (
-                    <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
-                  )}
-                </div>
-                <Badge variant="destructive" className="shrink-0 mt-0.5 text-xs">{Number(r.failed) ? "נכשל" : getResultLabels(parseDisplayConfig(r.display_configuration)).skipped.label}</Badge>
-              </Link>
-            ))}
+            {failedReports.map((r) => {
+              const scores = getActiveScores(parseScoreConfig(r.score_config));
+              const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
+              const withValues = scores
+                .map((s) => {
+                  const grade = grades[parseInt(s.key.replace("score", "")) - 1];
+                  const result = evaluateScore(grade, s.threshold, s.thresholdOperator);
+                  return { label: s.label, format: s.format, grade, result };
+                })
+                .filter((a) => a.grade != null);
+              const rl = getResultLabels(parseDisplayConfig(r.display_configuration));
+              const resultLabel = r.result === "completed" ? rl.completed.label : r.result === "skipped" ? rl.skipped.label : rl.na.label;
+              return (
+                <Link
+                  key={r.id}
+                  href={`/activities/${r.activity_id}?gaps=1`}
+                  className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <p className="text-sm font-medium">{r.activity_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.activity_type_name} · {formatDate(r.activity_date)}
+                    </p>
+                    {withValues.length > 0 && (
+                      <p className="text-xs">
+                        {withValues.map((a, i) => (
+                          <span key={i}>
+                            {i > 0 && " · "}
+                            <span className="text-muted-foreground">{a.label}: </span>
+                            <span className={a.result === "failed" ? "text-amber-600 font-medium" : a.result === "passed" ? "text-green-600" : "text-muted-foreground"}>
+                              {formatGradeDisplay(a.grade, a.format)}
+                            </span>
+                          </span>
+                        ))}
+                      </p>
+                    )}
+                    {r.note && (
+                      <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0 mt-0.5">
+                    {Number(r.failed) === 1 && (
+                      <Badge className="text-xs bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800">נכשל</Badge>
+                    )}
+                    <Badge
+                      variant={r.result === "skipped" ? "destructive" : "outline"}
+                      className="text-xs"
+                    >
+                      {resultLabel}
+                    </Badge>
+                  </div>
+                </Link>
+              );
+            })}
             {(missingRows ?? []).map((a) => (
               <Link
                 key={a.id}
@@ -753,58 +781,97 @@ export default function SoldierDetailPage() {
 
       {/* Completed activities section */}
       <div data-tour="soldier-completed" className="space-y-2">
-        <h2 className="text-sm font-semibold text-muted-foreground">
-          פעילויות שהושלמו
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground">
+            פעילויות שהושלמו
+          </h2>
+          {completedReports.length > 0 && (
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline"
+              onClick={() => setShowAllActivities((v) => !v)}
+            >
+              {showAllActivities ? "עם ציונים בלבד" : "הצג הכל"}
+            </button>
+          )}
+        </div>
 
-        {completedReports.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-            <FileText size={16} />
-            <span>אין פעילויות שהושלמו</span>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
-            {completedReports.map((r) => {
-              const scores = getActiveScores(parseScoreConfig(r.score_config));
-              const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
-              const withValues = scores
-                .map((s) => ({ label: s.label, format: s.format, grade: grades[parseInt(s.key.replace("score", "")) - 1] }))
-                .filter((a) => a.grade != null);
-              const rl = getResultLabels(parseDisplayConfig(r.display_configuration));
-              const resultLabel = r.result === "completed" ? rl.completed.label : r.result === "skipped" ? rl.skipped.label : r.result === "na" ? rl.na.label : null;
-              return (
-                <Link
-                  key={r.id}
-                  href={`/activities/${r.activity_id}`}
-                  className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    <p className="text-sm font-medium">{r.activity_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {r.activity_type_name} · {formatDate(r.activity_date)}
-                    </p>
-                    {withValues.length > 0 && (
+        {(() => {
+          const filtered = showAllActivities
+            ? completedReports
+            : completedReports.filter((r) => {
+                const hasScores = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6].some((g) => g != null);
+                return hasScores;
+              });
+          if (filtered.length === 0) {
+            return (
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+                <FileText size={16} />
+                <span>{completedReports.length === 0 ? "אין פעילויות שהושלמו" : "אין פעילויות עם ציונים"}</span>
+              </div>
+            );
+          }
+          return (
+            <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+              {filtered.map((r) => {
+                const scores = getActiveScores(parseScoreConfig(r.score_config));
+                const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
+                const withValues = scores
+                  .map((s) => {
+                    const grade = grades[parseInt(s.key.replace("score", "")) - 1];
+                    const result = evaluateScore(grade, s.threshold, s.thresholdOperator);
+                    return { label: s.label, format: s.format, grade, result };
+                  })
+                  .filter((a) => a.grade != null);
+                const rl = getResultLabels(parseDisplayConfig(r.display_configuration));
+                const resultLabel = r.result === "completed" ? rl.completed.label : r.result === "skipped" ? rl.skipped.label : r.result === "na" ? rl.na.label : null;
+                return (
+                  <Link
+                    key={r.id}
+                    href={`/activities/${r.activity_id}`}
+                    className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <p className="text-sm font-medium">{r.activity_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {withValues.map((a) => `${a.label}: ${formatGradeDisplay(a.grade, a.format)}`).join(" · ")}
+                        {r.activity_type_name} · {formatDate(r.activity_date)}
                       </p>
-                    )}
-                    {r.note && (
-                      <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
-                    )}
-                  </div>
-                  {resultLabel && (
-                    <Badge
-                      variant={r.result === "completed" && !Number(r.failed) ? "default" : r.result === "na" ? "secondary" : "destructive"}
-                      className={`shrink-0 mt-0.5 text-xs ${r.result === "completed" && !Number(r.failed) ? "bg-emerald-600" : ""}`}
-                    >
-                      {resultLabel}
-                    </Badge>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        )}
+                      {withValues.length > 0 && (
+                        <p className="text-xs">
+                          {withValues.map((a, i) => (
+                            <span key={i}>
+                              {i > 0 && " · "}
+                              <span className="text-muted-foreground">{a.label}: </span>
+                              <span className={a.result === "failed" ? "text-amber-600 font-medium" : a.result === "passed" ? "text-green-600" : "text-muted-foreground"}>
+                                {formatGradeDisplay(a.grade, a.format)}
+                              </span>
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                      {r.note && (
+                        <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0 mt-0.5">
+                      {Number(r.failed) === 1 && (
+                        <Badge className="text-xs bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800">נכשל</Badge>
+                      )}
+                      {resultLabel && (
+                        <Badge
+                          variant={r.result === "completed" ? "default" : r.result === "na" ? "secondary" : "destructive"}
+                          className={`text-xs ${r.result === "completed" ? "bg-emerald-600" : ""}`}
+                        >
+                          {resultLabel}
+                        </Badge>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Image zoom dialog */}
