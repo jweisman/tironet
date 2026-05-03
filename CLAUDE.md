@@ -673,11 +673,118 @@ Synced via `commander_events` stream scoped by `visible_platoon_ids` CTE. Squad 
 | **Commanders page** | CRUD under each user row | Events included in `/api/users/hierarchy` response |
 | **Home page** | Events active today | `CommanderEventsCallout` — PowerSync query, platoon/company commanders only |
 | **Calendar** | Each day in startDate–endDate range | New `commander_event` type in `CalendarEventType`, indigo color, `CalendarClock` icon |
-| **Daily Forum report** | Events active on report date | New "אירועי מפקדים" section after active requests, before הספקים |
+| **Daily Forum report** | Events active on report date | "אירועי מפקדים" section after active requests, then "ציונים" section, before הספקים |
 
 ### Icon
 
 `CalendarClock` from lucide-react — used consistently across home page callout, calendar chips, and calendar PDF.
+
+## Incidents (ציונים)
+
+Commendations and infractions logged against soldiers. Managed from the soldier detail page.
+
+### Data model
+
+`Incident` has `soldierId`, `type` (`commendation` | `infraction`), `date`, `description`, `response` (optional), `createdByName` (denormalized), `createdByUserId`. No `cycleId` — scoped through the soldier's squad → cycle chain.
+
+### Permissions
+
+- **Create:** any commander in the soldier's chain of command
+- **Edit/delete:** platoon commander or higher (`effectiveRole` = `platoon_commander` or `company_commander`)
+
+### PowerSync sync
+
+Synced via `incidents` stream scoped by `visible_squad_ids` CTE (same as soldiers): `WHERE soldier_id IN (SELECT id FROM soldiers WHERE squad_id IN visible_squad_ids)`.
+
+### Where incidents are surfaced
+
+| Surface | Implementation |
+|---|---|
+| **Soldier detail page** | `IncidentSection` component with CRUD dialogs, between card and requests |
+| **Daily Forum report** | "ציונים" section — incidents matching the report date, with type badges |
+
+### Key files
+- `src/components/incidents/IncidentSection.tsx` — list + create/edit/delete dialogs
+- `src/components/incidents/IncidentForm.tsx` — create/edit form (offline-first via `db.execute`)
+- `src/app/api/incidents/route.ts` — POST
+- `src/app/api/incidents/[id]/route.ts` — PATCH, DELETE
+
+## Home Visits (ביקורי בית)
+
+Home visit tracking for soldiers. Managed from the soldier detail page.
+
+### Data model
+
+`HomeVisit` has `soldierId`, `date`, `status` (`in_order` | `deficiencies`), `notes` (optional), `createdByName` (denormalized), `createdByUserId`. No `cycleId` — scoped through the soldier's squad → cycle chain.
+
+### Permissions
+
+Same as incidents: any commander can create, platoon commander+ can edit/delete.
+
+### PowerSync sync
+
+Synced via `home_visits` stream scoped by `visible_squad_ids` CTE.
+
+### Where home visits are surfaced
+
+| Surface | Implementation |
+|---|---|
+| **Soldier detail page** | `HomeVisitSection` component with CRUD dialogs |
+| **Calendar** | `home_visit` event type, sky blue color, `Home` icon, links to `/soldiers/{soldierId}` |
+
+### Calendar integration
+
+`home_visit` is a `CalendarEventType` with its own filter category. Added to `EVENT_TYPE_COLORS`, `EVENT_TYPE_LABELS`, `FILTER_CATEGORY_LABELS`, `FILTER_TO_EVENT_TYPES`, `visibleTypesToFilters`, `getEventHref`, `buildCalendarEvents`, `fetchCalendarData`, and the PDF renderer's `EVENT_TYPE_HEX` and `getEventIcon`.
+
+### Key files
+- `src/components/home-visits/HomeVisitSection.tsx` — list + create/edit/delete dialogs
+- `src/components/home-visits/HomeVisitForm.tsx` — create/edit form (offline-first via `db.execute`)
+- `src/app/api/home-visits/route.ts` — POST
+- `src/app/api/home-visits/[id]/route.ts` — PATCH, DELETE
+
+## Personal File Report (תיק אישי)
+
+A per-soldier PDF report containing all sections from the soldier detail page. Available from the reports page under "חיילים". Accessible to platoon and company commanders only (not squad commanders).
+
+### Scope
+
+Uses `getPersonalFileScope()` from `src/lib/api/personal-file-scope.ts` — similar to `getReportScope` but simpler (only `platoon_commander` and `company_commander`).
+
+### Page flow
+
+Reports page → Personal File page (soldier list with platoon filter) → PDF download per soldier.
+
+### Platoon filter
+
+Uses the mobile calendar filter pattern: filter icon with collapsible panel on mobile (`SlidersHorizontal` icon), inline select on desktop.
+
+### PDF sections
+
+Profile picture, personal details (unit/rank, IDs, DOB on separate lines), status badge, contact details, emergency contact, notes, incidents (with type badges), home visits (with status badges), requests, activities (scored only, with threshold coloring — green for passed, amber for failed scores, red "נכשל" badge for failed reports).
+
+### Key files
+- `src/lib/api/personal-file-scope.ts` — scope function
+- `src/lib/reports/render-personal-file.ts` — `fetchPersonalFile()` + `renderPersonalFileHtml()`
+- `src/app/api/reports/personal-file/route.ts` — soldier list API for the picker page
+- `src/app/api/reports/personal-file/pdf/route.ts` — PDF generation per soldier
+- `src/app/(app)/reports/personal-file/page.tsx` — soldier picker page
+
+## Soldier Detail Page — Edit Forms
+
+The soldier detail page splits editing into four focused dialogs instead of one large form:
+
+| Dialog | Component | Fields |
+|---|---|---|
+| פרטים אישיים | `EditPersonalForm` | name, IDs, rank, status, DOB, photo |
+| פרטי קשר | `EditContactForm` | phone, street, apt, city |
+| הערות | `EditNotesForm` | notes |
+| איש קשר לחירום | `EditEmergencyContactForm` | emergency phone, name, relationship |
+
+All four forms are in `src/components/soldiers/EditSoldierForm.tsx`. Each section on the detail page has its own pencil icon that opens the corresponding dialog. The top-right pencil opens the personal details form.
+
+### Emergency contact fields
+
+`emergencyContactName` (string, nullable) and `emergencyContactRelationship` (string, nullable) on the Soldier model. Relationship options: `mother` (אמא), `father` (אבא), `sibling` (אח/אחות), `spouse` (בן/בת זוג), `friend` (חבר/ה), `other` (אחר). Supported in soldier detail display, edit forms, and bulk import.
 
 ## Calendar (לוח אירועים)
 
@@ -695,7 +802,7 @@ A top-level page (`/calendar`) showing a monthly calendar of activities, leave r
 
 ### Event types and filter categories
 
-Four internal event types: `activity`, `leave`, `medical_appointment`, `sick_day`. The toolbar exposes three **filter categories** that group these: `activity`, `leave`, `medical` (combines appointments + sick days). This keeps the toolbar compact on mobile.
+Six internal event types: `activity`, `leave`, `medical_appointment`, `sick_day`, `commander_event`, `home_visit`. The toolbar exposes five **filter categories** that group these: `activity`, `leave`, `medical` (combines appointments + sick days), `commander_event`, `home_visit`.
 
 ### Responsive views
 
@@ -706,19 +813,19 @@ Four internal event types: `activity`, `leave`, `medical_appointment`, `sick_day
 ### Color scheme
 
 - **Multi-platoon users** (company level, "all platoons" selected): events colored by **platoon** using a fixed 8-color palette assigned by sort order.
-- **Single-platoon users** or filtered to one platoon: events colored by **event type** (blue=activity, amber=leave, rose=medical, purple=sick day).
+- **Single-platoon users** or filtered to one platoon: events colored by **event type** (blue=activity, amber=leave, rose=medical, purple=sick day, teal=commander event, sky=home visit).
 - Legend and dots both use `color.hex` (inline style) for consistent rendering in light and dark mode.
 
 ### Role access
 
-| Role | Activities | Leave | Medical/Sick | Platoon filter |
-|---|---|---|---|---|
-| squad_commander | Yes | Yes | Yes | Own platoon (no filter) |
-| platoon_commander | Yes | Yes | Yes | Own platoon (no filter) |
-| company_commander | Yes | Yes | Yes | All + per-platoon |
-| instructor | Yes | No | No | All platoons in company |
-| company_medic | No | No | Yes | All platoons in company |
-| hardship_coordinator | No access | | | |
+| Role | Activities | Leave | Medical/Sick | Commander Events | Home Visits | Platoon filter |
+|---|---|---|---|---|---|---|
+| squad_commander | Yes | Yes | Yes | No | Yes | Own platoon (no filter) |
+| platoon_commander | Yes | Yes | Yes | Yes | Yes | Own platoon (no filter) |
+| company_commander | Yes | Yes | Yes | Yes | Yes | All + per-platoon |
+| instructor | Yes | No | No | No | No | All platoons in company |
+| company_medic | No | No | Yes | No | No | All platoons in company |
+| hardship_coordinator | No access | | | | | |
 
 ### Safari grid-cols-7 workaround
 
