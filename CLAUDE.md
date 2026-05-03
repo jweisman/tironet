@@ -679,13 +679,23 @@ Synced via `commander_events` stream scoped by `visible_platoon_ids` CTE. Squad 
 
 `CalendarClock` from lucide-react — used consistently across home page callout, calendar chips, and calendar PDF.
 
-## Incidents (ציונים)
+## Incidents (אירועים)
 
-Commendations and infractions logged against soldiers. Managed from the soldier detail page.
+Commendations, disciplinary issues, and safety incidents logged against soldiers. Managed from the soldier detail page.
 
 ### Data model
 
-`Incident` has `soldierId`, `type` (`commendation` | `infraction`), `date`, `description`, `response` (optional), `createdByName` (denormalized), `createdByUserId`. No `cycleId` — scoped through the soldier's squad → cycle chain.
+`Incident` has `soldierId`, `type` (`commendation` | `discipline` | `safety`), `subtype` (required, depends on type), `date`, `description`, `response` (optional), `createdByName` (denormalized), `createdByUserId`. No `cycleId` — scoped through the soldier's squad → cycle chain.
+
+### Type and subtype options
+
+Defined in `src/lib/incidents/constants.ts` — `INCIDENT_TYPE_LABELS` and `SUBTYPE_OPTIONS`. Subtype values are English keys with Hebrew labels; available options depend on the parent type. **Subtype is required** — every type has a `general` (כללי) catch-all option. The form defaults new incidents to `general` and resets to `general` whenever `type` changes (the previous value is no longer valid for the new type).
+
+| Type | Color | Icon | Subtypes |
+|---|---|---|---|
+| commendation (צל״ש) | green | `Award` | `fitness` (כושר), `teamwork` (עבודת צוות), `general` (כללי) |
+| discipline (משמעת) | amber | `AlertTriangle` | `smoking` (עישון), `reliability` (אמינות), `general` (כללי) |
+| safety (בטיחות) | red | `ShieldAlert` | `weapon` (מטווח), `general` (כללי) |
 
 ### Permissions
 
@@ -701,9 +711,11 @@ Synced via `incidents` stream scoped by `visible_squad_ids` CTE (same as soldier
 | Surface | Implementation |
 |---|---|
 | **Soldier detail page** | `IncidentSection` component with CRUD dialogs, between card and requests |
-| **Daily Forum report** | "ציונים" section — incidents matching the report date, with type badges |
+| **Daily Forum report** | "אירועים" section — incidents matching the report date, with type+subtype badges |
+| **Personal File report** | "אירועים" section — full incident history with badges and threshold colors |
 
 ### Key files
+- `src/lib/incidents/constants.ts` — shared type labels, subtype options, `getSubtypeLabel()` helper
 - `src/components/incidents/IncidentSection.tsx` — list + create/edit/delete dialogs
 - `src/components/incidents/IncidentForm.tsx` — create/edit form (offline-first via `db.execute`)
 - `src/app/api/incidents/route.ts` — POST

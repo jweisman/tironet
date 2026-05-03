@@ -28,6 +28,7 @@ describe("POST /api/incidents", () => {
   const validBody = {
     soldierId: "550e8400-e29b-41d4-a716-446655440001",
     type: "commendation",
+    subtype: "general",
     date: "2026-05-01",
     description: "Outstanding performance",
     createdByName: "User Test",
@@ -112,5 +113,69 @@ describe("POST /api/incidents", () => {
     const res = await POST(req);
     expect(res.status).toBe(201);
     expect(mockIncidentCreate.mock.calls[0][0].data).toHaveProperty("id", clientId);
+  });
+
+  it("accepts discipline and safety types", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({ role: "squad_commander" as never, unitType: "squad", unitId: "squad-1" })],
+      }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({ cycleId: "cycle-1", squadId: "squad-1" } as never);
+    mockIncidentCreate.mockResolvedValue({ id: "inc-1" } as never);
+
+    for (const type of ["discipline", "safety"]) {
+      const req = createMockRequest("POST", "/api/incidents", { ...validBody, type });
+      const res = await POST(req);
+      expect(res.status).toBe(201);
+    }
+  });
+
+  it("rejects legacy infraction type", async () => {
+    mockAuth.mockResolvedValue({ user: mockSessionUser() } as never);
+    const req = createMockRequest("POST", "/api/incidents", { ...validBody, type: "infraction" });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("persists subtype when provided", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({ role: "squad_commander" as never, unitType: "squad", unitId: "squad-1" })],
+      }),
+    } as never);
+    mockSoldierFindUnique.mockResolvedValue({ cycleId: "cycle-1", squadId: "squad-1" } as never);
+    mockIncidentCreate.mockResolvedValue({ id: "inc-1" } as never);
+
+    const req = createMockRequest("POST", "/api/incidents", { ...validBody, subtype: "fitness" });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    expect(mockIncidentCreate.mock.calls[0][0].data).toHaveProperty("subtype", "fitness");
+  });
+
+  it("rejects when subtype is omitted", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({ role: "squad_commander" as never, unitType: "squad", unitId: "squad-1" })],
+      }),
+    } as never);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { subtype: _, ...bodyWithoutSubtype } = validBody;
+    const req = createMockRequest("POST", "/api/incidents", bodyWithoutSubtype);
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects when subtype is empty string", async () => {
+    mockAuth.mockResolvedValue({
+      user: mockSessionUser({
+        cycleAssignments: [mockAssignment({ role: "squad_commander" as never, unitType: "squad", unitId: "squad-1" })],
+      }),
+    } as never);
+
+    const req = createMockRequest("POST", "/api/incidents", { ...validBody, subtype: "" });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
   });
 });

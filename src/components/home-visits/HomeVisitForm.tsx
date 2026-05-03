@@ -42,10 +42,11 @@ export function HomeVisitForm({ soldierId, userName, userId, existing, onSuccess
         );
       } else {
         const id = crypto.randomUUID();
+        const createdAt = new Date().toISOString();
         await db.execute(
-          `INSERT INTO home_visits (id, soldier_id, date, created_by_name, created_by_user_id, status, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [id, soldierId, date, userName, userId, status, notes.trim() || null],
+          `INSERT INTO home_visits (id, soldier_id, date, created_by_name, created_by_user_id, status, notes, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, soldierId, date, userName, userId, status, notes.trim() || null, createdAt],
         );
       }
       onSuccess();

@@ -582,7 +582,10 @@ model ScheduledReminder {
 model Incident {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   soldierId       String   @map("soldier_id") @db.Uuid
-  type            String   // "commendation" | "infraction"
+  type            String   // "commendation" | "discipline" | "safety"
+  /// Subtype — valid values depend on type (see SUBTYPE_OPTIONS in src/lib/incidents/constants.ts).
+  /// Always populated; defaults to 'general' when no specific subtype applies.
+  subtype         String
   date            DateTime @db.Date
   createdByName   String   @map("created_by_name")
   createdByUserId String   @map("created_by_user_id") @db.Uuid

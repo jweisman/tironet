@@ -79,15 +79,20 @@ Editing is done via a modal dialog for core request fields. Medical appointments
   * administers the system via the Admin section
   * no effect on scope — requires a cycle assignment like all other roles
 
-## Incidents (ציונים)
+## Incidents (אירועים)
 * _Types_:
-  * `commendation` (ציון לשבח) — positive recognition
-  * `infraction` (ציון התנהגות) — behavioral issue
+  * `commendation` (צל״ש) — positive recognition (green)
+  * `discipline` (משמעת) — disciplinary issue (amber)
+  * `safety` (בטיחות) — safety incident (red)
+* _Subtypes_ (required, depend on type — defaults to `general`):
+  * commendation: `fitness` (כושר), `teamwork` (עבודת צוות), `general` (כללי)
+  * discipline: `smoking` (עישון), `reliability` (אמינות), `general` (כללי)
+  * safety: `weapon` (מטווח), `general` (כללי)
 * _Permissions_:
   * Any commander in the chain of command can create incidents
   * Only platoon commanders or higher can edit/delete
 * _Visibility_: Scoped by chain of command (same as soldiers)
-* _Surfaces_: Soldier detail page, Daily Forum report (for incidents on the report date)
+* _Surfaces_: Soldier detail page, Daily Forum report (for incidents on the report date), Personal File report
 
 ## Home Visits (ביקורי בית)
 * _Statuses_:

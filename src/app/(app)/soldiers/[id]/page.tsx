@@ -175,19 +175,19 @@ const SPECIAL_CONDITIONS_QUERY = `
 `;
 
 const INCIDENTS_QUERY = `
-  SELECT id, soldier_id, type, date, created_by_name, created_by_user_id,
-         description, response
+  SELECT id, soldier_id, type, subtype, date, created_by_name, created_by_user_id,
+         description, response, created_at
   FROM incidents
   WHERE soldier_id = ?
-  ORDER BY date DESC
+  ORDER BY date DESC, created_at DESC
 `;
 
 const HOME_VISITS_QUERY = `
   SELECT id, soldier_id, date, created_by_name, created_by_user_id,
-         status, notes
+         status, notes, created_at
   FROM home_visits
   WHERE soldier_id = ?
-  ORDER BY date DESC
+  ORDER BY date DESC, created_at DESC
 `;
 
 interface RawSoldierRequest {

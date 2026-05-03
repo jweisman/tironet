@@ -8,6 +8,7 @@ import type { ActivitySummaryRow } from "@/lib/reports/render-activity-summary";
 import { parseMedicalAppointments, formatAppointment } from "@/lib/requests/medical-appointments";
 import type { MedicalAppointment } from "@/lib/requests/medical-appointments";
 import { parseSickDays, formatSickDay } from "@/lib/requests/sick-days";
+import { INCIDENT_TYPE_LABELS, getSubtypeLabel } from "@/lib/incidents/constants";
 import type { SickDay } from "@/lib/requests/sick-days";
 import { isRequestActive } from "@/lib/requests/active";
 import { fetchAttendance, STATUS_LABELS as ATTENDANCE_STATUS_LABELS } from "@/lib/reports/render-attendance";
@@ -108,6 +109,7 @@ export interface IncidentItem {
   id: string;
   soldierName: string;
   type: string;
+  subtype: string | null;
   description: string;
   response: string | null;
 }
@@ -117,10 +119,6 @@ const CMDR_EVENT_TYPE_LABELS: Record<string, string> = {
   medical: "רפואה",
 };
 
-const INCIDENT_TYPE_LABELS: Record<string, string> = {
-  commendation: "ציון לשבח",
-  infraction: "ציון התנהגות",
-};
 
 export interface PlatoonForumSection {
   platoonId: string;
@@ -675,6 +673,7 @@ export async function fetchDailyForum(
     select: {
       id: true,
       type: true,
+      subtype: true,
       description: true,
       response: true,
       soldier: {
@@ -695,6 +694,7 @@ export async function fetchDailyForum(
       id: inc.id,
       soldierName: `${inc.soldier.familyName} ${inc.soldier.givenName}`,
       type: inc.type,
+      subtype: inc.subtype,
       description: inc.description,
       response: inc.response,
     });
@@ -971,15 +971,22 @@ export function renderDailyForumHtml(data: DailyForumData): string {
         .filter((p) => p.incidents.length > 0)
         .map((p) => {
           const rows = p.incidents.map((inc) => {
-            const typeLabel = INCIDENT_TYPE_LABELS[inc.type] ?? inc.type;
-            const badgeColor = inc.type === "commendation" ? "background:#dcfce7;color:#166534;border:1px solid #bbf7d0;" : "background:#fef3c7;color:#92400e;border:1px solid #fde68a;";
-            const badge = `<span style="${badgeColor}padding:1px 8px;border-radius:9999px;font-size:11px;font-weight:500;white-space:nowrap;">${escapeHtml(typeLabel)}</span>`;
+            const typeLabel = INCIDENT_TYPE_LABELS[inc.type as "commendation" | "discipline" | "safety"] ?? inc.type;
+            const subtypeLabel = getSubtypeLabel(inc.type, inc.subtype);
+            const fullLabel = subtypeLabel ? `${typeLabel} · ${subtypeLabel}` : typeLabel;
+            const badgeColor =
+              inc.type === "commendation"
+                ? "background:#dcfce7;color:#166534;border:1px solid #bbf7d0;"
+                : inc.type === "safety"
+                ? "background:#fee2e2;color:#991b1b;border:1px solid #fecaca;"
+                : "background:#fef3c7;color:#92400e;border:1px solid #fde68a;";
+            const badge = `<span style="${badgeColor}padding:1px 8px;border-radius:9999px;font-size:11px;font-weight:500;white-space:nowrap;">${escapeHtml(fullLabel)}</span>`;
             return `<tr><td>${escapeHtml(inc.soldierName)}</td><td>${badge}</td><td>${escapeHtml(inc.description)}</td><td>${inc.response ? escapeHtml(inc.response) : ""}</td></tr>`;
           }).join("\n");
           return `${platoonHeader(p)}<table><thead><tr><th>חייל</th><th>סוג</th><th>תיאור</th><th>תגובה</th></tr></thead><tbody>${rows}</tbody></table>`;
         })
         .join("\n")
-    : '<p class="no-data">אין ציונים</p>';
+    : '<p class="no-data">אין אירועים</p>';
 
   const todayHtml = data.platoons.every((p) => p.todayActivities.length === 0)
     ? '<p class="no-data">אין פעילויות להיום</p>'
@@ -1039,7 +1046,7 @@ export function renderDailyForumHtml(data: DailyForumData): string {
     </div>
 
     <div class="group-block">
-      <h2 class="group-title">ציונים (${totalIncidents})</h2>
+      <h2 class="group-title">אירועים (${totalIncidents})</h2>
       <div class="group-content">${incidentsHtml}</div>
     </div>
 

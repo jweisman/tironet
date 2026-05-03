@@ -129,6 +129,7 @@ const commander_events = new Table({
 const incidents = new Table({
   soldier_id: column.text,
   type: column.text,
+  subtype: column.text,
   date: column.text,
   created_by_name: column.text,
   created_by_user_id: column.text,

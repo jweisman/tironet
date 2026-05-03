@@ -8,7 +8,8 @@ import type { Role } from "@/types";
 const postSchema = z.object({
   id: z.string().uuid().optional(),
   soldierId: z.string().uuid(),
-  type: z.enum(["commendation", "infraction"]),
+  type: z.enum(["commendation", "discipline", "safety"]),
+  subtype: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   description: z.string().min(1),
   response: z.string().nullable().optional(),
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { id: clientId, soldierId, type, date, description, response, createdByName, createdByUserId } = parsed.data;
+  const { id: clientId, soldierId, type, subtype, date, description, response, createdByName, createdByUserId } = parsed.data;
 
   const soldier = await prisma.soldier.findUnique({
     where: { id: soldierId },
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
       ...(clientId ? { id: clientId } : {}),
       soldierId,
       type,
+      subtype,
       date: new Date(date + "T00:00:00.000Z"),
       description,
       response: response ?? null,

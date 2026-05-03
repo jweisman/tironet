@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { escapeHtml } from "@/lib/reports/html-helpers";
 import { getActiveScores, parseScoreConfig, evaluateScore } from "@/types/score-config";
 import { formatGradeDisplay } from "@/lib/score-format";
+import { INCIDENT_TYPE_LABELS, getSubtypeLabel, type IncidentType } from "@/lib/incidents/constants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,7 @@ export interface SoldierProfile {
 
 interface IncidentEntry {
   type: string;
+  subtype: string | null;
   date: string;
   description: string;
   response: string | null;
@@ -98,11 +100,6 @@ const REQUEST_STATUS_LABELS: Record<string, string> = {
   denied: "נדחתה",
 };
 
-const INCIDENT_TYPE_LABELS: Record<string, string> = {
-  commendation: "ציון לשבח",
-  infraction: "ציון התנהגות",
-};
-
 const HOME_VISIT_STATUS_LABELS: Record<string, string> = {
   in_order: "תקין",
   deficiencies: "ליקויים",
@@ -134,7 +131,7 @@ export async function fetchPersonalFile(
       cycle: { select: { name: true } },
       incidents: {
         orderBy: { date: "desc" },
-        select: { type: true, date: true, description: true, response: true, createdByName: true },
+        select: { type: true, subtype: true, date: true, description: true, response: true, createdByName: true },
       },
       homeVisits: {
         orderBy: { date: "desc" },
@@ -218,6 +215,7 @@ export async function fetchPersonalFile(
       squadName: soldier.squad.name,
       incidents: soldier.incidents.map((i) => ({
         type: i.type,
+        subtype: i.subtype,
         date: i.date.toISOString().split("T")[0],
         description: i.description,
         response: i.response,
@@ -302,13 +300,19 @@ export function renderPersonalFileHtml(data: PersonalFileData): string {
 
   // Incidents
   const incidentsHtml = s.incidents.length === 0
-    ? '<p style="font-size:11px;color:#9ca3af;">אין ציונים</p>'
+    ? '<p style="font-size:11px;color:#9ca3af;">אין אירועים</p>'
     : `<table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead><tr style="border-bottom:2px solid #e5e7eb;"><th style="text-align:start;padding:4px 6px;">תאריך</th><th style="text-align:start;padding:4px 6px;">סוג</th><th style="text-align:start;padding:4px 6px;">תיאור</th><th style="text-align:start;padding:4px 6px;">תגובה</th></tr></thead>
         <tbody>${s.incidents.map((i) => {
-          const typeBadge = i.type === "commendation"
-            ? badge(INCIDENT_TYPE_LABELS[i.type], "#dcfce7", "#166534")
-            : badge(INCIDENT_TYPE_LABELS[i.type], "#fef3c7", "#92400e");
+          const typeLabel = INCIDENT_TYPE_LABELS[i.type as IncidentType] ?? i.type;
+          const subtypeLabel = getSubtypeLabel(i.type, i.subtype);
+          const fullLabel = subtypeLabel ? `${typeLabel} · ${subtypeLabel}` : typeLabel;
+          const typeBadge =
+            i.type === "commendation"
+              ? badge(fullLabel, "#dcfce7", "#166534")
+              : i.type === "safety"
+              ? badge(fullLabel, "#fee2e2", "#991b1b")
+              : badge(fullLabel, "#fef3c7", "#92400e");
           return `<tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:4px 6px;">${formatDate(i.date)}</td><td style="padding:4px 6px;">${typeBadge}</td><td style="padding:4px 6px;">${escapeHtml(i.description)}</td><td style="padding:4px 6px;color:#6b7280;">${i.response ? escapeHtml(i.response) : ""}</td></tr>`;
         }).join("")}</tbody>
       </table>`;
@@ -393,7 +397,7 @@ export function renderPersonalFileHtml(data: PersonalFileData): string {
   ${sectionTitle("הערות")}
   ${notesHtml}
 
-  ${sectionTitle(`ציונים (${s.incidents.length})`)}
+  ${sectionTitle(`אירועים (${s.incidents.length})`)}
   ${incidentsHtml}
 
   ${sectionTitle(`ביקורי בית (${s.homeVisits.length})`)}

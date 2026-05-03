@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Award, AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { Plus, Award, AlertTriangle, ShieldAlert, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,17 +14,35 @@ import {
 } from "@/components/ui/dialog";
 import { IncidentForm } from "./IncidentForm";
 import { usePowerSync } from "@powersync/react";
+import { INCIDENT_TYPE_LABELS, getSubtypeLabel, type IncidentType } from "@/lib/incidents/constants";
 
 export interface RawIncident {
   id: string;
   soldier_id: string;
   type: string;
+  subtype: string | null;
   date: string;
   created_by_name: string;
   created_by_user_id: string;
   description: string;
   response: string | null;
+  created_at: string | null;
 }
+
+const TYPE_ICON: Record<IncidentType, { Icon: typeof Award; className: string }> = {
+  commendation: { Icon: Award, className: "text-green-600" },
+  discipline: { Icon: AlertTriangle, className: "text-amber-500" },
+  safety: { Icon: ShieldAlert, className: "text-red-600" },
+};
+
+const TYPE_BADGE_CLASS: Record<IncidentType, string> = {
+  commendation:
+    "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800",
+  discipline:
+    "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+  safety:
+    "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
+};
 
 interface Props {
   incidents: RawIncident[];
@@ -42,7 +60,11 @@ export function IncidentSection({ incidents, soldierId, canCreate, canEditDelete
   const [confirmDelete, setConfirmDelete] = useState<RawIncident | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const sorted = [...incidents].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = [...incidents].sort((a, b) => {
+    const byDate = b.date.localeCompare(a.date);
+    if (byDate !== 0) return byDate;
+    return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+  });
 
   async function handleDelete() {
     if (!confirmDelete) return;
@@ -58,11 +80,11 @@ export function IncidentSection({ incidents, soldierId, canCreate, canEditDelete
   return (
     <div data-tour="soldier-incidents" className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-muted-foreground">ציונים</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground">אירועים</h2>
         {canCreate && (
           <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus size={14} className="ml-1" />
-            הוסף ציון
+            הוסף אירוע
           </Button>
         )}
       </div>
@@ -70,63 +92,60 @@ export function IncidentSection({ incidents, soldierId, canCreate, canEditDelete
       {sorted.length === 0 ? (
         <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
           <Award size={16} />
-          <span>אין ציונים</span>
+          <span>אין אירועים</span>
         </div>
       ) : (
         <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
-          {sorted.map((inc) => (
-            <div key={inc.id} className="px-4 py-3 space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    {inc.type === "commendation" ? (
-                      <Award size={14} className="text-green-600" />
-                    ) : (
-                      <AlertTriangle size={14} className="text-amber-500" />
-                    )}
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className={
-                      inc.type === "commendation"
-                        ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800"
-                        : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800"
-                    }
-                  >
-                    {inc.type === "commendation" ? "ציון לשבח" : "ציון התנהגות"}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(inc.date).toLocaleDateString("he-IL")}
-                  </span>
-                </div>
-                {canEditDelete && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
-                      onClick={() => setEditIncident(inc)}
-                      aria-label="ערוך ציון"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                      onClick={() => setConfirmDelete(inc)}
-                      aria-label="מחק ציון"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+          {sorted.map((inc) => {
+            const typeKey = inc.type as IncidentType;
+            const iconConfig = TYPE_ICON[typeKey] ?? TYPE_ICON.discipline;
+            const badgeClass = TYPE_BADGE_CLASS[typeKey] ?? TYPE_BADGE_CLASS.discipline;
+            const typeLabel = INCIDENT_TYPE_LABELS[typeKey] ?? inc.type;
+            const subtypeLabel = getSubtypeLabel(inc.type, inc.subtype);
+            const Icon = iconConfig.Icon;
+            return (
+              <div key={inc.id} className="px-4 py-3 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <Icon size={14} className={iconConfig.className} />
+                    </span>
+                    <Badge variant="outline" className={badgeClass}>
+                      {typeLabel}{subtypeLabel ? ` · ${subtypeLabel}` : ""}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(inc.date).toLocaleDateString("he-IL")}
+                    </span>
                   </div>
+                  {canEditDelete && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                        onClick={() => setEditIncident(inc)}
+                        aria-label="ערוך אירוע"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                        onClick={() => setConfirmDelete(inc)}
+                        aria-label="מחק אירוע"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm">{inc.description}</p>
+                {inc.response && (
+                  <p className="text-sm text-muted-foreground">תגובה: {inc.response}</p>
                 )}
+                <p className="text-xs text-muted-foreground">נוצר ע״י {inc.created_by_name}</p>
               </div>
-              <p className="text-sm">{inc.description}</p>
-              {inc.response && (
-                <p className="text-sm text-muted-foreground">תגובה: {inc.response}</p>
-              )}
-              <p className="text-xs text-muted-foreground">נוצר ע״י {inc.created_by_name}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -134,7 +153,7 @@ export function IncidentSection({ incidents, soldierId, canCreate, canEditDelete
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>ציון חדש</DialogTitle>
+            <DialogTitle>אירוע חדש</DialogTitle>
           </DialogHeader>
           <IncidentForm
             soldierId={soldierId}
@@ -150,7 +169,7 @@ export function IncidentSection({ incidents, soldierId, canCreate, canEditDelete
       <Dialog open={!!editIncident} onOpenChange={(open) => !open && setEditIncident(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>עריכת ציון</DialogTitle>
+            <DialogTitle>עריכת אירוע</DialogTitle>
           </DialogHeader>
           {editIncident && (
             <IncidentForm
@@ -169,9 +188,9 @@ export function IncidentSection({ incidents, soldierId, canCreate, canEditDelete
       <Dialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>מחיקת ציון</DialogTitle>
+            <DialogTitle>מחיקת אירוע</DialogTitle>
             <DialogDescription>
-              האם למחוק את הציון? פעולה זו לא ניתנת לביטול.
+              האם למחוק את האירוע? פעולה זו לא ניתנת לביטול.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

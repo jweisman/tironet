@@ -346,8 +346,8 @@ export const soldierDetailTourSteps: VersionedStep[] = [
   {
     element: "[data-tour='soldier-incidents']",
     popover: {
-      title: "ציונים",
-      description: "ציוני שבח והתנהגות — צפו, הוסיפו ועקבו אחר ציונים של החייל.",
+      title: "אירועים",
+      description: "צל״ש, משמעת ובטיחות — צפו, הוסיפו ועקבו אחר אירועים של החייל.",
     },
     version: 2,
   },

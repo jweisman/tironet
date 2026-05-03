@@ -126,7 +126,7 @@ streams:
   incidents:
     auto_subscribe: true
     query: >
-      SELECT id, soldier_id, type, date, created_by_name, created_by_user_id,
+      SELECT id, soldier_id, type, subtype, date, created_by_name, created_by_user_id,
              description, response, created_at, updated_at
       FROM incidents
       WHERE soldier_id IN (SELECT id FROM soldiers WHERE squad_id IN visible_squad_ids)

@@ -23,6 +23,7 @@ export interface RawHomeVisit {
   created_by_user_id: string;
   status: string;
   notes: string | null;
+  created_at: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -46,7 +47,11 @@ export function HomeVisitSection({ visits, soldierId, canCreate, canEditDelete, 
   const [confirmDelete, setConfirmDelete] = useState<RawHomeVisit | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const sorted = [...visits].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = [...visits].sort((a, b) => {
+    const byDate = b.date.localeCompare(a.date);
+    if (byDate !== 0) return byDate;
+    return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+  });
 
   async function handleDelete() {
     if (!confirmDelete) return;

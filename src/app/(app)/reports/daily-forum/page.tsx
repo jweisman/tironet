@@ -14,6 +14,7 @@ import { extractRequestFields, formatNotes } from "@/lib/reports/detail-columns"
 import { RequestDetailColumns } from "@/components/reports/RequestDetailColumns";
 import { AttendanceTable } from "@/components/reports/AttendanceTable";
 import { REQUEST_STATUS_LABELS, ASSIGNED_ROLE_LABELS } from "@/lib/requests/constants";
+import { INCIDENT_TYPE_LABELS, getSubtypeLabel, type IncidentType } from "@/lib/incidents/constants";
 import type { RequestStatus, Role } from "@/types";
 import { getResultLabels } from "@/types/display-config";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
@@ -380,17 +381,17 @@ function ForumContent({ data }: { data: DailyForumData }) {
         );
       })()}
 
-      {/* ציונים */}
+      {/* אירועים */}
       {(() => {
         const totalIncidents = platoons.reduce((s, p) => s + (p.incidents?.length ?? 0), 0);
         return (
           <div className="mb-6">
             <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
-              ציונים ({totalIncidents})
+              אירועים ({totalIncidents})
             </h2>
             <div className="ps-4">
               {totalIncidents === 0 ? (
-                <p className="text-xs text-muted-foreground">אין ציונים</p>
+                <p className="text-xs text-muted-foreground">אין אירועים</p>
               ) : (
                 platoons.map((p) => {
                   const items = p.incidents ?? [];
@@ -409,18 +410,29 @@ function ForumContent({ data }: { data: DailyForumData }) {
                             </tr>
                           </thead>
                           <tbody>
-                            {items.map((inc) => (
-                              <tr key={inc.id} className="border-b border-border">
-                                <td className="px-2 py-1.5">{inc.soldierName}</td>
-                                <td className="px-2 py-1.5">
-                                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${inc.type === "commendation" ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"}`}>
-                                    {{ commendation: "ציון לשבח", infraction: "ציון התנהגות" }[inc.type] ?? inc.type}
-                                  </span>
-                                </td>
-                                <td className="px-2 py-1.5">{inc.description}</td>
-                                <td className="px-2 py-1.5 text-muted-foreground">{inc.response ?? ""}</td>
-                              </tr>
-                            ))}
+                            {items.map((inc) => {
+                              const typeLabel = INCIDENT_TYPE_LABELS[inc.type as IncidentType] ?? inc.type;
+                              const subtypeLabel = getSubtypeLabel(inc.type, inc.subtype);
+                              const fullLabel = subtypeLabel ? `${typeLabel} · ${subtypeLabel}` : typeLabel;
+                              const badgeClass =
+                                inc.type === "commendation"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400"
+                                  : inc.type === "safety"
+                                  ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-400"
+                                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400";
+                              return (
+                                <tr key={inc.id} className="border-b border-border">
+                                  <td className="px-2 py-1.5">{inc.soldierName}</td>
+                                  <td className="px-2 py-1.5">
+                                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
+                                      {fullLabel}
+                                    </span>
+                                  </td>
+                                  <td className="px-2 py-1.5">{inc.description}</td>
+                                  <td className="px-2 py-1.5 text-muted-foreground">{inc.response ?? ""}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

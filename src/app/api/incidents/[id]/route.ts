@@ -6,7 +6,8 @@ import { effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
 
 const patchSchema = z.object({
-  type: z.enum(["commendation", "infraction"]).optional(),
+  type: z.enum(["commendation", "discipline", "safety"]).optional(),
+  subtype: z.string().min(1).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   description: z.string().min(1).optional(),
   response: z.string().nullable().optional(),
@@ -79,6 +80,7 @@ export async function PATCH(
 
   const updateData: Record<string, unknown> = {};
   if (parsed.data.type !== undefined) updateData.type = parsed.data.type;
+  if (parsed.data.subtype !== undefined) updateData.subtype = parsed.data.subtype;
   if (parsed.data.date !== undefined) updateData.date = new Date(parsed.data.date + "T00:00:00.000Z");
   if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
   if (parsed.data.response !== undefined) updateData.response = parsed.data.response;
