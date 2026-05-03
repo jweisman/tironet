@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { DoorOpen, Stethoscope, Thermometer, CalendarClock } from "lucide-react";
+import { DoorOpen, Stethoscope, Thermometer, CalendarClock, Home } from "lucide-react";
 import { ActivityTypeIcon } from "@/components/activities/ActivityTypeIcon";
 import type { CalendarEvent, CalendarEventType, PlatoonColor } from "@/lib/calendar/events";
 import { EVENT_TYPE_LABELS, getEventHref } from "@/lib/calendar/events";
@@ -17,6 +17,7 @@ const REQUEST_TYPE_ICONS: Partial<
   medical_appointment: Stethoscope,
   sick_day: Thermometer,
   commander_event: CalendarClock,
+  home_visit: Home,
 };
 
 function pad(n: number): string {

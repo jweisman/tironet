@@ -78,3 +78,23 @@ Editing is done via a modal dialog for core request fields. Medical appointments
 * _Admin_:
   * administers the system via the Admin section
   * no effect on scope — requires a cycle assignment like all other roles
+
+## Incidents (ציונים)
+* _Types_:
+  * `commendation` (ציון לשבח) — positive recognition
+  * `infraction` (ציון התנהגות) — behavioral issue
+* _Permissions_:
+  * Any commander in the chain of command can create incidents
+  * Only platoon commanders or higher can edit/delete
+* _Visibility_: Scoped by chain of command (same as soldiers)
+* _Surfaces_: Soldier detail page, Daily Forum report (for incidents on the report date)
+
+## Home Visits (ביקורי בית)
+* _Statuses_:
+  * `in_order` (תקין) — everything is fine
+  * `deficiencies` (ליקויים) — issues found
+* _Permissions_:
+  * Any commander in the chain of command can create home visits
+  * Only platoon commanders or higher can edit/delete
+* _Visibility_: Scoped by chain of command (same as soldiers)
+* _Surfaces_: Soldier detail page, Calendar

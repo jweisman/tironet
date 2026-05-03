@@ -344,6 +344,22 @@ export const soldierDetailTourSteps: VersionedStep[] = [
     },
   },
   {
+    element: "[data-tour='soldier-incidents']",
+    popover: {
+      title: "ציונים",
+      description: "ציוני שבח והתנהגות — צפו, הוסיפו ועקבו אחר ציונים של החייל.",
+    },
+    version: 2,
+  },
+  {
+    element: "[data-tour='soldier-home-visits']",
+    popover: {
+      title: "ביקורי בית",
+      description: "תיעוד ביקורי בית — תאריך, סטטוס והערות.",
+    },
+    version: 2,
+  },
+  {
     element: "[data-tour='soldier-gaps']",
     popover: {
       title: "פעילויות עם פערים",

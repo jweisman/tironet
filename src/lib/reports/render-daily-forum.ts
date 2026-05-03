@@ -104,9 +104,22 @@ export interface CommanderEventItem {
   endDate: string;
 }
 
+export interface IncidentItem {
+  id: string;
+  soldierName: string;
+  type: string;
+  description: string;
+  response: string | null;
+}
+
 const CMDR_EVENT_TYPE_LABELS: Record<string, string> = {
   leave: "יציאה",
   medical: "רפואה",
+};
+
+const INCIDENT_TYPE_LABELS: Record<string, string> = {
+  commendation: "ציון לשבח",
+  infraction: "ציון התנהגות",
 };
 
 export interface PlatoonForumSection {
@@ -123,6 +136,7 @@ export interface PlatoonForumSection {
     leave: OpenRequestItem[];
   };
   commanderEvents: CommanderEventItem[];
+  incidents: IncidentItem[];
   todayActivities: TodayActivityItem[];
   tomorrowActivities: TomorrowActivityItem[];
   gaps: GapActivityItem[];
@@ -648,6 +662,45 @@ export async function fetchDailyForum(
   }
 
   // ---------------------------------------------------------------------------
+  // Incidents on the report date
+  // ---------------------------------------------------------------------------
+  const incidentsRaw = await prisma.incident.findMany({
+    where: {
+      soldier: {
+        squad: { platoonId: { in: platoonIds } },
+        cycleId,
+      },
+      date: new Date(today + "T00:00:00.000Z"),
+    },
+    select: {
+      id: true,
+      type: true,
+      description: true,
+      response: true,
+      soldier: {
+        select: {
+          familyName: true,
+          givenName: true,
+          squad: { select: { platoonId: true } },
+        },
+      },
+    },
+  });
+
+  const incidentsByPlatoon = new Map<string, IncidentItem[]>();
+  for (const inc of incidentsRaw) {
+    const pId = inc.soldier.squad.platoonId;
+    if (!incidentsByPlatoon.has(pId)) incidentsByPlatoon.set(pId, []);
+    incidentsByPlatoon.get(pId)!.push({
+      id: inc.id,
+      soldierName: `${inc.soldier.familyName} ${inc.soldier.givenName}`,
+      type: inc.type,
+      description: inc.description,
+      response: inc.response,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Assemble per-platoon sections
   // ---------------------------------------------------------------------------
   const platoonSections: PlatoonForumSection[] = platoons.map((platoon) => ({
@@ -657,6 +710,7 @@ export async function fetchDailyForum(
     openRequests: requestsByPlatoon.get(platoon.id) ?? { medical: [], hardship: [], leave: [] },
     activeRequests: activeByPlatoon.get(platoon.id) ?? { medical: [], leave: [] },
     commanderEvents: cmdrByPlatoon.get(platoon.id) ?? [],
+    incidents: incidentsByPlatoon.get(platoon.id) ?? [],
     todayActivities: todayByPlatoon.get(platoon.id) ?? [],
     tomorrowActivities: tomorrowByPlatoon.get(platoon.id) ?? [],
     gaps: gapsByPlatoon.get(platoon.id) ?? [],
@@ -911,6 +965,22 @@ export function renderDailyForumHtml(data: DailyForumData): string {
         .join("\n")
     : '<p class="no-data">אין אירועי מפקדים</p>';
 
+  const totalIncidents = data.platoons.reduce((s, p) => s + p.incidents.length, 0);
+  const incidentsHtml = totalIncidents > 0
+    ? data.platoons
+        .filter((p) => p.incidents.length > 0)
+        .map((p) => {
+          const rows = p.incidents.map((inc) => {
+            const typeLabel = INCIDENT_TYPE_LABELS[inc.type] ?? inc.type;
+            const badgeColor = inc.type === "commendation" ? "background:#dcfce7;color:#166534;border:1px solid #bbf7d0;" : "background:#fef3c7;color:#92400e;border:1px solid #fde68a;";
+            const badge = `<span style="${badgeColor}padding:1px 8px;border-radius:9999px;font-size:11px;font-weight:500;white-space:nowrap;">${escapeHtml(typeLabel)}</span>`;
+            return `<tr><td>${escapeHtml(inc.soldierName)}</td><td>${badge}</td><td>${escapeHtml(inc.description)}</td><td>${inc.response ? escapeHtml(inc.response) : ""}</td></tr>`;
+          }).join("\n");
+          return `${platoonHeader(p)}<table><thead><tr><th>חייל</th><th>סוג</th><th>תיאור</th><th>תגובה</th></tr></thead><tbody>${rows}</tbody></table>`;
+        })
+        .join("\n")
+    : '<p class="no-data">אין ציונים</p>';
+
   const todayHtml = data.platoons.every((p) => p.todayActivities.length === 0)
     ? '<p class="no-data">אין פעילויות להיום</p>'
     : data.platoons
@@ -966,6 +1036,11 @@ export function renderDailyForumHtml(data: DailyForumData): string {
     <div class="group-block">
       <h2 class="group-title">אירועי מפקדים (${totalCmdrEvents})</h2>
       <div class="group-content">${cmdrEventsHtml}</div>
+    </div>
+
+    <div class="group-block">
+      <h2 class="group-title">ציונים (${totalIncidents})</h2>
+      <div class="group-content">${incidentsHtml}</div>
     </div>
 
     <div class="group-block">

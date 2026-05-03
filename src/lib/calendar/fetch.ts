@@ -7,6 +7,7 @@ import {
   type RawActivity,
   type RawRequest,
   type RawCommanderEventData,
+  type RawHomeVisitData,
 } from "@/lib/calendar/events";
 import type { CalendarScope } from "@/lib/api/calendar-scope";
 
@@ -21,10 +22,10 @@ function getVisibleTypes(role: CalendarScope["role"]): CalendarEventType[] {
     case "company_medic":
       return ["medical_appointment", "sick_day"];
     case "squad_commander":
-      return ["activity", "leave", "medical_appointment", "sick_day"];
+      return ["activity", "leave", "medical_appointment", "sick_day", "home_visit"];
     default:
       // platoon_commander, company_commander
-      return ["activity", "leave", "medical_appointment", "sick_day", "commander_event"];
+      return ["activity", "leave", "medical_appointment", "sick_day", "commander_event", "home_visit"];
   }
 }
 
@@ -173,7 +174,47 @@ export async function fetchCalendarData(
     }));
   }
 
-  const events = buildCalendarEvents(rawActivities, rawRequests, startDate, endDate, rawCommanderEvents);
+  // Fetch home visits
+  let rawHomeVisits: RawHomeVisitData[] = [];
+  if (visibleTypes.includes("home_visit")) {
+    const soldierFilter = scope.squadId
+      ? { squadId: scope.squadId }
+      : { squad: { platoon: { id: { in: scope.platoonIds } } } };
+
+    const homeVisits = await prisma.homeVisit.findMany({
+      where: {
+        date: { gte: new Date(startDate), lte: new Date(endDate + "T23:59:59.999Z") },
+        soldier: {
+          cycleId,
+          ...soldierFilter,
+        },
+      },
+      select: {
+        id: true,
+        date: true,
+        status: true,
+        soldier: {
+          select: {
+            id: true,
+            familyName: true,
+            givenName: true,
+            squad: { select: { platoon: { select: { id: true, name: true } } } },
+          },
+        },
+      },
+    });
+    rawHomeVisits = homeVisits.map((hv) => ({
+      id: hv.id,
+      soldierId: hv.soldier.id,
+      soldierName: `${hv.soldier.familyName} ${hv.soldier.givenName}`,
+      date: hv.date.toISOString().split("T")[0],
+      status: hv.status,
+      platoonId: hv.soldier.squad.platoon.id,
+      platoonName: hv.soldier.squad.platoon.name,
+    }));
+  }
+
+  const events = buildCalendarEvents(rawActivities, rawRequests, startDate, endDate, rawCommanderEvents, rawHomeVisits);
 
   return {
     cycleName: cycle.name,

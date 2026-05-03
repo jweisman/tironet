@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle, Navigation, WifiOff, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSyncReady } from "@/hooks/useSyncReady";
@@ -23,6 +24,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EditPersonalForm, EditContactForm, EditNotesForm, EditEmergencyContactForm } from "@/components/soldiers/EditSoldierForm";
+import { IncidentSection } from "@/components/incidents/IncidentSection";
+import { HomeVisitSection } from "@/components/home-visits/HomeVisitSection";
+import type { RawIncident } from "@/components/incidents/IncidentSection";
+import type { RawHomeVisit } from "@/components/home-visits/HomeVisitSection";
 import { CreateRequestForm } from "@/components/requests/CreateRequestForm";
 import {
   REQUEST_TYPE_LABELS,
@@ -169,6 +174,22 @@ const SPECIAL_CONDITIONS_QUERY = `
     AND (status = 'open' OR status = 'approved')
 `;
 
+const INCIDENTS_QUERY = `
+  SELECT id, soldier_id, type, date, created_by_name, created_by_user_id,
+         description, response
+  FROM incidents
+  WHERE soldier_id = ?
+  ORDER BY date DESC
+`;
+
+const HOME_VISITS_QUERY = `
+  SELECT id, soldier_id, date, created_by_name, created_by_user_id,
+         status, notes
+  FROM home_visits
+  WHERE soldier_id = ?
+  ORDER BY date DESC
+`;
+
 interface RawSoldierRequest {
   id: string;
   type: string;
@@ -270,8 +291,15 @@ export default function SoldierDetailPage() {
   const { data: reportRows } = useQuery<RawReport>(REPORTS_QUERY, soldierParams);
   const { data: missingRows } = useQuery<RawMissing>(MISSING_QUERY, missingParams);
   const { data: soldierRequests } = useQuery<RawSoldierRequest>(SOLDIER_REQUESTS_QUERY, soldierParams);
+  const { data: incidentRows } = useQuery<RawIncident>(INCIDENTS_QUERY, soldierParams);
+  const { data: homeVisitRows } = useQuery<RawHomeVisit>(HOME_VISITS_QUERY, soldierParams);
   const { data: specialConditionsRows } = useQuery<{ count: number }>(SPECIAL_CONDITIONS_QUERY, soldierParams);
   const hasSpecialConditions = Number(specialConditionsRows?.[0]?.count ?? 0) > 0;
+
+  const { data: session } = useSession();
+  const sessionUser = session?.user as { id?: string; familyName?: string; givenName?: string } | undefined;
+  const currentUserName = sessionUser ? `${sessionUser.familyName ?? ""} ${sessionUser.givenName ?? ""}`.trim() : "";
+  const currentUserId = sessionUser?.id ?? "";
 
   const raw = soldierRows?.[0] ?? null;
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!raw, soldierLoading);
@@ -577,6 +605,26 @@ export default function SoldierDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Incidents section */}
+      <IncidentSection
+        incidents={incidentRows ?? []}
+        soldierId={soldierId}
+        canCreate={!!userRole}
+        canEditDelete={userRole === "platoon_commander" || userRole === "company_commander"}
+        userName={currentUserName}
+        userId={currentUserId}
+      />
+
+      {/* Home visits section */}
+      <HomeVisitSection
+        visits={homeVisitRows ?? []}
+        soldierId={soldierId}
+        canCreate={!!userRole}
+        canEditDelete={userRole === "platoon_commander" || userRole === "company_commander"}
+        userName={currentUserName}
+        userId={currentUserId}
+      />
 
       {/* Requests section */}
       <div data-tour="soldier-requests" className="space-y-2">

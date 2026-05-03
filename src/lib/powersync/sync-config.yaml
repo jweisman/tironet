@@ -122,3 +122,19 @@ streams:
       FROM commander_events
       WHERE cycle_id IN auth.parameter('cycle_ids')
       AND platoon_id IN visible_platoon_ids
+
+  incidents:
+    auto_subscribe: true
+    query: >
+      SELECT id, soldier_id, type, date, created_by_name, created_by_user_id,
+             description, response, created_at, updated_at
+      FROM incidents
+      WHERE soldier_id IN (SELECT id FROM soldiers WHERE squad_id IN visible_squad_ids)
+
+  home_visits:
+    auto_subscribe: true
+    query: >
+      SELECT id, soldier_id, date, created_by_name, created_by_user_id,
+             status, notes, created_at, updated_at
+      FROM home_visits
+      WHERE soldier_id IN (SELECT id FROM soldiers WHERE squad_id IN visible_squad_ids)

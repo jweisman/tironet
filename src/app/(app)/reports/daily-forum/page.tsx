@@ -380,6 +380,59 @@ function ForumContent({ data }: { data: DailyForumData }) {
         );
       })()}
 
+      {/* ציונים */}
+      {(() => {
+        const totalIncidents = platoons.reduce((s, p) => s + (p.incidents?.length ?? 0), 0);
+        return (
+          <div className="mb-6">
+            <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
+              ציונים ({totalIncidents})
+            </h2>
+            <div className="ps-4">
+              {totalIncidents === 0 ? (
+                <p className="text-xs text-muted-foreground">אין ציונים</p>
+              ) : (
+                platoons.map((p) => {
+                  const items = p.incidents ?? [];
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={p.platoonId}>
+                      {multi && <PlatoonLabel platoon={p} />}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="border-b-2 border-border">
+                              <th className="text-start px-2 py-1.5 font-semibold">חייל</th>
+                              <th className="text-start px-2 py-1.5 font-semibold">סוג</th>
+                              <th className="text-start px-2 py-1.5 font-semibold">תיאור</th>
+                              <th className="text-start px-2 py-1.5 font-semibold">תגובה</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {items.map((inc) => (
+                              <tr key={inc.id} className="border-b border-border">
+                                <td className="px-2 py-1.5">{inc.soldierName}</td>
+                                <td className="px-2 py-1.5">
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${inc.type === "commendation" ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"}`}>
+                                    {{ commendation: "ציון לשבח", infraction: "ציון התנהגות" }[inc.type] ?? inc.type}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-1.5">{inc.description}</td>
+                                <td className="px-2 py-1.5 text-muted-foreground">{inc.response ?? ""}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* הספקים */}
       <div className="mb-6">
         <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">

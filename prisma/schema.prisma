@@ -273,6 +273,8 @@ model Soldier {
   squad           Squad            @relation(fields: [squadId], references: [id])
   activityReports ActivityReport[]
   requests        Request[]
+  incidents       Incident[]
+  homeVisits      HomeVisit[]
 
   @@index([cycleId, squadId], name: "idx_soldiers_cycle_squad")
   @@index([squadId, status], name: "idx_soldiers_squad_status")
@@ -571,4 +573,47 @@ model ScheduledReminder {
   @@index([requestId], name: "idx_scheduled_reminders_request")
   @@index([userId], name: "idx_scheduled_reminders_user")
   @@map("scheduled_reminders")
+}
+
+// ---------------------------------------------------------------------------
+// Incidents (ציונים)
+// ---------------------------------------------------------------------------
+
+model Incident {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  soldierId       String   @map("soldier_id") @db.Uuid
+  type            String   // "commendation" | "infraction"
+  date            DateTime @db.Date
+  createdByName   String   @map("created_by_name")
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
+  description     String
+  response        String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  soldier Soldier @relation(fields: [soldierId], references: [id], onDelete: Cascade)
+
+  @@index([soldierId], name: "idx_incidents_soldier")
+  @@map("incidents")
+}
+
+// ---------------------------------------------------------------------------
+// Home Visits (ביקורי בית)
+// ---------------------------------------------------------------------------
+
+model HomeVisit {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  soldierId       String   @map("soldier_id") @db.Uuid
+  date            DateTime @db.Date
+  createdByName   String   @map("created_by_name")
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
+  status          String   // "in_order" | "deficiencies"
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  soldier Soldier @relation(fields: [soldierId], references: [id], onDelete: Cascade)
+
+  @@index([soldierId], name: "idx_home_visits_soldier")
+  @@map("home_visits")
 }

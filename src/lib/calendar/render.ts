@@ -29,6 +29,7 @@ const EVENT_TYPE_HEX: Record<CalendarEventType, { hex: string; hexBg: string; he
   medical_appointment: { hex: "#e11d48", hexBg: "#ffe4e6", hexBorder: "#fda4af" },
   sick_day: { hex: "#7c3aed", hexBg: "#ede9fe", hexBorder: "#c4b5fd" },
   commander_event: { hex: "#0d9488", hexBg: "#ccfbf1", hexBorder: "#5eead4" },
+  home_visit: { hex: "#0284c7", hexBg: "#e0f2fe", hexBorder: "#7dd3fc" },
 };
 
 // ---------------------------------------------------------------------------
@@ -86,6 +87,7 @@ const ICON_LEAVE = lucideIconToSvg("door-open") ?? "";
 const ICON_MEDICAL = lucideIconToSvg("stethoscope") ?? "";
 const ICON_SICK = lucideIconToSvg("thermometer") ?? "";
 const ICON_COMMANDER = lucideIconToSvg("calendar-clock") ?? "";
+const ICON_HOME = lucideIconToSvg("home") ?? "";
 const ICON_FALLBACK = lucideIconToSvg("clipboard-list") ?? "";
 
 // Cache for activity type icons
@@ -96,6 +98,7 @@ function getEventIcon(event: CalendarEvent): string {
     case "leave": return ICON_LEAVE;
     case "medical_appointment": return ICON_MEDICAL;
     case "sick_day": return ICON_SICK;
+    case "home_visit": return ICON_HOME;
     case "commander_event":
     case "activity": {
       if (!event.icon) return event.type === "commander_event" ? ICON_COMMANDER : ICON_FALLBACK;

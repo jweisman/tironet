@@ -126,6 +126,29 @@ const commander_events = new Table({
   end_date: column.text,
 });
 
+const incidents = new Table({
+  soldier_id: column.text,
+  type: column.text,
+  date: column.text,
+  created_by_name: column.text,
+  created_by_user_id: column.text,
+  description: column.text,
+  response: column.text,
+  created_at: column.text,
+  updated_at: column.text,
+});
+
+const home_visits = new Table({
+  soldier_id: column.text,
+  date: column.text,
+  created_by_name: column.text,
+  created_by_user_id: column.text,
+  status: column.text,
+  notes: column.text,
+  created_at: column.text,
+  updated_at: column.text,
+});
+
 export const AppSchema = new Schema({
   cycles,
   companies,
@@ -138,6 +161,8 @@ export const AppSchema = new Schema({
   requests,
   request_actions,
   commander_events,
+  incidents,
+  home_visits,
 });
 
 export type Database = (typeof AppSchema)["types"];

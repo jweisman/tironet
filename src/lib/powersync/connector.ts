@@ -241,6 +241,44 @@ export class TironetConnector implements PowerSyncBackendConnector {
           } else if (opType === UpdateType.DELETE) {
             await apiRequest(`/api/soldiers/${id}`, "DELETE");
           }
+        } else if (table === "incidents") {
+          const incidentMapping: Record<string, string> = {
+            soldier_id: "soldierId", created_by_name: "createdByName",
+            created_by_user_id: "createdByUserId",
+          };
+          function mapIncidentData(d: Record<string, unknown>) {
+            const body: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(d)) {
+              body[incidentMapping[key] ?? key] = value;
+            }
+            return body;
+          }
+          if (opType === UpdateType.PUT) {
+            await apiRequest("/api/incidents", "POST", { id, ...mapIncidentData(opData as Record<string, unknown>) });
+          } else if (opType === UpdateType.PATCH) {
+            await apiRequest(`/api/incidents/${id}`, "PATCH", mapIncidentData(opData as Record<string, unknown>));
+          } else if (opType === UpdateType.DELETE) {
+            await apiRequest(`/api/incidents/${id}`, "DELETE");
+          }
+        } else if (table === "home_visits") {
+          const homeVisitMapping: Record<string, string> = {
+            soldier_id: "soldierId", created_by_name: "createdByName",
+            created_by_user_id: "createdByUserId",
+          };
+          function mapHomeVisitData(d: Record<string, unknown>) {
+            const body: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(d)) {
+              body[homeVisitMapping[key] ?? key] = value;
+            }
+            return body;
+          }
+          if (opType === UpdateType.PUT) {
+            await apiRequest("/api/home-visits", "POST", { id, ...mapHomeVisitData(opData as Record<string, unknown>) });
+          } else if (opType === UpdateType.PATCH) {
+            await apiRequest(`/api/home-visits/${id}`, "PATCH", mapHomeVisitData(opData as Record<string, unknown>));
+          } else if (opType === UpdateType.DELETE) {
+            await apiRequest(`/api/home-visits/${id}`, "DELETE");
+          }
         }
       }
 
