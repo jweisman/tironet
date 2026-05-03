@@ -210,7 +210,10 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
         imminent: isImminentRequest(r, today, now),
         past: isPastRequest(r, today, now),
       }))
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      .sort((a, b) => {
+        if (a.past !== b.past) return a.past ? 1 : -1;
+        return a.sortKey.localeCompare(b.sortKey);
+      });
   }, [raw, typeFilter]);
 
   const [expanded, setExpanded] = useState(false);
