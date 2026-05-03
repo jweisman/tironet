@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Pencil, CheckCircle, Plus, FileText, Trash2, MessageCircle, Navigation, WifiOff, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 import { useQuery } from "@powersync/react";
 import { useCycle } from "@/contexts/CycleContext";
 import { useSyncReady } from "@/hooks/useSyncReady";
@@ -22,7 +23,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EditSoldierForm } from "@/components/soldiers/EditSoldierForm";
+import { EditPersonalForm, EditContactForm, EditNotesForm, EditEmergencyContactForm } from "@/components/soldiers/EditSoldierForm";
+import { IncidentSection } from "@/components/incidents/IncidentSection";
+import { HomeVisitSection } from "@/components/home-visits/HomeVisitSection";
+import type { RawIncident } from "@/components/incidents/IncidentSection";
+import type { RawHomeVisit } from "@/components/home-visits/HomeVisitSection";
 import { CreateRequestForm } from "@/components/requests/CreateRequestForm";
 import {
   REQUEST_TYPE_LABELS,
@@ -35,13 +40,22 @@ import { isRequestActive, isRequestOpen, isRequestUrgent } from "@/lib/requests/
 import type { SoldierStatus, RequestType, RequestStatus, Role } from "@/types";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { toIsraeliDisplay } from "@/lib/phone";
-import { parseScoreConfig, getActiveScores } from "@/types/score-config";
+import { parseScoreConfig, getActiveScores, evaluateScore } from "@/types/score-config";
 import { parseDisplayConfig, getResultLabels } from "@/types/display-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  mother: "אמא",
+  father: "אבא",
+  sibling: "אח/אחות",
+  spouse: "בן/בת זוג",
+  friend: "חבר/ה",
+  other: "אחר",
+};
 
 const STATUS_LABEL: Record<SoldierStatus, string> = {
   active: "פעיל",
@@ -92,6 +106,7 @@ const SOLDIER_QUERY = `
   SELECT
     s.id, s.given_name, s.family_name, s.rank, s.status, s.profile_image,
     s.id_number, s.civilian_id, s.cycle_id, s.squad_id, s.phone, s.emergency_phone,
+    s.emergency_contact_name, s.emergency_contact_relationship,
     s.street, s.apt, s.city, s.notes, s.date_of_birth,
     sq.name AS squad_name, sq.platoon_id,
     p.id AS platoon_id, p.name AS platoon_name
@@ -159,6 +174,22 @@ const SPECIAL_CONDITIONS_QUERY = `
     AND (status = 'open' OR status = 'approved')
 `;
 
+const INCIDENTS_QUERY = `
+  SELECT id, soldier_id, type, date, created_by_name, created_by_user_id,
+         description, response
+  FROM incidents
+  WHERE soldier_id = ?
+  ORDER BY date DESC
+`;
+
+const HOME_VISITS_QUERY = `
+  SELECT id, soldier_id, date, created_by_name, created_by_user_id,
+         status, notes
+  FROM home_visits
+  WHERE soldier_id = ?
+  ORDER BY date DESC
+`;
+
 interface RawSoldierRequest {
   id: string;
   type: string;
@@ -177,6 +208,7 @@ interface RawSoldier {
   id: string; given_name: string; family_name: string;
   id_number: string | null; civilian_id: string | null; rank: string | null; status: string; profile_image: string | null;
   phone: string | null; emergency_phone: string | null;
+  emergency_contact_name: string | null; emergency_contact_relationship: string | null;
   street: string | null; apt: string | null; city: string | null; notes: string | null;
   date_of_birth: string | null;
   cycle_id: string; squad_id: string;
@@ -218,13 +250,17 @@ export default function SoldierDetailPage() {
     }
   }, []);
 
-  const [editOpen, setEditOpen] = useState(false);
+  const [editPersonalOpen, setEditPersonalOpen] = useState(false);
+  const [editContactOpen, setEditContactOpen] = useState(false);
+  const [editNotesOpen, setEditNotesOpen] = useState(false);
+  const [editEmergencyOpen, setEditEmergencyOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [requestTypeMenuOpen, setRequestTypeMenuOpen] = useState(false);
   const [createRequestType, setCreateRequestType] = useState<RequestType | null>(null);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
+  const [showAllActivities, setShowAllActivities] = useState(false);
   const { selectedCycleId, selectedAssignment } = useCycle();
   const rawUserRole = (selectedAssignment?.role ?? "") as Role | "";
   const userRole = rawUserRole ? effectiveRole(rawUserRole) : "";
@@ -256,8 +292,15 @@ export default function SoldierDetailPage() {
   const { data: reportRows } = useQuery<RawReport>(REPORTS_QUERY, soldierParams);
   const { data: missingRows } = useQuery<RawMissing>(MISSING_QUERY, missingParams);
   const { data: soldierRequests } = useQuery<RawSoldierRequest>(SOLDIER_REQUESTS_QUERY, soldierParams);
+  const { data: incidentRows } = useQuery<RawIncident>(INCIDENTS_QUERY, soldierParams);
+  const { data: homeVisitRows } = useQuery<RawHomeVisit>(HOME_VISITS_QUERY, soldierParams);
   const { data: specialConditionsRows } = useQuery<{ count: number }>(SPECIAL_CONDITIONS_QUERY, soldierParams);
   const hasSpecialConditions = Number(specialConditionsRows?.[0]?.count ?? 0) > 0;
+
+  const { data: session } = useSession();
+  const sessionUser = session?.user as { id?: string; familyName?: string; givenName?: string } | undefined;
+  const currentUserName = sessionUser ? `${sessionUser.familyName ?? ""} ${sessionUser.givenName ?? ""}`.trim() : "";
+  const currentUserId = sessionUser?.id ?? "";
 
   const raw = soldierRows?.[0] ?? null;
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(!!raw, soldierLoading);
@@ -307,6 +350,8 @@ export default function SoldierDetailPage() {
     profileImage: raw.profile_image,
     phone: raw.phone,
     emergencyPhone: raw.emergency_phone,
+    emergencyContactName: raw.emergency_contact_name,
+    emergencyContactRelationship: raw.emergency_contact_relationship,
     street: raw.street,
     apt: raw.apt,
     city: raw.city,
@@ -393,27 +438,12 @@ export default function SoldierDetailPage() {
 
           {/* Info */}
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h1 className="text-lg font-bold leading-tight">
-                  {raw.family_name} {raw.given_name}
-                </h1>
-                {raw.rank && (
-                  <p className="text-sm text-muted-foreground">{raw.rank}</p>
-                )}
-                {raw.id_number && (
-                  <p className="text-sm text-muted-foreground">מ.א. {raw.id_number}</p>
-                )}
-                {raw.civilian_id && (
-                  <p className="text-sm text-muted-foreground">מ.ז. {raw.civilian_id}</p>
-                )}
-                {raw.date_of_birth && (
-                  <p className="text-sm text-muted-foreground">
-                    ת.לידה {new Date(raw.date_of_birth).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" })}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5">
+            {/* Row 1: Edit buttons + Name */}
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-lg font-bold leading-tight">
+                {raw.family_name} {raw.given_name}
+              </h1>
+              <div className="flex items-center gap-1.5 shrink-0">
                 {canDelete && (
                   <Button
                     variant="outline"
@@ -430,86 +460,172 @@ export default function SoldierDetailPage() {
                   variant="outline"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setEditOpen(true)}
-                  aria-label="ערוך פרטי חייל"
+                  onClick={() => setEditPersonalOpen(true)}
+                  aria-label="ערוך פרטים אישיים"
                 >
                   <Pencil size={14} />
                 </Button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge
-                variant={statusVariant}
-                className={
-                  raw.status === "injured"
-                    ? "bg-amber-100 text-amber-800 border-amber-200"
-                    : ""
-                }
-              >
-                {STATUS_LABEL[raw.status as SoldierStatus]}
-              </Badge>
-              {hasSpecialConditions && (
-                <Badge className="bg-purple-100 text-purple-800 border-purple-200">
-                  ת&quot;ש מיוחד
+            {/* Row 2: Details + Status badge */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-0.5">
+                <p className="text-sm text-muted-foreground">
+                  {raw.platoon_name} / {raw.squad_name}
+                  {raw.rank && ` · ${raw.rank}`}
+                </p>
+                {raw.id_number && (
+                  <p className="text-sm text-muted-foreground">מ.א. {raw.id_number}</p>
+                )}
+                {raw.civilian_id && (
+                  <p className="text-sm text-muted-foreground">מ.ז. {raw.civilian_id}</p>
+                )}
+                {raw.date_of_birth && (
+                  <p className="text-sm text-muted-foreground">
+                    ת.לידה {new Date(raw.date_of_birth).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" })}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Badge
+                  variant={statusVariant}
+                  className={
+                    raw.status === "injured"
+                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                      : ""
+                  }
+                >
+                  {STATUS_LABEL[raw.status as SoldierStatus]}
                 </Badge>
-              )}
+                {hasSpecialConditions && (
+                  <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                    ת&quot;ש מיוחד
+                  </Badge>
+                )}
+              </div>
             </div>
-
-            <p className="text-sm text-muted-foreground">
-              {raw.platoon_name} / {raw.squad_name}
-            </p>
           </div>
         </div>
 
         {/* Contact info & notes */}
-        {(raw.phone || raw.emergency_phone || raw.street || raw.city || raw.notes) && (
-          <div className="border-t border-border pt-3 space-y-1.5 text-sm">
-            {raw.phone && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">טלפון:</span>
-                <a href={`tel:${raw.phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.phone)}</a>
-                <a
-                  href={`https://wa.me/${raw.phone.replace("+", "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-emerald-600 hover:text-emerald-700 transition-colors"
-                  aria-label="שלח הודעת WhatsApp"
-                >
-                  <MessageCircle size={16} />
-                </a>
-              </div>
-            )}
-            {raw.emergency_phone && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">טלפון חירום:</span>
-                <a href={`tel:${raw.emergency_phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.emergency_phone)}</a>
-              </div>
-            )}
-            {(raw.street || raw.city) && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">כתובת:</span>
-                <span>{[raw.street, raw.apt ? `דירה ${raw.apt}` : null, raw.city].filter(Boolean).join(", ")}</span>
-                <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent([raw.street, raw.city].filter(Boolean).join(", "))}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:text-blue-600 transition-colors"
-                  aria-label="נווט לכתובת"
-                >
-                  <Navigation size={16} />
-                </a>
-              </div>
-            )}
-            {raw.notes && (
-              <div className="flex items-start gap-2">
-                <span className="text-muted-foreground shrink-0">הערות:</span>
-                <span className="whitespace-pre-wrap">{raw.notes}</span>
-              </div>
-            )}
+        <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">פרטי קשר</span>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1"
+              onClick={() => setEditContactOpen(true)}
+              aria-label="ערוך פרטי קשר"
+            >
+              <Pencil size={12} />
+            </button>
           </div>
-        )}
+          {raw.phone && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">טלפון:</span>
+              <a href={`tel:${raw.phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.phone)}</a>
+              <a
+                href={`https://wa.me/${raw.phone.replace("+", "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-600 hover:text-emerald-700 transition-colors"
+                aria-label="שלח הודעת WhatsApp"
+              >
+                <MessageCircle size={16} />
+              </a>
+            </div>
+          )}
+          {(raw.street || raw.city) && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">כתובת:</span>
+              <span>{[raw.street, raw.apt ? `דירה ${raw.apt}` : null, raw.city].filter(Boolean).join(", ")}</span>
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent([raw.street, raw.city].filter(Boolean).join(", "))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-600 transition-colors"
+                aria-label="נווט לכתובת"
+              >
+                <Navigation size={16} />
+              </a>
+            </div>
+          )}
+          {!raw.phone && !raw.street && !raw.city && (
+            <p className="text-muted-foreground text-xs">לא הוזנו פרטי קשר</p>
+          )}
+        </div>
+
+        {/* Notes */}
+        <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">הערות</span>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1"
+              onClick={() => setEditNotesOpen(true)}
+              aria-label="ערוך הערות"
+            >
+              <Pencil size={12} />
+            </button>
+          </div>
+          {raw.notes ? (
+            <p className="whitespace-pre-wrap">{raw.notes}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs">אין הערות</p>
+          )}
+        </div>
+
+        {/* Emergency contact */}
+        <div className="border-t border-border pt-3 space-y-1.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">איש קשר לחירום</span>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1"
+              onClick={() => setEditEmergencyOpen(true)}
+              aria-label="ערוך איש קשר לחירום"
+            >
+              <Pencil size={12} />
+            </button>
+          </div>
+          {raw.emergency_contact_name && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">שם:</span>
+              <span>{raw.emergency_contact_name}{raw.emergency_contact_relationship ? ` (${RELATIONSHIP_LABELS[raw.emergency_contact_relationship] ?? raw.emergency_contact_relationship})` : ""}</span>
+            </div>
+          )}
+          {raw.emergency_phone && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">טלפון:</span>
+              <a href={`tel:${raw.emergency_phone}`} className="text-primary hover:underline" dir="ltr">{toIsraeliDisplay(raw.emergency_phone)}</a>
+            </div>
+          )}
+          {!raw.emergency_phone && !raw.emergency_contact_name && (
+            <p className="text-muted-foreground text-xs">לא הוזן איש קשר לחירום</p>
+          )}
+        </div>
       </div>
+
+      {/* Incidents section */}
+      <IncidentSection
+        incidents={incidentRows ?? []}
+        soldierId={soldierId}
+        canCreate={!!userRole}
+        canEditDelete={userRole === "platoon_commander" || userRole === "company_commander"}
+        userName={currentUserName}
+        userId={currentUserId}
+      />
+
+      {/* Home visits section */}
+      <HomeVisitSection
+        visits={homeVisitRows ?? []}
+        soldierId={soldierId}
+        canCreate={!!userRole}
+        canEditDelete={userRole === "platoon_commander" || userRole === "company_commander"}
+        userName={currentUserName}
+        userId={currentUserId}
+      />
 
       {/* Requests section */}
       <div data-tour="soldier-requests" className="space-y-2">
@@ -590,33 +706,60 @@ export default function SoldierDetailPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-card divide-y divide-border overflow-hidden">
-            {failedReports.map((r) => (
-              <Link
-                key={r.id}
-                href={`/activities/${r.activity_id}?gaps=1`}
-                className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex-1 min-w-0 space-y-0.5">
-                  <p className="text-sm font-medium">{r.activity_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.activity_type_name} · {formatDate(r.activity_date)}
-                  </p>
-                  {(() => {
-                    const scores = getActiveScores(parseScoreConfig(r.score_config));
-                    const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
-                    const withValues = scores
-                      .map((s) => ({ label: s.label, format: s.format, grade: grades[parseInt(s.key.replace("score", "")) - 1] }))
-                      .filter((a) => a.grade != null);
-                    if (withValues.length === 0) return null;
-                    return <p className="text-xs text-muted-foreground">{withValues.map((a) => `${a.label}: ${formatGradeDisplay(a.grade, a.format)}`).join(" · ")}</p>;
-                  })()}
-                  {r.note && (
-                    <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
-                  )}
-                </div>
-                <Badge variant="destructive" className="shrink-0 mt-0.5 text-xs">{Number(r.failed) ? "נכשל" : getResultLabels(parseDisplayConfig(r.display_configuration)).skipped.label}</Badge>
-              </Link>
-            ))}
+            {failedReports.map((r) => {
+              const scores = getActiveScores(parseScoreConfig(r.score_config));
+              const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
+              const withValues = scores
+                .map((s) => {
+                  const grade = grades[parseInt(s.key.replace("score", "")) - 1];
+                  const result = evaluateScore(grade, s.threshold, s.thresholdOperator);
+                  return { label: s.label, format: s.format, grade, result };
+                })
+                .filter((a) => a.grade != null);
+              const rl = getResultLabels(parseDisplayConfig(r.display_configuration));
+              const resultLabel = r.result === "completed" ? rl.completed.label : r.result === "skipped" ? rl.skipped.label : rl.na.label;
+              return (
+                <Link
+                  key={r.id}
+                  href={`/activities/${r.activity_id}?gaps=1`}
+                  className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <p className="text-sm font-medium">{r.activity_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.activity_type_name} · {formatDate(r.activity_date)}
+                    </p>
+                    {withValues.length > 0 && (
+                      <p className="text-xs">
+                        {withValues.map((a, i) => (
+                          <span key={i}>
+                            {i > 0 && " · "}
+                            <span className="text-muted-foreground">{a.label}: </span>
+                            <span className={a.result === "failed" ? "text-amber-600 font-medium" : a.result === "passed" ? "text-green-600" : "text-muted-foreground"}>
+                              {formatGradeDisplay(a.grade, a.format)}
+                            </span>
+                          </span>
+                        ))}
+                      </p>
+                    )}
+                    {r.note && (
+                      <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0 mt-0.5">
+                    {Number(r.failed) === 1 && (
+                      <Badge className="text-xs bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800">נכשל</Badge>
+                    )}
+                    <Badge
+                      variant={r.result === "skipped" ? "destructive" : "outline"}
+                      className="text-xs"
+                    >
+                      {resultLabel}
+                    </Badge>
+                  </div>
+                </Link>
+              );
+            })}
             {(missingRows ?? []).map((a) => (
               <Link
                 key={a.id}
@@ -638,58 +781,97 @@ export default function SoldierDetailPage() {
 
       {/* Completed activities section */}
       <div data-tour="soldier-completed" className="space-y-2">
-        <h2 className="text-sm font-semibold text-muted-foreground">
-          פעילויות שהושלמו
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground">
+            פעילויות שהושלמו
+          </h2>
+          {completedReports.length > 0 && (
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline"
+              onClick={() => setShowAllActivities((v) => !v)}
+            >
+              {showAllActivities ? "עם ציונים בלבד" : "הצג הכל"}
+            </button>
+          )}
+        </div>
 
-        {completedReports.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-            <FileText size={16} />
-            <span>אין פעילויות שהושלמו</span>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
-            {completedReports.map((r) => {
-              const scores = getActiveScores(parseScoreConfig(r.score_config));
-              const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
-              const withValues = scores
-                .map((s) => ({ label: s.label, format: s.format, grade: grades[parseInt(s.key.replace("score", "")) - 1] }))
-                .filter((a) => a.grade != null);
-              const rl = getResultLabels(parseDisplayConfig(r.display_configuration));
-              const resultLabel = r.result === "completed" ? rl.completed.label : r.result === "skipped" ? rl.skipped.label : r.result === "na" ? rl.na.label : null;
-              return (
-                <Link
-                  key={r.id}
-                  href={`/activities/${r.activity_id}`}
-                  className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    <p className="text-sm font-medium">{r.activity_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {r.activity_type_name} · {formatDate(r.activity_date)}
-                    </p>
-                    {withValues.length > 0 && (
+        {(() => {
+          const filtered = showAllActivities
+            ? completedReports
+            : completedReports.filter((r) => {
+                const hasScores = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6].some((g) => g != null);
+                return hasScores;
+              });
+          if (filtered.length === 0) {
+            return (
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+                <FileText size={16} />
+                <span>{completedReports.length === 0 ? "אין פעילויות שהושלמו" : "אין פעילויות עם ציונים"}</span>
+              </div>
+            );
+          }
+          return (
+            <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+              {filtered.map((r) => {
+                const scores = getActiveScores(parseScoreConfig(r.score_config));
+                const grades = [r.grade1, r.grade2, r.grade3, r.grade4, r.grade5, r.grade6];
+                const withValues = scores
+                  .map((s) => {
+                    const grade = grades[parseInt(s.key.replace("score", "")) - 1];
+                    const result = evaluateScore(grade, s.threshold, s.thresholdOperator);
+                    return { label: s.label, format: s.format, grade, result };
+                  })
+                  .filter((a) => a.grade != null);
+                const rl = getResultLabels(parseDisplayConfig(r.display_configuration));
+                const resultLabel = r.result === "completed" ? rl.completed.label : r.result === "skipped" ? rl.skipped.label : r.result === "na" ? rl.na.label : null;
+                return (
+                  <Link
+                    key={r.id}
+                    href={`/activities/${r.activity_id}`}
+                    className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <p className="text-sm font-medium">{r.activity_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {withValues.map((a) => `${a.label}: ${formatGradeDisplay(a.grade, a.format)}`).join(" · ")}
+                        {r.activity_type_name} · {formatDate(r.activity_date)}
                       </p>
-                    )}
-                    {r.note && (
-                      <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
-                    )}
-                  </div>
-                  {resultLabel && (
-                    <Badge
-                      variant={r.result === "completed" && !Number(r.failed) ? "default" : r.result === "na" ? "secondary" : "destructive"}
-                      className={`shrink-0 mt-0.5 text-xs ${r.result === "completed" && !Number(r.failed) ? "bg-emerald-600" : ""}`}
-                    >
-                      {resultLabel}
-                    </Badge>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        )}
+                      {withValues.length > 0 && (
+                        <p className="text-xs">
+                          {withValues.map((a, i) => (
+                            <span key={i}>
+                              {i > 0 && " · "}
+                              <span className="text-muted-foreground">{a.label}: </span>
+                              <span className={a.result === "failed" ? "text-amber-600 font-medium" : a.result === "passed" ? "text-green-600" : "text-muted-foreground"}>
+                                {formatGradeDisplay(a.grade, a.format)}
+                              </span>
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                      {r.note && (
+                        <p className="text-xs text-muted-foreground truncate">הערה: {r.note}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0 mt-0.5">
+                      {Number(r.failed) === 1 && (
+                        <Badge className="text-xs bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800">נכשל</Badge>
+                      )}
+                      {resultLabel && (
+                        <Badge
+                          variant={r.result === "completed" ? "default" : r.result === "na" ? "secondary" : "destructive"}
+                          className={`text-xs ${r.result === "completed" ? "bg-emerald-600" : ""}`}
+                        >
+                          {resultLabel}
+                        </Badge>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Image zoom dialog */}
@@ -764,16 +946,58 @@ export default function SoldierDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      {/* Edit Personal Dialog */}
+      <Dialog open={editPersonalOpen} onOpenChange={setEditPersonalOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>עריכת פרטי חייל</DialogTitle>
+            <DialogTitle>פרטים אישיים</DialogTitle>
           </DialogHeader>
-          <EditSoldierForm
+          <EditPersonalForm
             soldier={soldier}
-            onSuccess={() => { setEditOpen(false); toast.success("החייל עודכן בהצלחה"); }}
-            onCancel={() => setEditOpen(false)}
+            onSuccess={() => { setEditPersonalOpen(false); toast.success("הפרטים עודכנו בהצלחה"); }}
+            onCancel={() => setEditPersonalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Contact Dialog */}
+      <Dialog open={editContactOpen} onOpenChange={setEditContactOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>פרטי קשר</DialogTitle>
+          </DialogHeader>
+          <EditContactForm
+            soldier={soldier}
+            onSuccess={() => { setEditContactOpen(false); toast.success("פרטי הקשר עודכנו בהצלחה"); }}
+            onCancel={() => setEditContactOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Notes Dialog */}
+      <Dialog open={editNotesOpen} onOpenChange={setEditNotesOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>הערות</DialogTitle>
+          </DialogHeader>
+          <EditNotesForm
+            soldier={soldier}
+            onSuccess={() => { setEditNotesOpen(false); toast.success("ההערות עודכנו בהצלחה"); }}
+            onCancel={() => setEditNotesOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Emergency Contact Dialog */}
+      <Dialog open={editEmergencyOpen} onOpenChange={setEditEmergencyOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>איש קשר לחירום</DialogTitle>
+          </DialogHeader>
+          <EditEmergencyContactForm
+            soldier={soldier}
+            onSuccess={() => { setEditEmergencyOpen(false); toast.success("איש הקשר לחירום עודכן בהצלחה"); }}
+            onCancel={() => setEditEmergencyOpen(false)}
           />
         </DialogContent>
       </Dialog>

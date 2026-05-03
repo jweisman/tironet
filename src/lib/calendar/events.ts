@@ -5,7 +5,7 @@ import { parseSickDays } from "@/lib/requests/sick-days";
 // Types
 // ---------------------------------------------------------------------------
 
-export type CalendarEventType = "activity" | "leave" | "medical_appointment" | "sick_day" | "commander_event";
+export type CalendarEventType = "activity" | "leave" | "medical_appointment" | "sick_day" | "commander_event" | "home_visit";
 
 export interface CalendarEvent {
   id: string;
@@ -61,6 +61,7 @@ export const EVENT_TYPE_COLORS: Record<CalendarEventType, PlatoonColor> = {
   medical_appointment: { bg: "bg-rose-100", text: "text-rose-800", border: "border-rose-300", hex: "#e11d48", hexBg: "#ffe4e6" },
   sick_day: { bg: "bg-purple-100", text: "text-purple-800", border: "border-purple-300", hex: "#7c3aed", hexBg: "#ede9fe" },
   commander_event: { bg: "bg-teal-100", text: "text-teal-800", border: "border-teal-300", hex: "#0d9488", hexBg: "#ccfbf1" },
+  home_visit: { bg: "bg-sky-100", text: "text-sky-800", border: "border-sky-300", hex: "#0284c7", hexBg: "#e0f2fe" },
 };
 
 export function getPlatoonColorMap(platoonIds: string[]): Map<string, PlatoonColor> {
@@ -81,19 +82,21 @@ export const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   medical_appointment: "תורים רפואיים",
   sick_day: "ימי מחלה",
   commander_event: "אירועי מפקדים",
+  home_visit: "ביקורי בית",
 };
 
 // ---------------------------------------------------------------------------
 // Filter categories — groups event types for the toolbar
 // ---------------------------------------------------------------------------
 
-export type CalendarFilterCategory = "activity" | "leave" | "medical" | "commander_event";
+export type CalendarFilterCategory = "activity" | "leave" | "medical" | "commander_event" | "home_visit";
 
 export const FILTER_CATEGORY_LABELS: Record<CalendarFilterCategory, string> = {
   activity: "פעילויות",
   leave: "יציאות",
   medical: "רפואה",
   commander_event: "אירועי מפקדים",
+  home_visit: "ביקורי בית",
 };
 
 /** Map a filter category to the event types it controls */
@@ -102,6 +105,7 @@ export const FILTER_TO_EVENT_TYPES: Record<CalendarFilterCategory, CalendarEvent
   leave: ["leave"],
   medical: ["medical_appointment", "sick_day"],
   commander_event: ["commander_event"],
+  home_visit: ["home_visit"],
 };
 
 /** Derive filter categories from visible event types */
@@ -113,6 +117,7 @@ export function visibleTypesToFilters(visibleTypes: CalendarEventType[]): Calend
     filters.push("medical");
   }
   if (visibleTypes.includes("commander_event")) filters.push("commander_event");
+  if (visibleTypes.includes("home_visit")) filters.push("home_visit");
   return filters;
 }
 
@@ -209,6 +214,16 @@ export interface RawCommanderEventData {
   platoonName: string;
 }
 
+export interface RawHomeVisitData {
+  id: string;
+  soldierId: string;
+  soldierName: string;
+  date: string; // YYYY-MM-DD
+  status: string;
+  platoonId: string;
+  platoonName: string;
+}
+
 const CMDR_EVENT_ICON: Record<string, string> = {
   leave: "DoorOpen",
   medical: "Stethoscope",
@@ -220,6 +235,7 @@ export function buildCalendarEvents(
   startDate: string,
   endDate: string,
   commanderEvents?: RawCommanderEventData[],
+  homeVisits?: RawHomeVisitData[],
 ): CalendarEvent[] {
   const events: CalendarEvent[] = [];
 
@@ -314,6 +330,22 @@ export function buildCalendarEvents(
     }
   }
 
+  // Home visits — single day each
+  for (const hv of homeVisits ?? []) {
+    if (hv.date >= startDate && hv.date <= endDate) {
+      events.push({
+        id: `home-visit-${hv.id}`,
+        date: hv.date,
+        type: "home_visit",
+        label: hv.soldierName,
+        platoonId: hv.platoonId,
+        platoonName: hv.platoonName,
+        icon: "Home",
+        sourceId: hv.soldierId,
+      });
+    }
+  }
+
   return events;
 }
 
@@ -324,6 +356,7 @@ export function buildCalendarEvents(
 export function getEventHref(event: CalendarEvent): string | null {
   if (event.type === "activity") return `/activities/${event.sourceId}`;
   if (event.type === "commander_event") return event.userId ? `/users?expand=${event.userId}` : null;
+  if (event.type === "home_visit") return `/soldiers/${event.sourceId}`;
   return `/requests/${event.sourceId}`;
 }
 

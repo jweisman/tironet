@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { DoorOpen, Stethoscope, Thermometer, CalendarClock } from "lucide-react";
+import { DoorOpen, Stethoscope, Thermometer, CalendarClock, Home } from "lucide-react";
 import { ActivityTypeIcon } from "@/components/activities/ActivityTypeIcon";
 import type { CalendarEventType } from "@/lib/calendar/events";
 import type { PlatoonColor } from "@/lib/calendar/events";
@@ -14,6 +14,7 @@ const REQUEST_TYPE_ICONS: Partial<
   medical_appointment: Stethoscope,
   sick_day: Thermometer,
   commander_event: CalendarClock,
+  home_visit: Home,
 };
 
 interface CalendarEventChipProps {
