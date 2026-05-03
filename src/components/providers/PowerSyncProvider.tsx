@@ -94,18 +94,14 @@ export function TironetPowerSyncProvider({
         console.log("[PowerSync] init() resolved — DB open, local queries ready");
         setInitFailed(false);
 
-        // Start sync — may fail offline, PowerSync retries automatically.
-        console.log("[PowerSync] calling connect()...");
-        performance.mark("powersync-connect-start");
-        await localDb.connect(connector);
-
-        performance.mark("powersync-connect-end");
-        console.log("[PowerSync] connect() resolved — sync started");
-        // Confirm successful rebuild after a DB clear
+        // Confirm successful rebuild after a DB clear (timeout or corruption).
+        // Fired here, after init() succeeds, since init recovery is what the
+        // clear-and-reload flow is meant to fix. connect() may still fail
+        // offline — that's a separate signal.
         try {
           if (sessionStorage.getItem("tironet:db-cleared") === "1") {
             sessionStorage.removeItem("tironet:db-cleared");
-            Sentry.captureMessage("DB rebuild successful after corruption recovery", {
+            Sentry.captureMessage("DB rebuild successful after init recovery", {
               level: "info",
               tags: { component: "powersync", phase: "rebuild-success" },
             });
@@ -113,6 +109,14 @@ export function TironetPowerSyncProvider({
         } catch {
           // sessionStorage unavailable
         }
+
+        // Start sync — may fail offline, PowerSync retries automatically.
+        console.log("[PowerSync] calling connect()...");
+        performance.mark("powersync-connect-start");
+        await localDb.connect(connector);
+
+        performance.mark("powersync-connect-end");
+        console.log("[PowerSync] connect() resolved — sync started");
       })
       .catch((err: unknown) => {
         if (isCorruptError(err)) {
