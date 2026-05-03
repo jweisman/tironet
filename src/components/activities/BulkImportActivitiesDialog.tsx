@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import { readSpreadsheet } from "@/lib/utils/spreadsheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -245,8 +246,8 @@ export function BulkImportActivitiesDialog({
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = ev.target?.result;
-        const wb = XLSX.read(data, { type: "array" });
+        const data = ev.target?.result as ArrayBuffer;
+        const wb = readSpreadsheet(data, file.name);
         setWorkbook(wb);
         setRows(parseSheet(wb, activityTypes));
       } catch {

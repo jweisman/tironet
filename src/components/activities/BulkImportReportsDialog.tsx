@@ -2,6 +2,7 @@
 
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
+import { readSpreadsheet } from "@/lib/utils/spreadsheet";
 import { parseGradeInput, formatGradeDisplay } from "@/lib/score-format";
 import type { ActiveScore, ScoreConfig } from "@/types/score-config";
 import { calculateFailure } from "@/types/score-config";
@@ -376,8 +377,8 @@ export function BulkImportReportsDialog({
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = ev.target?.result;
-        const wb = XLSX.read(data, { type: "array" });
+        const data = ev.target?.result as ArrayBuffer;
+        const wb = readSpreadsheet(data, file.name);
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(
           sheet,
@@ -446,14 +447,20 @@ export function BulkImportReportsDialog({
         if (!row.soldierId) continue;
 
         const existing = existingReports.get(row.soldierId);
-        const grades = {
-          grade1: row.grades[0] ?? existing?.grade1 ?? null,
-          grade2: row.grades[1] ?? existing?.grade2 ?? null,
-          grade3: row.grades[2] ?? existing?.grade3 ?? null,
-          grade4: row.grades[3] ?? existing?.grade4 ?? null,
-          grade5: row.grades[4] ?? existing?.grade5 ?? null,
-          grade6: row.grades[5] ?? existing?.grade6 ?? null,
+        const grades: Record<GradeKey, number | null> = {
+          grade1: existing?.grade1 ?? null,
+          grade2: existing?.grade2 ?? null,
+          grade3: existing?.grade3 ?? null,
+          grade4: existing?.grade4 ?? null,
+          grade5: existing?.grade5 ?? null,
+          grade6: existing?.grade6 ?? null,
         };
+        // activeScores may skip grade slots (e.g. start at grade2), so map by
+        // gradeKey rather than array index.
+        activeScores.forEach((score, i) => {
+          const value = row.grades[i];
+          if (value != null) grades[score.gradeKey] = value;
+        });
         const { failed } = calculateFailure(
           grades, activeScores, scoreConfig?.failureThreshold,
         );

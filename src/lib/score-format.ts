@@ -14,19 +14,29 @@ export function formatGradeDisplay(value: number | null, format: "number" | "tim
 }
 
 /**
- * Parse a grade input that may be a plain number or a time string (M:SS / MM:SS).
+ * Parse a grade input that may be a plain number or a time string (M:SS, MM:SS, or HH:MM:SS).
  * When format is "number", only plain numbers are accepted (colon is rejected).
- * When format is "time", M:SS strings are converted to seconds; plain numbers are also accepted.
+ * When format is "time", time strings are converted to total seconds; plain numbers are also accepted.
  * When format is omitted, both formats are accepted (backwards-compatible).
  */
 export function parseGradeInput(raw: string, format?: "number" | "time"): number | null {
   const trimmed = raw.trim();
   if (trimmed === "") return null;
 
-  // Time format: M:SS or MM:SS
+  // HH:MM:SS — common CSV export format for durations
+  const hmsMatch = trimmed.match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (hmsMatch) {
+    if (format === "number") return null;
+    const hours = Number(hmsMatch[1]);
+    const minutes = Number(hmsMatch[2]);
+    const seconds = Number(hmsMatch[3]);
+    if (minutes >= 60 || seconds >= 60) return null;
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  // M:SS or MM:SS
   const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})$/);
   if (timeMatch) {
-    // Reject time input for number-format scores
     if (format === "number") return null;
     const minutes = Number(timeMatch[1]);
     const seconds = Number(timeMatch[2]);

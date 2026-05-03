@@ -25,6 +25,26 @@ describe("parseGradeInput", () => {
     expect(parseGradeInput("1:99")).toBeNull();
   });
 
+  it("parses HH:MM:SS time format to seconds", () => {
+    expect(parseGradeInput("00:10:56")).toBe(656);
+    expect(parseGradeInput("00:00:30")).toBe(30);
+    expect(parseGradeInput("01:00:00")).toBe(3600);
+    expect(parseGradeInput("00:12:05")).toBe(725);
+  });
+
+  it("rejects HH:MM:SS with invalid minutes/seconds", () => {
+    expect(parseGradeInput("00:60:00")).toBeNull();
+    expect(parseGradeInput("00:00:60")).toBeNull();
+  });
+
+  it("rejects HH:MM:SS when format is number", () => {
+    expect(parseGradeInput("00:10:56", "number")).toBeNull();
+  });
+
+  it("accepts HH:MM:SS when format is time", () => {
+    expect(parseGradeInput("00:10:56", "time")).toBe(656);
+  });
+
   it("rejects malformed time strings", () => {
     expect(parseGradeInput("3:5")).toBeNull(); // needs two-digit seconds
     expect(parseGradeInput(":30")).toBeNull();
