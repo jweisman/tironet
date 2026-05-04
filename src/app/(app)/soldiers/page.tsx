@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, AlertCircle, FileUp, FileText, WifiOff, HeartHandshake } from "lucide-react";
+import { Plus, AlertCircle, FileUp, FileText, WifiOff, HeartHandshake } from "lucide-react";
 import { toast } from "sonner";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useCycle } from "@/contexts/CycleContext";
@@ -34,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SoldierStatus } from "@/types";
@@ -484,18 +484,13 @@ export default function SoldiersPage() {
       {/* Sticky top search + gaps filter */}
       <div ref={stickyBarRef} className="sticky z-20 bg-background border-b border-border px-4 pt-3 pb-2 space-y-2" style={{ top: "var(--app-header-height, 0px)" }}>
         <div className="flex items-center gap-2">
-          <div data-tour="soldiers-search" className="relative flex-1">
-            <Search
-              size={16}
-              className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-            />
-            <Input
-              placeholder="חיפוש לפי שם, מ״א או טלפון..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pe-8"
-            />
-          </div>
+          <SearchInput
+            data-tour="soldiers-search"
+            containerClassName="flex-1"
+            placeholder="חיפוש לפי שם, מ״א או טלפון..."
+            value={search}
+            onValueChange={setSearch}
+          />
           <div className="hidden md:flex items-center gap-2 shrink-0">
             <button
               data-tour="soldiers-import-btn"

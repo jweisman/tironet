@@ -8,6 +8,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -161,6 +162,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [saveError, setSaveError] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showGapsOnly, setShowGapsOnly] = useState(initialGapsOnly);
+  const [soldierSearch, setSoldierSearch] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -260,6 +262,30 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     const refs = debounceRefs.current;
     return () => { refs.forEach(clearTimeout); };
   }, []);
+
+  // Sticky bar height tracking — search bar above squad list, and bulk
+  // update bar (when editing) sit on top of the squad headers.
+  const searchBarRef = useRef<HTMLDivElement>(null);
+  const bulkBarRef = useRef<HTMLDivElement>(null);
+  const [searchBarH, setSearchBarH] = useState(0);
+  const [bulkBarH, setBulkBarH] = useState(0);
+  useEffect(() => {
+    const el = searchBarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setSearchBarH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    const el = bulkBarRef.current;
+    if (!el) {
+      setBulkBarH(0);
+      return;
+    }
+    const ro = new ResizeObserver(() => setBulkBarH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [editingReports]);
 
   useEffect(() => {
     if (editingMetadata) {
@@ -702,26 +728,51 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
       </div>
       </div>
 
+      {/* Sticky soldier search — list-level filter above the squad headers */}
+      <div
+        ref={searchBarRef}
+        className="sticky z-20 bg-background border-b border-border px-4 py-2"
+        style={{ top: "var(--app-header-height, 0px)" }}
+      >
+        <SearchInput
+          placeholder="חיפוש חייל..."
+          value={soldierSearch}
+          onValueChange={setSoldierSearch}
+        />
+      </div>
+
       {/* Bulk update bar */}
       {editingReports && (
-        <div className="sticky top-0 z-10">
+        <div
+          ref={bulkBarRef}
+          className="sticky z-10"
+          style={{ top: `calc(var(--app-header-height, 0px) + ${searchBarH}px)` }}
+        >
           <BulkUpdateBar onBulkUpdate={handleBulkUpdate} loading={bulkLoading} resultLabels={resultLabels} />
         </div>
       )}
 
       {/* Squads & soldiers */}
       <div className="pb-24">
-        {(() => { let firstSoldierTagged = false; return data.squads.map((squad) => {
-          const visibleSoldiers = showGapsOnly
+        {(() => { let firstSoldierTagged = false; const trimmedSearch = soldierSearch.trim().toLowerCase(); return data.squads.map((squad) => {
+          let visibleSoldiers = showGapsOnly
             ? squad.soldiers.filter((s) => isGap(s.id))
             : squad.soldiers;
+          if (trimmedSearch) {
+            visibleSoldiers = visibleSoldiers.filter((s) =>
+              `${s.familyName} ${s.givenName}`.toLowerCase().includes(trimmedSearch)
+            );
+          }
 
           if (visibleSoldiers.length === 0) return null;
 
           return (
           <div key={squad.id}>
             {/* Squad header */}
-            <div className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b border-border flex items-center justify-between">
+            <div
+              className="sticky z-10 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b border-border flex items-center justify-between"
+              style={{ top: `calc(var(--app-header-height, 0px) + ${searchBarH + bulkBarH}px)` }}
+            >
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 {squad.name}
               </span>
