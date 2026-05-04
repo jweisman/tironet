@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -63,7 +64,10 @@ function RequestCard({ req, highlightDates }: { req: OpenRequestItem; highlightD
   const notes = formatNotes(req.notes);
 
   return (
-    <div className="border-b border-border py-2 px-1">
+    <Link
+      href={`/requests/${req.id}`}
+      className="block border-b border-border py-2 px-1 hover:bg-muted/50 transition-colors"
+    >
       <div className="flex items-center gap-2">
         <span className="font-semibold text-sm">{req.soldierName}</span>
         <span className="text-xs text-muted-foreground">{req.squad}</span>
@@ -82,7 +86,7 @@ function RequestCard({ req, highlightDates }: { req: OpenRequestItem; highlightD
         </span>
       </div>
       <RequestDetailColumns data={{ fields, appointments, sickDays, notes }} />
-    </div>
+    </Link>
   );
 }
 
