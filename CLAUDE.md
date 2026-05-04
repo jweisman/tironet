@@ -946,13 +946,49 @@ One sheet per platoon. Header occupies 4 rows; each activity gets `colCount = sc
 **Per-cell formatting:**
 - Blank score (no report, or report with null grade) → light grey background (`{0.93, 0.93, 0.93}`)
 - Failing score (per-score `threshold` + `thresholdOperator` evaluated via `evaluateScore`) → red background (`{0.98, 0.82, 0.82}`) + bold dark-red text
+- Future activity (`activity.date > now`) → empty cell, no formatting at all
 - Note: cell coloring uses **per-score thresholds directly**, not the report-level `failed` flag. Don't gate on `failureThreshold` — `evaluateScore` returns `null` when no threshold is configured, so the comparison naturally short-circuits. (Earlier the route gated on `failureThreshold` being truthy; that broke once `calculateFailure` started defaulting to 1.)
+
+### Date filter
+
+When a `dateRange` of week/month is selected, the activity window is bounded `[afterDate, tomorrowStart)` — past activities only. When **no** `dateRange` is selected ("all dates"), there is **no upper bound** — future activities are included with empty/uncolored cells (see formatting above).
 
 Freeze panes: 4 rows × 1 column.
 
 ### Key files
 - API route: `src/app/api/reports/all-activity/sheets/route.ts` (POST)
 - Reports page card: `src/app/(app)/reports/page.tsx` (label: "כל הציונים")
+- Reusable dialog: `src/components/reports/SheetsExportDialog.tsx`
+
+## All Results Report (כל התוצאות)
+
+A Google Sheets export with one sheet per platoon, listing every soldier × every activity in the cycle (no score-config filter, unlike All Scores). One column per activity. Reuses `SheetsExportDialog` with `reportType="all-results"`. Spreadsheet is named `דוח תוצאות - {cycle}`.
+
+### Sheet structure
+
+Same 4 header rows as All Scores (activity name, date, notes, "תוצאה" sub-label per column). One column per activity. All soldiers listed regardless of whether a report exists. Squad header rows merge across all data columns. Freeze panes: 4 rows × 1 column.
+
+### Date filter
+
+When a `dateRange` of week/month is selected, the activity window is bounded `[afterDate, tomorrowStart)` — past activities only, matching the All Scores behavior. When **no** `dateRange` is selected ("all dates"), there is **no upper bound** — future activities are included. Cells from activities whose `date > now` are emitted empty and uncolored (no blank-grey background) so upcoming columns visually distinguish from past columns with missing reports.
+
+### Cell value + color mapping
+
+Each cell shows the activity type's display label for the result, with a tint background that matches the in-app palette:
+
+| State | Cell text | Background |
+|---|---|---|
+| No report | empty | grey `{0.93, 0.93, 0.93}` |
+| `result=completed`, `failed=false` | `displayConfiguration.results.completed.label` (default "ביצע") | light green `{0.86, 0.96, 0.85}` |
+| `result=completed`, `failed=true` | `"נכשל"` | red `{0.98, 0.82, 0.82}` + bold dark-red text |
+| `result=skipped` | `displayConfiguration.results.skipped.label` (default "לא ביצע") | light amber `{0.99, 0.95, 0.78}` |
+| `result=na` | `displayConfiguration.results.na.label` (default "לא רלוונטי") | medium grey `{0.85, 0.85, 0.85}` |
+
+Labels resolve via `getResultLabels(activityType.displayConfiguration)` per activity, with fallback to the defaults in `src/types/display-config.ts`. The `failed` flag is taken from `ActivityReport.failed` directly (already maintained by the failure-threshold logic in `calculateFailure`); this route does not re-evaluate per-score thresholds.
+
+### Key files
+- API route: `src/app/api/reports/all-results/sheets/route.ts` (POST)
+- Reports page card: `src/app/(app)/reports/page.tsx` (label: "כל התוצאות")
 - Reusable dialog: `src/components/reports/SheetsExportDialog.tsx`
 
 ## Bulk Import Pattern (Spreadsheet Upload)

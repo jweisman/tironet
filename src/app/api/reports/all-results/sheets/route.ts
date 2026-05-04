@@ -4,17 +4,28 @@ import { getReportScope } from "@/lib/api/report-scope";
 import { refreshAccessToken } from "@/lib/reports/google-oauth";
 import { dateRangeToAfterDate } from "@/lib/reports/date-range";
 import type { SessionUser } from "@/types";
-import type { ScoreConfig } from "@/types/score-config";
-import { getActiveScores, evaluateScore } from "@/types/score-config";
-import { formatGradeDisplay } from "@/lib/score-format";
+import type { DisplayConfiguration } from "@/types/display-config";
+import { getResultLabels } from "@/types/display-config";
 
 export const maxDuration = 60;
 
 // ---------------------------------------------------------------------------
-// POST /api/reports/all-activity/sheets?cycleId=...&spreadsheetId=...
-// "All Scores" report (UI label: כל הציונים) — limited to activity types
-// that have at least one active score configured.
+// POST /api/reports/all-results/sheets?cycleId=...&spreadsheetId=...
+// "All Results" report (UI label: כל התוצאות) — every soldier × every
+// activity in the cycle, one column per activity, cell content is the result
+// (completed / skipped / na / failed) using the activity type's labels.
 // ---------------------------------------------------------------------------
+
+type ResultKind = "completed" | "skipped" | "na" | "failed" | "blank";
+
+const RESULT_BG: Record<Exclude<ResultKind, "blank">, { red: number; green: number; blue: number }> = {
+  completed: { red: 0.86, green: 0.96, blue: 0.85 }, // light green
+  skipped: { red: 0.99, green: 0.95, blue: 0.78 }, // light amber
+  na: { red: 0.85, green: 0.85, blue: 0.85 }, // medium grey
+  failed: { red: 0.98, green: 0.82, blue: 0.82 }, // light red
+};
+
+const BLANK_BG = { red: 0.93, green: 0.93, blue: 0.93 };
 
 export async function POST(request: NextRequest) {
   const cycleId = request.nextUrl.searchParams.get("cycleId");
@@ -105,12 +116,6 @@ export async function POST(request: NextRequest) {
               activityId: true,
               result: true,
               failed: true,
-              grade1: true,
-              grade2: true,
-              grade3: true,
-              grade4: true,
-              grade5: true,
-              grade6: true,
             },
             where: {
               activity: {
@@ -132,7 +137,7 @@ export async function POST(request: NextRequest) {
     ],
   });
 
-  const allActivities = await prisma.activity.findMany({
+  const activities = await prisma.activity.findMany({
     where: {
       cycleId,
       platoonId: { in: scope!.platoonIds },
@@ -141,20 +146,11 @@ export async function POST(request: NextRequest) {
     },
     include: {
       activityType: {
-        select: { name: true, scoreConfig: true },
+        select: { name: true, displayConfiguration: true },
       },
     },
     orderBy: { date: "asc" },
   });
-
-  type ActivityWithType = (typeof allActivities)[number];
-
-  function getActivityScores(a: ActivityWithType) {
-    return getActiveScores(a.activityType.scoreConfig as ScoreConfig | null);
-  }
-
-  // Limit to activities whose type has at least one active score configured.
-  const activities = allActivities.filter((a) => getActivityScores(a).length > 0);
 
   function formatActivityDate(d: Date): string {
     const day = String(d.getUTCDate()).padStart(2, "0");
@@ -162,7 +158,7 @@ export async function POST(request: NextRequest) {
     return `${day}/${month}/${d.getUTCFullYear()}`;
   }
 
-  // Group squads by platoon → one sheet per platoon (only platoons with qualifying activities)
+  // Group squads by platoon → one sheet per platoon (only platoons with activities in range)
   const platoonMap = new Map<string, { platoonName: string; squads: typeof squads }>();
   for (const squad of squads) {
     const pid = squad.platoon.id;
@@ -177,7 +173,6 @@ export async function POST(request: NextRequest) {
 
   const sheetTitles = platoonEntries.map((p) => p.platoonName);
 
-  // Per-cell formatting tracking (red bg for failed, grey for blank).
   type CellAddr = { row: number; col: number };
 
   const squadSheetData = platoonEntries.map((platoonEntry) => {
@@ -185,47 +180,45 @@ export async function POST(request: NextRequest) {
     const platoonActivities = activities.filter((a) =>
       platoonEntry.squads.some((sq) => sq.platoon.id === a.platoonId)
     );
-    const scoresPerActivity = platoonActivities.map((a) => getActivityScores(a));
-    // One column per active score per activity (no result column).
-    const colCounts = scoresPerActivity.map((scores) => scores.length);
-    // Total columns including the leading name column
-    const totalCols = 1 + colCounts.reduce((a, b) => a + b, 0);
+    // One column per activity, plus the leading name column
+    const totalCols = 1 + platoonActivities.length;
+
+    // Pre-resolve labels per activity from displayConfiguration
+    const labelsPerActivity = platoonActivities.map((a) =>
+      getResultLabels(a.activityType.displayConfiguration as DisplayConfiguration | null)
+    );
 
     // Header rows (offset by 1 for name column):
-    // Row 0: activity name (merged per activity)
-    // Row 1: activity date (merged per activity)
-    // Row 2: activity notes (merged per activity)
-    // Row 3: score labels per activity
+    // Row 0: activity name
+    // Row 1: activity date
+    // Row 2: activity notes
+    // Row 3: "תוצאה" label per activity
     const activityNameRow: string[] = [""];
     const dateRow: string[] = [""];
     const notesRow: string[] = [""];
-    const scoreLabelRow: string[] = ["שם"];
+    const labelRow: string[] = ["שם"];
 
-    for (let ai = 0; ai < platoonActivities.length; ai++) {
-      const a = platoonActivities[ai];
+    for (const a of platoonActivities) {
       activityNameRow.push(`${a.activityType.name} - ${a.name}`);
       dateRow.push(formatActivityDate(a.date));
       notesRow.push(a.notes ?? "");
-      for (let c = 1; c < colCounts[ai]; c++) {
-        activityNameRow.push("");
-        dateRow.push("");
-        notesRow.push("");
-      }
-      const scores = scoresPerActivity[ai];
-      for (const s of scores) scoreLabelRow.push(s.label);
+      labelRow.push("תוצאה");
     }
 
-    // Data rows: squad header row, then soldier rows, repeated per squad.
     type SoldierRow = { values: string[]; rowIndex: number };
     const soldierRows: SoldierRow[] = [];
     const squadHeaderRowIndexes: number[] = [];
-    const failedCells: CellAddr[] = [];
+    const cellsByKind: Record<Exclude<ResultKind, "blank">, CellAddr[]> = {
+      completed: [],
+      skipped: [],
+      na: [],
+      failed: [],
+    };
     const blankCells: CellAddr[] = [];
     const dataValueRows: string[][] = [];
     const HEADER_ROW_COUNT = 4;
 
     for (const squad of platoonEntry.squads) {
-      // Squad header row (squad name in column A, rest empty — merged in formatting)
       const squadHeaderRow: string[] = [squad.name];
       for (let c = 1; c < totalCols; c++) squadHeaderRow.push("");
       squadHeaderRowIndexes.push(HEADER_ROW_COUNT + dataValueRows.length);
@@ -234,36 +227,49 @@ export async function POST(request: NextRequest) {
       for (const soldier of squad.soldiers) {
         const row: string[] = [`${soldier.familyName} ${soldier.givenName}`];
         const rowIndex = HEADER_ROW_COUNT + dataValueRows.length;
-        let colCursor = 1;
         for (let ai = 0; ai < platoonActivities.length; ai++) {
+          const cellCol = 1 + ai;
           const activity = platoonActivities[ai];
-          const scores = scoresPerActivity[ai];
-          // Future activities haven't happened yet — leave score cells empty
-          // and unstyled so upcoming columns visually distinguish from past
-          // columns with missing scores.
+          // Future activities haven't happened yet — leave the cell empty and
+          // unstyled so the column shows as upcoming rather than as missing.
           if (activity.date > now) {
-            for (let c = 0; c < scores.length; c++) row.push("");
-            colCursor += scores.length;
+            row.push("");
             continue;
           }
           const report = soldier.activityReports.find(
             (r) => r.activityId === activity.id
           );
-          for (let c = 0; c < scores.length; c++) {
-            const score = scores[c];
-            const cellCol = colCursor + c;
-            const g = report ? report[score.gradeKey] : null;
-            if (g == null) {
+          const labels = labelsPerActivity[ai];
+
+          if (!report) {
+            row.push("");
+            blankCells.push({ row: rowIndex, col: cellCol });
+            continue;
+          }
+
+          if (report.failed) {
+            row.push("נכשל");
+            cellsByKind.failed.push({ row: rowIndex, col: cellCol });
+            continue;
+          }
+
+          switch (report.result) {
+            case "completed":
+              row.push(labels.completed.label);
+              cellsByKind.completed.push({ row: rowIndex, col: cellCol });
+              break;
+            case "skipped":
+              row.push(labels.skipped.label);
+              cellsByKind.skipped.push({ row: rowIndex, col: cellCol });
+              break;
+            case "na":
+              row.push(labels.na.label);
+              cellsByKind.na.push({ row: rowIndex, col: cellCol });
+              break;
+            default:
               row.push("");
               blankCells.push({ row: rowIndex, col: cellCol });
-            } else {
-              row.push(formatGradeDisplay(Number(g), score.format));
-              if (evaluateScore(Number(g), score.threshold, score.thresholdOperator) === "failed") {
-                failedCells.push({ row: rowIndex, col: cellCol });
-              }
-            }
           }
-          colCursor += scores.length;
         }
         soldierRows.push({ values: row, rowIndex });
         dataValueRows.push(row);
@@ -272,23 +278,23 @@ export async function POST(request: NextRequest) {
 
     return {
       sheetTitle,
-      colCounts,
       totalCols,
+      activityCount: platoonActivities.length,
       soldierRows,
       squadHeaderRowIndexes,
-      failedCells,
+      cellsByKind,
       blankCells,
       hasNotes: platoonActivities.some((a) => (a.notes ?? "").trim() !== ""),
       valueRange: {
         range: `'${sheetTitle}'!A1`,
-        values: [activityNameRow, dateRow, notesRow, scoreLabelRow, ...dataValueRows],
+        values: [activityNameRow, dateRow, notesRow, labelRow, ...dataValueRows],
       },
     };
   });
 
   if (squadSheetData.length === 0) {
     return NextResponse.json(
-      { error: "אין פעילויות עם ציונים בטווח הנבחר" },
+      { error: "אין פעילויות בטווח הנבחר" },
       { status: 400 },
     );
   }
@@ -296,20 +302,18 @@ export async function POST(request: NextRequest) {
   try {
     let spreadsheetId: string;
     let spreadsheetName: string;
-    let sheetIdMap: Map<string, number>; // title → sheetId for formatting
+    let sheetIdMap: Map<string, number>;
     let fileFallback = false;
 
     if (targetSpreadsheetId) {
-      // ---------- Write to existing workbook ----------
       const result = await writeToExistingSpreadsheet(
-        accessToken, targetSpreadsheetId, sheetTitles, squadSheetData, cycle.name
+        accessToken, targetSpreadsheetId, sheetTitles
       );
 
       if (result.notFound) {
-        // File was deleted or unshared — fall back to creating new
         fileFallback = true;
         const fallbackResult = await createNewSpreadsheet(
-          accessToken, sheetTitles, squadSheetData, cycle.name
+          accessToken, sheetTitles, cycle.name
         );
         if (fallbackResult.needsAuth) {
           await prisma.googleExportToken.delete({ where: { userId: sessionUser.id } });
@@ -327,9 +331,8 @@ export async function POST(request: NextRequest) {
         sheetIdMap = result.sheetIdMap!;
       }
     } else {
-      // ---------- Create new workbook ----------
       const result = await createNewSpreadsheet(
-        accessToken, sheetTitles, squadSheetData, cycle.name
+        accessToken, sheetTitles, cycle.name
       );
       if (result.needsAuth) {
         await prisma.googleExportToken.delete({ where: { userId: sessionUser.id } });
@@ -340,7 +343,6 @@ export async function POST(request: NextRequest) {
       sheetIdMap = result.sheetIdMap!;
     }
 
-    // Populate data
     const valueRanges = squadSheetData.map((s) => s.valueRange);
     await sheetsApiFetch(
       accessToken,
@@ -348,7 +350,6 @@ export async function POST(request: NextRequest) {
       { valueInputOption: "RAW", data: valueRanges }
     );
 
-    // Apply formatting
     const formatRequests = buildFormatRequests(squadSheetData, sheetIdMap);
     await sheetsApiFetch(
       accessToken,
@@ -356,12 +357,11 @@ export async function POST(request: NextRequest) {
       { requests: formatRequests }
     );
 
-    // Store as default for next time
     await prisma.reportExportDefault.upsert({
-      where: { userId_reportType: { userId: sessionUser.id, reportType: "all-activity" } },
+      where: { userId_reportType: { userId: sessionUser.id, reportType: "all-results" } },
       create: {
         userId: sessionUser.id,
-        reportType: "all-activity",
+        reportType: "all-results",
         spreadsheetId,
         spreadsheetName,
       },
@@ -389,11 +389,11 @@ export async function POST(request: NextRequest) {
 
 interface SheetData {
   sheetTitle: string;
-  colCounts: number[];
   totalCols: number;
+  activityCount: number;
   soldierRows: { values: string[]; rowIndex: number }[];
   squadHeaderRowIndexes: number[];
-  failedCells: { row: number; col: number }[];
+  cellsByKind: Record<Exclude<ResultKind, "blank">, { row: number; col: number }[]>;
   blankCells: { row: number; col: number }[];
   hasNotes: boolean;
   valueRange: { range: string; values: string[][] };
@@ -425,7 +425,6 @@ async function sheetsApiFetch(accessToken: string, url: string, body: unknown) {
 async function createNewSpreadsheet(
   accessToken: string,
   sheetTitles: string[],
-  _squadSheetData: SheetData[],
   cycleName: string
 ): Promise<SpreadsheetResult> {
   const sheetProperties = sheetTitles.map((title, index) => ({
@@ -441,7 +440,7 @@ async function createNewSpreadsheet(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        properties: { title: `דוח ציונים - ${cycleName}`, locale: "iw" },
+        properties: { title: `דוח תוצאות - ${cycleName}`, locale: "iw" },
         sheets: sheetProperties,
       }),
     }
@@ -469,11 +468,8 @@ async function createNewSpreadsheet(
 async function writeToExistingSpreadsheet(
   accessToken: string,
   spreadsheetId: string,
-  sheetTitles: string[],
-  _squadSheetData: SheetData[],
-  cycleName: string
+  sheetTitles: string[]
 ): Promise<SpreadsheetResult> {
-  // 1. Get existing spreadsheet metadata
   const metaRes = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=properties.title,sheets.properties`,
     {
@@ -492,15 +488,11 @@ async function writeToExistingSpreadsheet(
   const meta = await metaRes.json();
   const existingSheets: { properties: { sheetId: number; title: string } }[] = meta.sheets ?? [];
 
-  // 2. Build batchUpdate: replace only sheets with matching names, leave others
   const newTitleSet = new Set(sheetTitles);
   const existingByTitle = new Map(existingSheets.map((s) => [s.properties.title, s.properties.sheetId]));
 
-  // Delete only existing sheets whose name matches a new sheet title
   const sheetsToDelete = existingSheets.filter((s) => newTitleSet.has(s.properties.title));
 
-  // For new sheets that DON'T collide with existing names, add directly with final name.
-  // For those that DO collide, add with temp name, delete old, then rename.
   const baseSheetId = Date.now() % 1_000_000_000;
   const requests: object[] = [];
   const needsRename: { sheetId: number; title: string }[] = [];
@@ -508,7 +500,6 @@ async function writeToExistingSpreadsheet(
   for (let i = 0; i < sheetTitles.length; i++) {
     const title = sheetTitles[i];
     if (existingByTitle.has(title)) {
-      // Name collision — use temp name, rename after delete
       const tempName = `__tmp_${baseSheetId + i}`;
       requests.push({
         addSheet: {
@@ -517,7 +508,6 @@ async function writeToExistingSpreadsheet(
       });
       needsRename.push({ sheetId: baseSheetId + i, title });
     } else {
-      // No collision — add with final name directly
       requests.push({
         addSheet: {
           properties: { sheetId: baseSheetId + i, title, rightToLeft: true },
@@ -526,14 +516,12 @@ async function writeToExistingSpreadsheet(
     }
   }
 
-  // Delete old sheets that share names with new ones
   for (const sheet of sheetsToDelete) {
     requests.push({
       deleteSheet: { sheetId: sheet.properties.sheetId },
     });
   }
 
-  // Rename temp sheets to final names
   for (const { sheetId, title } of needsRename) {
     requests.push({
       updateSheetProperties: {
@@ -573,31 +561,7 @@ function buildFormatRequests(
   return squadSheetData.flatMap((sd) => {
     const sheetId = sheetIdMap.get(sd.sheetTitle) ?? 0;
 
-    // Merge activity name (row 0), date (row 1), and notes (row 2) per activity.
-    // Offset by 1 for the leading name column.
-    const mergeRequests: object[] = [];
-    let colOffset = 1;
-    for (const colCount of sd.colCounts) {
-      if (colCount > 1) {
-        for (const headerRow of [0, 1, 2]) {
-          mergeRequests.push({
-            mergeCells: {
-              range: {
-                sheetId,
-                startRowIndex: headerRow,
-                endRowIndex: headerRow + 1,
-                startColumnIndex: colOffset,
-                endColumnIndex: colOffset + colCount,
-              },
-              mergeType: "MERGE_ALL",
-            },
-          });
-        }
-      }
-      colOffset += colCount;
-    }
-
-    // Merge each squad header row across all columns (col 1..totalCols)
+    // Squad header rows: merged across all data columns
     const squadMergeRequests: object[] = [];
     for (const ri of sd.squadHeaderRowIndexes) {
       if (sd.totalCols > 1) {
@@ -616,8 +580,8 @@ function buildFormatRequests(
       }
     }
 
-    // Red background + bold for failed score cells
-    const failedCellRequests: object[] = sd.failedCells.map((cell) => ({
+    // Failed cells: red bg + bold dark red
+    const failedCellRequests: object[] = sd.cellsByKind.failed.map((cell) => ({
       repeatCell: {
         range: {
           sheetId,
@@ -628,35 +592,43 @@ function buildFormatRequests(
         },
         cell: {
           userEnteredFormat: {
-            backgroundColor: { red: 0.98, green: 0.82, blue: 0.82 },
+            backgroundColor: RESULT_BG.failed,
             textFormat: {
               bold: true,
               foregroundColorStyle: { rgbColor: { red: 0.7, green: 0.05, blue: 0.05 } },
             },
+            horizontalAlignment: "CENTER",
           },
         },
-        fields: "userEnteredFormat(backgroundColor,textFormat)",
+        fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
       },
     }));
 
-    // Light grey background for blank score cells
-    const blankCellRequests: object[] = sd.blankCells.map((cell) => ({
-      repeatCell: {
-        range: {
-          sheetId,
-          startRowIndex: cell.row,
-          endRowIndex: cell.row + 1,
-          startColumnIndex: cell.col,
-          endColumnIndex: cell.col + 1,
-        },
-        cell: {
-          userEnteredFormat: {
-            backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 },
+    function bgRequests(cells: { row: number; col: number }[], bg: { red: number; green: number; blue: number }): object[] {
+      return cells.map((cell) => ({
+        repeatCell: {
+          range: {
+            sheetId,
+            startRowIndex: cell.row,
+            endRowIndex: cell.row + 1,
+            startColumnIndex: cell.col,
+            endColumnIndex: cell.col + 1,
           },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: bg,
+              horizontalAlignment: "CENTER",
+            },
+          },
+          fields: "userEnteredFormat(backgroundColor,horizontalAlignment)",
         },
-        fields: "userEnteredFormat.backgroundColor",
-      },
-    }));
+      }));
+    }
+
+    const completedCellRequests = bgRequests(sd.cellsByKind.completed, RESULT_BG.completed);
+    const skippedCellRequests = bgRequests(sd.cellsByKind.skipped, RESULT_BG.skipped);
+    const naCellRequests = bgRequests(sd.cellsByKind.na, RESULT_BG.na);
+    const blankCellRequests = bgRequests(sd.blankCells, BLANK_BG);
 
     // Squad header rows: bold, dark grey background, centered
     const squadHeaderFormatRequests: object[] = sd.squadHeaderRowIndexes.map((ri) => ({
@@ -674,7 +646,6 @@ function buildFormatRequests(
     }));
 
     return [
-      ...mergeRequests,
       ...squadMergeRequests,
       // Header rows formatting (4 rows: name, date, notes, labels)
       {
@@ -692,7 +663,6 @@ function buildFormatRequests(
           fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,wrapStrategy,verticalAlignment)",
         },
       },
-      // Notes row may need extra height when present
       ...(sd.hasNotes
         ? [
             {
@@ -706,6 +676,9 @@ function buildFormatRequests(
         : []),
       ...squadHeaderFormatRequests,
       ...blankCellRequests,
+      ...naCellRequests,
+      ...skippedCellRequests,
+      ...completedCellRequests,
       ...failedCellRequests,
       // Freeze 4 header rows + 1 column (name)
       {
