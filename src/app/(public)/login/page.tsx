@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useTranslations } from "next-intl";
@@ -31,6 +31,17 @@ function LoginForm() {
   const [smsSending, setSmsSending] = useState(false);
   const [smsVerifying, setSmsVerifying] = useState(false);
   const [smsError, setSmsError] = useState<string | null>(null);
+
+  // Hide magic email link in installed PWA — the link opens in the default
+  // browser, not the PWA, leaving the user signed in elsewhere (#206).
+  const [isStandalone, setIsStandalone] = useState(false);
+  useEffect(() => {
+    setIsStandalone(
+      window.matchMedia("(display-mode: standalone)").matches ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (navigator as any).standalone === true,
+    );
+  }, []);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -247,30 +258,34 @@ function LoginForm() {
               {t("signInWithGoogle")}
             </Button>
 
-            <div className="flex items-center gap-3">
-              <Separator className="flex-1" />
-              <span className="text-sm text-muted-foreground">או</span>
-              <Separator className="flex-1" />
-            </div>
+            {!isStandalone && (
+              <>
+                <div className="flex items-center gap-3">
+                  <Separator className="flex-1" />
+                  <span className="text-sm text-muted-foreground">או</span>
+                  <Separator className="flex-1" />
+                </div>
 
-            {/* Magic link */}
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">{t("signInWithEmail")}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder={t("emailPlaceholder")}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  dir="ltr"
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={sending}>
-                {sending ? "שולח..." : t("sendMagicLink")}
-              </Button>
-            </form>
+                {/* Magic link */}
+                <form onSubmit={handleEmailSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">{t("signInWithEmail")}</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder={t("emailPlaceholder")}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      dir="ltr"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={sending}>
+                    {sending ? "שולח..." : t("sendMagicLink")}
+                  </Button>
+                </form>
+              </>
+            )}
           </div>
         )}
       </div>
