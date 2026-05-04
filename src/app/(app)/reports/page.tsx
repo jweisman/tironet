@@ -300,7 +300,7 @@ export default function ReportsPage() {
             </div>
           </button>
 
-          {/* All Activity report card */}
+          {/* All Scores report card */}
           <div className="space-y-2">
             <button
               type="button"
@@ -312,13 +312,13 @@ export default function ReportsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold">כל הפעילויות</p>
+                  <p className="text-sm font-semibold">כל הציונים</p>
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                     Sheets
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  טבלת חיילים × פעילויות עם ציונים — גיליון Google Sheets לכל כיתה
+                  טבלת חיילים × ציונים לפעילויות עם ציונים מוגדרים — גיליון Google Sheets לכל מחלקה
                 </p>
               </div>
             </button>

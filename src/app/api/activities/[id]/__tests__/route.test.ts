@@ -299,6 +299,88 @@ describe("PATCH /api/activities/[id]", () => {
     expect(json.activity.name).toBe("Updated Name");
     expect(json.activity.platoon.companyName).toBe("Company Alpha");
   });
+
+  it("updates notes when provided", async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      platoonId: "platoon-1",
+    } as never);
+
+    const scope = makePlatoonCommanderScope();
+    mockGetActivityScope.mockResolvedValue({
+      scope,
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    mockPrisma.activity.update.mockResolvedValue({
+      id: "act-1",
+      name: "Shooting Drill",
+      date: new Date("2026-03-15"),
+      status: "active",
+      isRequired: true,
+      notes: "5 כד׳\n25 מ",
+      activityType: { id: "type-1", name: "Shooting", icon: "target" },
+      platoon: {
+        id: "platoon-1",
+        name: "Platoon A",
+        company: { name: "Company Alpha" },
+      },
+    } as never);
+
+    const req = createMockRequest("PATCH", "/api/activities/act-1", {
+      notes: "5 כד׳\n25 מ",
+    });
+    const res = await PATCH(req, makeParams("act-1"));
+    expect(res.status).toBe(200);
+
+    expect(mockPrisma.activity.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notes: "5 כד׳\n25 מ" }),
+      })
+    );
+  });
+
+  it("clears notes when set to null", async () => {
+    mockPrisma.activity.findUnique.mockResolvedValue({
+      cycleId: "cycle-1",
+      platoonId: "platoon-1",
+    } as never);
+
+    const scope = makePlatoonCommanderScope();
+    mockGetActivityScope.mockResolvedValue({
+      scope,
+      error: null,
+      user: mockSessionUser(),
+    });
+
+    mockPrisma.activity.update.mockResolvedValue({
+      id: "act-1",
+      name: "Shooting Drill",
+      date: new Date("2026-03-15"),
+      status: "active",
+      isRequired: true,
+      notes: null,
+      activityType: { id: "type-1", name: "Shooting", icon: "target" },
+      platoon: {
+        id: "platoon-1",
+        name: "Platoon A",
+        company: { name: "Company Alpha" },
+      },
+    } as never);
+
+    const req = createMockRequest("PATCH", "/api/activities/act-1", {
+      notes: null,
+    });
+    const res = await PATCH(req, makeParams("act-1"));
+    expect(res.status).toBe(200);
+
+    expect(mockPrisma.activity.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notes: null }),
+      })
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

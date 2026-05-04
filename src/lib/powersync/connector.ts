@@ -149,6 +149,7 @@ export class TironetConnector implements PowerSyncBackendConnector {
             if (d.activity_type_id !== undefined) body.activityTypeId = d.activity_type_id;
             if (d.is_required !== undefined) body.isRequired = Boolean(d.is_required);
             if (d.status !== undefined) body.status = d.status;
+            if (d.notes !== undefined) body.notes = d.notes;
             await apiRequest(`/api/activities/${id}`, "PATCH", body);
           } else if (opType === UpdateType.DELETE) {
             await apiRequest(`/api/activities/${id}`, "DELETE");

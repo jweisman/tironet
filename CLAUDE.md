@@ -227,11 +227,11 @@ Writes are **instant and optimistic** — no network round-trip, no loading stat
 
 `ActivityResult` has three values: `completed` (soldier participated), `skipped` (didn't participate), `na` (not applicable). A separate `failed` boolean on `ActivityReport` indicates score-based failure, calculated automatically from score thresholds.
 
-**Score thresholds:** Each `ScoreSlot` in `scoreConfig` has optional `threshold` (number) and `thresholdOperator` (`>`, `>=`, `<`, `<=`). The operator defines the **failing** condition (e.g., `>` means fail if score > threshold — used for time scores where lower is better). `scoreConfig.failureThreshold` (number) controls how many individually-failed scores mark the report as failed (e.g., 1 = any single score failure).
+**Score thresholds:** Each `ScoreSlot` in `scoreConfig` has optional `threshold` (number) and `thresholdOperator` (`>`, `>=`, `<`, `<=`). The operator defines the **failing** condition (e.g., `>` means fail if score > threshold — used for time scores where lower is better). `scoreConfig.failureThreshold` (number) controls how many individually-failed scores mark the report as failed; **defaults to 1** when any score has a configured threshold but `failureThreshold` is null. Only set explicitly to require multiple failures (e.g., 2 of 3). Configuring a per-score threshold is the signal that auto-failure is enabled — the count is just a refinement.
 
 **`calculateFailure()`** in `src/types/score-config.ts` is the pure function that evaluates grades against thresholds. Returns `{ failed: boolean, scoreResults: Map<gradeKey, "passed"|"failed"|null> }`. Called from: `handleReportChange` (on grade change), `BulkImportReportsDialog` (before import), and the first-display recalculation (see below).
 
-**First-display recalculation:** The activity detail page (`/activities/[id]/page.tsx`) recalculates `failed` from current grades + thresholds in its `useMemo` — this ensures correct display regardless of what's stored. A separate one-shot `useEffect` in `ActivityDetail` (`syncFailedToSQLite`) reads the stored values from SQLite, diffs against the calculation, and writes back any mismatches. This converges the DB on first view without affecting the display (which is already correct from the `useMemo`). When no `failureThreshold` is configured, `failed` is always `false`.
+**First-display recalculation:** The activity detail page (`/activities/[id]/page.tsx`) recalculates `failed` from current grades + thresholds in its `useMemo` — this ensures correct display regardless of what's stored. A separate one-shot `useEffect` in `ActivityDetail` (`syncFailedToSQLite`) reads the stored values from SQLite, diffs against the calculation, and writes back any mismatches. This converges the DB on first view without affecting the display (which is already correct from the `useMemo`). When no score has a threshold configured, `failed` is always `false`.
 
 **Concurrency:** `failed` is always updated atomically with the grade that triggered it — same SQL UPDATE, same PowerSync CRUD op, same server PATCH. This preserves the field-level merge pattern. The server trusts the client's `failed` value (accepted race for concurrent edits with failureThreshold > 1).
 
@@ -909,6 +909,40 @@ Activity types used for physical training should have their `displayConfiguratio
 ### SheetsExportDialog is reusable
 
 `SheetsExportDialog` accepts optional `apiEndpoint` (default: `/api/reports/all-activity/sheets`) and `reportType` (default: `"all-activity"`) props. Each report type stores its own default spreadsheet via `ReportExportDefault`. When adding a new Sheets-based report, create a new API route and pass the endpoint/type to the dialog.
+
+> The default endpoint/type are still named `all-activity` for backward compat with existing `ReportExportDefault` rows; the user-facing label is "כל הציונים" (All Scores). See the All Scores Report section below.
+
+## All Scores Report (כל הציונים)
+
+A Google Sheets export with one sheet per platoon, listing every soldier × every activity-with-scores in the cycle. Available from the reports page; reuses `SheetsExportDialog`. Spreadsheet is named `דוח ציונים - {cycle}`.
+
+### Activity filter
+
+Only activities whose `ActivityType.scoreConfig` has at least one **active score** (label set) are included. Filtered post-query via `getActiveScores(scoreConfig).length > 0`. Platoons with no qualifying activities are skipped entirely; if no platoon qualifies the route returns 400.
+
+### Sheet structure
+
+One sheet per platoon. Header occupies 4 rows; each activity gets `colCount = scores.length` columns (no result/תוצאה column). The leading column (A) is the soldier name.
+
+**Header rows (0-3, all merged across each activity's columns):**
+- Row 0: `{activityType.name} - {activity.name}`
+- Row 1: activity date (dd/MM/yyyy)
+- Row 2: activity notes (`Activity.notes`, may be empty; row gets extra height when any activity has notes)
+- Row 3: per-score labels (`scoreConfig` slot labels)
+
+**Body:** for each squad, a single squad-header row (squad name merged across cols 1..totalCols, dark grey), then one row per soldier. **All soldiers are listed** regardless of whether they have a report. No summary row.
+
+**Per-cell formatting:**
+- Blank score (no report, or report with null grade) → light grey background (`{0.93, 0.93, 0.93}`)
+- Failing score (per-score `threshold` + `thresholdOperator` evaluated via `evaluateScore`) → red background (`{0.98, 0.82, 0.82}`) + bold dark-red text
+- Note: cell coloring uses **per-score thresholds directly**, not the report-level `failed` flag. Don't gate on `failureThreshold` — `evaluateScore` returns `null` when no threshold is configured, so the comparison naturally short-circuits. (Earlier the route gated on `failureThreshold` being truthy; that broke once `calculateFailure` started defaulting to 1.)
+
+Freeze panes: 4 rows × 1 column.
+
+### Key files
+- API route: `src/app/api/reports/all-activity/sheets/route.ts` (POST)
+- Reports page card: `src/app/(app)/reports/page.tsx` (label: "כל הציונים")
+- Reusable dialog: `src/components/reports/SheetsExportDialog.tsx`
 
 ## Bulk Import Pattern (Spreadsheet Upload)
 

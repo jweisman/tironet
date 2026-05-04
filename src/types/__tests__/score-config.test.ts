@@ -196,18 +196,24 @@ describe("calculateFailure", () => {
     thresholdOperator: operator,
   });
 
-  it("returns failed=false when failureThreshold is null (skips evaluation)", () => {
+  it("defaults failureThreshold to 1 when null and a score has a threshold", () => {
     const scores = [makeScore("grade1", 50, "<")];
     const result = calculateFailure({ grade1: 30 }, scores, null);
-    expect(result.failed).toBe(false);
-    // Skips score evaluation entirely — scoreResults is empty
-    expect(result.scoreResults.size).toBe(0);
+    expect(result.failed).toBe(true);
+    expect(result.scoreResults.get("grade1")).toBe("failed");
   });
 
-  it("returns failed=false when failureThreshold is undefined", () => {
+  it("defaults failureThreshold to 1 when undefined and a score has a threshold", () => {
     const scores = [makeScore("grade1", 50, "<")];
     const result = calculateFailure({ grade1: 30 }, scores, undefined);
+    expect(result.failed).toBe(true);
+  });
+
+  it("returns failed=false when no score has a threshold configured", () => {
+    const scores = [makeScore("grade1", null, null)];
+    const result = calculateFailure({ grade1: 30 }, scores, null);
     expect(result.failed).toBe(false);
+    expect(result.scoreResults.size).toBe(0);
   });
 
   it("returns failed=true with single failure and failureThreshold=1", () => {

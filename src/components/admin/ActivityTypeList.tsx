@@ -475,20 +475,25 @@ export default function ActivityTypeList({ initialTypes }: Props) {
 
                 {/* Failure threshold (edit mode only, shown when any score has a threshold) */}
                 {editingId === type.id && editScores.some((s) => s.label.trim() && s.threshold.trim() && s.thresholdOperator) && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="text-xs text-muted-foreground shrink-0">מספר ציונים כושלים לסימון ככישלון:</span>
-                    <Input
-                      value={editFailureThreshold}
-                      onChange={(e) => setEditFailureThreshold(e.target.value)}
-                      className="text-xs w-16 h-8"
-                      inputMode="numeric"
-                      placeholder="—"
-                    />
+                  <div className="space-y-1 pt-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground shrink-0">מספר ציונים כושלים לסימון ככישלון:</span>
+                      <Input
+                        value={editFailureThreshold}
+                        onChange={(e) => setEditFailureThreshold(e.target.value)}
+                        className="text-xs w-16 h-8"
+                        inputMode="numeric"
+                        placeholder="1"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      ברירת מחדל: 1 (כישלון אחד מסמן את הפעילות ככשלון). הגדל רק כדי לדרוש מספר כשלונות.
+                    </p>
                   </div>
                 )}
 
-                {/* View mode: show failure threshold if configured */}
-                {editingId !== type.id && type.scoreConfig?.failureThreshold && (
+                {/* View mode: show failure threshold if configured (>1, since 1 is the default) */}
+                {editingId !== type.id && type.scoreConfig?.failureThreshold && type.scoreConfig.failureThreshold > 1 && (
                   <p className="text-xs text-muted-foreground pt-1">
                     סף כישלון: {type.scoreConfig.failureThreshold} ציונים כושלים
                   </p>

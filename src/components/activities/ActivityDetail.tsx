@@ -89,6 +89,7 @@ export interface ActivityDetailData {
   name: string;
   date: string;
   isRequired: boolean;
+  notes: string | null;
   activityType: { id: string; name: string; icon: string; activeScores: ActiveScore[]; scoreConfig?: ScoreConfig | null; displayConfiguration?: DisplayConfiguration | null };
   platoon: { id: string; name: string; companyName: string };
   role: string;
@@ -122,9 +123,11 @@ async function syncFailedToSQLite(
 
   const stale: { id: string; failed: boolean }[] = [];
   for (const row of rows) {
-    const expected = failureThreshold
-      ? calculateFailure(row as unknown as Record<string, number | null>, activeScores, failureThreshold).failed
-      : false;
+    const expected = calculateFailure(
+      row as unknown as Record<string, number | null>,
+      activeScores,
+      failureThreshold,
+    ).failed;
     if (expected !== (Number(row.failed) === 1)) {
       stale.push({ id: row.id, failed: expected });
     }
@@ -240,6 +243,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
   const [metaDate, setMetaDate] = useState(data.date.split("T")[0]);
   const [metaActivityTypeId, setMetaActivityTypeId] = useState(data.activityType.id);
   const [metaIsRequired, setMetaIsRequired] = useState(data.isRequired);
+  const [metaNotes, setMetaNotes] = useState(data.notes ?? "");
   const [metaSubmitting, setMetaSubmitting] = useState(false);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
@@ -497,6 +501,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
           date: metaDate,
           activityTypeId: metaActivityTypeId,
           isRequired: metaIsRequired,
+          notes: metaNotes.trim() || null,
         }),
       });
 
@@ -514,6 +519,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         date: updated.date,
         status: updated.status,
         isRequired: updated.isRequired,
+        notes: updated.notes ?? null,
         activityType: {
           ...prev.activityType,
           ...updated.activityType,
@@ -630,6 +636,7 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                   setMetaDate(data.date.split("T")[0]);
                   setMetaActivityTypeId(data.activityType.id);
                   setMetaIsRequired(data.isRequired);
+                  setMetaNotes(data.notes ?? "");
                   setEditingMetadata(true);
                 }}
                 aria-label="ערוך פרטים"
@@ -639,6 +646,12 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
             </div>
           )}
         </div>
+
+        {data.notes && (
+          <div className="text-sm text-foreground/80 whitespace-pre-wrap break-words">
+            {data.notes}
+          </div>
+        )}
 
         {activityCounts.total > 0 && (
           <ActivityProgressBar counts={activityCounts} />
@@ -921,6 +934,18 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
                 value={metaDate}
                 onChange={(e) => setMetaDate(e.target.value)}
                 dir="ltr"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <Label htmlFor="meta-notes">הערות או הדגשים</Label>
+              <textarea
+                id="meta-notes"
+                value={metaNotes}
+                onChange={(e) => setMetaNotes(e.target.value)}
+                rows={3}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
             </div>
 

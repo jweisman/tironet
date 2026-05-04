@@ -9,6 +9,7 @@ const patchSchema = z.object({
   activityTypeId: z.string().uuid().optional(),
   isRequired: z.boolean().optional(),
   status: z.enum(["draft", "active"]).optional(),
+  notes: z.string().nullable().optional(),
 });
 
 export async function GET(
@@ -139,6 +140,7 @@ export async function GET(
     date: activity.date.toISOString(),
     status: activity.status,
     isRequired: activity.isRequired,
+    notes: activity.notes,
     activityType: activity.activityType,
     platoon: {
       id: activity.platoon.id,
@@ -215,6 +217,7 @@ export async function PATCH(
   if (parsed.data.activityTypeId !== undefined) updateData.activityTypeId = parsed.data.activityTypeId;
   if (parsed.data.isRequired !== undefined) updateData.isRequired = parsed.data.isRequired;
   if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
+  if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
 
   const updated = await prisma.activity.update({
     where: { id },

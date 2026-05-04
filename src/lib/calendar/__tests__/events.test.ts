@@ -418,6 +418,7 @@ describe("buildCalendarEvents — commander events", () => {
   function makeCmdrEvent(overrides: Partial<RawCommanderEventData> = {}): RawCommanderEventData {
     return {
       id: "ce1",
+      userId: "u1",
       userName: "כהן יוסי",
       type: "leave",
       startDate: "2026-04-10",

@@ -9,6 +9,7 @@ const activitySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   isRequired: z.boolean().optional().default(true),
   status: z.enum(["draft", "active"]).optional().default("active"),
+  notes: z.string().nullable().optional(),
 });
 
 const bulkSchema = z.object({
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
             date: new Date(a.date),
             isRequired: a.isRequired,
             status: a.status,
+            notes: a.notes ?? null,
             createdByUserId: user.id,
           },
         })

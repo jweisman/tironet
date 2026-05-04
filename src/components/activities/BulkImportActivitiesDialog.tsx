@@ -49,6 +49,7 @@ interface ParsedRow {
   name: string;
   date: string;
   isRequired: boolean;
+  notes: string;
   errors: string[];
 }
 
@@ -61,7 +62,7 @@ const VALID_REQUIRED: Record<string, boolean> = {
   false: false,
 };
 
-const TEMPLATE_HEADERS = ["סוג פעילות", "שם", "תאריך", "חובה"];
+const TEMPLATE_HEADERS = ["סוג פעילות", "שם", "תאריך", "חובה", "הערות"];
 
 function downloadTemplate(activityTypes: ActivityType[]) {
   const type1 = activityTypes[0]?.name ?? "ירי";
@@ -69,10 +70,10 @@ function downloadTemplate(activityTypes: ActivityType[]) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    [type1, `${type1} יום 1`, "2026-04-01", "כן"],
+    [type1, `${type1} יום 1`, "2026-04-01", "כן", "5 כד׳\n25 מ"],
     [type2, `${type2} מסכם`],
   ]);
-  ws["!cols"] = [{ wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 10 }];
+  ws["!cols"] = [{ wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 10 }, { wch: 24 }];
   XLSX.utils.book_append_sheet(wb, ws, "פעילויות");
   XLSX.writeFile(wb, "תבנית-פעילויות.xlsx");
 }
@@ -104,6 +105,7 @@ function parseSheet(
   const nameIdx = headers.findIndex((h) => h === "שם");
   const dateIdx = headers.findIndex((h) => h === "תאריך");
   const requiredIdx = headers.findIndex((h) => h === "חובה");
+  const notesIdx = headers.findIndex((h) => h === "הערות");
   // Build type name → id lookup (case-insensitive, trimmed)
   const typeLookup = new Map<string, string>();
   for (const t of activityTypes) {
@@ -122,8 +124,9 @@ function parseSheet(
     const dateRawValue = getRaw(dateIdx);
     const dateRaw = dateRawValue != null ? String(dateRawValue).trim() : "";
     const requiredRaw = get(requiredIdx);
+    const notes = get(notesIdx);
     // Skip completely empty rows
-    if (!activityTypeName && !name && !dateRaw && !requiredRaw) return;
+    if (!activityTypeName && !name && !dateRaw && !requiredRaw && !notes) return;
 
     const errors: string[] = [];
 
@@ -179,6 +182,7 @@ function parseSheet(
       name,
       date,
       isRequired,
+      notes,
       errors,
     });
   });
@@ -285,6 +289,7 @@ export function BulkImportActivitiesDialog({
               name: r.name,
               date: r.date,
               isRequired: r.isRequired,
+              notes: r.notes || null,
             })),
           }),
         });
@@ -407,7 +412,7 @@ export function BulkImportActivitiesDialog({
                 </p>
               ) : (
                 <div className="rounded-md border overflow-x-auto text-sm">
-                  <table className="w-full min-w-[420px]">
+                  <table className="w-full min-w-[480px]">
                     <thead>
                       <tr className="border-b bg-muted/50 text-xs">
                         <th className="text-end px-2 py-1.5 font-medium">#</th>
@@ -415,6 +420,7 @@ export function BulkImportActivitiesDialog({
                         <th className="text-end px-2 py-1.5 font-medium">שם</th>
                         <th className="text-end px-2 py-1.5 font-medium">תאריך</th>
                         <th className="text-end px-2 py-1.5 font-medium">חובה</th>
+                        <th className="text-end px-2 py-1.5 font-medium">הערות</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -449,6 +455,9 @@ export function BulkImportActivitiesDialog({
                           </td>
                           <td className="px-2 py-1.5 text-muted-foreground">
                             {row.isRequired ? "כן" : "לא"}
+                          </td>
+                          <td className="px-2 py-1.5 text-muted-foreground whitespace-pre-wrap break-words max-w-[200px]">
+                            {row.notes || "—"}
                           </td>
                         </tr>
                       ))}

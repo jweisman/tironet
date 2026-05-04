@@ -66,6 +66,7 @@ const activities = new Table({
   date: column.text,
   is_required: column.integer,
   status: column.text,
+  notes: column.text,
 });
 
 const activity_reports = new Table({

@@ -76,7 +76,7 @@ streams:
   activities:
     auto_subscribe: true
     query: >
-      SELECT id, platoon_id, cycle_id, activity_type_id, name, date, is_required, status
+      SELECT id, platoon_id, cycle_id, activity_type_id, name, date, is_required, status, notes
       FROM activities
       WHERE platoon_id IN visible_platoon_ids
 

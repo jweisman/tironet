@@ -24,7 +24,7 @@ import { parseDisplayConfig } from "@/types/display-config";
 
 const ACTIVITY_QUERY = `
   SELECT
-    a.id, a.name, a.date, a.status, a.is_required,
+    a.id, a.name, a.date, a.status, a.is_required, a.notes,
     a.platoon_id, a.cycle_id,
     at.id AS activity_type_id, at.name AS activity_type_name, at.icon AS activity_type_icon,
     at.score_config, at.display_configuration,
@@ -59,6 +59,7 @@ const REPORTS_QUERY = `
 
 interface RawActivity {
   id: string; name: string; date: string; status: string; is_required: number;
+  notes: string | null;
   platoon_id: string; cycle_id: string;
   activity_type_id: string; activity_type_name: string; activity_type_icon: string;
   score_config: string | null;
@@ -180,10 +181,8 @@ export default function ActivityPage() {
                       grade6: report.grade6 != null ? Number(report.grade6) : null,
                     };
                     // Recalculate failed on first display from current scores + thresholds.
-                    // No failureThreshold → failed is always false (no auto-failure configured).
-                    const failed = scoreConfig?.failureThreshold
-                      ? calculateFailure(grades, activeScores, scoreConfig.failureThreshold).failed
-                      : false;
+                    // calculateFailure handles the "no thresholds configured" case internally.
+                    const failed = calculateFailure(grades, activeScores, scoreConfig?.failureThreshold).failed;
                     return {
                       id: report.id,
                       result: report.result as ActivityResult,
@@ -210,6 +209,7 @@ export default function ActivityPage() {
       name: activity.name,
       date: activity.date,
       isRequired: Number(activity.is_required) === 1,
+      notes: activity.notes,
       activityType: {
         id: activity.activity_type_id,
         name: activity.activity_type_name,

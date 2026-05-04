@@ -40,6 +40,7 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
   const [nameOverridden, setNameOverridden] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [isRequired, setIsRequired] = useState(true);
+  const [notes, setNotes] = useState("");
   const [platoonId, setPlatoonId] = useState(
     platoonOptions.length === 1 ? platoonOptions[0].id : ""
   );
@@ -96,6 +97,7 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
             name: name.trim(),
             date,
             isRequired,
+            notes: notes.trim() || null,
           }),
         });
 
@@ -186,6 +188,18 @@ export function CreateActivityForm({ cycleId, platoonOptions, onSuccess, onCance
           value={date}
           onChange={(e) => setDate(e.target.value)}
           dir="ltr"
+        />
+      </div>
+
+      {/* Notes */}
+      <div className="space-y-1.5">
+        <Label htmlFor="activity-notes">הערות או הדגשים</Label>
+        <textarea
+          id="activity-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
       </div>
 

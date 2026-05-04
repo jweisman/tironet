@@ -321,6 +321,7 @@ model Activity {
   date            DateTime       @db.Date
   isRequired      Boolean        @default(true) @map("is_required")
   status          ActivityStatus @default(draft)
+  notes           String?
   createdByUserId String         @map("created_by_user_id") @db.Uuid
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz()

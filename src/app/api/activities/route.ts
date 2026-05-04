@@ -11,6 +11,7 @@ const createSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   isRequired: z.boolean().optional().default(true),
   status: z.enum(["draft", "active"]).optional().default("active"),
+  notes: z.string().optional().nullable(),
 });
 
 export async function GET(request: NextRequest) {
@@ -87,6 +88,7 @@ export async function GET(request: NextRequest) {
       date: activity.date.toISOString(),
       status: activity.status,
       isRequired: activity.isRequired,
+      notes: activity.notes,
       activityType: activity.activityType,
       platoon: {
         id: activity.platoon.id,
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { cycleId, platoonId, activityTypeId, name, date, isRequired, status } = parsed.data;
+  const { cycleId, platoonId, activityTypeId, name, date, isRequired, status, notes } = parsed.data;
 
   const { scope, error, user } = await getActivityScope(cycleId);
   if (error || !scope || !user) return error!;
@@ -149,6 +151,7 @@ export async function POST(request: NextRequest) {
       date: new Date(date),
       isRequired,
       status,
+      notes: notes ?? null,
       createdByUserId: user.id,
     },
     include: {

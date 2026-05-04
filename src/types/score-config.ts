@@ -107,8 +107,10 @@ export interface FailureCalculation {
  * against the threshold. If the number of individually-failed scores meets
  * or exceeds `failureThreshold`, the report is marked as failed.
  *
- * Returns `failed: false` if failureThreshold is null/undefined (no auto-failure
- * configured for this activity type).
+ * `failureThreshold` defaults to 1 when any score has a configured threshold —
+ * i.e. configuring a per-score threshold is the signal to enable auto-failure;
+ * the count is only needed to require multiple failures (e.g. 2 of 3).
+ * Returns `failed: false` if no score has a threshold at all.
  */
 export function calculateFailure(
   grades: Record<string, number | null>,
@@ -117,10 +119,14 @@ export function calculateFailure(
 ): FailureCalculation {
   const scoreResults = new Map<GradeKey, ScoreResult>();
 
-  // No threshold configured — skip all evaluation
-  if (!failureThreshold) {
+  const anyThresholdConfigured = activeScores.some(
+    (s) => s.threshold != null && s.thresholdOperator,
+  );
+  if (!anyThresholdConfigured) {
     return { failed: false, scoreResults };
   }
+
+  const effectiveThreshold = failureThreshold && failureThreshold > 0 ? failureThreshold : 1;
 
   for (const score of activeScores) {
     const result = evaluateScore(
@@ -136,5 +142,5 @@ export function calculateFailure(
     if (result === "failed") failedCount++;
   }
 
-  return { failed: failedCount >= failureThreshold, scoreResults };
+  return { failed: failedCount >= effectiveThreshold, scoreResults };
 }

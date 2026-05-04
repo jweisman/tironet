@@ -162,7 +162,7 @@ export function SheetsExportDialog({
   async function handleShare() {
     if (!resultUrl) return;
     try {
-      await navigator.share({ title: resultName ?? "דוח פעילויות", url: resultUrl });
+      await navigator.share({ title: resultName ?? "דוח ציונים", url: resultUrl });
     } catch {
       // User cancelled share sheet — ignore
     }

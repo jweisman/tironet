@@ -297,4 +297,47 @@ describe("POST /api/activities", () => {
     expect(json.activity.name).toBe(validBody.name);
     expect(json.activity.platoon.companyName).toBe("Company Alpha");
   });
+
+  it("persists notes when provided", async () => {
+    const user = mockSessionUser();
+    const scope = makePlatoonCommanderScope({
+      platoonIds: [validBody.platoonId],
+    });
+    mockGetActivityScope.mockResolvedValue({ scope, error: null, user });
+
+    mockPrisma.platoon.findFirst.mockResolvedValue({
+      id: validBody.platoonId,
+    } as never);
+
+    const createdActivity = {
+      id: "new-id",
+      cycleId: validBody.cycleId,
+      platoonId: validBody.platoonId,
+      name: validBody.name,
+      date: new Date(validBody.date),
+      status: "draft",
+      isRequired: true,
+      notes: "5 כד׳\n25 מ",
+      activityType: { id: validBody.activityTypeId, name: "Shooting", icon: "target" },
+      platoon: {
+        id: validBody.platoonId,
+        name: "Platoon A",
+        company: { name: "Company Alpha" },
+      },
+    };
+    mockPrisma.activity.create.mockResolvedValue(createdActivity as never);
+
+    const req = createMockRequest("POST", "/api/activities", {
+      ...validBody,
+      notes: "5 כד׳\n25 מ",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+
+    expect(mockPrisma.activity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notes: "5 כד׳\n25 מ" }),
+      })
+    );
+  });
 });

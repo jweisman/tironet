@@ -5,13 +5,15 @@ import { refreshAccessToken } from "@/lib/reports/google-oauth";
 import { dateRangeToAfterDate } from "@/lib/reports/date-range";
 import type { SessionUser } from "@/types";
 import type { ScoreConfig } from "@/types/score-config";
-import { getActiveScores } from "@/types/score-config";
+import { getActiveScores, evaluateScore } from "@/types/score-config";
 import { formatGradeDisplay } from "@/lib/score-format";
 
 export const maxDuration = 60;
 
 // ---------------------------------------------------------------------------
 // POST /api/reports/all-activity/sheets?cycleId=...&spreadsheetId=...
+// "All Scores" report (UI label: כל הציונים) — limited to activity types
+// that have at least one active score configured.
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
@@ -128,7 +130,7 @@ export async function POST(request: NextRequest) {
     ],
   });
 
-  const activities = await prisma.activity.findMany({
+  const allActivities = await prisma.activity.findMany({
     where: {
       cycleId,
       platoonId: { in: scope!.platoonIds },
@@ -146,11 +148,22 @@ export async function POST(request: NextRequest) {
     orderBy: { date: "asc" },
   });
 
-  function getActivityScores(a: typeof activities[number]) {
+  type ActivityWithType = (typeof allActivities)[number];
+
+  function getActivityScores(a: ActivityWithType) {
     return getActiveScores(a.activityType.scoreConfig as ScoreConfig | null);
   }
 
-  // Group squads by platoon → one sheet per platoon
+  // Limit to activities whose type has at least one active score configured.
+  const activities = allActivities.filter((a) => getActivityScores(a).length > 0);
+
+  function formatActivityDate(d: Date): string {
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+    return `${day}/${month}/${d.getUTCFullYear()}`;
+  }
+
+  // Group squads by platoon → one sheet per platoon (only platoons with qualifying activities)
   const platoonMap = new Map<string, { platoonName: string; squads: typeof squads }>();
   for (const squad of squads) {
     const pid = squad.platoon.id;
@@ -159,9 +172,14 @@ export async function POST(request: NextRequest) {
     }
     platoonMap.get(pid)!.squads.push(squad);
   }
-  const platoonEntries = [...platoonMap.values()];
+  const platoonEntries = [...platoonMap.values()].filter((entry) =>
+    activities.some((a) => entry.squads.some((sq) => sq.platoon.id === a.platoonId)),
+  );
 
   const sheetTitles = platoonEntries.map((p) => p.platoonName);
+
+  // Per-cell formatting tracking (red bg for failed, grey for blank).
+  type CellAddr = { row: number; col: number };
 
   const squadSheetData = platoonEntries.map((platoonEntry) => {
     const sheetTitle = platoonEntry.platoonName;
@@ -169,76 +187,79 @@ export async function POST(request: NextRequest) {
       platoonEntry.squads.some((sq) => sq.platoon.id === a.platoonId)
     );
     const scoresPerActivity = platoonActivities.map((a) => getActivityScores(a));
-    // +1 for result column per activity
-    const colCounts = scoresPerActivity.map((scores) => Math.max(scores.length, 1) + 1);
-    const totalCols = colCounts.reduce((a, b) => a + b, 0);
+    // One column per active score per activity (no result column).
+    const colCounts = scoresPerActivity.map((scores) => scores.length);
+    // Total columns including the leading name column
+    const totalCols = 1 + colCounts.reduce((a, b) => a + b, 0);
 
-    // Row 1: merged activity name headers (extra col for "כיתה")
-    const activityNameRow: string[] = ["", ""];
+    // Header rows (offset by 1 for name column):
+    // Row 0: activity name (merged per activity)
+    // Row 1: activity date (merged per activity)
+    // Row 2: activity notes (merged per activity)
+    // Row 3: score labels per activity
+    const activityNameRow: string[] = [""];
+    const dateRow: string[] = [""];
+    const notesRow: string[] = [""];
+    const scoreLabelRow: string[] = ["שם"];
+
     for (let ai = 0; ai < platoonActivities.length; ai++) {
       const a = platoonActivities[ai];
       activityNameRow.push(`${a.activityType.name} - ${a.name}`);
-      for (let c = 1; c < colCounts[ai]; c++) activityNameRow.push("");
-    }
-
-    // Row 2: score labels
-    const scoreLabelRow: string[] = ["חייל", "כיתה"];
-    for (let ai = 0; ai < platoonActivities.length; ai++) {
-      const scores = scoresPerActivity[ai];
-      scoreLabelRow.push("תוצאה");
-      if (scores.length <= 1) {
-        scoreLabelRow.push(scores[0]?.label ?? "ציון");
-      } else {
-        for (const s of scores) scoreLabelRow.push(s.label);
+      dateRow.push(formatActivityDate(a.date));
+      notesRow.push(a.notes ?? "");
+      for (let c = 1; c < colCounts[ai]; c++) {
+        activityNameRow.push("");
+        dateRow.push("");
+        notesRow.push("");
       }
+      const scores = scoresPerActivity[ai];
+      for (const s of scores) scoreLabelRow.push(s.label);
     }
 
-    // Data rows: all soldiers across all squads in this platoon
-    type SoldierRow = { values: string[]; failedActivities: number[] };
+    // Data rows: squad header row, then soldier rows, repeated per squad.
+    type SoldierRow = { values: string[]; rowIndex: number };
     const soldierRows: SoldierRow[] = [];
-    const passCountPerActivity = new Array(platoonActivities.length).fill(0);
-    const failCountPerActivity = new Array(platoonActivities.length).fill(0);
+    const squadHeaderRowIndexes: number[] = [];
+    const failedCells: CellAddr[] = [];
+    const blankCells: CellAddr[] = [];
+    const dataValueRows: string[][] = [];
+    const HEADER_ROW_COUNT = 4;
 
     for (const squad of platoonEntry.squads) {
+      // Squad header row (squad name in column A, rest empty — merged in formatting)
+      const squadHeaderRow: string[] = [squad.name];
+      for (let c = 1; c < totalCols; c++) squadHeaderRow.push("");
+      squadHeaderRowIndexes.push(HEADER_ROW_COUNT + dataValueRows.length);
+      dataValueRows.push(squadHeaderRow);
+
       for (const soldier of squad.soldiers) {
-        const row: string[] = [`${soldier.familyName} ${soldier.givenName}`, squad.name];
-        const failedActivities: number[] = [];
+        const row: string[] = [`${soldier.familyName} ${soldier.givenName}`];
+        const rowIndex = HEADER_ROW_COUNT + dataValueRows.length;
+        let colCursor = 1;
         for (let ai = 0; ai < platoonActivities.length; ai++) {
           const report = soldier.activityReports.find(
             (r) => r.activityId === platoonActivities[ai].id
           );
           const scores = scoresPerActivity[ai];
-          const scoreColCount = Math.max(scores.length, 1);
-          if (!report) {
-            row.push("");
-            for (let c = 0; c < scoreColCount; c++) row.push("");
-          } else {
-            const resultLabel = report.result === "completed" ? "עבר" : report.result === "skipped" ? "לא ביצע" : report.result === "na" ? "לא רלוונטי" : "";
-            row.push(resultLabel);
-            if (report.result === "skipped" || report.failed) {
-              failedActivities.push(ai);
-              failCountPerActivity[ai]++;
-            } else if (report.result === "completed") {
-              passCountPerActivity[ai]++;
-            }
-            for (let c = 0; c < scoreColCount; c++) {
-              const gradeKey = scores[c]?.gradeKey ?? (`grade${c + 1}` as keyof typeof report);
-              const g = report[gradeKey];
-              row.push(g != null ? formatGradeDisplay(Number(g), scores[c]?.format) : "");
+          for (let c = 0; c < scores.length; c++) {
+            const score = scores[c];
+            const cellCol = colCursor + c;
+            const g = report ? report[score.gradeKey] : null;
+            if (g == null) {
+              row.push("");
+              blankCells.push({ row: rowIndex, col: cellCol });
+            } else {
+              row.push(formatGradeDisplay(Number(g), score.format));
+              if (evaluateScore(Number(g), score.threshold, score.thresholdOperator) === "failed") {
+                failedCells.push({ row: rowIndex, col: cellCol });
+              }
             }
           }
+          colCursor += scores.length;
         }
-        soldierRows.push({ values: row, failedActivities });
+        soldierRows.push({ values: row, rowIndex });
+        dataValueRows.push(row);
       }
-    }
-
-    // Summary row
-    const summaryRow: string[] = ["סיכום", ""];
-    for (let ai = 0; ai < platoonActivities.length; ai++) {
-      const scores = scoresPerActivity[ai];
-      const scoreColCount = Math.max(scores.length, 1);
-      summaryRow.push(`${passCountPerActivity[ai]}/${failCountPerActivity[ai]}`);
-      for (let c = 0; c < scoreColCount; c++) summaryRow.push("");
     }
 
     return {
@@ -246,13 +267,23 @@ export async function POST(request: NextRequest) {
       colCounts,
       totalCols,
       soldierRows,
-      summaryRowIndex: soldierRows.length + 2, // 0-indexed: row 0=names, row 1=labels, then soldiers
+      squadHeaderRowIndexes,
+      failedCells,
+      blankCells,
+      hasNotes: platoonActivities.some((a) => (a.notes ?? "").trim() !== ""),
       valueRange: {
         range: `'${sheetTitle}'!A1`,
-        values: [activityNameRow, scoreLabelRow, ...soldierRows.map((r) => r.values), summaryRow],
+        values: [activityNameRow, dateRow, notesRow, scoreLabelRow, ...dataValueRows],
       },
     };
   });
+
+  if (squadSheetData.length === 0) {
+    return NextResponse.json(
+      { error: "אין פעילויות עם ציונים בטווח הנבחר" },
+      { status: 400 },
+    );
+  }
 
   try {
     let spreadsheetId: string;
@@ -352,8 +383,11 @@ interface SheetData {
   sheetTitle: string;
   colCounts: number[];
   totalCols: number;
-  soldierRows: { values: string[]; failedActivities: number[] }[];
-  summaryRowIndex: number;
+  soldierRows: { values: string[]; rowIndex: number }[];
+  squadHeaderRowIndexes: number[];
+  failedCells: { row: number; col: number }[];
+  blankCells: { row: number; col: number }[];
+  hasNotes: boolean;
   valueRange: { range: string; values: string[][] };
 }
 
@@ -399,7 +433,7 @@ async function createNewSpreadsheet(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        properties: { title: `דוח פעילויות - ${cycleName}`, locale: "iw" },
+        properties: { title: `דוח ציונים - ${cycleName}`, locale: "iw" },
         sheets: sheetProperties,
       }),
     }
@@ -531,90 +565,146 @@ function buildFormatRequests(
   return squadSheetData.flatMap((sd) => {
     const sheetId = sheetIdMap.get(sd.sheetTitle) ?? 0;
 
-    // Merge activity name cells in row 1 (offset by 2 for name + squad columns)
+    // Merge activity name (row 0), date (row 1), and notes (row 2) per activity.
+    // Offset by 1 for the leading name column.
     const mergeRequests: object[] = [];
-    let colOffset = 2;
+    let colOffset = 1;
     for (const colCount of sd.colCounts) {
       if (colCount > 1) {
-        mergeRequests.push({
+        for (const headerRow of [0, 1, 2]) {
+          mergeRequests.push({
+            mergeCells: {
+              range: {
+                sheetId,
+                startRowIndex: headerRow,
+                endRowIndex: headerRow + 1,
+                startColumnIndex: colOffset,
+                endColumnIndex: colOffset + colCount,
+              },
+              mergeType: "MERGE_ALL",
+            },
+          });
+        }
+      }
+      colOffset += colCount;
+    }
+
+    // Merge each squad header row across all columns (col 1..totalCols)
+    const squadMergeRequests: object[] = [];
+    for (const ri of sd.squadHeaderRowIndexes) {
+      if (sd.totalCols > 1) {
+        squadMergeRequests.push({
           mergeCells: {
             range: {
               sheetId,
-              startRowIndex: 0,
-              endRowIndex: 1,
-              startColumnIndex: colOffset,
-              endColumnIndex: colOffset + colCount,
+              startRowIndex: ri,
+              endRowIndex: ri + 1,
+              startColumnIndex: 1,
+              endColumnIndex: sd.totalCols,
             },
             mergeType: "MERGE_ALL",
           },
         });
       }
-      colOffset += colCount;
     }
 
-    // Red font for score cells of failed soldiers
-    const redFontRequests: object[] = [];
-    for (let ri = 0; ri < sd.soldierRows.length; ri++) {
-      const sr = sd.soldierRows[ri];
-      for (const ai of sr.failedActivities) {
-        // Calculate column range for this activity's cells
-        let startCol = 2;
-        for (let j = 0; j < ai; j++) startCol += sd.colCounts[j];
-        redFontRequests.push({
-          repeatCell: {
-            range: {
-              sheetId,
-              startRowIndex: ri + 2, // skip 2 header rows
-              endRowIndex: ri + 3,
-              startColumnIndex: startCol,
-              endColumnIndex: startCol + sd.colCounts[ai],
+    // Red background + bold for failed score cells
+    const failedCellRequests: object[] = sd.failedCells.map((cell) => ({
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: cell.row,
+          endRowIndex: cell.row + 1,
+          startColumnIndex: cell.col,
+          endColumnIndex: cell.col + 1,
+        },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: { red: 0.98, green: 0.82, blue: 0.82 },
+            textFormat: {
+              bold: true,
+              foregroundColorStyle: { rgbColor: { red: 0.7, green: 0.05, blue: 0.05 } },
             },
-            cell: {
-              userEnteredFormat: {
-                textFormat: { foregroundColorStyle: { rgbColor: { red: 0.8, green: 0.1, blue: 0.1 } } },
-              },
-            },
-            fields: "userEnteredFormat.textFormat.foregroundColorStyle",
           },
-        });
-      }
-    }
+        },
+        fields: "userEnteredFormat(backgroundColor,textFormat)",
+      },
+    }));
+
+    // Light grey background for blank score cells
+    const blankCellRequests: object[] = sd.blankCells.map((cell) => ({
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: cell.row,
+          endRowIndex: cell.row + 1,
+          startColumnIndex: cell.col,
+          endColumnIndex: cell.col + 1,
+        },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 },
+          },
+        },
+        fields: "userEnteredFormat.backgroundColor",
+      },
+    }));
+
+    // Squad header rows: bold, dark grey background, centered
+    const squadHeaderFormatRequests: object[] = sd.squadHeaderRowIndexes.map((ri) => ({
+      repeatCell: {
+        range: { sheetId, startRowIndex: ri, endRowIndex: ri + 1 },
+        cell: {
+          userEnteredFormat: {
+            textFormat: { bold: true },
+            backgroundColor: { red: 0.78, green: 0.78, blue: 0.78 },
+            horizontalAlignment: "CENTER",
+          },
+        },
+        fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment)",
+      },
+    }));
 
     return [
       ...mergeRequests,
-      // Header rows formatting
+      ...squadMergeRequests,
+      // Header rows formatting (4 rows: name, date, notes, labels)
       {
         repeatCell: {
-          range: { sheetId, startRowIndex: 0, endRowIndex: 2 },
+          range: { sheetId, startRowIndex: 0, endRowIndex: 4 },
           cell: {
             userEnteredFormat: {
               textFormat: { bold: true },
               backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 },
               horizontalAlignment: "CENTER",
+              wrapStrategy: "WRAP",
+              verticalAlignment: "MIDDLE",
             },
           },
-          fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment)",
+          fields: "userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,wrapStrategy,verticalAlignment)",
         },
       },
-      // Summary row formatting
-      {
-        repeatCell: {
-          range: { sheetId, startRowIndex: sd.summaryRowIndex, endRowIndex: sd.summaryRowIndex + 1 },
-          cell: {
-            userEnteredFormat: {
-              textFormat: { bold: true },
-              backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 },
+      // Notes row may need extra height when present
+      ...(sd.hasNotes
+        ? [
+            {
+              updateDimensionProperties: {
+                range: { sheetId, dimension: "ROWS", startIndex: 2, endIndex: 3 },
+                properties: { pixelSize: 60 },
+                fields: "pixelSize",
+              },
             },
-          },
-          fields: "userEnteredFormat(textFormat,backgroundColor)",
-        },
-      },
-      // Freeze 2 header rows + 2 columns (name + squad)
+          ]
+        : []),
+      ...squadHeaderFormatRequests,
+      ...blankCellRequests,
+      ...failedCellRequests,
+      // Freeze 4 header rows + 1 column (name)
       {
         updateSheetProperties: {
           properties: {
             sheetId,
-            gridProperties: { frozenRowCount: 2, frozenColumnCount: 2 },
+            gridProperties: { frozenRowCount: 4, frozenColumnCount: 1 },
           },
           fields: "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
         },
@@ -626,11 +716,10 @@ function buildFormatRequests(
             sheetId,
             dimension: "COLUMNS",
             startIndex: 0,
-            endIndex: sd.totalCols + 2,
+            endIndex: sd.totalCols,
           },
         },
       },
-      ...redFontRequests,
     ];
   });
 }
