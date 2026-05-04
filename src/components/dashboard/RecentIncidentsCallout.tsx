@@ -97,7 +97,7 @@ export function RecentIncidentsCallout({ cycleId, squadId }: Props) {
   const hiddenCount = incidents.length - INITIAL_LIMIT;
 
   return (
-    <div className="space-y-2">
+    <div data-tour="home-recent-incidents" className="space-y-2">
       <div className="flex items-center gap-2">
         <AlertTriangle size={14} className="text-muted-foreground" />
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">

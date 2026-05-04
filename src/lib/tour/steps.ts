@@ -94,7 +94,7 @@ export const homeTourSteps: VersionedStep[] = [
     popover: {
       title: "פרופיל",
       description:
-        "לחצו על התמונה כדי לעבור לדף הפרופיל — עדכון פרטים, תמונה והגדרות התראות.",
+        "לחצו על התמונה כדי לעבור לדף הפרופיל — עדכון פרטים, תמונה והגדרות התראות ותזכורות.",
     },
   },
   // v2 — new features
@@ -124,6 +124,24 @@ export const homeTourSteps: VersionedStep[] = [
         "לחצו על ׳עוד׳ כדי למצוא את לוח האירועים — לוח חודשי עם פעילויות, יציאות, תורים וימי מחלה.",
     },
     version: 2,
+  },
+  {
+    element: "[data-tour='home-recent-incidents']",
+    popover: {
+      title: "אירועים אחרונים",
+      description:
+        "צל״שים, אירועי משמעת ובטיחות מהשבוע האחרון בשרשרת הפיקוד שלכם. לחצו על אירוע כדי לעבור לכרטיס החייל.",
+    },
+    version: 3,
+  },
+  {
+    element: "[data-tour='home-commander-events']",
+    popover: {
+      title: "אירועי מפקדים היום",
+      description:
+        "מפקדים כפופים שביציאה או בתור רפואי היום. לחצו כדי לעבור לעריכת האירועים בדף המפקדים.",
+    },
+    version: 4,
   },
 ];
 
@@ -346,8 +364,8 @@ export const soldierDetailTourSteps: VersionedStep[] = [
   {
     element: "[data-tour='soldier-incidents']",
     popover: {
-      title: "אירועים",
-      description: "צל״ש, משמעת ובטיחות — צפו, הוסיפו ועקבו אחר אירועים של החייל.",
+      title: "ציונים",
+      description: "ציוני שבח והתנהגות — צפו, הוסיפו ועקבו אחר ציונים של החייל.",
     },
     version: 2,
   },

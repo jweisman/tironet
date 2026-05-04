@@ -55,7 +55,7 @@ export function CommanderEventsCallout({ cycleId }: { cycleId: string }) {
   if (events.length === 0) return null;
 
   return (
-    <div className="space-y-2">
+    <div data-tour="home-commander-events" className="space-y-2">
       <div className="flex items-center gap-2">
         <DoorOpen size={14} className="text-muted-foreground" />
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">

@@ -1175,7 +1175,7 @@ Tour steps support versioning so new features can be highlighted to returning us
 
 **Adding new versioned steps:**
 1. Add steps to the relevant array in `steps.ts` with `version: N` where N > current max
-2. E2e helper (`e2e/helpers/auth.ts`) sets `tironet:tour-seen:*` to `"1"` (version 1) — if you add v2+ steps, update the stored value to match the max version to suppress tours in tests
+2. No e2e changes needed — the `loginAndSaveState` helper sets `showTour: false` via `/api/user-preferences`, which suppresses auto-start globally regardless of version (see gotcha #10 in the e2e section)
 
 ### User Preferences (`UserPreference` model)
 
