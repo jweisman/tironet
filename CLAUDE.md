@@ -782,6 +782,16 @@ Profile picture, personal details (unit/rank, IDs, DOB on separate lines), statu
 - `src/app/api/reports/personal-file/pdf/route.ts` — PDF generation per soldier
 - `src/app/(app)/reports/personal-file/page.tsx` — soldier picker page
 
+## Home Visit Report (דוח ביקורי בית)
+
+A single PDF (and HTML preview) listing every soldier in the user's scope grouped by platoon and squad, showing each home visit's date, status, and notes. Soldiers without home visits are still listed (with "לא בוצע"). Reuses `getPersonalFileScope()` — platoon and company commanders only.
+
+### Key files
+- `src/lib/reports/render-home-visit-report.ts` — `fetchHomeVisitReport()` + `renderHomeVisitReportHtml()` + `HOME_VISIT_STATUS_LABELS`
+- `src/app/api/reports/home-visit-report/route.ts` — JSON for the preview page
+- `src/app/api/reports/home-visit-report/pdf/route.ts` — PDF generation
+- `src/app/(app)/reports/home-visit-report/page.tsx` — preview page with download button
+
 ## Soldier Detail Page — Edit Forms
 
 The soldier detail page splits editing into four focused dialogs instead of one large form:
