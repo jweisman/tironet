@@ -1350,7 +1350,20 @@ Generated once with `npx web-push generate-vapid-keys`. Stored as environment va
 
    Opt-out via `requestAssignmentEnabled`.
 
-3. **Active Requests Daily** (scheduled) — same cron as daily tasks. Notifies squad and platoon commanders about approved requests (leave/medical) active on the target date. Scoped by the commander's assigned squads/platoons. Opt-out via `activeRequestsEnabled`.
+3. **Active Requests Daily** (scheduled, #202) — same cron as daily tasks. Notifies squad and platoon commanders about approved requests (leave/medical) active on the target date. Scoped by the commander's assigned squads/platoons. The body opens with the request count (`יש N בקשות פעילות {להיום|למחר}`) and lists up to 4 detail rows ordered earliest-time-first, with `ועוד...` when there are more. Detail rows reuse the home-page leave wording — `{name} יציאה עד HH:MM` / `חזרה עד HH:MM` / `ביציאה` for leave, `{name} תור רפואי בשעה HH:MM` (or no time for date-only) per appointment, and `{name} ביום מחלה` per sick day. Shared formatters live in `src/lib/requests/active.ts` (`getLeaveOnDate`, `formatLeaveOnDateLabel`, `formatMedicalApptShortLabel`, `SICK_DAY_SHORT_LABEL`); server-side callers must pass `timeZone: "Asia/Jerusalem"` since Vercel runs in UTC. Opt-out via `activeRequestsEnabled`.
+
+   **Leave label state machine** (`getLeaveOnDate(dep, ret, dateStr, now?)`): the operative event for a leave on a given date depends on which boundary falls on that date — and, when `now` is provided, on whether the departure time has passed. This is shared between the home page callout and the notification so they agree.
+
+   | Case | Label |
+   |---|---|
+   | Departure today, return today (single-day), departure not yet passed | `יציאה עד HH:MM` (departure) |
+   | Single-day leave, departure passed | `חזרה עד HH:MM` (swap to return — soldier is now out) |
+   | Multi-day leave starting today, departure not yet passed | `יציאה עד HH:MM` |
+   | Multi-day leave starting today, departure passed | `ביציאה` (mid — past departure isn't actionable; not greyed out on home page) |
+   | Return today (departure was a prior day) | `חזרה עד HH:MM` (greys out on home page once past, like medical appointments) |
+   | Mid-stretch (departure prior day, return future day) | `ביציאה` |
+
+   Without `now`, the function picks departure when it falls on the date — fine for non-realtime callers (e.g. tests). Medical appointments are treated as discrete events: greyed out once past. Leave departures are state boundaries: once they pass, the operative state ("ביציאה" or "חזרה עד ...") replaces the past departure rather than greying it out.
 
 4. **New Appointment Added** (event-driven) — fires from `PATCH /api/requests/[id]` when new medical appointments are detected (comparing old vs new `medical_appointments` JSON). Notifies the soldier's squad commander and platoon commander/sergeant. Opt-out via `newAppointmentEnabled`.
 

@@ -15,6 +15,7 @@ import {
   REQUEST_TYPE_LABELS,
   REQUEST_TYPE_ICONS,
 } from "@/lib/requests/constants";
+import { getLeaveOnDate, formatLeaveOnDateLabel } from "@/lib/requests/active";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import type { RequestType } from "@/types";
 
@@ -91,21 +92,29 @@ function isWithinNextHour(iso: string, now: Date): boolean {
   return t > n && t - n <= 60 * 60 * 1000;
 }
 
-function formatShortDate(iso: string): string {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString("he-IL", { day: "numeric", month: "short" });
-  const hasTime = iso.includes("T") && !iso.endsWith("T00:00:00.000Z");
-  if (hasTime) {
-    const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-    return `${date} ${time}`;
+/** ISO of the operative timed event today, or null for all-day / mid-leave. */
+function operativeTodayIso(r: RawActiveRequest, today: string, now: Date): string | null {
+  if (r.type === "leave") {
+    const info = getLeaveOnDate(r.departure_at, r.return_at, today, now);
+    if (info.iso && info.iso.includes("T") && !info.iso.endsWith("T00:00:00.000Z")) {
+      return info.iso;
+    }
+    return null;
   }
-  return date;
+  if (r.type === "medical") {
+    const appts = parseMedicalAppointments(r.medical_appointments);
+    const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
+    if (todayAppt && todayAppt.date.includes("T") && !todayAppt.date.endsWith("T00:00:00.000Z")) {
+      return todayAppt.date;
+    }
+    return null;
+  }
+  return null;
 }
 
-function getTodayDetail(type: string, raw: RawActiveRequest, today: string): string | null {
+function getTodayDetail(type: string, raw: RawActiveRequest, today: string, now: Date): string | null {
   if (type === "leave") {
-    if (raw.return_at) return `חזרה ${formatShortDate(raw.return_at)}`;
-    return "ביציאה";
+    return formatLeaveOnDateLabel(getLeaveOnDate(raw.departure_at, raw.return_at, today, now));
   }
   if (type === "medical") {
     const appts = parseMedicalAppointments(raw.medical_appointments);
@@ -121,59 +130,20 @@ function getTodayDetail(type: string, raw: RawActiveRequest, today: string): str
 
 /** Returns true when the request has a timed event starting within the next hour. */
 function isImminentRequest(r: RawActiveRequest, today: string, now: Date): boolean {
-  if (r.type === "leave") {
-    if (r.departure_at && r.departure_at.split("T")[0] === today) {
-      return isWithinNextHour(r.departure_at, now);
-    }
-    return false;
-  }
-  if (r.type === "medical") {
-    const appts = parseMedicalAppointments(r.medical_appointments);
-    const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
-    if (todayAppt) return isWithinNextHour(todayAppt.date, now);
-    return false;
-  }
-  return false;
+  const iso = operativeTodayIso(r, today, now);
+  return iso != null && isWithinNextHour(iso, now);
 }
 
 /** Returns true when the request's timed event for today has already passed. */
 function isPastRequest(r: RawActiveRequest, today: string, now: Date): boolean {
-  if (r.type === "leave") {
-    if (r.departure_at && r.departure_at.split("T")[0] === today) {
-      return isTimedAndPast(r.departure_at, now);
-    }
-    return false;
-  }
-  if (r.type === "medical") {
-    const appts = parseMedicalAppointments(r.medical_appointments);
-    const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
-    if (todayAppt) return isTimedAndPast(todayAppt.date, now);
-    return false;
-  }
-  return false;
+  const iso = operativeTodayIso(r, today, now);
+  return iso != null && new Date(iso).getTime() <= now.getTime();
 }
 
-function isTimedAndPast(iso: string, now: Date): boolean {
-  if (!iso.includes("T") || iso.endsWith("T00:00:00.000Z")) return false;
-  return new Date(iso).getTime() <= now.getTime();
-}
-
-/** Sort key: timed events by their time, all-day events (sick days, dateless leave) last. */
-function todaySortKey(r: RawActiveRequest, today: string): string {
-  if (r.type === "leave") {
-    const dep = r.departure_at;
-    if (dep && dep.includes("T") && !dep.endsWith("T00:00:00.000Z") && dep.split("T")[0] <= today) {
-      return dep; // has time → sort by it
-    }
-    return `${today}T99:99`; // all-day
-  }
-  if (r.type === "medical") {
-    const appts = parseMedicalAppointments(r.medical_appointments);
-    const todayAppt = appts.find((a) => a.date.split("T")[0] === today);
-    if (todayAppt && todayAppt.date.includes("T")) return todayAppt.date;
-    return `${today}T99:99`; // sick day or date-only appointment
-  }
-  return `${today}T99:99`;
+/** Sort key: timed events by their time, all-day events (sick days, mid-leave) last. */
+function todaySortKey(r: RawActiveRequest, today: string, now: Date): string {
+  const iso = operativeTodayIso(r, today, now);
+  return iso ?? `${today}T99:99`;
 }
 
 interface Props {
@@ -205,8 +175,8 @@ export function ActiveRequestsCallout({ cycleId, squadId, typeFilter }: Props) {
         type: r.type as RequestType,
         soldierName: r.soldier_name,
         squadName: r.squad_name,
-        detail: getTodayDetail(r.type, r, today) ?? "",
-        sortKey: todaySortKey(r, today),
+        detail: getTodayDetail(r.type, r, today, now) ?? "",
+        sortKey: todaySortKey(r, today, now),
         imminent: isImminentRequest(r, today, now),
         past: isPastRequest(r, today, now),
       }))

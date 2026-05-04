@@ -3,7 +3,17 @@ import { prisma } from "@/lib/db/prisma";
 import { sendPushToUsers } from "@/lib/push/send";
 import { parseMedicalAppointments } from "@/lib/requests/medical-appointments";
 import { parseSickDays } from "@/lib/requests/sick-days";
+import {
+  getLeaveOnDate,
+  formatLeaveOnDateLabel,
+  formatMedicalApptShortLabel,
+  SICK_DAY_SHORT_LABEL,
+} from "@/lib/requests/active";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
+
+const NOTIFICATION_TIME_ZONE = "Asia/Jerusalem";
+const MAX_DETAIL_ROWS = 4;
+const ALL_DAY_SORT_SUFFIX = "T99:99";
 
 /**
  * GET /api/cron/daily-tasks
@@ -53,7 +63,7 @@ export async function GET(req: NextRequest) {
   // -------------------------------------------------------------------------
   const targetDate = mode === "morning" ? todayStr : tomorrowStr;
   const label = mode === "morning" ? "להיום" : "למחר";
-  results.activeRequests = await sendActiveRequestNotifications(targetDate, label);
+  results.activeRequests = await sendActiveRequestNotifications(targetDate, label, now);
 
   return NextResponse.json(results);
 }
@@ -171,6 +181,7 @@ async function sendActivityGapNotifications(
 async function sendActiveRequestNotifications(
   targetDate: string,
   label: string,
+  now: Date,
 ): Promise<{ sent: number; total: number }> {
   // Find squad and platoon commanders in active cycles
   const assignments = await prisma.userCycleAssignment.findMany({
@@ -228,7 +239,8 @@ async function sendActiveRequestNotifications(
 
   if (allSquadIds.size === 0) return { sent: 0, total: 0 };
 
-  // Find approved requests for soldiers in these squads
+  // Find approved requests for soldiers in these squads, with names for the
+  // notification body
   const requests = await prisma.request.findMany({
     where: {
       status: "approved",
@@ -245,63 +257,126 @@ async function sendActiveRequestNotifications(
       returnAt: true,
       medicalAppointments: true,
       sickDays: true,
-      soldier: { select: { squadId: true } },
+      soldier: {
+        select: { squadId: true, familyName: true, givenName: true },
+      },
     },
   });
 
-  // Filter to requests active on the target date
-  const activeOnDate = requests.filter((r) => {
-    if (r.type === "leave") {
-      const dep = r.departureAt?.toISOString().split("T")[0];
-      const ret = r.returnAt?.toISOString().split("T")[0];
-      // Leave overlaps target date
-      return dep != null && ret != null && dep <= targetDate && ret >= targetDate;
-    }
-    if (r.type === "medical") {
-      const appts = parseMedicalAppointments(r.medicalAppointments as string | null);
-      const days = parseSickDays(r.sickDays as string | null);
-      return appts.some((a) => a.date.split("T")[0] === targetDate) || days.some((d) => d.date.split("T")[0] === targetDate);
-    }
-    return false;
-  });
-
-  if (activeOnDate.length === 0) return { sent: 0, total: 0 };
-
-  // Build squadId → set of active request IDs
+  // Build per-request "events" — one per leave-on-date, one per same-day
+  // medical appointment, and one per same-day sick day. Each event has its own
+  // sort key so we can list earliest-time-first across requests.
+  interface Event {
+    requestId: string;
+    squadId: string;
+    detail: string;
+    sortKey: string;
+  }
+  const eventsBySquad = new Map<string, Event[]>();
   const requestsBySquad = new Map<string, Set<string>>();
-  for (const r of activeOnDate) {
-    const sqId = r.soldier.squadId;
-    if (!requestsBySquad.has(sqId)) requestsBySquad.set(sqId, new Set());
-    requestsBySquad.get(sqId)!.add(r.id);
-  }
+  const addEvent = (e: Event) => {
+    if (!eventsBySquad.has(e.squadId)) eventsBySquad.set(e.squadId, []);
+    eventsBySquad.get(e.squadId)!.push(e);
+    if (!requestsBySquad.has(e.squadId)) requestsBySquad.set(e.squadId, new Set());
+    requestsBySquad.get(e.squadId)!.add(e.requestId);
+  };
 
-  // For each user, count requests in their scope
-  const notifyUsers: string[] = [];
-  for (const [userId, userSquadIds] of squadIdsByUser) {
-    let count = 0;
-    for (const sqId of userSquadIds) {
-      count += requestsBySquad.get(sqId)?.size ?? 0;
+  for (const r of requests) {
+    const soldierName = `${r.soldier.familyName} ${r.soldier.givenName}`;
+    const squadId = r.soldier.squadId;
+
+    if (r.type === "leave") {
+      const dep = r.departureAt?.toISOString();
+      const ret = r.returnAt?.toISOString();
+      const depDate = dep?.split("T")[0];
+      const retDate = ret?.split("T")[0];
+      const overlapsTarget =
+        depDate != null && retDate != null && depDate <= targetDate && retDate >= targetDate;
+      if (!overlapsTarget) continue;
+      const info = getLeaveOnDate(dep, ret, targetDate, now);
+      const label = formatLeaveOnDateLabel(info, { timeZone: NOTIFICATION_TIME_ZONE });
+      const sortKey =
+        info.iso && info.iso.includes("T") && !info.iso.endsWith("T00:00:00.000Z")
+          ? info.iso
+          : `${targetDate}${ALL_DAY_SORT_SUFFIX}`;
+      addEvent({
+        requestId: r.id,
+        squadId,
+        detail: `${soldierName} ${label}`,
+        sortKey,
+      });
+    } else if (r.type === "medical") {
+      const appts = parseMedicalAppointments(r.medicalAppointments as string | null).filter(
+        (a) => a.date.split("T")[0] === targetDate,
+      );
+      const sickDays = parseSickDays(r.sickDays as string | null).filter(
+        (d) => d.date === targetDate,
+      );
+      for (const a of appts) {
+        const apptLabel = formatMedicalApptShortLabel(a, { timeZone: NOTIFICATION_TIME_ZONE });
+        const hasTime = a.date.includes("T") && !a.date.endsWith("T00:00:00.000Z");
+        addEvent({
+          requestId: r.id,
+          squadId,
+          detail: `${soldierName} ${apptLabel}`,
+          sortKey: hasTime ? a.date : `${targetDate}${ALL_DAY_SORT_SUFFIX}`,
+        });
+      }
+      for (const _ of sickDays) {
+        addEvent({
+          requestId: r.id,
+          squadId,
+          detail: `${soldierName} ${SICK_DAY_SHORT_LABEL}`,
+          sortKey: `${targetDate}${ALL_DAY_SORT_SUFFIX}`,
+        });
+      }
     }
-    if (count > 0) notifyUsers.push(userId);
   }
 
-  if (notifyUsers.length === 0) return { sent: 0, total: 0 };
+  if (eventsBySquad.size === 0) return { sent: 0, total: 0 };
 
+  // For each user: gather events across all their squads, count distinct
+  // requests, and build the notification body.
   let sent = 0;
+  let total = 0;
   const promises: Promise<void>[] = [];
-  for (const userId of notifyUsers) {
+  for (const [userId, userSquadIds] of squadIdsByUser) {
+    const userEvents: Event[] = [];
+    const userRequestIds = new Set<string>();
+    for (const sqId of userSquadIds) {
+      for (const e of eventsBySquad.get(sqId) ?? []) {
+        userEvents.push(e);
+        userRequestIds.add(e.requestId);
+      }
+    }
+    if (userRequestIds.size === 0) continue;
+
+    userEvents.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+    const requestCount = userRequestIds.size;
+    const opener =
+      requestCount === 1
+        ? `יש בקשה פעילה אחת ${label}`
+        : `יש ${requestCount} בקשות פעילות ${label}`;
+    const visible = userEvents.slice(0, MAX_DETAIL_ROWS);
+    const more = userEvents.length > MAX_DETAIL_ROWS ? "\nועוד..." : "";
+    const body = `${opener}\n${visible.map((e) => e.detail).join("\n")}${more}`;
+
+    total++;
     promises.push(
       sendPushToUsers(
         [userId],
         {
           title: "בקשות פעילות",
-          body: `יש לך בקשות פעילות ${label}`,
+          body,
           url: "/requests?filter=active",
         },
         "activeRequestsEnabled",
-      ).then(() => { sent++; }),
+      ).then(() => {
+        sent++;
+      }),
     );
   }
   await Promise.allSettled(promises);
-  return { sent, total: notifyUsers.length };
+  return { sent, total };
 }

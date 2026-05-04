@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { isRequestActive, isRequestOpen, isRequestUrgent } from "../active";
+import {
+  isRequestActive,
+  isRequestOpen,
+  isRequestUrgent,
+  getLeaveOnDate,
+  formatLeaveOnDateLabel,
+  formatMedicalApptShortLabel,
+  SICK_DAY_SHORT_LABEL,
+} from "../active";
 
 // ---------------------------------------------------------------------------
 // isRequestActive
@@ -286,5 +294,150 @@ describe("isRequestUrgent", () => {
 
   it("returns false for unknown type", () => {
     expect(isRequestUrgent({ type: "other" })).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLeaveOnDate
+// ---------------------------------------------------------------------------
+
+describe("getLeaveOnDate", () => {
+  it("classifies departure-on-date when departureAt falls on the date", () => {
+    expect(
+      getLeaveOnDate("2026-04-15T11:00:00Z", "2026-04-18T18:00:00Z", "2026-04-15"),
+    ).toEqual({ kind: "departure", iso: "2026-04-15T11:00:00Z" });
+  });
+
+  it("classifies return-on-date when only returnAt falls on the date", () => {
+    expect(
+      getLeaveOnDate("2026-04-10T08:00:00Z", "2026-04-15T13:00:00Z", "2026-04-15"),
+    ).toEqual({ kind: "return", iso: "2026-04-15T13:00:00Z" });
+  });
+
+  it("classifies mid-stretch when neither boundary is on the date", () => {
+    expect(
+      getLeaveOnDate("2026-04-10T08:00:00Z", "2026-04-20T18:00:00Z", "2026-04-15"),
+    ).toEqual({ kind: "mid", iso: null });
+  });
+
+  it("prefers departure when both fall on the date (single-day leave)", () => {
+    expect(
+      getLeaveOnDate("2026-04-15T08:00:00Z", "2026-04-15T16:00:00Z", "2026-04-15"),
+    ).toEqual({ kind: "departure", iso: "2026-04-15T08:00:00Z" });
+  });
+
+  it("swaps to return on a single-day leave once departure has passed", () => {
+    // now is between departure (08:00) and return (16:00)
+    const now = new Date("2026-04-15T10:00:00Z");
+    expect(
+      getLeaveOnDate("2026-04-15T08:00:00Z", "2026-04-15T16:00:00Z", "2026-04-15", now),
+    ).toEqual({ kind: "return", iso: "2026-04-15T16:00:00Z" });
+  });
+
+  it("keeps departure on a single-day leave when departure is still upcoming", () => {
+    const now = new Date("2026-04-15T07:00:00Z");
+    expect(
+      getLeaveOnDate("2026-04-15T08:00:00Z", "2026-04-15T16:00:00Z", "2026-04-15", now),
+    ).toEqual({ kind: "departure", iso: "2026-04-15T08:00:00Z" });
+  });
+
+  it("flips a multi-day leave to mid (ביציאה) once departure has passed", () => {
+    // Departure today at 08:00, return tomorrow — at 10:00 the soldier is on leave
+    const now = new Date("2026-04-15T10:00:00Z");
+    expect(
+      getLeaveOnDate("2026-04-15T08:00:00Z", "2026-04-16T18:00:00Z", "2026-04-15", now),
+    ).toEqual({ kind: "mid", iso: null });
+  });
+
+  it("keeps a multi-day leave on departure when it hasn't passed yet", () => {
+    const now = new Date("2026-04-15T07:00:00Z");
+    expect(
+      getLeaveOnDate("2026-04-15T08:00:00Z", "2026-04-16T18:00:00Z", "2026-04-15", now),
+    ).toEqual({ kind: "departure", iso: "2026-04-15T08:00:00Z" });
+  });
+
+  it("accepts Date objects in addition to strings", () => {
+    const dep = new Date("2026-04-15T11:00:00Z");
+    const ret = new Date("2026-04-18T18:00:00Z");
+    expect(getLeaveOnDate(dep, ret, "2026-04-15").kind).toBe("departure");
+  });
+
+  it("returns mid for null inputs", () => {
+    expect(getLeaveOnDate(null, null, "2026-04-15")).toEqual({ kind: "mid", iso: null });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatLeaveOnDateLabel
+// ---------------------------------------------------------------------------
+
+describe("formatLeaveOnDateLabel", () => {
+  it("renders יציאה עד {time} for departures", () => {
+    expect(
+      formatLeaveOnDateLabel(
+        { kind: "departure", iso: "2026-04-15T11:30:00Z" },
+        { timeZone: "Asia/Jerusalem" },
+      ),
+    ).toBe("יציאה עד 14:30");
+  });
+
+  it("renders חזרה עד {time} for returns", () => {
+    expect(
+      formatLeaveOnDateLabel(
+        { kind: "return", iso: "2026-04-15T13:00:00Z" },
+        { timeZone: "Asia/Jerusalem" },
+      ),
+    ).toBe("חזרה עד 16:00");
+  });
+
+  it("renders ביציאה for mid-stretch", () => {
+    expect(formatLeaveOnDateLabel({ kind: "mid", iso: null })).toBe("ביציאה");
+  });
+
+  it("falls back to ביציאה when iso has no time component", () => {
+    expect(
+      formatLeaveOnDateLabel({ kind: "departure", iso: "2026-04-15" }),
+    ).toBe("ביציאה");
+  });
+
+  it("falls back to ביציאה for midnight-UTC iso (date-only)", () => {
+    expect(
+      formatLeaveOnDateLabel({ kind: "return", iso: "2026-04-15T00:00:00.000Z" }),
+    ).toBe("ביציאה");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatMedicalApptShortLabel
+// ---------------------------------------------------------------------------
+
+describe("formatMedicalApptShortLabel", () => {
+  it("renders תור רפואי בשעה {time} when a time is present", () => {
+    expect(
+      formatMedicalApptShortLabel(
+        { date: "2026-04-15T11:30:00Z" },
+        { timeZone: "Asia/Jerusalem" },
+      ),
+    ).toBe("תור רפואי בשעה 14:30");
+  });
+
+  it("renders תור רפואי for date-only appointments", () => {
+    expect(formatMedicalApptShortLabel({ date: "2026-04-15" })).toBe("תור רפואי");
+  });
+
+  it("renders תור רפואי for midnight-UTC iso (date-only)", () => {
+    expect(formatMedicalApptShortLabel({ date: "2026-04-15T00:00:00.000Z" })).toBe(
+      "תור רפואי",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SICK_DAY_SHORT_LABEL
+// ---------------------------------------------------------------------------
+
+describe("SICK_DAY_SHORT_LABEL", () => {
+  it("is the Hebrew sick-day short label", () => {
+    expect(SICK_DAY_SHORT_LABEL).toBe("ביום מחלה");
   });
 });

@@ -124,7 +124,7 @@ describe("GET /api/cron/daily-tasks", () => {
     expect(body.activityGaps.total).toBe(0);
   });
 
-  it("morning: skips activity gaps, sends active request notifications", async () => {
+  it("morning: skips activity gaps, sends active request notifications with detail rows", async () => {
     const todayStr = new Date().toISOString().split("T")[0];
 
     // Morning: only active requests, no activity gaps
@@ -137,8 +137,11 @@ describe("GET /api/cron/daily-tasks", () => {
         type: "medical",
         departureAt: null,
         returnAt: null,
-        medicalAppointments: JSON.stringify([{ id: "a1", date: todayStr, place: "A", type: "X" }]),
-        soldier: { squadId: "squad-1" },
+        medicalAppointments: JSON.stringify([
+          { id: "a1", date: `${todayStr}T11:30:00Z`, place: "A", type: "X" },
+        ]),
+        sickDays: null,
+        soldier: { squadId: "squad-1", familyName: "כהן", givenName: "אבי" },
       },
     ] as never);
 
@@ -150,7 +153,7 @@ describe("GET /api/cron/daily-tasks", () => {
       ["user-1"],
       expect.objectContaining({
         title: "בקשות פעילות",
-        body: "יש לך בקשות פעילות להיום",
+        body: "יש בקשה פעילה אחת להיום\nכהן אבי תור רפואי בשעה 14:30",
         url: "/requests?filter=active",
       }),
       "activeRequestsEnabled",
@@ -175,22 +178,112 @@ describe("GET /api/cron/daily-tasks", () => {
         id: "req-1",
         type: "leave",
         departureAt: new Date(tomorrowStr + "T08:00:00Z"),
-        returnAt: new Date(tomorrowStr + "T20:00:00Z"),
+        returnAt: new Date(tomorrowStr + "T13:00:00Z"),
         medicalAppointments: null,
-        soldier: { squadId: "squad-1" },
+        sickDays: null,
+        soldier: { squadId: "squad-1", familyName: "לוי", givenName: "דן" },
       },
     ] as never);
 
     const res = await GET(makeRequest());
     const body = await res.json();
     expect(body.activeRequests.total).toBe(1);
+    // Both departure and return fall on tomorrow → departure wins (single-day)
     expect(mockSendPush).toHaveBeenCalledWith(
       ["user-1"],
       expect.objectContaining({
         title: "בקשות פעילות",
-        body: "יש לך בקשות פעילות למחר",
+        body: "יש בקשה פעילה אחת למחר\nלוי דן יציאה עד 11:00",
       }),
       "activeRequestsEnabled",
     );
+  });
+
+  it("morning: orders detail rows by time, plural opener, sick day last", async () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    mockAssignments.mockResolvedValue([
+      { userId: "user-1", unitId: "squad-1", unitType: "squad", role: "squad_commander", cycleId: "cycle-1" },
+    ] as never);
+    mockRequests.mockResolvedValue([
+      {
+        // late medical
+        id: "req-1",
+        type: "medical",
+        departureAt: null,
+        returnAt: null,
+        medicalAppointments: JSON.stringify([
+          { id: "a1", date: `${todayStr}T13:30:00Z`, place: "X", type: "Y" },
+        ]),
+        sickDays: null,
+        soldier: { squadId: "squad-1", familyName: "דגן", givenName: "יוסי" },
+      },
+      {
+        // early medical
+        id: "req-2",
+        type: "medical",
+        departureAt: null,
+        returnAt: null,
+        medicalAppointments: JSON.stringify([
+          { id: "a2", date: `${todayStr}T07:30:00Z`, place: "X", type: "Y" },
+        ]),
+        sickDays: null,
+        soldier: { squadId: "squad-1", familyName: "לוי", givenName: "דן" },
+      },
+      {
+        // sick day (all-day → last)
+        id: "req-3",
+        type: "medical",
+        departureAt: null,
+        returnAt: null,
+        medicalAppointments: null,
+        sickDays: JSON.stringify([{ id: "d1", date: todayStr }]),
+        soldier: { squadId: "squad-1", familyName: "כהן", givenName: "אבי" },
+      },
+    ] as never);
+
+    const res = await GET(makeRequest("test-secret", "morning"));
+    const body = await res.json();
+    expect(body.activeRequests.total).toBe(1);
+    expect(mockSendPush).toHaveBeenCalledWith(
+      ["user-1"],
+      expect.objectContaining({
+        body: [
+          "יש 3 בקשות פעילות להיום",
+          "לוי דן תור רפואי בשעה 10:30",
+          "דגן יוסי תור רפואי בשעה 16:30",
+          "כהן אבי ביום מחלה",
+        ].join("\n"),
+      }),
+      "activeRequestsEnabled",
+    );
+  });
+
+  it("morning: caps detail rows at 4 and appends ועוד...", async () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    mockAssignments.mockResolvedValue([
+      { userId: "user-1", unitId: "squad-1", unitType: "squad", role: "squad_commander", cycleId: "cycle-1" },
+    ] as never);
+    const requests = Array.from({ length: 6 }, (_, i) => ({
+      id: `req-${i}`,
+      type: "medical",
+      departureAt: null,
+      returnAt: null,
+      medicalAppointments: JSON.stringify([
+        { id: `a${i}`, date: `${todayStr}T${String(6 + i).padStart(2, "0")}:00:00Z`, place: "X", type: "Y" },
+      ]),
+      sickDays: null,
+      soldier: { squadId: "squad-1", familyName: "כהן", givenName: `סולדייר${i}` },
+    }));
+    mockRequests.mockResolvedValue(requests as never);
+
+    const res = await GET(makeRequest("test-secret", "morning"));
+    expect(res.status).toBe(200);
+    const call = mockSendPush.mock.calls[0];
+    expect(call?.[1].body).toMatch(/^יש 6 בקשות פעילות להיום\n/);
+    // First 4 detail rows + ועוד
+    expect(call?.[1].body.split("\n")).toHaveLength(6); // opener + 4 rows + ועוד...
+    expect(call?.[1].body.endsWith("\nועוד...")).toBe(true);
   });
 });

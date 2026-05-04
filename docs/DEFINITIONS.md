@@ -12,7 +12,8 @@ This document summarizes the up-to-date definitions for terms used throughout th
 * _In progress (ממתינה)_: Status is `open` — still progressing through the approval chain
 * _Active (פעילה)_: Approved, with the following conditions:
   * leave requests where the departure or return date is today or in the future
-  * medical requests with any appointment date in the future
+  * medical requests with any appointment date today or in the future
+  * medical requests with a sick day today or in the future
 * _Approved (אושרה)_: Status is approved (terminal — workflow is complete)
 * _Open (פתוחות)_: In progress or active
 * _Action Required ("Mine")_: Requests where `assignedRole` matches the user's role. Includes denied requests pending acknowledgement.
