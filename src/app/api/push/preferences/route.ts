@@ -10,6 +10,7 @@ const patchSchema = z.object({
   requestAssignmentEnabled: z.boolean().optional(),
   activeRequestsEnabled: z.boolean().optional(),
   newAppointmentEnabled: z.boolean().optional(),
+  severeIncidentEnabled: z.boolean().optional(),
   reminderLeadMinutes: z.union([
     z.literal(null),
     z.literal(0),
@@ -40,6 +41,7 @@ export async function GET() {
     requestAssignmentEnabled: pref?.requestAssignmentEnabled ?? true,
     activeRequestsEnabled: pref?.activeRequestsEnabled ?? true,
     newAppointmentEnabled: pref?.newAppointmentEnabled ?? true,
+    severeIncidentEnabled: pref?.severeIncidentEnabled ?? true,
     reminderLeadMinutes: pref?.reminderLeadMinutes ?? null,
   });
 }
@@ -86,6 +88,7 @@ export async function PATCH(req: NextRequest) {
     requestAssignmentEnabled: pref.requestAssignmentEnabled,
     activeRequestsEnabled: pref.activeRequestsEnabled,
     newAppointmentEnabled: pref.newAppointmentEnabled,
+    severeIncidentEnabled: pref.severeIncidentEnabled,
     reminderLeadMinutes: pref.reminderLeadMinutes ?? null,
   });
 }

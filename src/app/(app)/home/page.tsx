@@ -15,6 +15,7 @@ import type { VisibleSections } from "@/components/dashboard/PlatoonSummaryCard"
 import { TodayActivities } from "@/components/dashboard/TodayActivities";
 import { ActiveRequestsCallout } from "@/components/dashboard/ActiveRequestsCallout";
 import { CommanderEventsCallout } from "@/components/dashboard/CommanderEventsCallout";
+import { RecentIncidentsCallout } from "@/components/dashboard/RecentIncidentsCallout";
 import { BirthdayCallout } from "@/components/dashboard/BirthdayCallout";
 import type { SquadSummary } from "@/app/api/dashboard/route";
 import { effectiveRole, ROLE_LABELS } from "@/lib/auth/permissions";
@@ -541,6 +542,11 @@ export default function HomePage() {
       {/* Commander events callout (#170) — platoon and company commanders only */}
       {selectedCycleId && (role === "platoon_commander" || role === "company_commander") && (
         <CommanderEventsCallout cycleId={selectedCycleId} />
+      )}
+
+      {/* Recent incidents callout (#205) — soldier-managing roles only */}
+      {selectedCycleId && rawRole !== "instructor" && rawRole !== "company_medic" && rawRole !== "hardship_coordinator" && (
+        <RecentIncidentsCallout cycleId={selectedCycleId} squadId={squadId} />
       )}
 
       {/* Today's activities — not for medic, coordinator, or instructor */}

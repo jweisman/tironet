@@ -46,6 +46,7 @@ export default function ProfilePage() {
   const [requestAssignmentEnabled, setRequestAssignmentEnabled] = useState(true);
   const [activeRequestsEnabled, setActiveRequestsEnabled] = useState(true);
   const [newAppointmentEnabled, setNewAppointmentEnabled] = useState(true);
+  const [severeIncidentEnabled, setSevereIncidentEnabled] = useState(true);
   const [reminderLeadMinutes, setReminderLeadMinutes] = useState<number | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
@@ -59,6 +60,7 @@ export default function ProfilePage() {
           setRequestAssignmentEnabled(data.requestAssignmentEnabled);
           setActiveRequestsEnabled(data.activeRequestsEnabled);
           setNewAppointmentEnabled(data.newAppointmentEnabled);
+          setSevereIncidentEnabled(data.severeIncidentEnabled);
           setReminderLeadMinutes(data.reminderLeadMinutes ?? null);
         }
         setPrefsLoaded(true);
@@ -80,6 +82,7 @@ export default function ProfilePage() {
         else if (field === "requestAssignmentEnabled") setRequestAssignmentEnabled(!value);
         else if (field === "activeRequestsEnabled") setActiveRequestsEnabled(!value);
         else if (field === "newAppointmentEnabled") setNewAppointmentEnabled(!value);
+        else if (field === "severeIncidentEnabled") setSevereIncidentEnabled(!value);
         // reminderLeadMinutes revert is handled at the call site
       }
     },
@@ -340,6 +343,20 @@ export default function ProfilePage() {
                 onCheckedChange={(v) => {
                   setNewAppointmentEnabled(v);
                   updatePreference("newAppointmentEnabled", v);
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">אירועי משמעת ובטיחות</p>
+                <p className="text-xs text-muted-foreground">כאשר אירוע משמעת או בטיחות נוסף לחייל בשרשרת הפיקוד</p>
+              </div>
+              <Switch
+                checked={severeIncidentEnabled}
+                disabled={!prefsLoaded}
+                onCheckedChange={(v) => {
+                  setSevereIncidentEnabled(v);
+                  updatePreference("severeIncidentEnabled", v);
                 }}
               />
             </div>

@@ -565,12 +565,13 @@ Navigation (Sidebar/TabBar) filters out inaccessible pages, but pages also guard
 
 ## Home Page Architecture
 
-The home page (`src/app/(app)/home/page.tsx`) is a role-aware dashboard with four sections, each conditionally rendered:
+The home page (`src/app/(app)/home/page.tsx`) is a role-aware dashboard with several sections, each conditionally rendered:
 
 1. **Requests requiring action** — amber callout linking to `/requests?filter=mine`. Hidden for `instructor`.
 2. **Active requests today** (`ActiveRequestsCallout`) — shows approved leave/medical requests active *today* (same logic as the morning cron notification: leave where `departureAt <= today AND returnAt >= today`, medical where an appointment date `=== today`). Hidden for `instructor` and `hardship_coordinator`. Filtered to medical only for `company_medic` via `typeFilter` prop.
-3. **Today's activities** (`TodayActivities`) — activities scheduled for today with progress bars. Grid layout (2 columns on desktop), capped at 4 with "show more". Hidden for `company_medic`, `hardship_coordinator`, and `instructor`.
-4. **Summary cards** — role-dependent:
+3. **Recent incidents** (`RecentIncidentsCallout`, #205) — incidents from the last 7 days (today + 6 prior, Israel time) for soldiers in the user's chain of command. PowerSync's `visible_squad_ids` CTE handles scoping; squad commanders pass `squadId` to narrow further. Initial limit 3 with "show more" expand. Click → `/soldiers/{soldierId}`. Hidden for `instructor`, `company_medic`, and `hardship_coordinator`.
+4. **Today's activities** (`TodayActivities`) — activities scheduled for today with progress bars. Grid layout (2 columns on desktop), capped at 4 with "show more". Hidden for `company_medic`, `hardship_coordinator`, and `instructor`.
+5. **Summary cards** — role-dependent:
    - **Squad commander:** single `SquadSummaryCard`
    - **Platoon commander:** `AggregateRow` + grid of `SquadSummaryCard` (2 columns)
    - **Company-level roles** (company commander, deputy, instructor, medic): grid of `PlatoonSummaryCard` (2 columns) — aggregated stats per platoon, not per squad
@@ -1336,6 +1337,7 @@ Generated once with `npx web-push generate-vapid-keys`. Stored as environment va
 | Request requiring action | Event (create/workflow) | Squad/platoon/company commanders — own unit only | `requestAssignmentEnabled` |
 | Active requests daily | Cron (20:00 Israel) | Squad + platoon commanders — own unit only | `activeRequestsEnabled` |
 | New appointment added | Event (medical edit) | Squad + platoon commanders — own unit only | `newAppointmentEnabled` |
+| Severe incident added | Event (incident POST) | Squad + platoon + company commanders — full chain, excluding creator | `severeIncidentEnabled` |
 
 1. **Daily Tasks** (scheduled) — Vercel Cron at 20:00 Israel time (17:00 UTC) via `vercel.json`. Counts missing activity reports for today/yesterday per squad commander. Opt-out via `dailyTasksEnabled`.
 
@@ -1353,6 +1355,8 @@ Generated once with `npx web-push generate-vapid-keys`. Stored as environment va
 4. **New Appointment Added** (event-driven) — fires from `PATCH /api/requests/[id]` when new medical appointments are detected (comparing old vs new `medical_appointments` JSON). Notifies the soldier's squad commander and platoon commander/sergeant. Opt-out via `newAppointmentEnabled`.
 
 5. **Request Reminders** (scheduled via QStash) — per-commander advance reminders before medical appointments (with time component) and leave departures. Opt-in via `reminderLeadMinutes` (null = disabled, valid values: 15/30/60/120/180 minutes). See "Scheduled Reminders (QStash)" section below.
+
+6. **Severe Incident Added** (event-driven, #205) — fires from `POST /api/incidents` only when `type` is `discipline` or `safety` (not `commendation`). `notifySevereIncident()` resolves recipients up the chain (squad commander, platoon commander/sergeant, company commander/deputy) for the soldier's units, then excludes the `createdByUserId`. Title: `אירוע ${typeLabel}`; body: `אירוע ${typeLabel} נוסף ל${soldierName}`; URL: `/soldiers/{soldierId}`. Opt-out via `severeIncidentEnabled`.
 
 ### Scheduled Reminders (QStash)
 

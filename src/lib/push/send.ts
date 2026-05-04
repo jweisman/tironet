@@ -118,7 +118,7 @@ export async function sendPushToUser(
 export async function sendPushToUsers(
   userIds: string[],
   payload: PushPayload,
-  preferenceField: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled" | "newAppointmentEnabled",
+  preferenceField: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled" | "newAppointmentEnabled" | "severeIncidentEnabled",
 ): Promise<void> {
   if (userIds.length === 0) {
     console.log(`[push] sendPushToUsers called with empty userIds for ${preferenceField}`);
@@ -128,7 +128,7 @@ export async function sendPushToUsers(
   // Load preferences for all target users in one query.
   const prefs = await prisma.notificationPreference.findMany({
     where: { userId: { in: userIds } },
-    select: { userId: true, dailyTasksEnabled: true, requestAssignmentEnabled: true, activeRequestsEnabled: true, newAppointmentEnabled: true },
+    select: { userId: true, dailyTasksEnabled: true, requestAssignmentEnabled: true, activeRequestsEnabled: true, newAppointmentEnabled: true, severeIncidentEnabled: true },
   });
 
   const prefMap = new Map(prefs.map((p) => [p.userId, p[preferenceField]]));

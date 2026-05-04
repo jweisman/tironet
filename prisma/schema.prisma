@@ -469,6 +469,7 @@ model NotificationPreference {
   requestAssignmentEnabled Boolean @default(true) @map("request_assignment_enabled")
   activeRequestsEnabled    Boolean @default(true) @map("active_requests_enabled")
   newAppointmentEnabled    Boolean @default(true) @map("new_appointment_enabled")
+  severeIncidentEnabled    Boolean @default(true) @map("severe_incident_enabled")
   reminderLeadMinutes      Int?    @map("reminder_lead_minutes")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
