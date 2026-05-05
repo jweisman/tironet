@@ -569,7 +569,7 @@ The home page (`src/app/(app)/home/page.tsx`) is a role-aware dashboard with sev
 
 1. **Requests requiring action** — amber callout linking to `/requests?filter=mine`. Hidden for `instructor`.
 2. **Active requests today** (`ActiveRequestsCallout`) — shows approved leave/medical requests active *today* (same logic as the morning cron notification: leave where `departureAt <= today AND returnAt >= today`, medical where an appointment date `=== today`). Hidden for `instructor` and `hardship_coordinator`. Filtered to medical only for `company_medic` via `typeFilter` prop.
-3. **Recent incidents** (`RecentIncidentsCallout`, #205) — incidents from the last 7 days (today + 6 prior, Israel time) for soldiers in the user's chain of command. PowerSync's `visible_squad_ids` CTE handles scoping; squad commanders pass `squadId` to narrow further. Initial limit 3 with "show more" expand. Click → `/soldiers/{soldierId}`. Hidden for `instructor`, `company_medic`, and `hardship_coordinator`.
+3. **Recent incidents** (`RecentIncidentsCallout`, #205) — incidents from the last 3 days (today + 2 prior, Israel time) for soldiers in the user's chain of command. PowerSync's `visible_squad_ids` CTE handles scoping; squad commanders pass `squadId` to narrow further. Initial limit 3 with "show more" expand. Click → `/soldiers/{soldierId}`. Hidden for `instructor`, `company_medic`, and `hardship_coordinator`.
 4. **Today's activities** (`TodayActivities`) — activities scheduled for today with progress bars. Grid layout (2 columns on desktop), capped at 4 with "show more". Hidden for `company_medic`, `hardship_coordinator`, and `instructor`.
 5. **Summary cards** — role-dependent:
    - **Squad commander:** single `SquadSummaryCard`
