@@ -1040,6 +1040,28 @@ State is persisted to `localStorage` under `tironet:stopwatch:{activityId}:{scor
 
 Both checks are pure functions (`isTerminalState`, `isStaleRunningState`) and unit-tested independently. The threshold is exported as `STALE_RUNNING_THRESHOLD_MS` so it's easy to find and adjust.
 
+### QR transfer of unassigned laps between devices
+
+A single instructor recording laps becomes a bottleneck when 80 soldiers are queued for assignment. Senders can transfer their unassigned lap list to other devices via QR code, letting multiple instructors assign in parallel.
+
+**Semantics — copy, not cut.** The sender's lap list is unchanged after sharing. Both devices keep working with their full list. If both happen to assign the same lap number to different soldiers, PowerSync's last-writer-wins behavior on `activity_reports` accepts whichever write arrives last — this is an accepted-risk design decision because in practice each instructor handles a separate set of soldiers (different paper numbers).
+
+**Payload format** (in [src/lib/stopwatch/transfer.ts](src/lib/stopwatch/transfer.ts)) is compact JSON: `{ v: 1, a: activityId, s: scoreKey, l: [[number, elapsedMs], ...] }`. ~5–10 bytes per lap; 80 laps fits well within a Version-5 QR at error-correction level M. Bump `PAYLOAD_VERSION` for any structural change — receivers reject mismatched versions.
+
+**Activity + score validation on receive.** The receiver must already be on the matching activity+score before they scan. The decoder rejects mismatches with a Hebrew error in the scan view, so misrouted scans never silently apply to the wrong activity.
+
+**Receiver state semantics** (`importLaps` in [src/lib/stopwatch/state.ts](src/lib/stopwatch/state.ts)):
+- Existing local laps and timer state are replaced wholesale on import.
+- The timer resets to `00:00 paused` — the receiver is only assigning, not timing.
+- `nextLapNumber` advances to `max(local, max imported number) + 1` so any future locally-recorded laps continue cleanly.
+- Lap UUIDs are regenerated on the receiver. Re-scanning the same QR (e.g. after a clear) is therefore safe.
+
+**Confirmation gating.** If the receiver already has laps OR a non-zero accumulated timer when they scan a valid QR, they get a "replace local times" confirmation before the import goes through. Empty state imports silently.
+
+**Library choice.** [`qrcode`](https://www.npmjs.com/package/qrcode) for generation and [`jsqr`](https://www.npmjs.com/package/jsqr) for scanning, with the native `BarcodeDetector` API used as a fast path where available. Both libraries are pure-client, small, and don't require any service worker or backend changes.
+
+**Camera permission.** [`QRScanner.tsx`](src/components/activities/stopwatch/QRScanner.tsx) requests `getUserMedia({ video: { facingMode: "environment" } })` and tears down the stream on unmount. If permission is denied, an error is reported via `onError` and the user is shown a Hebrew message; the receiver flow is harmless to abort partway through.
+
 **Why `<StopwatchDialog>` has a `key` prop in `StopwatchButton`.** `loadFreshState` runs in `useStopwatch`'s lazy `useState` initializer, which fires **once per component mount**. Without forcing a remount, the dialog stays mounted across open→close→open cycles (because `selectedScore` is still truthy in `StopwatchButton`), so the second open never re-runs the freshness check — the React state still holds the just-closed (often terminal) state. `StopwatchButton` increments an `openCount` counter on each "open" click and passes it as `key={openCount}` to the dialog, forcing a fresh mount and re-running the freshness logic every time. Don't drop this — every reopen scenario relies on it.
 
 **Lap numbering does not regress on delete.** `nextLapNumber` only increments. If a lap is deleted, its number is gone — subsequent laps continue from where the counter was, so each "paper number" is unique for the lifetime of the lap list. `clearLaps()` resets the counter to 1 because the list is empty by definition.

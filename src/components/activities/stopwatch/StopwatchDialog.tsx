@@ -1,21 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Flag, Pause, Play, Trash2 } from "lucide-react";
+import { Flag, Pause, Play, QrCode, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { X } from "lucide-react";
 import { useStopwatch } from "@/hooks/useStopwatch";
 import { elapsedMs, formatStopwatch, roundToSeconds } from "@/lib/stopwatch/state";
 import type { GradeKey } from "../ActivityDetail";
 import { LapRow, type LapSoldier } from "./LapRow";
+import { ShareDialog } from "./ShareDialog";
 
 interface StopwatchDialogProps {
   open: boolean;
@@ -40,7 +43,7 @@ export function StopwatchDialog({
   soldiers,
   onApply,
 }: StopwatchDialogProps) {
-  const { state, now, start, pause, lap, reset, removeLap } = useStopwatch({
+  const { state, now, start, pause, lap, reset, removeLap, importLaps } = useStopwatch({
     activityId,
     scoreKey,
     active: open,
@@ -48,6 +51,7 @@ export function StopwatchDialog({
   const [expandedLapId, setExpandedLapId] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [confirmDeleteLapId, setConfirmDeleteLapId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const totalMs = elapsedMs(state, now);
   const isRunning = state.running;
@@ -76,13 +80,42 @@ export function StopwatchDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
+          showCloseButton={false}
           className="max-w-md sm:max-w-md flex flex-col p-0 gap-0"
           style={{ height: "calc(100dvh - 2rem)", maxHeight: "calc(100dvh - 2rem)" }}
         >
+          {/* Header with title + share + close. Auto close is disabled
+              (showCloseButton={false}) so both buttons live in the flex flow
+              and can't overlap. Buttons are grouped on one side and the title
+              on the other, separated by `justify-between` — in RTL this
+              parks the title at the right and the buttons at the left. */}
           <DialogHeader className="shrink-0 px-4 pt-4 pb-2 flex-row items-center justify-between gap-2">
-            <DialogTitle className="text-end text-sm text-muted-foreground font-normal">
+            <DialogTitle className="text-sm text-muted-foreground font-normal">
               {activityName} <span className="mx-1">{">"}</span> {scoreLabel}
             </DialogTitle>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setShareOpen(true)}
+                aria-label="שיתוף"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <QrCode size={16} />
+              </Button>
+              <DialogClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="סגור"
+                    className="text-muted-foreground hover:text-foreground"
+                  />
+                }
+              >
+                <X size={16} />
+              </DialogClose>
+            </div>
           </DialogHeader>
           <DialogDescription className="sr-only">סטופר לרישום זמני סיום</DialogDescription>
 
@@ -216,6 +249,17 @@ export function StopwatchDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Share / scan QR sub-modal */}
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        activityId={activityId}
+        scoreKey={scoreKey}
+        laps={state.laps}
+        onImport={importLaps}
+        hasExistingState={hasState}
+      />
     </>
   );
 }

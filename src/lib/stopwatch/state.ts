@@ -81,6 +81,32 @@ export function clearLaps(state: StopwatchState): StopwatchState {
 }
 
 /**
+ * Replace state with imported laps from another device (QR transfer).
+ *
+ * - Existing laps are dropped — the receiver should always confirm before
+ *   calling this if their lap list isn't empty.
+ * - Timer is reset to 00:00 paused. The receiver isn't running their own
+ *   timer; they're only assigning the imported lap times to soldiers.
+ * - Lap order: newest-first (highest number first), matching the rest of
+ *   the dialog's display convention.
+ * - `nextLapNumber` is set just above the highest imported number so any
+ *   future locally-recorded laps continue cleanly (relevant only if the
+ *   user later starts the timer on the receiver — uncommon, but free).
+ */
+export function importLaps(state: StopwatchState, laps: Lap[]): StopwatchState {
+  const sorted = [...laps].sort((a, b) => b.number - a.number);
+  const maxNumber = sorted.reduce((m, l) => Math.max(m, l.number), 0);
+  return {
+    ...state,
+    running: false,
+    startedAt: null,
+    accumulatedMs: 0,
+    laps: sorted,
+    nextLapNumber: Math.max(state.nextLapNumber, maxNumber + 1),
+  };
+}
+
+/**
  * Format milliseconds as MM:SS.cc (centiseconds).
  * MM is at least two digits but may grow beyond 99 for very long runs.
  */

@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  type Lap,
   type StopwatchState,
   clearLaps as clearLapsState,
   clearState as clearStorage,
   createInitialState,
+  importLaps as importLapsState,
   loadFreshState,
   pause as pauseState,
   recordLap as recordLapState,
@@ -90,6 +92,20 @@ export function useStopwatch({ activityId, scoreKey, active = true }: UseStopwat
     setState((s) => removeLapState(s, lapId));
   }, []);
 
+  /**
+   * Replace local lap list with laps imported from another device. UUIDs are
+   * regenerated locally so re-scanning the same QR (e.g. after a clear) is safe
+   * and never collides with stale ids that might still be referenced anywhere.
+   */
+  const importLaps = useCallback((incoming: Array<{ number: number; elapsedMs: number }>) => {
+    const laps: Lap[] = incoming.map((i) => ({
+      id: crypto.randomUUID(),
+      number: i.number,
+      elapsedMs: i.elapsedMs,
+    }));
+    setState((s) => importLapsState(s, laps));
+  }, []);
+
   /** Wipe everything for this (activityId, scoreKey) including the timer. */
   const reset = useCallback(() => {
     clearStorage(activityId, scoreKey);
@@ -104,6 +120,7 @@ export function useStopwatch({ activityId, scoreKey, active = true }: UseStopwat
     lap,
     clearLaps,
     removeLap,
+    importLaps,
     reset,
   };
 }

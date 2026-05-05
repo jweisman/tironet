@@ -6,6 +6,7 @@ import {
   createInitialState,
   elapsedMs,
   formatStopwatch,
+  importLaps,
   isStaleRunningState,
   isTerminalState,
   loadFreshState,
@@ -350,5 +351,74 @@ describe("loadFreshState", () => {
 
   it("returns null without touching storage when nothing is stored", () => {
     expect(loadFreshState("missing", "s", 0)).toBeNull();
+  });
+});
+
+describe("importLaps", () => {
+  it("replaces the lap list with the incoming laps, sorted newest-first", () => {
+    const s = createInitialState("a", "s");
+    const result = importLaps(s, [
+      { id: "x1", number: 1, elapsedMs: 5_000 },
+      { id: "x2", number: 2, elapsedMs: 8_000 },
+      { id: "x3", number: 3, elapsedMs: 12_000 },
+    ]);
+    expect(result.laps.map((l) => l.number)).toEqual([3, 2, 1]);
+  });
+
+  it("resets the timer to 00:00 paused", () => {
+    let s = start(createInitialState("a", "s"), 0);
+    s = recordLap(s, 1_000, "old");
+    s = pause(s, 5_000);
+    expect(elapsedMs(s, 99_999)).toBe(5_000);
+
+    const result = importLaps(s, [{ id: "y", number: 1, elapsedMs: 3_000 }]);
+    expect(result.running).toBe(false);
+    expect(result.startedAt).toBeNull();
+    expect(result.accumulatedMs).toBe(0);
+    expect(elapsedMs(result, 99_999)).toBe(0);
+  });
+
+  it("drops any existing local laps", () => {
+    let s = start(createInitialState("a", "s"), 0);
+    s = recordLap(s, 1_000, "old");
+    s = pause(s, 2_000);
+    expect(s.laps.length).toBe(1);
+
+    const result = importLaps(s, [{ id: "new", number: 5, elapsedMs: 7_000 }]);
+    expect(result.laps.map((l) => l.id)).toEqual(["new"]);
+  });
+
+  it("sets nextLapNumber just above the highest imported number", () => {
+    const s = createInitialState("a", "s");
+    const result = importLaps(s, [
+      { id: "x1", number: 17, elapsedMs: 1_000 },
+      { id: "x2", number: 5, elapsedMs: 2_000 },
+    ]);
+    expect(result.nextLapNumber).toBe(18);
+  });
+
+  it("does not regress nextLapNumber below the previous local max", () => {
+    let s = start(createInitialState("a", "s"), 0);
+    // Record several laps locally so nextLapNumber gets pushed up.
+    s = recordLap(s, 100, "a");
+    s = recordLap(s, 200, "b");
+    s = recordLap(s, 300, "c");
+    expect(s.nextLapNumber).toBe(4);
+    s = pause(s, 400);
+
+    // Import a single lap with a low number — we should NOT drop the counter back.
+    const result = importLaps(s, [{ id: "z", number: 1, elapsedMs: 50 }]);
+    expect(result.nextLapNumber).toBe(4);
+  });
+
+  it("handles an empty incoming list (effectively a reset of laps + timer)", () => {
+    let s = start(createInitialState("a", "s"), 0);
+    s = recordLap(s, 1_000, "a");
+    s = pause(s, 2_000);
+
+    const result = importLaps(s, []);
+    expect(result.laps).toEqual([]);
+    expect(result.running).toBe(false);
+    expect(result.accumulatedMs).toBe(0);
   });
 });
