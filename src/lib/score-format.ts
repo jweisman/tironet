@@ -47,3 +47,24 @@ export function parseGradeInput(raw: string, format?: "number" | "time"): number
   const num = Number(trimmed);
   return isNaN(num) ? null : num;
 }
+
+/**
+ * Parse a time input that may be a colon-form time string (M:SS, MM:SS, HH:MM:SS)
+ * or a digit-only compact form where the last 2 digits are seconds and the rest
+ * are minutes (e.g. "43" → 43s, "103" → 1:03 = 63s, "1215" → 12:15 = 735s).
+ *
+ * Used by the manual report-entry input so users can type with a numeric keypad.
+ * Bulk import callers must use parseGradeInput, which keeps treating plain numbers
+ * as raw seconds.
+ */
+export function parseCompactTimeInput(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  if (trimmed.includes(":")) return parseGradeInput(trimmed, "time");
+  if (!/^\d+$/.test(trimmed)) return null;
+  const secondsPart = trimmed.length <= 2 ? trimmed : trimmed.slice(-2);
+  const minutesPart = trimmed.length <= 2 ? "0" : trimmed.slice(0, -2);
+  const seconds = Number(secondsPart);
+  const minutes = Number(minutesPart);
+  return minutes * 60 + seconds;
+}
