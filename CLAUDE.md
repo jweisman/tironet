@@ -1021,6 +1021,68 @@ Unlike soldier/activity import, report import uses **user-defined column mapping
 - **UI:** `BulkImportDialog` in `src/components/soldiers/`. Squad can be selected per-batch or read from a column in the file.
 - **API:** `POST /api/soldiers/bulk` — scoped by role (squad/platoon/company commander or admin). Returns `activeActivityCount` to trigger "mark as N/A" prompt for late joiners.
 
+## Activity Stopwatch (סטופר)
+
+Lap-style stopwatch for capturing finishing times during timed activities (e.g. running tests). Replaces the "paper number → manual transcription" workflow described in #195. Available on the activity detail page when the activity type's score config has at least one slot with `format: "time"` AND the user has `canEditReports`.
+
+### State model and persistence
+
+Pure state lives in `src/lib/stopwatch/state.ts`. Shape: `{ activityId, scoreKey, startedAt, accumulatedMs, running, laps, nextLapNumber }`. While running, total elapsed = `accumulatedMs + (Date.now() - startedAt)`; pause folds the live delta back into `accumulatedMs` and clears `startedAt`. Laps store `{ id, number, elapsedMs }`.
+
+State is persisted to `localStorage` under `tironet:stopwatch:{activityId}:{scoreKey}` on every mutation. Persistence keyed by `(activityId, scoreKey)` — opening the stopwatch on a different score (or a different activity) starts fresh; reopening on the same pair restores both the running timer and any unassigned laps.
+
+**Survives app close:** because `running` and `startedAt` are persisted, closing the dialog (or the whole app) while the timer runs has no effect on the elapsed reading on reopen — `now - startedAt` continues to grow. There is no "while-closed" delta to apply.
+
+**Auto-reset on reopen.** Persisted state is filtered through `loadFreshState()` whenever the dialog opens, which discards two flavors of dead state and falls through to a fresh initial state:
+
+- **Terminal:** `laps.length === 0 && nextLapNumber > 1 && !running` — i.e. the user recorded laps in the past, all of them were assigned (or deleted), and the timer was paused/stopped. This is the "session is over" signal. Catches the common case of returning to the same activity+score on a different day and finding stale state from last session.
+- **Stale running:** `running && now - startedAt > STALE_RUNNING_THRESHOLD_MS` (currently 6 hours). Catches forgotten timers — the user closed the dialog mid-race and never came back, leaving `running=true` to accumulate elapsed indefinitely. The threshold is intentionally generous (well above any realistic session length) so legitimate long activities aren't reset.
+
+Both checks are pure functions (`isTerminalState`, `isStaleRunningState`) and unit-tested independently. The threshold is exported as `STALE_RUNNING_THRESHOLD_MS` so it's easy to find and adjust.
+
+**Why `<StopwatchDialog>` has a `key` prop in `StopwatchButton`.** `loadFreshState` runs in `useStopwatch`'s lazy `useState` initializer, which fires **once per component mount**. Without forcing a remount, the dialog stays mounted across open→close→open cycles (because `selectedScore` is still truthy in `StopwatchButton`), so the second open never re-runs the freshness check — the React state still holds the just-closed (often terminal) state. `StopwatchButton` increments an `openCount` counter on each "open" click and passes it as `key={openCount}` to the dialog, forcing a fresh mount and re-running the freshness logic every time. Don't drop this — every reopen scenario relies on it.
+
+**Lap numbering does not regress on delete.** `nextLapNumber` only increments. If a lap is deleted, its number is gone — subsequent laps continue from where the counter was, so each "paper number" is unique for the lifetime of the lap list. `clearLaps()` resets the counter to 1 because the list is empty by definition.
+
+### React hook
+
+`useStopwatch({ activityId, scoreKey, active })` in `src/hooks/useStopwatch.ts` wraps the pure state with `useState` (lazy init from localStorage). A single `useEffect` drives a `requestAnimationFrame` tick that updates a `now: number` state — chained while running, fired once when paused so the rendered time refreshes correctly after a long idle. The `active` flag (set to the dialog's `open` prop) suspends the tick when the dialog is closed.
+
+The hook is called inside `StopwatchDialog`, which only mounts when the user has selected a score — there's no SSR concern with the lazy `localStorage` read.
+
+### UI components
+
+All under `src/components/activities/stopwatch/`:
+- **`StopwatchButton`** — entry point shown in the activity header alongside "ייבוא דיווחים" / "ערוך דיווח". Filters `activeScores` to time-format only; renders nothing if none exist. With one time score, opens `StopwatchDialog` directly. With multiple, opens a small score-picker dialog first.
+- **`StopwatchDialog`** — large modal (`max-w-md max-h-[90vh] h-[90vh] flex flex-col`) with the breadcrumb title (`{activityName} > {scoreLabel}`), MM:SS.cc timer, three round controls (clear, play/pause, lap), and the lap list.
+- **`LapRow`** — collapsed shows `[chevron][time][number][trash]`. Expanded swaps the right-side controls for a `SearchInput` + selected-soldier pill + apply checkmark. Search results dropdown filters by `${familyName} ${givenName}` substring (case-insensitive).
+
+### Apply path (`applyStopwatchTime` in `ActivityDetail`)
+
+Applying a lap to a soldier sets `result = "completed"` AND the chosen grade field in a single SQL UPDATE (or INSERT for new rows), then recalculates `failed` from current grades + thresholds. Both fields land in the same PowerSync `opData`, so the connector PATCHes them atomically. Other grade fields are not touched — concurrent edits on a different score for the same soldier still merge correctly.
+
+The lap is removed from local state on successful apply. If the soldier already had a value for this score, it is overwritten without confirmation.
+
+### Display precision vs storage
+
+- Live timer + lap rows: `MM:SS.cc` (centiseconds), via `formatStopwatch(ms)` in `state.ts`.
+- Stored grade value: rounded to **whole seconds** (`Math.round(ms / 1000)`) at apply time — matches the existing `time` score storage convention (integer seconds, displayed via `formatGradeDisplay`).
+
+### Button disabled states
+
+- **Clear:** disabled while running OR when both the timer is at 00:00 and there are no laps. Calls the hook's `reset()` (timer + laps + localStorage), behind an `AlertDialog` confirmation.
+- **Start/Pause:** never disabled.
+- **Lap:** disabled when not running.
+- **Per-row trash:** always confirmable via dialog — no swipe-to-delete.
+
+### Visual button order in the Hebrew RTL layout
+
+The Base UI `Dialog.Popup` renders inside a portal that does not inherit `dir="rtl"` from the parent, so flexbox inside the dialog flows **left-to-right** even when the rest of the app is RTL. To get the wireframe's right-to-left visual order (clear, play/pause, lap), the DOM order must be the *reverse*: `[lap, play/pause, clear]`. This is brittle if Base UI ever changes its portal behavior — if you add another flex row to a dialog, double-check by inspecting the rendered order.
+
+### Concurrency
+
+The lap list is per-device only. Two instructors running the stopwatch on the same activity+score on different devices each see their own laps. Applying a lap on one device does not remove it on the other (it just overwrites whatever value the other instructor may have entered through the normal report flow).
+
 ## PWA / Service Worker Architecture
 
 ### Why `@serwist/turbopack` (not `@ducanh2912/next-pwa`)
@@ -1139,6 +1201,18 @@ Browsers render `datetime-local` inputs with the current date/time even when `va
 
 - **Required/committed fields** (e.g. appointment date after clicking "add"): set a real default value like the next round hour. This avoids ambiguity and prevents the browser from showing a phantom value the user didn't choose. See `defaultDatetime()` in `AppointmentListEditor.tsx`.
 - **Optional fields** (e.g. paramedic date, sick day from/to): use `style={value ? undefined : { color: "transparent" }}` to visually hide the browser's placeholder date. The field appears empty until the user explicitly picks a date.
+
+### Icon-only buttons need `leading-none` — Safari/WebKit baseline fix
+
+The `icon`, `icon-xs`, `icon-sm`, and `icon-lg` size variants in [src/components/ui/button.tsx](src/components/ui/button.tsx) include `leading-none` (line-height: 1). Without it, the button inherits the parent's text line-height. Inside a button containing a single inline SVG, WebKit reserves baseline space at the bottom of the line box (Blink does not), making the button render a few pixels taller in Safari than in Chrome. In tight layouts — round controls above a divider, icon buttons in a flex row before another sibling — that extra space pushes neighbors closer than the design intends and produces inconsistent vertical spacing across browsers.
+
+`leading-none` collapses the line box to the font size, so the button's vertical extent is governed by `size-*` (height/width) only and renders identically in both engines.
+
+**Equivalent fixes** if you ever need a one-off override and don't want to touch the variant:
+- `[&_svg]:block` on the parent — makes the SVG a block element with no baseline.
+- `[&_svg]:align-middle` on the parent — aligns the SVG to the line-box middle.
+
+**When NOT to use `leading-none`:** buttons that contain text. Tightening line-height to `1` strips wrap-friendly leading from multi-line button text. The icon-* variants are safe specifically because they contain only an SVG; if you ever add text into an icon-sized button, drop the line-height back to the default.
 
 ### Native date/datetime-local inputs — iOS Safari overflow fix
 
