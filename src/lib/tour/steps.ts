@@ -99,15 +99,6 @@ export const homeTourSteps: VersionedStep[] = [
   },
   // v2 — new features
   {
-    element: "[data-tour='user-avatar']",
-    popover: {
-      title: "תזכורות לתורים ויציאות",
-      description:
-        "הגדירו תזכורת אוטומטית לפני תורים רפואיים ושעות יציאה. לחצו על הפרופיל ועברו להגדרות התראות.",
-    },
-    version: 2,
-  },
-  {
     element: "[data-tour='nav-calendar']",
     popover: {
       title: "לוח אירועים",
@@ -440,6 +431,16 @@ export const activityDetailTourSteps: VersionedStep[] = [
       title: "שורת חייל",
       description: "כאן תראו את הדיווח של כל חייל — תוצאה, ציונים והערה.",
     },
+  },
+  // v3 — stopwatch
+  {
+    element: "[data-tour='activity-stopwatch']",
+    popover: {
+      title: "סטופר",
+      description:
+        "מודדים זמני סיום של חיילים? פתחו את הסטופר, רישמו הקפות תוך כדי הריצה והקצו כל זמן לחייל בלחיצה אחת. ניתן גם לשתף את הזמנים עם מכשיר נוסף באמצעות קוד QR כדי לזרז את ההקצאה.",
+    },
+    version: 3,
   },
 ];
 

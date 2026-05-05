@@ -66,7 +66,13 @@ export function StopwatchButton({
 
   return (
     <>
-      <Button size="sm" variant="outline" onClick={handleClick} aria-label="סטופר">
+      <Button
+        data-tour="activity-stopwatch"
+        size="sm"
+        variant="outline"
+        onClick={handleClick}
+        aria-label="סטופר"
+      >
         <Timer size={14} className="me-1" />
         סטופר
       </Button>

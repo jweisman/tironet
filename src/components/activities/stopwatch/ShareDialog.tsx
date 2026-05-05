@@ -74,7 +74,12 @@ function ShareDialogInner({
       laps: laps.map((l) => ({ number: l.number, elapsedMs: l.elapsedMs })),
     };
     const text = encodePayload(payload);
-    QRCode.toDataURL(text, { errorCorrectionLevel: "M", margin: 2, width: 320 })
+    // Error-correction level "L" (low, ~7% redundancy) over "M" — we're
+    // going screen-to-camera with a clean source image, so M's extra
+    // redundancy buys nothing useful and costs ~17% in capacity.
+    // Source resolution 600px keeps the rendered QR sharp even on
+    // 2–3× DPI displays after the browser scales it down to fit the dialog.
+    QRCode.toDataURL(text, { errorCorrectionLevel: "L", margin: 2, width: 600 })
       .then((url) => {
         if (!cancelled) setQrDataUrl(url);
       })
@@ -162,10 +167,10 @@ function ShareDialogInner({
                 <img
                   src={qrDataUrl}
                   alt="QR"
-                  className="w-72 h-72 rounded-md border border-border bg-white"
+                  className="w-full rounded-md border border-border bg-white"
                 />
               ) : (
-                <div className="w-72 h-72 rounded-md border border-border bg-muted animate-pulse" />
+                <div className="w-full aspect-square rounded-md border border-border bg-muted animate-pulse" />
               )}
               <p className="text-xs text-muted-foreground text-center">
                 {hebrewCount(laps.length, "זמן זמין", "זמנים זמינים")} להעברה
