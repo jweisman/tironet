@@ -151,6 +151,7 @@ const SHELL_ROUTES = [
   "/soldiers",
   "/requests",
   "/reports",        // report listing page
+  "/support",        // support/diagnostics — must work offline
   "/activities/_",   // detail page shell (dummy slug — same HTML for any ID)
   "/soldiers/_",     // detail page shell
   "/requests/_",     // request detail page shell
@@ -206,7 +207,7 @@ function resolveShellRoute(pathname: string, origin: string): {
   htmlKey: string;
 } | null {
   // List pages (exact path)
-  if (pathname === "/home" || pathname === "/activities" || pathname === "/soldiers" || pathname === "/requests" || pathname === "/reports") {
+  if (pathname === "/home" || pathname === "/activities" || pathname === "/soldiers" || pathname === "/requests" || pathname === "/reports" || pathname === "/support") {
     return { htmlKey: `${origin}${pathname}` };
   }
 

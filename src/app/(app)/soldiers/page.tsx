@@ -229,7 +229,8 @@ export default function SoldiersPage() {
   const { data: rawOpenRequestCounts } = useQuery<RawOpenRequestCount>(OPEN_REQUEST_COUNT_QUERY, queryParams);
   const { showLoading, showConnectionError } = useSyncReady(
     (rawSoldiers ?? []).length > 0,
-    soldiersLoading
+    soldiersLoading,
+    { page: "soldiers", selectedCycleId, role: rawRole || "none" }
   );
 
   // Build soldier → hardship set (for the hardship filter)
