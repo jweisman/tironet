@@ -86,8 +86,23 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
   }
 
   function handleGradeChange(gradeKey: GradeKey, format: "number" | "time", score: ActiveScore, e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value;
     const el = e.target;
+
+    // Live-format time inputs: strip non-digits and insert colon once there are
+    // 3+ digits. Users type append-only so forcing the caret to end is fine; on
+    // blur, handleGradeBlur normalizes <3-digit values to M:SS (e.g. 43 → 0:43).
+    if (format === "time") {
+      const digits = el.value.replace(/\D/g, "");
+      const formatted = digits.length >= 3
+        ? `${digits.slice(0, -2)}:${digits.slice(-2)}`
+        : digits;
+      if (formatted !== el.value) {
+        el.value = formatted;
+        el.setSelectionRange(formatted.length, formatted.length);
+      }
+    }
+
+    const raw = el.value;
     const trimmed = raw.trim();
     const parsed = trimmed !== "" ? parseForFormat(raw, format) : undefined;
     const isInvalid = trimmed !== "" && parsed === null;

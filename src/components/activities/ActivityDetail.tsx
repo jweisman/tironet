@@ -744,54 +744,55 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         )}
 
         {activityCounts.total > 0 && (
-          <ActivityProgressBar counts={activityCounts} />
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <ActivityProgressBar counts={activityCounts} />
+            </div>
+            {gapsCount > 0 && (
+              <button
+                data-tour="activity-gaps-filter"
+                type="button"
+                onClick={() => setShowGapsOnly((v) => !v)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
+                  showGapsOnly
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                    : "bg-muted text-muted-foreground hover:bg-amber-100 hover:text-amber-800"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${showGapsOnly ? "bg-amber-500" : "bg-muted-foreground"}`} />
+                פערים ({gapsCount})
+              </button>
+            )}
+          </div>
         )}
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {gapsCount > 0 && (
-            <button
-              data-tour="activity-gaps-filter"
-              type="button"
-              onClick={() => setShowGapsOnly((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                showGapsOnly
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                  : "bg-muted text-muted-foreground hover:bg-amber-100 hover:text-amber-800"
-              }`}
+        {data.canEditReports && (
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <StopwatchButton
+              activityId={data.id}
+              activityName={data.name}
+              activeScores={activeScores}
+              soldiers={stopwatchSoldiers}
+              onApply={applyStopwatchTime}
+            />
+            <Button
+              data-tour="activity-import-reports"
+              size="sm"
+              variant="outline"
+              onClick={() => setImportReportsOpen(true)}
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${showGapsOnly ? "bg-amber-500" : "bg-muted-foreground"}`} />
-              פערים ({gapsCount})
-            </button>
-          )}
-          <div className="flex-1" />
-            {data.canEditReports && (
-              <>
-                <StopwatchButton
-                  activityId={data.id}
-                  activityName={data.name}
-                  activeScores={activeScores}
-                  soldiers={stopwatchSoldiers}
-                  onApply={applyStopwatchTime}
-                />
-                <Button
-                  data-tour="activity-import-reports"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setImportReportsOpen(true)}
-                >
-                  ייבוא דיווחים
-                </Button>
-                <Button
-                  data-tour="activity-edit-reports"
-                  size="sm"
-                  variant={editingReports ? "default" : "outline"}
-                  onClick={() => setEditingReports((v) => !v)}
-                >
-                  {editingReports ? "סיים עריכה" : "ערוך דיווח"}
-                </Button>
-              </>
-            )}
-        </div>
+              ייבוא דיווחים
+            </Button>
+            <Button
+              data-tour="activity-edit-reports"
+              size="sm"
+              variant={editingReports ? "default" : "outline"}
+              onClick={() => setEditingReports((v) => !v)}
+            >
+              {editingReports ? "סיים עריכה" : "ערוך דיווח"}
+            </Button>
+          </div>
+        )}
 
         {saveError && (
           <p className="text-xs text-destructive">{saveError}</p>
