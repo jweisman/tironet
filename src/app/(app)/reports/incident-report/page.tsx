@@ -137,7 +137,9 @@ function BarChart({ data }: { data: IncidentReportData }) {
           strokeWidth="1"
         />
         {data.groups.map((group, gi) => {
-          const groupLeft = padLeft + gi * (groupWidth + groupGap);
+          // RTL: first group (gi=0) on the right, last on the left
+          const reverseGroupIdx = data.groups.length - 1 - gi;
+          const groupLeft = padLeft + reverseGroupIdx * (groupWidth + groupGap);
           const totalBarsWidth =
             INCIDENT_TYPES.length * barWidth +
             (INCIDENT_TYPES.length - 1) * barGap;
@@ -145,9 +147,11 @@ function BarChart({ data }: { data: IncidentReportData }) {
           return (
             <g key={group.id}>
               {INCIDENT_TYPES.map((type, ti) => {
+                // RTL: first type (commendation) on right, matching legend order
+                const reverseTypeIdx = INCIDENT_TYPES.length - 1 - ti;
                 const count = group.counts[type];
                 const barHeight = (count / yMax) * chartHeight;
-                const x = barsLeft + ti * (barWidth + barGap);
+                const x = barsLeft + reverseTypeIdx * (barWidth + barGap);
                 const y = padTop + chartHeight - barHeight;
                 return (
                   <g key={type}>
