@@ -70,7 +70,10 @@ export function TabBar() {
   const remainingOverflow = overflowItems.slice(availableSlots);
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background md:hidden">
+    <nav
+      className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background md:hidden"
+      style={{ transform: "translateZ(0)" }}
+    >
       <div className="flex">
         {staticTabs.map(({ href, icon: Icon, labelKey }) => {
           const active = pathname.startsWith(href);
