@@ -2,7 +2,7 @@
 
 import { memo, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { parseGradeInput, formatGradeDisplay } from "@/lib/score-format";
+import { parseGradeInput, parseCompactTimeInput, formatGradeDisplay } from "@/lib/score-format";
 import type { ActivityResult } from "@/types";
 import type { GradeKey } from "./ActivityDetail";
 import type { ActiveScore } from "@/types/score-config";
@@ -81,11 +81,30 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
     onChange(soldier.id, "result", newResult);
   }
 
+  function parseForFormat(raw: string, format: "number" | "time"): number | null {
+    return format === "time" ? parseCompactTimeInput(raw) : parseGradeInput(raw, format);
+  }
+
   function handleGradeChange(gradeKey: GradeKey, format: "number" | "time", score: ActiveScore, e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value;
     const el = e.target;
+
+    // Live-format time inputs: strip non-digits and insert colon once there are
+    // 3+ digits. Users type append-only so forcing the caret to end is fine; on
+    // blur, handleGradeBlur normalizes <3-digit values to M:SS (e.g. 43 → 0:43).
+    if (format === "time") {
+      const digits = el.value.replace(/\D/g, "");
+      const formatted = digits.length >= 3
+        ? `${digits.slice(0, -2)}:${digits.slice(-2)}`
+        : digits;
+      if (formatted !== el.value) {
+        el.value = formatted;
+        el.setSelectionRange(formatted.length, formatted.length);
+      }
+    }
+
+    const raw = el.value;
     const trimmed = raw.trim();
-    const parsed = trimmed !== "" ? parseGradeInput(raw, format) : undefined;
+    const parsed = trimmed !== "" ? parseForFormat(raw, format) : undefined;
     const isInvalid = trimmed !== "" && parsed === null;
 
     if (isInvalid) {
@@ -110,9 +129,16 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
     if (existing) clearTimeout(existing);
     if (isInvalid) return; // don't save invalid input
     debounceRefs.current.set(gradeKey, setTimeout(() => {
-      const num = parseGradeInput(raw, format);
+      const num = parseForFormat(raw, format);
       onChange(soldier.id, gradeKey, num);
     }, 500));
+  }
+
+  function handleGradeBlur(format: "number" | "time", e: React.FocusEvent<HTMLInputElement>) {
+    if (format !== "time") return;
+    const el = e.target;
+    const parsed = parseCompactTimeInput(el.value);
+    if (parsed !== null) el.value = formatGradeDisplay(parsed, "time");
   }
 
   function handleNoteChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -210,9 +236,10 @@ export const ReportRow = memo(function ReportRow({ soldier, report, activeScores
             <input
               key={score.gradeKey}
               type="text"
-              inputMode={score.format === "time" ? "text" : "numeric"}
+              inputMode="numeric"
               defaultValue={formatGradeDisplay(report[score.gradeKey], score.format)}
               onChange={(e) => handleGradeChange(score.gradeKey, score.format, score, e)}
+              onBlur={(e) => handleGradeBlur(score.format, e)}
               placeholder={score.label}
               aria-label={score.label}
               className="w-28 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"

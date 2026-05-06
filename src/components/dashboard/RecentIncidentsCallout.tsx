@@ -29,10 +29,10 @@ const TYPE_BADGE_CLASS: Record<IncidentType, string> = {
     "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
 };
 
-// Recent incidents: today + 6 prior days, scoped to the user's chain of command
+// Recent incidents: today + 2 prior days, scoped to the user's chain of command
 // via PowerSync's visible_squad_ids CTE. Squad-level callers also pass squadId
 // to narrow further (matching the dashboard pattern).
-// Params: [cycleId, weekStart, squadId, squadId]
+// Params: [cycleId, windowStart, squadId, squadId]
 const RECENT_INCIDENTS_QUERY = `
   SELECT
     i.id,
@@ -74,18 +74,18 @@ export function RecentIncidentsCallout({ cycleId, squadId }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
 
-  const weekStart = useMemo(() => {
-    // Today (Israel time) minus 6 days = inclusive 7-day window ending today.
+  const windowStart = useMemo(() => {
+    // Today (Israel time) minus 2 days = inclusive 3-day window ending today.
     const today = new Date(
       new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date()),
     );
-    today.setUTCDate(today.getUTCDate() - 6);
+    today.setUTCDate(today.getUTCDate() - 2);
     return today.toISOString().slice(0, 10);
   }, []);
 
   const params = useMemo(
-    () => [cycleId, weekStart, squadId, squadId],
-    [cycleId, weekStart, squadId],
+    () => [cycleId, windowStart, squadId, squadId],
+    [cycleId, windowStart, squadId],
   );
   const { data: raw } = useQuery<RawRecentIncident>(RECENT_INCIDENTS_QUERY, params);
 

@@ -31,6 +31,7 @@ import { ActivityProgressBar, type ActivityCounts } from "./ActivityProgressBar"
 import { BulkImportReportsDialog } from "./BulkImportReportsDialog";
 import { ReportRow } from "./ReportRow";
 import { ActivityTypeIcon } from "./ActivityTypeIcon";
+import { StopwatchButton } from "./stopwatch/StopwatchButton";
 import type { ActivityResult } from "@/types";
 import type { ActiveScore, ScoreConfig } from "@/types/score-config";
 import { calculateFailure } from "@/types/score-config";
@@ -364,6 +365,69 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
     [data.id, db]
   );
 
+  const applyStopwatchTime = useCallback(
+    async (soldierId: string, gradeKey: GradeKey, seconds: number) => {
+      setSaveError(null);
+      const current = reportsRef.current.get(soldierId) ?? EMPTY_REPORT;
+      const updated: SoldierReport = {
+        ...current,
+        result: "completed",
+        [gradeKey]: seconds,
+      };
+      const { failed } = calculateFailure(
+        updated as unknown as Record<string, number | null>,
+        activeScores,
+        scoreConfig?.failureThreshold,
+      );
+      updated.failed = failed;
+
+      const rowId = updated.id ?? (await deterministicId(data.id, soldierId));
+      const exists = await db.getOptional<{ id: string }>(
+        "SELECT id FROM activity_reports WHERE id = ?",
+        [rowId],
+      );
+      if (exists) {
+        await db.execute(
+          `UPDATE activity_reports SET result = ?, ${gradeKey} = ?, failed = ?, activity_id = ?, soldier_id = ? WHERE id = ?`,
+          [updated.result, updated[gradeKey], updated.failed ? 1 : 0, data.id, soldierId, rowId],
+        );
+      } else {
+        await db.execute(
+          "INSERT INTO activity_reports (id, activity_id, soldier_id, result, failed, grade1, grade2, grade3, grade4, grade5, grade6, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [
+            rowId, data.id, soldierId,
+            updated.result, updated.failed ? 1 : 0,
+            updated.grade1, updated.grade2, updated.grade3,
+            updated.grade4, updated.grade5, updated.grade6,
+            updated.note,
+          ],
+        );
+      }
+      setReports((prev) => {
+        const next = new Map(prev);
+        next.set(soldierId, { ...updated, id: rowId });
+        return next;
+      });
+    },
+    [activeScores, data.id, db, scoreConfig?.failureThreshold],
+  );
+
+  const stopwatchSoldiers = useMemo(() => {
+    const list: { id: string; givenName: string; familyName: string; rank: string | null }[] = [];
+    for (const squad of data.squads) {
+      if (!squad.canEdit) continue;
+      for (const soldier of squad.soldiers) {
+        list.push({
+          id: soldier.id,
+          givenName: soldier.givenName,
+          familyName: soldier.familyName,
+          rank: soldier.rank,
+        });
+      }
+    }
+    return list;
+  }, [data.squads]);
+
   const handleReportChange = useCallback(
     (soldierId: string, field: "result" | GradeKey | "note", value: unknown) => {
       // Build updated report from the ref (always current) — NOT from the
@@ -680,47 +744,55 @@ export function ActivityDetail({ initialData, initialGapsOnly = false }: Props) 
         )}
 
         {activityCounts.total > 0 && (
-          <ActivityProgressBar counts={activityCounts} />
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <ActivityProgressBar counts={activityCounts} />
+            </div>
+            {gapsCount > 0 && (
+              <button
+                data-tour="activity-gaps-filter"
+                type="button"
+                onClick={() => setShowGapsOnly((v) => !v)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
+                  showGapsOnly
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                    : "bg-muted text-muted-foreground hover:bg-amber-100 hover:text-amber-800"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${showGapsOnly ? "bg-amber-500" : "bg-muted-foreground"}`} />
+                פערים ({gapsCount})
+              </button>
+            )}
+          </div>
         )}
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {gapsCount > 0 && (
-            <button
-              data-tour="activity-gaps-filter"
-              type="button"
-              onClick={() => setShowGapsOnly((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                showGapsOnly
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                  : "bg-muted text-muted-foreground hover:bg-amber-100 hover:text-amber-800"
-              }`}
+        {data.canEditReports && (
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <StopwatchButton
+              activityId={data.id}
+              activityName={data.name}
+              activeScores={activeScores}
+              soldiers={stopwatchSoldiers}
+              onApply={applyStopwatchTime}
+            />
+            <Button
+              data-tour="activity-import-reports"
+              size="sm"
+              variant="outline"
+              onClick={() => setImportReportsOpen(true)}
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${showGapsOnly ? "bg-amber-500" : "bg-muted-foreground"}`} />
-              פערים ({gapsCount})
-            </button>
-          )}
-          <div className="flex-1" />
-            {data.canEditReports && (
-              <>
-                <Button
-                  data-tour="activity-import-reports"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setImportReportsOpen(true)}
-                >
-                  ייבוא דיווחים
-                </Button>
-                <Button
-                  data-tour="activity-edit-reports"
-                  size="sm"
-                  variant={editingReports ? "default" : "outline"}
-                  onClick={() => setEditingReports((v) => !v)}
-                >
-                  {editingReports ? "סיים עריכה" : "ערוך דיווח"}
-                </Button>
-              </>
-            )}
-        </div>
+              ייבוא דיווחים
+            </Button>
+            <Button
+              data-tour="activity-edit-reports"
+              size="sm"
+              variant={editingReports ? "default" : "outline"}
+              onClick={() => setEditingReports((v) => !v)}
+            >
+              {editingReports ? "סיים עריכה" : "ערוך דיווח"}
+            </Button>
+          </div>
+        )}
 
         {saveError && (
           <p className="text-xs text-destructive">{saveError}</p>

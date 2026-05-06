@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseGradeInput, formatGradeDisplay } from "../score-format";
+import { parseGradeInput, parseCompactTimeInput, formatGradeDisplay } from "../score-format";
 
 describe("parseGradeInput", () => {
   it("returns null for empty string", () => {
@@ -73,6 +73,48 @@ describe("parseGradeInput", () => {
 
   it("accepts plain numbers when format is time", () => {
     expect(parseGradeInput("195", "time")).toBe(195);
+  });
+});
+
+describe("parseCompactTimeInput", () => {
+  it("returns null for empty/whitespace", () => {
+    expect(parseCompactTimeInput("")).toBeNull();
+    expect(parseCompactTimeInput("   ")).toBeNull();
+  });
+
+  it("parses digit-only input as compact M:SS time (last 2 digits = seconds)", () => {
+    expect(parseCompactTimeInput("0")).toBe(0);
+    expect(parseCompactTimeInput("00")).toBe(0);
+    expect(parseCompactTimeInput("5")).toBe(5);
+    expect(parseCompactTimeInput("43")).toBe(43);
+    expect(parseCompactTimeInput("103")).toBe(63);
+    expect(parseCompactTimeInput("1215")).toBe(12 * 60 + 15);
+    expect(parseCompactTimeInput("12345")).toBe(123 * 60 + 45);
+  });
+
+  it("trims whitespace on digit-only input", () => {
+    expect(parseCompactTimeInput("  103  ")).toBe(63);
+  });
+
+  it("delegates colon-form input to the time parser", () => {
+    expect(parseCompactTimeInput("3:15")).toBe(195);
+    expect(parseCompactTimeInput("0:30")).toBe(30);
+    expect(parseCompactTimeInput("12:05")).toBe(725);
+    expect(parseCompactTimeInput("00:10:56")).toBe(656);
+  });
+
+  it("rejects malformed colon input", () => {
+    expect(parseCompactTimeInput("3:60")).toBeNull();
+    expect(parseCompactTimeInput("3:5")).toBeNull();
+    expect(parseCompactTimeInput(":30")).toBeNull();
+    expect(parseCompactTimeInput("3:")).toBeNull();
+  });
+
+  it("rejects non-digit garbage", () => {
+    expect(parseCompactTimeInput("abc")).toBeNull();
+    expect(parseCompactTimeInput("3.5")).toBeNull();
+    expect(parseCompactTimeInput("-5")).toBeNull();
+    expect(parseCompactTimeInput("1:2:3:4")).toBeNull();
   });
 });
 
