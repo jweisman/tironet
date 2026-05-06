@@ -792,6 +792,28 @@ A single PDF (and HTML preview) listing every soldier in the user's scope groupe
 - `src/app/api/reports/home-visit-report/pdf/route.ts` — PDF generation
 - `src/app/(app)/reports/home-visit-report/page.tsx` — preview page with download button
 
+## Incident Report (דוח אירועים)
+
+A PDF report aggregating soldier incidents in a cycle. Available from the reports page under "חיילים". Reuses `getPersonalFileScope()` — platoon and company commanders only (squad commanders excluded, like home-visit and personal-file reports).
+
+### Sections
+
+1. **Bar chart** — grouped vertical bars (one group per squad for platoon commanders; one group per platoon for company commanders), three bars per group: commendation (green `#16a34a`), discipline (amber `#d97706`), safety (red `#dc2626`). Inline SVG, no chart library. Y-axis auto-scales via `niceCeil()`.
+2. **List** — incidents grouped by squad/platoon, sorted by date descending within each group. Each row shows date, type+subtype badge, soldier name (with squad meta when grouping by platoon), description, and optional response.
+
+### Grouping logic
+
+- `platoon_commander` scope → `groupBy: "squad"` — bars per squad in their platoon.
+- `company_commander` scope → `groupBy: "platoon"` — bars per platoon across the company.
+
+Selected automatically by the API route based on the resolved `scope.role`. The data shape (`IncidentReportData.groupBy`) carries this through to the renderer so the list presentation can include squad meta when bars represent platoons.
+
+### Key files
+- `src/lib/reports/render-incident-report.ts` — `fetchIncidentReport()`, `renderBarChartSvg()`, `renderIncidentReportHtml()`, `INCIDENT_TYPE_COLORS`
+- `src/app/api/reports/incident-report/route.ts` — JSON for the preview page
+- `src/app/api/reports/incident-report/pdf/route.ts` — PDF generation
+- `src/app/(app)/reports/incident-report/page.tsx` — preview page with download button (re-renders the same SVG client-side)
+
 ## Soldier Detail Page — Edit Forms
 
 The soldier detail page splits editing into four focused dialogs instead of one large form:
