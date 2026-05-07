@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "@powersync/react";
+import { useTrackedQuery } from "./useTrackedQuery";
 import { useCycle } from "@/contexts/CycleContext";
 import { effectiveRole } from "@/lib/auth/permissions";
 import type { Role } from "@/types";
@@ -33,7 +33,7 @@ export function useRequestBadge(): number {
     () => [selectedCycleId ?? "", role, squadFilter, squadFilter],
     [selectedCycleId, role, squadFilter],
   );
-  const { data } = useQuery<{ count: number }>(BADGE_QUERY, params);
+  const { data } = useTrackedQuery<{ count: number }>("appshell.BADGE", BADGE_QUERY, params);
 
   if (!selectedCycleId || !role) return 0;
   return Number(data?.[0]?.count ?? 0);

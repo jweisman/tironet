@@ -493,7 +493,7 @@ async function collectDiagnostics(
   // (recorded by usePagePerf hook, written to sessionStorage on each mount/data-ready)
   try {
     const pageTimings: Record<string, string> = {};
-    for (const pageId of ["soldiers", "activities", "requests"]) {
+    for (const pageId of ["home", "soldiers", "activities", "requests"]) {
       const entry = readPagePerf(pageId);
       if (!entry) {
         pageTimings[pageId] = "not visited this session";
@@ -526,6 +526,7 @@ async function collectDiagnostics(
     const marks = [
       "theme-init", "appshell-mount", "splash-dismissed",
       "powersync-init-start", "powersync-init-end",
+      "powersync-prewarm-start", "powersync-prewarm-end",
       "powersync-connect-start", "powersync-connect-end",
     ];
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;

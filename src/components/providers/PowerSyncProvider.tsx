@@ -94,6 +94,19 @@ export function TironetPowerSyncProvider({
         console.log("[PowerSync] init() resolved — DB open, local queries ready");
         setInitFailed(false);
 
+        // Pre-warm the wa-sqlite worker. The first SQL query in a session pays
+        // a multi-second cold-start cost on iOS Safari (worker spawn + WASM
+        // instantiate + OPFS handle setup), and any list page that mounts
+        // before then sees its useQuery calls block on it. Running a no-op
+        // SELECT here forces that work to happen during the boot/splash phase.
+        performance.mark("powersync-prewarm-start");
+        try {
+          await localDb.execute("SELECT 1");
+        } catch (err) {
+          console.warn("[PowerSync] pre-warm query failed:", err);
+        }
+        performance.mark("powersync-prewarm-end");
+
         // Confirm successful rebuild after a DB clear (timeout or corruption).
         // Fired here, after init() succeeds, since init recovery is what the
         // clear-and-reload flow is meant to fix. connect() may still fail

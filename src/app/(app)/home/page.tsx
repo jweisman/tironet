@@ -9,6 +9,7 @@ import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useRequestBadge } from "@/hooks/useRequestBadge";
 import { useSyncReady } from "@/hooks/useSyncReady";
+import { usePagePerf } from "@/hooks/usePagePerf";
 import { SquadSummaryCard } from "@/components/dashboard/SquadSummaryCard";
 import { PlatoonSummaryCard } from "@/components/dashboard/PlatoonSummaryCard";
 import type { VisibleSections } from "@/components/dashboard/PlatoonSummaryCard";
@@ -290,6 +291,7 @@ export default function HomePage() {
   );
 
   const { data: rawSquads, isLoading: squadsLoading } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
+  usePagePerf("home", (rawSquads ?? []).length > 0);
   const { data: rawSoldierCounts } = useQuery<RawSquadSoldierCount>(SQUAD_SOLDIER_COUNTS_QUERY, countsParams);
   const { data: rawSoldiersWithGaps } = useQuery<RawSoldiersWithGaps>(SOLDIERS_WITH_GAPS_QUERY, countsParams);
   const { data: rawActivityCompleteness } = useQuery<RawActivityCompleteness>(ACTIVITY_COMPLETENESS_QUERY, countsParams);

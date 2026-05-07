@@ -61,23 +61,26 @@ export function useTrackedQuery<RowType = unknown>(
   prevFetchingRef.current = isFetching;
 
   useEffect(() => {
+    // Record on every transition out of the initial unresolved state — including
+    // empty-result resolutions. Without this, queries that legitimately return
+    // 0 rows look like "never resolved" in diagnostics.
+    if (result.isLoading) return;
     const len = (result.data ?? []).length;
-    if (len !== prevDataLenRef.current && len > 0) {
-      const now = performance.now();
-      const mountAt = mountAtRef.current ?? now;
-      stateRef.current.dataEmits++;
-      stateRef.current.lastDataMs = Math.round(now - mountAt);
-      stateRef.current.rowCount = len;
-      if (stateRef.current.firstDataMs === null) {
-        stateRef.current.firstDataMs = stateRef.current.lastDataMs;
-      }
-      stateRef.current.loggedAt = Date.now();
-      try {
-        sessionStorage.setItem(STORAGE_PREFIX + label, JSON.stringify(stateRef.current));
-      } catch {}
+    if (len === prevDataLenRef.current) return;
+    const now = performance.now();
+    const mountAt = mountAtRef.current ?? now;
+    stateRef.current.dataEmits++;
+    stateRef.current.lastDataMs = Math.round(now - mountAt);
+    stateRef.current.rowCount = len;
+    if (stateRef.current.firstDataMs === null) {
+      stateRef.current.firstDataMs = stateRef.current.lastDataMs;
     }
+    stateRef.current.loggedAt = Date.now();
+    try {
+      sessionStorage.setItem(STORAGE_PREFIX + label, JSON.stringify(stateRef.current));
+    } catch {}
     prevDataLenRef.current = len;
-  }, [result.data, label]);
+  }, [result.data, result.isLoading, label]);
 
   return { data: result.data, isLoading: result.isLoading };
 }
