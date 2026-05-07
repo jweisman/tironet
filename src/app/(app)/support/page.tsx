@@ -214,6 +214,104 @@ async function collectDiagnostics(
     diagnostics["Sample Queries"] = { error: String(e) };
   }
 
+  // Performance probe — verifies index migration ran, captures query plans, times each hot query.
+  // Queries here mirror the ones in soldiers/activities/requests list pages — keep in sync.
+  if (dbReady && (selectedCycleId ?? "")) try {
+    const cycleId = selectedCycleId ?? "";
+    const probe: Record<string, unknown> = {};
+
+    // 1. List user-defined indexes (excludes sqlite_autoindex_* and ps_* internal indexes)
+    try {
+      const idxResult = await safeExecute(
+        db,
+        `SELECT tbl_name, name FROM sqlite_master
+         WHERE type='index' AND name NOT LIKE 'sqlite_%' AND tbl_name NOT LIKE 'ps_%'
+         ORDER BY tbl_name, name`,
+      );
+      const idxRows = idxResult.rows?._array ?? [];
+      probe.indexCount = idxRows.length;
+      probe.indexes = idxRows.map((r: Record<string, unknown>) => `${r.tbl_name}.${r.name}`);
+    } catch (e) {
+      probe.indexes = `error: ${String(e)}`;
+    }
+
+    // 2. Hot queries to benchmark + EXPLAIN QUERY PLAN
+    const HOT: { label: string; sql: string; params: unknown[] }[] = [
+      {
+        label: "soldiers/SOLDIERS",
+        sql: `SELECT s.id, s.given_name, s.family_name, s.id_number, s.civilian_id, s.rank, s.status, s.profile_image, s.phone, s.squad_id FROM soldiers s WHERE s.cycle_id = ? ORDER BY s.family_name ASC, s.given_name ASC`,
+        params: [cycleId],
+      },
+      {
+        label: "soldiers/GAP_COUNT",
+        sql: `SELECT s.id AS soldier_id, COUNT(DISTINCT a.id) AS gap_count FROM soldiers s JOIN squads sq ON sq.id = s.squad_id JOIN activities a ON a.platoon_id = sq.platoon_id AND a.cycle_id = s.cycle_id AND a.is_required = 1 AND a.status = 'active' AND a.date < DATE('now') LEFT JOIN activity_reports ar ON ar.activity_id = a.id AND ar.soldier_id = s.id WHERE s.cycle_id = ? AND (ar.id IS NULL OR ar.result = 'skipped' OR ar.failed = 1) GROUP BY s.id`,
+        params: [cycleId],
+      },
+      {
+        label: "soldiers/OPEN_REQUESTS",
+        sql: `SELECT r.soldier_id, r.type, r.status, r.urgent, r.special_conditions FROM requests r WHERE r.cycle_id = ? AND ((r.status = 'approved' AND ((r.type = 'leave' AND (r.departure_at >= DATE('now') OR r.return_at >= DATE('now'))) OR (r.type = 'medical' AND ((r.medical_appointments IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(r.medical_appointments) AS a WHERE json_extract(a.value, '$.date') >= DATE('now'))) OR (r.sick_days IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(r.sick_days) AS d WHERE json_extract(d.value, '$.date') >= DATE('now'))))))) OR r.status = 'open')`,
+        params: [cycleId],
+      },
+      {
+        label: "activities/ACTIVITIES",
+        sql: `SELECT a.id, a.name, a.date, a.status, a.is_required, at.name AS activity_type_name, at.icon AS activity_type_icon, p.id AS platoon_id, p.name AS platoon_name, c.name AS company_name FROM activities a JOIN activity_types at ON at.id = a.activity_type_id JOIN platoons p ON p.id = a.platoon_id JOIN companies c ON c.id = p.company_id WHERE a.cycle_id = ? ORDER BY a.date DESC`,
+        params: [cycleId],
+      },
+      {
+        label: "activities/REPORT_COUNTS",
+        sql: `SELECT ar.activity_id, COUNT(*) AS reported_count, SUM(CASE WHEN ar.result = 'completed' AND ar.failed = 0 THEN 1 ELSE 0 END) AS completed_count, SUM(CASE WHEN ar.result = 'skipped' THEN 1 ELSE 0 END) AS skipped_count, SUM(CASE WHEN ar.failed = 1 THEN 1 ELSE 0 END) AS score_failed_count, SUM(CASE WHEN ar.result = 'na' THEN 1 ELSE 0 END) AS na_count FROM activity_reports ar JOIN activities a ON a.id = ar.activity_id JOIN soldiers s ON s.id = ar.soldier_id WHERE a.cycle_id = ? AND (? = '' OR s.squad_id = ?) GROUP BY ar.activity_id`,
+        params: [cycleId, "", ""],
+      },
+      {
+        label: "activities/SOLDIER_COUNTS",
+        sql: `SELECT sq.platoon_id, COUNT(*) AS total_soldiers FROM soldiers s JOIN squads sq ON sq.id = s.squad_id WHERE s.status = 'active' AND s.cycle_id = ? AND (? = '' OR s.squad_id = ?) GROUP BY sq.platoon_id`,
+        params: [cycleId, "", ""],
+      },
+      {
+        label: "requests/REQUESTS",
+        sql: `SELECT r.id, r.type, r.status, r.assigned_role, r.description, r.urgent, r.special_conditions, r.created_at, r.departure_at, r.return_at, r.medical_appointments, r.sick_days, s.family_name || ' ' || s.given_name AS soldier_name, s.squad_id, sq.name AS squad_name, sq.platoon_id, p.name AS platoon_name FROM requests r JOIN soldiers s ON s.id = r.soldier_id JOIN squads sq ON sq.id = s.squad_id JOIN platoons p ON p.id = sq.platoon_id WHERE r.cycle_id = ? ORDER BY r.created_at DESC`,
+        params: [cycleId],
+      },
+    ];
+
+    const benchmarks: Record<string, unknown> = {};
+    for (const { label, sql, params } of HOT) {
+      try {
+        // Plan
+        const plan = await safeExecute(db, `EXPLAIN QUERY PLAN ${sql}`, params);
+        const planRows = plan.rows?._array ?? [];
+        const planText = planRows
+          .map((r: Record<string, unknown>) => String(r.detail ?? ""))
+          .filter(Boolean)
+          .join(" | ");
+
+        // Time 3 runs
+        const times: number[] = [];
+        let rowCount = 0;
+        for (let i = 0; i < 3; i++) {
+          const start = performance.now();
+          const res = await safeExecute(db, sql, params);
+          const elapsed = performance.now() - start;
+          times.push(Math.round(elapsed));
+          if (i === 0) rowCount = res.rows?._array?.length ?? 0;
+        }
+
+        benchmarks[label] = {
+          rowCount,
+          timesMs: times.join(", "),
+          plan: planText.length > 400 ? `${planText.slice(0, 400)}…` : planText,
+        };
+      } catch (e) {
+        benchmarks[label] = { error: String(e) };
+      }
+    }
+    probe.queries = benchmarks;
+
+    diagnostics["Performance Probe"] = probe;
+  } catch (e) {
+    diagnostics["Performance Probe"] = { error: String(e) };
+  }
+
   // Push Notifications — browser-side state
   try {
     const pushSupported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
