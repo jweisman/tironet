@@ -277,12 +277,12 @@ export function renderActivitySummaryHtml(
             <p class="total-line">סה״כ ${hebrewCount(activity.totalSoldiers, "חייל", "חיילים")}</p>
           </div>
         </div>
-        ${activity.rows.length > 0 ? `
+        ${labels.length > 0 && activity.rows.length > 0 ? `
         <table>
           <thead><tr><th>פלוגה</th><th>מחלקה</th><th>כיתה</th>${scoreHeaders}</tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
-        ` : '<p class="no-data">אין נתונים</p>'}
+        ` : labels.length > 0 ? '<p class="no-data">אין נתונים</p>' : ""}
         ${activity.failedSoldiers.length > 0 ? `
         <h3 style="font-size:12px;font-weight:700;margin:12px 0 6px 0;">${resultLabels.skipped.label} / ${resultLabels.na.label}</h3>
         <table>
