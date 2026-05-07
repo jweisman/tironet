@@ -9,15 +9,8 @@ import { useSafeStatus } from "./useSafeStatus";
  * @param hasData - whether the page's primary query returned any data
  * @param isLoading - the `isLoading` flag from `useQuery()` — true until
  *                    the first set of results is available
- * @param _context - reserved for future diagnostic capture; currently unused.
- *                   Kept in the signature so call sites that pass it don't
- *                   need to change.
  */
-export function useSyncReady(
-  hasData: boolean,
-  isLoading: boolean,
-  _context?: Record<string, unknown>,
-) {
+export function useSyncReady(hasData: boolean, isLoading: boolean) {
   const syncStatus = useSafeStatus();
   const downloading = syncStatus.dataFlowStatus?.downloading ?? false;
 

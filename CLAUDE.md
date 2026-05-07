@@ -1143,6 +1143,33 @@ Key files:
 
 Only `/_next/static/` assets (hashed filenames) are precached. Page HTML routes are excluded because they require SSR auth checks and would fail with 302 redirects during SW installation, breaking the entire SW.
 
+### Precache must ignore Vercel's `?dpl=` query param (#160)
+
+Vercel's [Skew Protection](https://vercel.com/docs/skew-protection) — enabled on this project — appends `?dpl=<deployment-id>` to chunk URLs at runtime so old clients can resolve to the deployment they were built against. Next.js does this automatically; we do not control it.
+
+The trap: precache keys are stored **without** the query string (just `/_next/static/chunks/abc.js`), but the browser requests them **with** `?dpl=...`. By default, Serwist's precache matcher does an exact URL match, so the lookup misses, the SW falls through to network, and **offline → ChunkLoadError on any not-yet-visited route**. The chunk is sitting in the precache; we just couldn't find it.
+
+**Fix** in `sw.ts`:
+
+```ts
+const serwist = new Serwist({
+  precacheEntries,
+  precacheOptions: {
+    ignoreURLParametersMatching: [/^dpl$/],
+  },
+  ...
+});
+```
+
+Without this, the offline-first behavior of the app is silently broken for any page the user hasn't visited online during the current session. With it, every chunk in `__SW_MANIFEST` is reachable offline regardless of the `?dpl=` value the browser appends.
+
+**Why this took a while to diagnose:** the symptom was "errors in airplane mode" but `useSyncReady` was never the cause — pages crashed at the React boundary before hooks even ran, and the original `error.tsx` boundary swallowed the message. Adding a temporary debug panel that exposed `error.name` and `error.stack` revealed `ChunkLoadError` and the full URL with `?dpl=...`, which pointed at the precache match. Confirmed via `caches.open('serwist-precache-v2-...').match(url, { ignoreSearch: true })` returning `true` — the chunk was there, just not findable without `ignoreSearch`.
+
+**Diagnostic recipe** if a similar SW caching issue recurs:
+1. Temporarily render `error.message` + `error.stack` inside the `(app)/error.tsx` boundary (revert before merging).
+2. From the iPhone (Safari Develop menu), in Web Inspector console: `caches.keys()` to list cache buckets, then `caches.open(name).then(c => c.match(url, { ignoreSearch: true }))` to test specific URLs.
+3. If `match` returns truthy with `ignoreSearch: true` but falsy without, the issue is query-string mismatch — extend `ignoreURLParametersMatching`.
+
 ### App shell model for detail routes (`/activities/[id]`, `/soldiers/[id]`)
 
 These are `"use client"` pages — the server returns the **same HTML shell for every UUID**. Data comes entirely from PowerSync (local SQLite via OPFS). This enables caching one generic shell per route pattern so any detail page is accessible offline once a single detail was visited.
@@ -1661,3 +1688,16 @@ The `/support` page (`src/app/(app)/support/page.tsx`) is a client-side diagnost
 ### Navigation
 
 The support page link appears in both `Sidebar.tsx` (desktop) and `AppShell.tsx` (mobile tab bar) for all roles. It is a standard `(app)` layout page — requires authentication, uses PowerSync context.
+
+### Support page must work offline
+
+`/support` is included in `SHELL_ROUTES` in `sw.ts` and in the list-page branch of `resolveShellRoute()` so the shell is precached and the page renders even when the user has no network. This matters because the page is the user's diagnostic escape hatch — if it doesn't load, you can't get a bug report.
+
+`POST /api/support` itself still requires the network. When the fetch fails (or `navigator.onLine` is false at submit time), the page renders an amber fallback panel with two buttons:
+
+1. **העתק דיווח** — copies the full diagnostics-as-text to the clipboard via `navigator.clipboard.writeText`. The user can paste into WhatsApp / email / wherever.
+2. **פתח אימייל** — opens a `mailto:support@tironet.org.il` with a short body asking the user to paste the clipboard content. iOS practically caps mailto bodies around 2KB, so the full report goes via clipboard, not via the URL.
+
+The fallback also includes a `<details>` preview of the report text so the user can verify what's being sent.
+
+Implementation: `formatDiagnosticsAsText()` in `support/page.tsx` mirrors the email's `diagHtml` rendering but as plain text. The state holding the formatted text is set when the submit handler detects either `!navigator.onLine` upfront or a fetch failure.
