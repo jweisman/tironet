@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Send, CheckCircle, Loader2, RefreshCw, Bell } from "lucide-react";
 import { clearLocalDatabase } from "@/lib/powersync/clear-local-db";
+import { readPagePerf } from "@/hooks/usePagePerf";
 import { useSyncStatus, type SyncState } from "@/hooks/useSyncStatus";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -485,6 +486,27 @@ async function collectDiagnostics(
     diagnostics["Shell Cache"] = shellInfo;
   } catch (e) {
     diagnostics["Shell Cache"] = { error: String(e) };
+  }
+
+  // Page render timing — most-recent visit to each list page
+  // (recorded by usePagePerf hook, written to sessionStorage on each mount/data-ready)
+  try {
+    const pageTimings: Record<string, string> = {};
+    for (const pageId of ["soldiers", "activities", "requests"]) {
+      const entry = readPagePerf(pageId);
+      if (!entry) {
+        pageTimings[pageId] = "not visited this session";
+        continue;
+      }
+      const ago = Math.round((Date.now() - entry.loggedAt) / 1000);
+      const ready = entry.mountToReadyMs == null
+        ? "data not ready"
+        : `${entry.mountToReadyMs}ms mount→data`;
+      pageTimings[pageId] = `${ready} (${ago}s ago)`;
+    }
+    diagnostics["Page Render Timing"] = pageTimings;
+  } catch (e) {
+    diagnostics["Page Render Timing"] = { error: String(e) };
   }
 
   // Startup timeline — performance marks set by layout.tsx and AppShell

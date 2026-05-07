@@ -9,6 +9,7 @@ import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { usePowerSync } from "@powersync/react";
 import { useSyncReady } from "@/hooks/useSyncReady";
+import { usePagePerf } from "@/hooks/usePagePerf";
 import { RequestCard, type RequestSummary } from "@/components/requests/RequestCard";
 import { CreateRequestForm } from "@/components/requests/CreateRequestForm";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
@@ -257,6 +258,8 @@ export default function RequestsPage() {
     (rawRequests ?? []).length > 0,
     requestsLoading
   );
+
+  usePagePerf("requests", (rawRequests ?? []).length > 0);
 
   const isMedic = rawRole === "company_medic";
   const isCoordinator = rawRole === "hardship_coordinator";

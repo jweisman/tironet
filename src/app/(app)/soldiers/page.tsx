@@ -9,6 +9,8 @@ import { useCycle } from "@/contexts/CycleContext";
 import { useQuery } from "@powersync/react";
 import { useSyncReady } from "@/hooks/useSyncReady";
 import { effectiveRole } from "@/lib/auth/permissions";
+import { isRequestOpen } from "@/lib/requests/active";
+import { usePagePerf } from "@/hooks/usePagePerf";
 import { useTour } from "@/hooks/useTour";
 import { useTourContext } from "@/contexts/TourContext";
 import { soldiersTourSteps } from "@/lib/tour/steps";
@@ -77,8 +79,11 @@ const SOLDIERS_QUERY = `
 
 // Gap count as a single aggregation query instead of a correlated subquery per soldier.
 // Counts activities where the soldier has no report, a skipped report, or a failed report.
+// COUNT(*) (not COUNT(DISTINCT a.id)): the join produces at most one row per (soldier, activity)
+// because the (activity_id, soldier_id) pair is unique in activity_reports. wa-sqlite's
+// COUNT(DISTINCT) was timing out at 5s+ on iOS Safari with 5k+ activity_reports.
 const GAP_COUNT_QUERY = `
-  SELECT s.id AS soldier_id, COUNT(DISTINCT a.id) AS gap_count
+  SELECT s.id AS soldier_id, COUNT(*) AS gap_count
   FROM soldiers s
   JOIN squads sq ON sq.id = s.squad_id
   JOIN activities a ON a.platoon_id = sq.platoon_id
@@ -101,28 +106,19 @@ const OPEN_REQUEST_COUNT_QUERY = `
   GROUP BY r.soldier_id
 `;
 
-// Open requests = active (approved + date criteria) OR in-progress (status open)
-// Used for the active request icons on soldier cards and the "open requests" filter
+// Open requests = active (approved + date criteria) OR in-progress (status open).
+// Used for the active request icons on soldier cards and the "open requests" filter.
+//
+// Previous version inlined the date logic with json_each() over medical_appointments and
+// sick_days. wa-sqlite's json_each was so slow that even EXPLAIN QUERY PLAN timed out
+// (>5s) on iOS Safari. Now we fetch the candidate set (open + approved leave/medical)
+// and filter in JS using the shared isRequestOpen() helper.
 const OPEN_REQUESTS_QUERY = `
-  SELECT r.soldier_id, r.type, r.status, r.urgent, r.special_conditions
+  SELECT r.soldier_id, r.type, r.status, r.urgent, r.special_conditions,
+         r.departure_at, r.return_at, r.medical_appointments, r.sick_days
   FROM requests r
   WHERE r.cycle_id = ?
-    AND (
-      (r.status = 'approved' AND (
-        (r.type = 'leave' AND (r.departure_at >= DATE('now') OR r.return_at >= DATE('now')))
-        OR (r.type = 'medical' AND (
-          (r.medical_appointments IS NOT NULL AND EXISTS (
-            SELECT 1 FROM json_each(r.medical_appointments) AS a
-            WHERE json_extract(a.value, '$.date') >= DATE('now')
-          ))
-          OR (r.sick_days IS NOT NULL AND EXISTS (
-            SELECT 1 FROM json_each(r.sick_days) AS d
-            WHERE json_extract(d.value, '$.date') >= DATE('now')
-          ))
-        ))
-      ))
-      OR r.status = 'open'
-    )
+    AND (r.status = 'open' OR (r.status = 'approved' AND r.type IN ('leave', 'medical')))
 `;
 
 // Approved hardship requests — separate from "active" since they have no date criteria.
@@ -141,6 +137,10 @@ interface RawOpenRequest {
   status: string;
   urgent: number | null;
   special_conditions: number | null;
+  departure_at: string | null;
+  return_at: string | null;
+  medical_appointments: string | null;
+  sick_days: string | null;
 }
 
 interface RawHardshipRequest {
@@ -232,6 +232,8 @@ export default function SoldiersPage() {
     soldiersLoading
   );
 
+  usePagePerf("soldiers", (rawSoldiers ?? []).length > 0);
+
   // Build soldier → hardship set (for the hardship filter)
   const hardshipSoldierIds = useMemo(() => {
     const set = new Set<string>();
@@ -240,10 +242,20 @@ export default function SoldiersPage() {
   }, [rawHardshipRequests]);
 
   const allSquads: SquadData[] = useMemo(() => {
-    // Build soldier → approved requests map (with urgency info)
+    // Build soldier → approved requests map (with urgency info).
+    // Filter the raw candidate set (cycle's open + approved-leave/medical) down to
+    // currently-open requests via the shared isRequestOpen() helper.
     type ApprovedReq = { type: RequestType; urgent: boolean };
     const approvedMap = new Map<string, ApprovedReq[]>();
     for (const ar of rawOpenRequests ?? []) {
+      if (!isRequestOpen({
+        status: ar.status,
+        type: ar.type,
+        departureAt: ar.departure_at,
+        returnAt: ar.return_at,
+        medicalAppointments: ar.medical_appointments,
+        sickDays: ar.sick_days,
+      })) continue;
       const entry: ApprovedReq = {
         type: ar.type as RequestType,
         urgent: ar.type === "medical" && ar.urgent === 1,

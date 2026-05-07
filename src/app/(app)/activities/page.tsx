@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery, usePowerSync } from "@powersync/react";
+import { usePagePerf } from "@/hooks/usePagePerf";
 import { useSyncReady } from "@/hooks/useSyncReady";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { useTour } from "@/hooks/useTour";
@@ -198,6 +199,8 @@ export default function ActivitiesPage() {
     (rawActivities ?? []).length > 0,
     activitiesLoading
   );
+
+  usePagePerf("activities", (rawActivities ?? []).length > 0);
 
   const companyId = selectedAssignment?.unitType === "company" ? selectedAssignment.unitId : "";
   const platoonParams = useMemo(() => [companyId], [companyId]);
