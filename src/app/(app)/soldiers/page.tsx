@@ -6,7 +6,7 @@ import { Plus, AlertCircle, FileUp, FileText, WifiOff, HeartHandshake } from "lu
 import { toast } from "sonner";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useCycle } from "@/contexts/CycleContext";
-import { useQuery } from "@powersync/react";
+import { useTrackedQuery } from "@/hooks/useTrackedQuery";
 import { useSyncReady } from "@/hooks/useSyncReady";
 import { effectiveRole } from "@/lib/auth/permissions";
 import { isRequestOpen } from "@/lib/requests/active";
@@ -221,12 +221,12 @@ export default function SoldiersPage() {
 
   // -------- PowerSync queries --------
   const queryParams = useMemo(() => [selectedCycleId ?? ""], [selectedCycleId]);
-  const { data: rawSoldiers, isLoading: soldiersLoading } = useQuery<RawSoldier>(SOLDIERS_QUERY, queryParams);
-  const { data: rawSquads } = useQuery<RawSquad>(SQUADS_QUERY, queryParams);
-  const { data: rawOpenRequests } = useQuery<RawOpenRequest>(OPEN_REQUESTS_QUERY, queryParams);
-  const { data: rawHardshipRequests } = useQuery<RawHardshipRequest>(HARDSHIP_REQUESTS_QUERY, queryParams);
-  const { data: rawGapCounts } = useQuery<RawGapCount>(GAP_COUNT_QUERY, queryParams);
-  const { data: rawOpenRequestCounts } = useQuery<RawOpenRequestCount>(OPEN_REQUEST_COUNT_QUERY, queryParams);
+  const { data: rawSoldiers, isLoading: soldiersLoading } = useTrackedQuery<RawSoldier>("soldiers.SOLDIERS", SOLDIERS_QUERY, queryParams);
+  const { data: rawSquads } = useTrackedQuery<RawSquad>("soldiers.SQUADS", SQUADS_QUERY, queryParams);
+  const { data: rawOpenRequests } = useTrackedQuery<RawOpenRequest>("soldiers.OPEN_REQUESTS", OPEN_REQUESTS_QUERY, queryParams);
+  const { data: rawHardshipRequests } = useTrackedQuery<RawHardshipRequest>("soldiers.HARDSHIP", HARDSHIP_REQUESTS_QUERY, queryParams);
+  const { data: rawGapCounts } = useTrackedQuery<RawGapCount>("soldiers.GAP_COUNT", GAP_COUNT_QUERY, queryParams);
+  const { data: rawOpenRequestCounts } = useTrackedQuery<RawOpenRequestCount>("soldiers.OPEN_REQ_COUNT", OPEN_REQUEST_COUNT_QUERY, queryParams);
   const { showLoading, showConnectionError } = useSyncReady(
     (rawSoldiers ?? []).length > 0,
     soldiersLoading

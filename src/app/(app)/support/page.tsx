@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Send, CheckCircle, Loader2, RefreshCw, Bell } from "lucide-react";
 import { clearLocalDatabase } from "@/lib/powersync/clear-local-db";
 import { readPagePerf } from "@/hooks/usePagePerf";
+import { readTrackedQueries } from "@/hooks/useTrackedQuery";
 import { useSyncStatus, type SyncState } from "@/hooks/useSyncStatus";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -252,12 +253,12 @@ async function collectDiagnostics(
       },
       {
         label: "soldiers/GAP_COUNT",
-        sql: `SELECT s.id AS soldier_id, COUNT(DISTINCT a.id) AS gap_count FROM soldiers s JOIN squads sq ON sq.id = s.squad_id JOIN activities a ON a.platoon_id = sq.platoon_id AND a.cycle_id = s.cycle_id AND a.is_required = 1 AND a.status = 'active' AND a.date < DATE('now') LEFT JOIN activity_reports ar ON ar.activity_id = a.id AND ar.soldier_id = s.id WHERE s.cycle_id = ? AND (ar.id IS NULL OR ar.result = 'skipped' OR ar.failed = 1) GROUP BY s.id`,
+        sql: `SELECT s.id AS soldier_id, COUNT(*) AS gap_count FROM soldiers s JOIN squads sq ON sq.id = s.squad_id JOIN activities a ON a.platoon_id = sq.platoon_id AND a.cycle_id = s.cycle_id AND a.is_required = 1 AND a.status = 'active' AND a.date < DATE('now') LEFT JOIN activity_reports ar ON ar.activity_id = a.id AND ar.soldier_id = s.id WHERE s.cycle_id = ? AND (ar.id IS NULL OR ar.result = 'skipped' OR ar.failed = 1) GROUP BY s.id`,
         params: [cycleId],
       },
       {
         label: "soldiers/OPEN_REQUESTS",
-        sql: `SELECT r.soldier_id, r.type, r.status, r.urgent, r.special_conditions FROM requests r WHERE r.cycle_id = ? AND ((r.status = 'approved' AND ((r.type = 'leave' AND (r.departure_at >= DATE('now') OR r.return_at >= DATE('now'))) OR (r.type = 'medical' AND ((r.medical_appointments IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(r.medical_appointments) AS a WHERE json_extract(a.value, '$.date') >= DATE('now'))) OR (r.sick_days IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(r.sick_days) AS d WHERE json_extract(d.value, '$.date') >= DATE('now'))))))) OR r.status = 'open')`,
+        sql: `SELECT r.soldier_id, r.type, r.status, r.urgent, r.special_conditions, r.departure_at, r.return_at, r.medical_appointments, r.sick_days FROM requests r WHERE r.cycle_id = ? AND (r.status = 'open' OR (r.status = 'approved' AND r.type IN ('leave', 'medical')))`,
         params: [cycleId],
       },
       {
@@ -507,6 +508,17 @@ async function collectDiagnostics(
     diagnostics["Page Render Timing"] = pageTimings;
   } catch (e) {
     diagnostics["Page Render Timing"] = { error: String(e) };
+  }
+
+  // Per-query lifecycle stats from useTrackedQuery — counts emits and re-fetches
+  // so we can tell whether one slow first emit or many re-runs is the bottleneck.
+  try {
+    const tracked = readTrackedQueries();
+    diagnostics["Query Lifecycle"] = Object.keys(tracked).length === 0
+      ? { note: "no tracked queries (visit a page first)" }
+      : tracked;
+  } catch (e) {
+    diagnostics["Query Lifecycle"] = { error: String(e) };
   }
 
   // Startup timeline — performance marks set by layout.tsx and AppShell

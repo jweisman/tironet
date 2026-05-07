@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 import { useCycle } from "@/contexts/CycleContext";
 import { useQuery, usePowerSync } from "@powersync/react";
+import { useTrackedQuery } from "@/hooks/useTrackedQuery";
 import { usePagePerf } from "@/hooks/usePagePerf";
 import { useSyncReady } from "@/hooks/useSyncReady";
 import { effectiveRole } from "@/lib/auth/permissions";
@@ -192,9 +193,9 @@ export default function ActivitiesPage() {
   const cycleId = selectedCycleId ?? "";
   const activityParams = useMemo(() => [cycleId], [cycleId]);
   const countsParams = useMemo(() => [cycleId, squadId, squadId], [cycleId, squadId]);
-  const { data: rawActivities, isLoading: activitiesLoading } = useQuery<RawActivity>(ACTIVITIES_QUERY, activityParams);
-  const { data: rawReportCounts } = useQuery<RawReportCounts>(REPORT_COUNTS_QUERY, countsParams);
-  const { data: rawSoldierCounts } = useQuery<RawSoldierCounts>(SOLDIER_COUNTS_QUERY, countsParams);
+  const { data: rawActivities, isLoading: activitiesLoading } = useTrackedQuery<RawActivity>("activities.ACTIVITIES", ACTIVITIES_QUERY, activityParams);
+  const { data: rawReportCounts } = useTrackedQuery<RawReportCounts>("activities.REPORT_COUNTS", REPORT_COUNTS_QUERY, countsParams);
+  const { data: rawSoldierCounts } = useTrackedQuery<RawSoldierCounts>("activities.SOLDIER_COUNTS", SOLDIER_COUNTS_QUERY, countsParams);
   const { showLoading, showConnectionError } = useSyncReady(
     (rawActivities ?? []).length > 0,
     activitiesLoading
