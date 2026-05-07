@@ -220,17 +220,24 @@ async function collectDiagnostics(
     const cycleId = selectedCycleId ?? "";
     const probe: Record<string, unknown> = {};
 
-    // 1. List user-defined indexes (excludes sqlite_autoindex_* and ps_* internal indexes)
+    // 1. List user-defined indexes. PowerSync stores synced rows in ps_data__<view> tables
+    // and exposes the friendly name as a SQLite view, so our indexes attach to ps_data__*.
+    // Filter by sql IS NOT NULL to skip implicit primary-key indexes.
     try {
       const idxResult = await safeExecute(
         db,
         `SELECT tbl_name, name FROM sqlite_master
-         WHERE type='index' AND name NOT LIKE 'sqlite_%' AND tbl_name NOT LIKE 'ps_%'
+         WHERE type='index' AND sql IS NOT NULL
          ORDER BY tbl_name, name`,
       );
       const idxRows = idxResult.rows?._array ?? [];
       probe.indexCount = idxRows.length;
-      probe.indexes = idxRows.map((r: Record<string, unknown>) => `${r.tbl_name}.${r.name}`);
+      probe.indexes = idxRows
+        .map((r: Record<string, unknown>) => {
+          const tbl = String(r.tbl_name ?? "").replace(/^ps_data__/, "");
+          return `${tbl}.${r.name}`;
+        })
+        .join(", ") || "(none)";
     } catch (e) {
       probe.indexes = `error: ${String(e)}`;
     }
@@ -274,10 +281,10 @@ async function collectDiagnostics(
       },
     ];
 
-    const benchmarks: Record<string, unknown> = {};
+    // Each query gets two flat keys: `<label>` (timing summary) and `<label>.plan` (query plan).
+    // Flat values are required because the email renderer only expands one level of nesting.
     for (const { label, sql, params } of HOT) {
       try {
-        // Plan
         const plan = await safeExecute(db, `EXPLAIN QUERY PLAN ${sql}`, params);
         const planRows = plan.rows?._array ?? [];
         const planText = planRows
@@ -285,7 +292,6 @@ async function collectDiagnostics(
           .filter(Boolean)
           .join(" | ");
 
-        // Time 3 runs
         const times: number[] = [];
         let rowCount = 0;
         for (let i = 0; i < 3; i++) {
@@ -296,16 +302,12 @@ async function collectDiagnostics(
           if (i === 0) rowCount = res.rows?._array?.length ?? 0;
         }
 
-        benchmarks[label] = {
-          rowCount,
-          timesMs: times.join(", "),
-          plan: planText.length > 400 ? `${planText.slice(0, 400)}…` : planText,
-        };
+        probe[label] = `rows=${rowCount} times=${times.join("/")}ms`;
+        probe[`${label}.plan`] = planText.length > 600 ? `${planText.slice(0, 600)}…` : planText;
       } catch (e) {
-        benchmarks[label] = { error: String(e) };
+        probe[label] = `error: ${String(e)}`;
       }
     }
-    probe.queries = benchmarks;
 
     diagnostics["Performance Probe"] = probe;
   } catch (e) {
