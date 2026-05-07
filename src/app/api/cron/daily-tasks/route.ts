@@ -12,7 +12,7 @@ import {
 import { hebrewCount } from "@/lib/utils/hebrew-count";
 
 const NOTIFICATION_TIME_ZONE = "Asia/Jerusalem";
-const MAX_DETAIL_ROWS = 4;
+const MAX_DETAIL_ROWS = 3;
 const ALL_DAY_SORT_SUFFIX = "T99:99";
 
 /**
@@ -359,7 +359,11 @@ async function sendActiveRequestNotifications(
         ? `יש בקשה פעילה אחת ${label}`
         : `יש ${requestCount} בקשות פעילות ${label}`;
     const visible = userEvents.slice(0, MAX_DETAIL_ROWS);
-    const more = userEvents.length > MAX_DETAIL_ROWS ? "\nועוד..." : "";
+    const remaining = userEvents.length - MAX_DETAIL_ROWS;
+    const more =
+      remaining > 0
+        ? `\nועוד ${hebrewCount(remaining, "בקשה", "בקשות")}`
+        : "";
     const body = `${opener}\n${visible.map((e) => e.detail).join("\n")}${more}`;
 
     total++;

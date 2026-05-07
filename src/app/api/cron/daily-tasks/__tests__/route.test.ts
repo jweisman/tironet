@@ -259,7 +259,7 @@ describe("GET /api/cron/daily-tasks", () => {
     );
   });
 
-  it("morning: caps detail rows at 4 and appends ועוד...", async () => {
+  it("morning: caps detail rows at 3 and appends remaining count", async () => {
     const todayStr = new Date().toISOString().split("T")[0];
 
     mockAssignments.mockResolvedValue([
@@ -282,8 +282,33 @@ describe("GET /api/cron/daily-tasks", () => {
     expect(res.status).toBe(200);
     const call = mockSendPush.mock.calls[0];
     expect(call?.[1].body).toMatch(/^יש 6 בקשות פעילות להיום\n/);
-    // First 4 detail rows + ועוד
-    expect(call?.[1].body.split("\n")).toHaveLength(6); // opener + 4 rows + ועוד...
-    expect(call?.[1].body.endsWith("\nועוד...")).toBe(true);
+    // opener + 3 rows + remaining count line
+    expect(call?.[1].body.split("\n")).toHaveLength(5);
+    expect(call?.[1].body.endsWith("\nועוד 3 בקשות")).toBe(true);
+  });
+
+  it("morning: uses singular noun when only one extra request remains", async () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    mockAssignments.mockResolvedValue([
+      { userId: "user-1", unitId: "squad-1", unitType: "squad", role: "squad_commander", cycleId: "cycle-1" },
+    ] as never);
+    const requests = Array.from({ length: 4 }, (_, i) => ({
+      id: `req-${i}`,
+      type: "medical",
+      departureAt: null,
+      returnAt: null,
+      medicalAppointments: JSON.stringify([
+        { id: `a${i}`, date: `${todayStr}T${String(6 + i).padStart(2, "0")}:00:00Z`, place: "X", type: "Y" },
+      ]),
+      sickDays: null,
+      soldier: { squadId: "squad-1", familyName: "כהן", givenName: `סולדייר${i}` },
+    }));
+    mockRequests.mockResolvedValue(requests as never);
+
+    const res = await GET(makeRequest("test-secret", "morning"));
+    expect(res.status).toBe(200);
+    const call = mockSendPush.mock.calls[0];
+    expect(call?.[1].body.endsWith("\nועוד בקשה 1")).toBe(true);
   });
 });
