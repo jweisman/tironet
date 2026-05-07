@@ -46,7 +46,7 @@ describe("GET /api/push/preferences", () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ dailyTasksEnabled: true, requestAssignmentEnabled: true, activeRequestsEnabled: true, newAppointmentEnabled: true, severeIncidentEnabled: true, reminderLeadMinutes: null });
+    expect(body).toEqual({ channel: "off", dailyTasksEnabled: true, requestAssignmentEnabled: true, activeRequestsEnabled: true, newAppointmentEnabled: true, severeIncidentEnabled: true, reminderLeadMinutes: null });
   });
 
   it("returns stored preferences", async () => {
@@ -54,6 +54,7 @@ describe("GET /api/push/preferences", () => {
     mockFindUnique.mockResolvedValue({
       id: "pref-1",
       userId: "user-1",
+      channel: "in_app",
       dailyTasksEnabled: false,
       requestAssignmentEnabled: true,
       activeRequestsEnabled: false,
@@ -64,7 +65,7 @@ describe("GET /api/push/preferences", () => {
 
     const res = await GET();
     const body = await res.json();
-    expect(body).toEqual({ dailyTasksEnabled: false, requestAssignmentEnabled: true, activeRequestsEnabled: false, newAppointmentEnabled: true, severeIncidentEnabled: true, reminderLeadMinutes: 30 });
+    expect(body).toEqual({ channel: "in_app", dailyTasksEnabled: false, requestAssignmentEnabled: true, activeRequestsEnabled: false, newAppointmentEnabled: true, severeIncidentEnabled: true, reminderLeadMinutes: 30 });
   });
 });
 
