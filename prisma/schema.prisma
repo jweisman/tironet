@@ -462,15 +462,24 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
+enum NotificationChannel {
+  off
+  in_app
+  sms
+
+  @@map("notification_channel")
+}
+
 model NotificationPreference {
-  id                       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId                   String  @unique @map("user_id") @db.Uuid
-  dailyTasksEnabled        Boolean @default(true) @map("daily_tasks_enabled")
-  requestAssignmentEnabled Boolean @default(true) @map("request_assignment_enabled")
-  activeRequestsEnabled    Boolean @default(true) @map("active_requests_enabled")
-  newAppointmentEnabled    Boolean @default(true) @map("new_appointment_enabled")
-  severeIncidentEnabled    Boolean @default(true) @map("severe_incident_enabled")
-  reminderLeadMinutes      Int?    @map("reminder_lead_minutes")
+  id                       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                   String              @unique @map("user_id") @db.Uuid
+  channel                  NotificationChannel @default(off)
+  dailyTasksEnabled        Boolean             @default(true) @map("daily_tasks_enabled")
+  requestAssignmentEnabled Boolean             @default(true) @map("request_assignment_enabled")
+  activeRequestsEnabled    Boolean             @default(true) @map("active_requests_enabled")
+  newAppointmentEnabled    Boolean             @default(true) @map("new_appointment_enabled")
+  severeIncidentEnabled    Boolean             @default(true) @map("severe_incident_enabled")
+  reminderLeadMinutes      Int?                @map("reminder_lead_minutes")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

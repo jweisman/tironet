@@ -17,7 +17,7 @@ A web application for managing IDF training cycles: soldiers, activities, attend
 - **Invitation system** — Admins and commanders invite users by email or SMS; if the user already exists, they are assigned directly to the cycle without an invitation link
 - **Authentication** — Google OAuth, email magic link (Nodemailer), and SMS OTP (Twilio Verify)
 - **Admin panel** — Manage cycles, companies, platoons, squads, activity types, and users
-- **Push notifications** — Daily task reminders for squad commanders (missing activity reports), real-time request assignment alerts, and scheduled reminders before medical appointments and leave departures (via QStash); opt-out per notification type and configurable reminder lead time in the profile page
+- **Notifications** — Daily task reminders for squad commanders (missing activity reports), real-time request assignment alerts, and scheduled reminders before medical appointments and leave departures (via QStash). Each user picks a delivery channel (off / in-app push / SMS) plus opt-out per notification type and configurable reminder lead time in the profile page
 - **Guided tour** — Interactive walkthrough (driver.js) on each main page; auto-starts on first visit, re-launchable via the help button in the header/sidebar
 - **Support & diagnostics** — In-app support page that collects device, browser, PowerSync sync status, table row counts, and JWT claims, then emails a formatted diagnostic report to the support team
 - **Company branding** — Upload a company logo (admin structure page) displayed on the dashboard; falls back to the IDF emblem

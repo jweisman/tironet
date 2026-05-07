@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/db/prisma";
+import { sendSms } from "@/lib/twilio";
 
 // Configure VAPID credentials lazily so the module can be imported even when
 // env vars are missing (e.g. in CI/e2e where push is not needed).
@@ -111,38 +112,137 @@ export async function sendPushToUser(
   return result;
 }
 
+function getAbsoluteUrl(relativeUrl: string): string {
+  // Prefer NEXT_PUBLIC_APP_URL — that's the URL the recipient's browser will
+  // use. APP_URL exists for Docker-internal calls (e.g. QStash → Next.js) and
+  // points at host.docker.internal in dev, which is unreachable from a phone.
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "");
+  if (!base) return relativeUrl;
+  return relativeUrl.startsWith("http") ? relativeUrl : base + relativeUrl;
+}
+
 /**
- * Send push notifications to multiple users, respecting their notification
- * preferences.
+ * Soft cap on outgoing SMS length (~4-5 Hebrew segments at 70 chars each).
+ * Safety belt against a future code path that builds an unbounded body —
+ * Twilio would otherwise charge per segment up to its own ~1600-char limit.
+ */
+const MAX_SMS_LENGTH = 320;
+
+/**
+ * Format a notification payload as an SMS body. The title is dropped — SMS has
+ * no separate heading like push, so the title would just be noise. The body is
+ * truncated if necessary, preserving the URL so the recipient can always open
+ * the full content in the app.
+ */
+export function formatSmsBody(payload: PushPayload): string {
+  const suffix = `\n${getAbsoluteUrl(payload.url)}`;
+  const maxBody = Math.max(0, MAX_SMS_LENGTH - suffix.length);
+  const body =
+    payload.body.length > maxBody
+      ? payload.body.slice(0, Math.max(0, maxBody - 1)) + "…"
+      : payload.body;
+  return body + suffix;
+}
+
+/**
+ * Send a notification as SMS to a user's phone number.
+ */
+export async function sendSmsToUser(
+  userId: string,
+  phone: string,
+  payload: PushPayload,
+): Promise<void> {
+  try {
+    await sendSms(phone, formatSmsBody(payload));
+    console.log(`[sms] sent "${payload.title}" to user ${userId}`);
+  } catch (err) {
+    console.warn(`[sms] failed to send to user ${userId}:`, err);
+  }
+}
+
+type PreferenceField =
+  | "dailyTasksEnabled"
+  | "requestAssignmentEnabled"
+  | "activeRequestsEnabled"
+  | "newAppointmentEnabled"
+  | "severeIncidentEnabled";
+
+/**
+ * Send notifications to multiple users, respecting per-user channel choice
+ * (off / in_app / sms) and the per-notification preference toggle.
+ *
+ * Users without a preference row default to channel=in_app and enabled=true
+ * (opt-out model). SMS recipients without a phone number are skipped.
  */
 export async function sendPushToUsers(
   userIds: string[],
   payload: PushPayload,
-  preferenceField: "dailyTasksEnabled" | "requestAssignmentEnabled" | "activeRequestsEnabled" | "newAppointmentEnabled" | "severeIncidentEnabled",
+  preferenceField: PreferenceField,
 ): Promise<void> {
   if (userIds.length === 0) {
-    console.log(`[push] sendPushToUsers called with empty userIds for ${preferenceField}`);
+    console.log(`[notify] sendPushToUsers called with empty userIds for ${preferenceField}`);
     return;
   }
 
-  // Load preferences for all target users in one query.
-  const prefs = await prisma.notificationPreference.findMany({
-    where: { userId: { in: userIds } },
-    select: { userId: true, dailyTasksEnabled: true, requestAssignmentEnabled: true, activeRequestsEnabled: true, newAppointmentEnabled: true, severeIncidentEnabled: true },
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: {
+      id: true,
+      phone: true,
+      notificationPreference: {
+        select: {
+          channel: true,
+          dailyTasksEnabled: true,
+          requestAssignmentEnabled: true,
+          activeRequestsEnabled: true,
+          newAppointmentEnabled: true,
+          severeIncidentEnabled: true,
+        },
+      },
+    },
   });
 
-  const prefMap = new Map(prefs.map((p) => [p.userId, p[preferenceField]]));
+  const tasks: Promise<unknown>[] = [];
+  let pushCount = 0;
+  let smsCount = 0;
+  let skippedOff = 0;
+  let skippedPref = 0;
+  let skippedNoPhone = 0;
 
-  // Users without a preference row default to enabled (opt-out model).
-  const eligibleUserIds = userIds.filter((id) => prefMap.get(id) !== false);
-  const skippedByPref = userIds.length - eligibleUserIds.length;
-  if (skippedByPref > 0) {
-    console.log(`[push] ${skippedByPref}/${userIds.length} users opted out of ${preferenceField}`);
+  for (const user of users) {
+    const pref = user.notificationPreference;
+    // Opt-in model: a user with no preference row hasn't picked a channel yet,
+    // so we don't send anything. The per-notification toggles still default to
+    // true once the user does set up a row.
+    const channel = pref?.channel ?? "off";
+    const enabled = pref?.[preferenceField] ?? true;
+
+    if (channel === "off") {
+      skippedOff++;
+      continue;
+    }
+    if (!enabled) {
+      skippedPref++;
+      continue;
+    }
+
+    if (channel === "sms") {
+      if (!user.phone) {
+        skippedNoPhone++;
+        continue;
+      }
+      smsCount++;
+      tasks.push(sendSmsToUser(user.id, user.phone, payload));
+    } else {
+      pushCount++;
+      tasks.push(sendPushToUser(user.id, payload));
+    }
   }
 
-  console.log(`[push] sending "${payload.title}" to ${eligibleUserIds.length} users (${preferenceField})`);
-
-  await Promise.allSettled(
-    eligibleUserIds.map((id) => sendPushToUser(id, payload)),
+  console.log(
+    `[notify] "${payload.title}" (${preferenceField}): ${pushCount} push, ${smsCount} sms, ` +
+    `skipped ${skippedOff} off, ${skippedPref} opt-out, ${skippedNoPhone} no-phone (of ${userIds.length})`,
   );
+
+  await Promise.allSettled(tasks);
 }
