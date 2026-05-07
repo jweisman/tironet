@@ -1463,24 +1463,45 @@ This creates a separate `tironet_test` database so e2e tests don't touch the dev
 - `PS_JWT_SECRET_B64URL` is its base64url encoding (used by PowerSync to verify tokens via JWKS) — needs `PS_` prefix
 - `PS_JWT_AUDIENCE` is the allowed JWT audience value (must match `NEXT_PUBLIC_POWERSYNC_URL`)
 
-## Push Notifications
+## Notifications
 
 ### Architecture
 
-Push notifications use the **Web Push API** (W3C standard) with **VAPID** authentication. No Firebase or Apple Developer account needed — the `web-push` npm package handles FCM (Chrome/Android) and Apple Push (Safari/iOS) endpoints transparently.
+Notifications support two delivery channels: **Web Push** (W3C standard) with **VAPID** authentication, and **SMS** via Twilio Messaging Service. Each user picks a channel (`off`, `in_app`, `sms`) on the profile page; the dispatcher routes accordingly.
 
 Key components:
-- `src/lib/push/send.ts` — server-side utility for sending push via `web-push`. Handles stale subscription cleanup (410/404) and per-user preference checking.
+- `src/lib/push/send.ts` — server-side dispatcher (`sendPushToUsers`) that routes by channel: skips `off`, sends push for `in_app`, sends SMS for `sms`. Also exports `sendPushToUser` (push-only), `sendSmsToUser`, and `formatSmsBody`. Handles stale push subscription cleanup (403/404/410).
+- `src/lib/twilio.ts` — `sendSms(to, body)` via Twilio Messaging Service.
 - `src/hooks/usePushSubscription.ts` — client-side hook for managing browser push subscription state, permission, and iOS detection.
 - `src/app/sw.ts` — `push` and `notificationclick` event listeners in the service worker.
-- `src/app/api/push/subscribe/route.ts` — POST/DELETE for managing push subscriptions.
-- `src/app/api/push/preferences/route.ts` — GET/PATCH for notification preference toggles.
+- `src/app/api/push/subscribe/route.ts` — POST/DELETE for managing push subscriptions. POST also auto-creates a `NotificationPreference` row (channel defaults to `in_app`).
+- `src/app/api/push/preferences/route.ts` — GET/PATCH for the channel selector and per-notification toggles.
 - `src/app/api/cron/daily-tasks/route.ts` — Vercel Cron job for nightly squad commander reminders.
+
+### Channel routing
+
+`sendPushToUsers(userIds, payload, preferenceField)` performs one query against `User` (joined to `notificationPreference`) and dispatches per recipient:
+
+| Channel | Phone | Per-notification toggle | Action |
+|---|---|---|---|
+| `off` | — | — | skip |
+| any | — | `false` | skip |
+| `in_app` | — | `true` | send web push to every device subscription |
+| `sms` | absent | `true` | skip (no number to send to) |
+| `sms` | present | `true` | send SMS via Twilio Messaging Service |
+
+**Opt-in model.** Users without a `NotificationPreference` row are treated as `channel=off` and receive nothing. The schema column default is also `off`. Subscribing to push (the explicit user action of clicking "Enable notifications") is the one path that creates a row with `channel=in_app`; this is set explicitly in the subscribe POST handler, not via the schema default. Per-notification toggles still default to `true` once a row exists — those represent whether the user wants each *category* of notification, not whether they want notifications at all.
+
+Existing users predating this change have rows with `channel=in_app` (set by the column default applied during the initial migration). The default flip to `off` only affects rows created from this point forward.
+
+The SMS body is `{body}\n{absoluteUrl}`. The push payload's `title` is **dropped** for SMS — there's no separate heading slot like in push notifications, so the title would just be noise. Make sure the `body` is self-contained when added to a payload that may be delivered as SMS. Absolute URLs are resolved from `NEXT_PUBLIC_APP_URL ?? APP_URL`. **Prefer `NEXT_PUBLIC_APP_URL`** — that's the URL the recipient's browser uses (`http://localhost:3001` in dev, `https://tironet.org.il` in prod). `APP_URL` exists for Docker-internal calls (e.g. QStash container → Next.js host) and points at `host.docker.internal` in dev, which is unreachable from a phone. If neither is set the relative path is used as-is.
+
+**SMS length cap (`MAX_SMS_LENGTH = 320`):** `formatSmsBody` truncates the body (preserving the URL) so the total message stays at ~4-5 Hebrew segments. This is a safety belt against a future code path building an unbounded body — Twilio would otherwise charge per segment up to its own ~1600-char hard limit. Today's bodies are well under the cap; raise the constant if a legitimate notification needs more.
 
 ### Database models
 
 - **`PushSubscription`** — per-device subscription (endpoint, p256dh, auth). One user can have multiple devices. Keyed by `endpoint` (unique).
-- **`NotificationPreference`** — per-user opt-out toggles. One-to-one with User. Created automatically when a user subscribes to push; deleted when their last subscription is removed.
+- **`NotificationPreference`** — per-user channel + opt-out toggles. One-to-one with User. Auto-created when a user subscribes to push (or via PATCH preferences) with `channel = in_app` by default. **Not deleted** when the last subscription is removed — an SMS-only user might have zero push subscriptions, and we mustn't lose their `channel = sms` choice.
 
 Neither model is synced via PowerSync — they are server-only.
 
@@ -1514,7 +1535,7 @@ Generated once with `npx web-push generate-vapid-keys`. Stored as environment va
 
    Opt-out via `requestAssignmentEnabled`.
 
-3. **Active Requests Daily** (scheduled, #202) — same cron as daily tasks. Notifies squad and platoon commanders about approved requests (leave/medical) active on the target date. Scoped by the commander's assigned squads/platoons. The body opens with the request count (`יש N בקשות פעילות {להיום|למחר}`) and lists up to 4 detail rows ordered earliest-time-first, with `ועוד...` when there are more. Detail rows reuse the home-page leave wording — `{name} יציאה עד HH:MM` / `חזרה עד HH:MM` / `ביציאה` for leave, `{name} תור רפואי בשעה HH:MM` (or no time for date-only) per appointment, and `{name} ביום מחלה` per sick day. Shared formatters live in `src/lib/requests/active.ts` (`getLeaveOnDate`, `formatLeaveOnDateLabel`, `formatMedicalApptShortLabel`, `SICK_DAY_SHORT_LABEL`); server-side callers must pass `timeZone: "Asia/Jerusalem"` since Vercel runs in UTC. Opt-out via `activeRequestsEnabled`.
+3. **Active Requests Daily** (scheduled, #202) — same cron as daily tasks. Notifies squad and platoon commanders about approved requests (leave/medical) active on the target date. Scoped by the commander's assigned squads/platoons. The body opens with the request count (`יש N בקשות פעילות {להיום|למחר}`) and lists up to 3 detail rows ordered earliest-time-first, with `ועוד N בקשות` when there are more. The cap is 3 (not more) so the full body fits inside iOS's lock-screen preview window — beyond that iOS truncates with its own "..." indicator and the "more" line gets clipped. The "more" line uses an explicit count (not bare `ועוד...`) because a standalone Hebrew word + ASCII `...` is bidi-ambiguous and renders unreliably. Detail rows reuse the home-page leave wording — `{name} יציאה עד HH:MM` / `חזרה עד HH:MM` / `ביציאה` for leave, `{name} תור רפואי בשעה HH:MM` (or no time for date-only) per appointment, and `{name} ביום מחלה` per sick day. Shared formatters live in `src/lib/requests/active.ts` (`getLeaveOnDate`, `formatLeaveOnDateLabel`, `formatMedicalApptShortLabel`, `SICK_DAY_SHORT_LABEL`); server-side callers must pass `timeZone: "Asia/Jerusalem"` since Vercel runs in UTC. Opt-out via `activeRequestsEnabled`.
 
    **Leave label state machine** (`getLeaveOnDate(dep, ret, dateStr, now?)`): the operative event for a leave on a given date depends on which boundary falls on that date — and, when `now` is provided, on whether the departure time has passed. This is shared between the home page callout and the notification so they agree.
 
@@ -1608,10 +1629,10 @@ This applies to all fire-and-forget work: push notifications, analytics, logging
 ### Adding new notification types
 
 1. Add a new preference field to `NotificationPreference` (Prisma schema + migration).
-2. Add a toggle in the profile page's notifications section.
-3. Call `sendPushToUsers()` with the new preference field name from the trigger point, wrapped in `after()`.
+2. Add a toggle in the profile page's notifications section. The toggle applies to all channels — there is no separate per-channel opt-out.
+3. Call `sendPushToUsers()` with the new preference field name from the trigger point, wrapped in `after()`. The dispatcher handles channel routing — no extra code per channel.
 4. If the trigger is a workflow action, add the call to **both** the online and connector code paths (see gotcha above).
-5. The push payload's `url` field determines where the notification click navigates.
+5. The payload's `url` field determines where the notification click navigates (push) or what link is appended to the SMS body (sms). Use a relative path; the dispatcher prepends `APP_URL`/`NEXT_PUBLIC_APP_URL` for SMS.
 
 ## Support / Diagnostics Page
 

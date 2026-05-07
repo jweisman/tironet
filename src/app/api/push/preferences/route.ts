@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth/auth";
 import { rescheduleRemindersForUser } from "@/lib/reminders/schedule";
 
 const patchSchema = z.object({
+  channel: z.enum(["off", "in_app", "sms"]).optional(),
   dailyTasksEnabled: z.boolean().optional(),
   requestAssignmentEnabled: z.boolean().optional(),
   activeRequestsEnabled: z.boolean().optional(),
@@ -37,6 +38,7 @@ export async function GET() {
   });
 
   return NextResponse.json({
+    channel: pref?.channel ?? "off",
     dailyTasksEnabled: pref?.dailyTasksEnabled ?? true,
     requestAssignmentEnabled: pref?.requestAssignmentEnabled ?? true,
     activeRequestsEnabled: pref?.activeRequestsEnabled ?? true,
@@ -84,6 +86,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   return NextResponse.json({
+    channel: pref.channel,
     dailyTasksEnabled: pref.dailyTasksEnabled,
     requestAssignmentEnabled: pref.requestAssignmentEnabled,
     activeRequestsEnabled: pref.activeRequestsEnabled,

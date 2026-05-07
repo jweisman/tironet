@@ -19,6 +19,7 @@ vi.mock("@/lib/db/prisma", () => ({
 }));
 
 import { fetchDailyForum, getIsraelDates, renderDailyForumHtml } from "../render-daily-forum";
+import type { OpenRequestItem } from "../render-daily-forum";
 import { prisma } from "@/lib/db/prisma";
 
 const mockCycleFindUnique = vi.mocked(prisma.cycle.findUnique);
@@ -451,8 +452,7 @@ describe("renderDailyForumHtml", () => {
   it("contains expected Hebrew headers", () => {
     const html = renderDailyForumHtml(emptyData);
     expect(html).toContain("דוח פורום יומי");
-    expect(html).toContain("בקשות ממתינות");
-    expect(html).toContain("בקשות פעילות");
+    expect(html).toContain("בקשות");
     expect(html).toContain("הספקים");
     expect(html).toContain("פעילויות היום");
     expect(html).toContain("פעילויות מחר");
@@ -556,10 +556,104 @@ describe("renderDailyForumHtml", () => {
 
   it("shows empty state messages", () => {
     const html = renderDailyForumHtml(emptyData);
-    expect(html).toContain("אין בקשות ממתינות");
-    expect(html).toContain("אין בקשות פעילות");
+    expect(html).toContain("אין בקשות");
     expect(html).toContain("אין פעילויות להיום");
     expect(html).toContain("אין פעילויות למחר");
     expect(html).toContain("אין פערים");
+  });
+
+  it("groups requests by type, then by status", () => {
+    const sample = (overrides: Partial<OpenRequestItem> = {}): OpenRequestItem => ({
+      id: "r1",
+      type: "leave",
+      typeLabel: "יציאה",
+      soldierName: "Cohen Avi",
+      squad: "כיתה 1",
+      status: "open",
+      assignedRole: "platoon_commander",
+      description: null,
+      createdAt: "2026-04-07T08:00:00Z",
+      place: null,
+      departureAt: null,
+      returnAt: null,
+      transportation: null,
+      paramedicDate: null,
+      medicalAppointments: null,
+      sickDays: null,
+      specialConditions: null,
+      notes: [],
+      ...overrides,
+    });
+    const data = {
+      ...emptyData,
+      platoons: [
+        {
+          ...emptyData.platoons[0],
+          openRequests: {
+            medical: [sample({ id: "om1" })],
+            hardship: [sample({ id: "oh1" })],
+            leave: [sample({ id: "ol1" })],
+          },
+          activeRequests: {
+            medical: [sample({ id: "am1", status: "approved", assignedRole: null })],
+            leave: [sample({ id: "al1", status: "approved", assignedRole: null })],
+          },
+        },
+      ],
+    };
+    const html = renderDailyForumHtml(data);
+    // Each type appears as its own section header
+    expect(html).toContain("רפואה");
+    expect(html).toContain("ת&quot;ש");
+    expect(html).toContain("יציאה");
+    // Status sub-headers appear with counts
+    expect(html).toContain("ממתינות (1)");
+    expect(html).toContain("פעילות (1)");
+    // Type appears before its status sub-headers
+    const medicalIdx = html.indexOf("רפואה");
+    const firstPendingIdx = html.indexOf("ממתינות", medicalIdx);
+    const firstActiveIdx = html.indexOf("פעילות", medicalIdx);
+    expect(firstPendingIdx).toBeGreaterThan(medicalIdx);
+    expect(firstActiveIdx).toBeGreaterThan(firstPendingIdx);
+  });
+
+  it("hardship type only shows ממתינות sub-section (no פעילות)", () => {
+    const sample = (overrides: Partial<OpenRequestItem> = {}): OpenRequestItem => ({
+      id: "r1",
+      type: "leave",
+      typeLabel: "יציאה",
+      soldierName: "Cohen Avi",
+      squad: "כיתה 1",
+      status: "open",
+      assignedRole: "platoon_commander",
+      description: null,
+      createdAt: "2026-04-07T08:00:00Z",
+      place: null,
+      departureAt: null,
+      returnAt: null,
+      transportation: null,
+      paramedicDate: null,
+      medicalAppointments: null,
+      sickDays: null,
+      specialConditions: null,
+      notes: [],
+      ...overrides,
+    });
+    const data = {
+      ...emptyData,
+      platoons: [
+        {
+          ...emptyData.platoons[0],
+          openRequests: { medical: [], hardship: [sample({ id: "oh1" })], leave: [] },
+          activeRequests: { medical: [], leave: [] },
+        },
+      ],
+    };
+    const html = renderDailyForumHtml(data);
+    expect(html).toContain("ת&quot;ש");
+    expect(html).toContain("ממתינות (1)");
+    // Only hardship section exists, and it has no פעילות sub-header
+    const hardshipIdx = html.indexOf("ת&quot;ש");
+    expect(html.indexOf("פעילות", hardshipIdx)).toBe(-1);
   });
 });

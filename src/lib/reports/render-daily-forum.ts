@@ -767,9 +767,8 @@ const ROLE_LABELS: Record<string, string> = {
   company_commander: 'מ"פ', deputy_company_commander: 'סמ"פ', instructor: "מדריך", company_medic: 'חופ"ל', hardship_coordinator: 'מש"קית ת"ש',
 };
 
-function renderRequestTypeSection(title: string, requests: OpenRequestItem[], options?: { highlightDates?: boolean }): string {
-  if (requests.length === 0) return "";
-  const cards = requests.map((req) => {
+function renderRequestCards(requests: OpenRequestItem[], options?: { highlightDates?: boolean }): string {
+  return requests.map((req) => {
     const details = renderRequestDetailsHtml(req, options);
     const statusBadge = `<span class="badge badge-status">${escapeHtml(STATUS_LABELS[req.status] ?? req.status)}</span>`;
     const roleBadge = req.assignedRole
@@ -787,13 +786,6 @@ function renderRequestTypeSection(title: string, requests: OpenRequestItem[], op
       </div>
     `;
   }).join("\n");
-
-  return `
-    <div class="type-group">
-      ${title ? `<div class="type-header">${escapeHtml(title)} (${requests.length})</div>` : ""}
-      ${cards}
-    </div>
-  `;
 }
 
 function renderTodayActivitiesHtml(activities: TodayActivityItem[]): string {
@@ -917,37 +909,60 @@ export function renderDailyForumHtml(data: DailyForumData): string {
     return multi ? `<div class="platoon-subheader">${escapeHtml(p.companyName)} — ${escapeHtml(p.platoonName)}</div>` : "";
   }
 
-  function renderTypePlatoons(title: string, getReqs: (p: PlatoonForumSection) => OpenRequestItem[], options?: { highlightDates?: boolean }): string {
-    const all = data.platoons.flatMap(getReqs);
-    if (all.length === 0) return "";
-    const perPlatoon = data.platoons
+  function renderStatusSubsection(
+    label: string,
+    getReqs: (p: PlatoonForumSection) => OpenRequestItem[],
+    options?: { highlightDates?: boolean },
+  ): string {
+    const total = data.platoons.reduce((s, p) => s + getReqs(p).length, 0);
+    if (total === 0) return "";
+    const platoonBlocks = data.platoons
       .filter((p) => getReqs(p).length > 0)
-      .map((p) => `${platoonHeader(p)}${renderRequestTypeSection(title, getReqs(p), options)}`)
+      .map((p) => `${platoonHeader(p)}${renderRequestCards(getReqs(p), options)}`)
       .join("\n");
-    return perPlatoon;
+    return `
+      <div class="type-group">
+        <div class="type-header">${escapeHtml(label)} (${total})</div>
+        ${platoonBlocks}
+      </div>
+    `;
   }
 
-  const totalOpen = data.platoons.reduce((s, p) => s + p.openRequests.medical.length + p.openRequests.hardship.length + p.openRequests.leave.length, 0);
-  // Count how many request types have data — collapse type header when only one
-  const openTypes = [
-    { title: "רפואה", get: (p: PlatoonForumSection) => p.openRequests.medical },
-    { title: 'ת"ש', get: (p: PlatoonForumSection) => p.openRequests.hardship },
-    { title: "יציאה", get: (p: PlatoonForumSection) => p.openRequests.leave },
-  ].filter((t) => data.platoons.some((p) => t.get(p).length > 0));
-  const collapseOpenType = openTypes.length === 1;
-  const openHtml = totalOpen > 0
-    ? openTypes.map((t) => renderTypePlatoons(collapseOpenType ? "" : t.title, t.get)).join("\n")
-    : '<p class="no-data">אין בקשות ממתינות</p>';
+  const requestTypes: Array<{
+    title: string;
+    open: (p: PlatoonForumSection) => OpenRequestItem[];
+    active?: (p: PlatoonForumSection) => OpenRequestItem[];
+  }> = [
+    { title: "רפואה", open: (p) => p.openRequests.medical, active: (p) => p.activeRequests.medical },
+    { title: 'ת"ש', open: (p) => p.openRequests.hardship },
+    { title: "יציאה", open: (p) => p.openRequests.leave, active: (p) => p.activeRequests.leave },
+  ];
 
-  const totalActive = data.platoons.reduce((s, p) => s + p.activeRequests.medical.length + p.activeRequests.leave.length, 0);
-  const activeTypes = [
-    { title: "רפואה", get: (p: PlatoonForumSection) => p.activeRequests.medical },
-    { title: "יציאה", get: (p: PlatoonForumSection) => p.activeRequests.leave },
-  ].filter((t) => data.platoons.some((p) => t.get(p).length > 0));
-  const collapseActiveType = activeTypes.length === 1;
-  const activeHtml = totalActive > 0
-    ? activeTypes.map((t) => renderTypePlatoons(collapseActiveType ? "" : t.title, t.get, { highlightDates: true })).join("\n")
-    : '<p class="no-data">אין בקשות פעילות</p>';
+  const totalRequests = requestTypes.reduce((s, rt) => {
+    const o = data.platoons.reduce((ss, p) => ss + rt.open(p).length, 0);
+    const a = rt.active ? data.platoons.reduce((ss, p) => ss + rt.active!(p).length, 0) : 0;
+    return s + o + a;
+  }, 0);
+
+  const requestSectionsHtml = totalRequests === 0
+    ? '<p class="no-data">אין בקשות</p>'
+    : requestTypes
+        .map((rt) => {
+          const openTotal = data.platoons.reduce((s, p) => s + rt.open(p).length, 0);
+          const activeTotal = rt.active ? data.platoons.reduce((s, p) => s + rt.active!(p).length, 0) : 0;
+          if (openTotal + activeTotal === 0) return "";
+          const openSection = renderStatusSubsection("ממתינות", rt.open);
+          const activeSection = rt.active ? renderStatusSubsection("פעילות", rt.active, { highlightDates: true }) : "";
+          return `
+            <div class="section-block">
+              <h3 class="section-title">${escapeHtml(rt.title)} (${openTotal + activeTotal})</h3>
+              ${openSection}
+              ${activeSection}
+            </div>
+          `;
+        })
+        .filter(Boolean)
+        .join("\n");
 
   const totalCmdrEvents = data.platoons.reduce((s, p) => s + p.commanderEvents.length, 0);
   const cmdrEventsHtml = totalCmdrEvents > 0
@@ -1028,16 +1043,8 @@ export function renderDailyForumHtml(data: DailyForumData): string {
     </div>
 
     <div class="group-block">
-      <h2 class="group-title">בקשות</h2>
-      <div class="section-block">
-        <h3 class="section-title">ממתינות${collapseOpenType && openTypes[0] ? ` — ${openTypes[0].title}` : ""} (${totalOpen})</h3>
-        ${openHtml}
-      </div>
-
-      <div class="section-block">
-        <h3 class="section-title">פעילות${collapseActiveType && activeTypes[0] ? ` — ${activeTypes[0].title}` : ""} (${totalActive})</h3>
-        ${activeHtml}
-      </div>
+      <h2 class="group-title">בקשות (${totalRequests})</h2>
+      ${requestSectionsHtml}
     </div>
 
     <div class="group-block">

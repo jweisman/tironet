@@ -163,7 +163,7 @@ export default function ActivitySummaryPage() {
               </div>
 
               {/* Rollup table */}
-              {activity.rows.length > 0 && (
+              {(activity.scoreLabels?.length ?? 0) > 0 && activity.rows.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-collapse">
                     <thead>
@@ -244,7 +244,7 @@ export default function ActivitySummaryPage() {
                 </div>
               )}
 
-              {activity.rows.length === 0 && (
+              {(activity.scoreLabels?.length ?? 0) > 0 && activity.rows.length === 0 && (
                 <p className="text-sm text-muted-foreground">אין נתונים</p>
               )}
             </section>
