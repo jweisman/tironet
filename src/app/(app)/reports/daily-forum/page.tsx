@@ -91,24 +91,6 @@ function RequestCard({ req, highlightDates }: { req: OpenRequestItem; highlightD
 }
 
 // ---------------------------------------------------------------------------
-// Request type section
-// ---------------------------------------------------------------------------
-
-function RequestTypeSection({ title, requests, highlightDates }: { title: string; requests: OpenRequestItem[]; highlightDates?: boolean }) {
-  if (requests.length === 0) return null;
-  return (
-    <div className="mb-3">
-      <div className="text-xs font-semibold bg-muted px-2 py-1 rounded-sm mb-1">
-        {title} ({requests.length})
-      </div>
-      {requests.map((req) => (
-        <RequestCard key={req.id} req={req} highlightDates={highlightDates} />
-      ))}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Today activity section
 // ---------------------------------------------------------------------------
 
@@ -248,8 +230,20 @@ function PlatoonLabel({ platoon }: { platoon: PlatoonForumSection }) {
 function ForumContent({ data }: { data: DailyForumData }) {
   const platoons = data.platoons;
   const multi = platoons.length > 1;
-  const totalOpen = platoons.reduce((s, p) => s + p.openRequests.medical.length + p.openRequests.hardship.length + p.openRequests.leave.length, 0);
-  const totalActive = platoons.reduce((s, p) => s + p.activeRequests.medical.length + p.activeRequests.leave.length, 0);
+  const requestTypes: Array<{
+    title: string;
+    open: (p: PlatoonForumSection) => OpenRequestItem[];
+    active?: (p: PlatoonForumSection) => OpenRequestItem[];
+  }> = [
+    { title: "רפואה", open: (p) => p.openRequests.medical, active: (p) => p.activeRequests.medical },
+    { title: 'ת"ש', open: (p) => p.openRequests.hardship },
+    { title: "יציאה", open: (p) => p.openRequests.leave, active: (p) => p.activeRequests.leave },
+  ];
+  const totalRequests = requestTypes.reduce((s, rt) => {
+    const o = platoons.reduce((ss, p) => ss + rt.open(p).length, 0);
+    const a = rt.active ? platoons.reduce((ss, p) => ss + rt.active!(p).length, 0) : 0;
+    return s + o + a;
+  }, 0);
 
   return (
     <>
@@ -282,53 +276,31 @@ function ForumContent({ data }: { data: DailyForumData }) {
       {/* בקשות */}
       <div className="mb-6">
         <h2 className="text-sm font-bold bg-muted px-3 py-1.5 rounded-sm border-r-4 border-foreground mb-3">
-          בקשות
+          בקשות ({totalRequests})
         </h2>
 
-        {(() => {
-          const openTypes = [
-            { title: "רפואה", get: (p: PlatoonForumSection) => p.openRequests.medical },
-            { title: 'ת"ש', get: (p: PlatoonForumSection) => p.openRequests.hardship },
-            { title: "יציאה", get: (p: PlatoonForumSection) => p.openRequests.leave },
-          ].filter((t) => platoons.some((p) => t.get(p).length > 0));
-          const collapseType = openTypes.length === 1;
-          return (
-            <div className="mb-5 ps-4">
-              <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
-                ממתינות{collapseType && openTypes[0] ? ` — ${openTypes[0].title}` : ""} ({totalOpen})
-              </h3>
-              {totalOpen === 0 ? (
-                <p className="text-xs text-muted-foreground">אין בקשות ממתינות</p>
-              ) : (
-                openTypes.map((t) => (
-                  <RequestTypePlatoons key={t.title} title={collapseType ? "" : t.title} platoons={platoons} getRequests={t.get} multi={multi} />
-                ))
-              )}
-            </div>
-          );
-        })()}
-
-        {(() => {
-          const activeTypes = [
-            { title: "רפואה", get: (p: PlatoonForumSection) => p.activeRequests.medical },
-            { title: "יציאה", get: (p: PlatoonForumSection) => p.activeRequests.leave },
-          ].filter((t) => platoons.some((p) => t.get(p).length > 0));
-          const collapseType = activeTypes.length === 1;
-          return (
-            <div className="mb-5 ps-4">
-              <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
-                פעילות{collapseType && activeTypes[0] ? ` — ${activeTypes[0].title}` : ""} ({totalActive})
-              </h3>
-              {totalActive === 0 ? (
-                <p className="text-xs text-muted-foreground">אין בקשות פעילות</p>
-              ) : (
-                activeTypes.map((t) => (
-                  <RequestTypePlatoons key={t.title} title={collapseType ? "" : t.title} platoons={platoons} getRequests={t.get} multi={multi} highlightDates />
-                ))
-              )}
-            </div>
-          );
-        })()}
+        {totalRequests === 0 ? (
+          <p className="text-xs text-muted-foreground ps-4">אין בקשות</p>
+        ) : (
+          requestTypes.map((rt) => {
+            const openTotal = platoons.reduce((s, p) => s + rt.open(p).length, 0);
+            const activeTotal = rt.active ? platoons.reduce((s, p) => s + rt.active!(p).length, 0) : 0;
+            if (openTotal + activeTotal === 0) return null;
+            return (
+              <div key={rt.title} className="mb-5 ps-4">
+                <h3 className="text-sm font-bold border-b border-border pb-1 mb-3">
+                  {rt.title} ({openTotal + activeTotal})
+                </h3>
+                {openTotal > 0 && (
+                  <RequestTypePlatoons title={`ממתינות`} platoons={platoons} getRequests={rt.open} multi={multi} />
+                )}
+                {rt.active && activeTotal > 0 && (
+                  <RequestTypePlatoons title={`פעילות`} platoons={platoons} getRequests={rt.active} multi={multi} highlightDates />
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* אירועי מפקדים */}
