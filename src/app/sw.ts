@@ -384,6 +384,14 @@ function offlineFallbackResponse(): Response {
 
 const serwist = new Serwist({
   precacheEntries,
+  // Vercel Skew Protection appends ?dpl=<deployment-id> to chunk URLs.
+  // Precache keys are stored without the query string, so without this
+  // option the runtime lookup misses and the SW falls through to network.
+  // When offline, that means ChunkLoadError on any not-yet-visited page.
+  // Issue #160.
+  precacheOptions: {
+    ignoreURLParametersMatching: [/^dpl$/],
+  },
   skipWaiting: true,
   clientsClaim: true,
   // navigationPreload is DISABLED. Safari (pre-18.5) has a critical bug where
