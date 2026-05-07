@@ -259,7 +259,7 @@ describe("GET /api/cron/daily-tasks", () => {
     );
   });
 
-  it("morning: caps detail rows at 3 and appends remaining count", async () => {
+  it("morning: caps detail rows at 3 and appends remaining count to the last line", async () => {
     const todayStr = new Date().toISOString().split("T")[0];
 
     mockAssignments.mockResolvedValue([
@@ -282,12 +282,13 @@ describe("GET /api/cron/daily-tasks", () => {
     expect(res.status).toBe(200);
     const call = mockSendPush.mock.calls[0];
     expect(call?.[1].body).toMatch(/^יש 6 בקשות פעילות להיום\n/);
-    // opener + 3 rows + remaining count line
-    expect(call?.[1].body.split("\n")).toHaveLength(5);
-    expect(call?.[1].body.endsWith("\nועוד 3 בקשות")).toBe(true);
+    // opener + 3 detail rows; "more" appended to the last detail line, not a new line
+    const lines = call?.[1].body.split("\n");
+    expect(lines).toHaveLength(4);
+    expect(lines?.[lines.length - 1]).toMatch(/ — ועוד 3$/);
   });
 
-  it("morning: uses singular noun when only one extra request remains", async () => {
+  it("morning: uses 'ועוד אחת' when only one extra request remains", async () => {
     const todayStr = new Date().toISOString().split("T")[0];
 
     mockAssignments.mockResolvedValue([
@@ -309,6 +310,8 @@ describe("GET /api/cron/daily-tasks", () => {
     const res = await GET(makeRequest("test-secret", "morning"));
     expect(res.status).toBe(200);
     const call = mockSendPush.mock.calls[0];
-    expect(call?.[1].body.endsWith("\nועוד בקשה 1")).toBe(true);
+    const lines = call?.[1].body.split("\n");
+    expect(lines).toHaveLength(4);
+    expect(lines?.[lines.length - 1]).toMatch(/ — ועוד אחת$/);
   });
 });
