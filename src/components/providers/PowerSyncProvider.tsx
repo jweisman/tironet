@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PowerSyncContext } from "@powersync/react";
+import { createBaseLogger, LogLevel } from "@powersync/web";
 import * as Sentry from "@sentry/nextjs";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/powersync/database";
@@ -9,6 +10,27 @@ import { TironetConnector } from "@/lib/powersync/connector";
 import { clearLocalDatabase } from "@/lib/powersync/clear-local-db";
 
 const connector = new TironetConnector();
+
+// Enable PowerSync DEBUG logging when ?powersync_debug=1 is in the URL or
+// localStorage["powersync_debug"] is set. Surfaces internal logger.debug
+// lines like "Validated checksums..." and "Saved batch for bucket:..."
+// so we can see which internal operation dominates worker time.
+if (typeof window !== "undefined") {
+  const params = new URLSearchParams(window.location.search);
+  const debugEnabled =
+    params.get("powersync_debug") === "1" ||
+    localStorage.getItem("powersync_debug") === "1";
+  if (debugEnabled) {
+    const baseLogger = createBaseLogger();
+    baseLogger.useDefaults();
+    baseLogger.setLevel(LogLevel.DEBUG);
+    if (params.get("powersync_debug") === "1") {
+      // URL param sticks via localStorage so reloads keep debug on.
+      localStorage.setItem("powersync_debug", "1");
+    }
+    console.log("[PowerSync] DEBUG logging enabled");
+  }
+}
 
 function isCorruptError(err: unknown): boolean {
   if (!err) return false;
