@@ -65,3 +65,7 @@ infra/**/lambda.zip
 
 # Local vars
 infra/**/terraform.tfvars
+
+# Claude Code — per-developer settings and runtime state
+.claude/settings.local.json
+.claude/*.lock

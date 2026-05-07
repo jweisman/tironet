@@ -44,10 +44,13 @@ export async function POST(req: NextRequest) {
         auth: keys.auth,
       },
     }),
-    // Ensure the user has a notification preferences row (both enabled by default)
+    // Ensure the user has a notification preferences row. Subscribing to push
+    // is itself the explicit "I want in-app notifications" signal, so set
+    // channel=in_app on create. (The column default is `off` for opt-in;
+    // we override here because subscribe is an explicit user action.)
     prisma.notificationPreference.upsert({
       where: { userId: session.user.id },
-      create: { userId: session.user.id },
+      create: { userId: session.user.id, channel: "in_app" },
       update: {},
     }),
   ]);
@@ -76,11 +79,8 @@ export async function DELETE(req: NextRequest) {
     where: { endpoint: endpoint.data, userId },
   });
 
-  // If this was the user's last subscription, remove their preference row
-  const remaining = await prisma.pushSubscription.count({ where: { userId } });
-  if (remaining === 0) {
-    await prisma.notificationPreference.deleteMany({ where: { userId } });
-  }
+  // Preference row is intentionally preserved — users may switch to channel=sms
+  // and have no push subscriptions, but still need their per-notification toggles.
 
   return NextResponse.json({ ok: true });
 }

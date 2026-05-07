@@ -19,8 +19,16 @@ import { toIsraeliDisplay } from "@/lib/phone";
 import { useTheme, type ThemePreference } from "@/contexts/ThemeContext";
 import { useUserPreferences } from "@/contexts/UserPreferenceContext";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
-import { Monitor, Sun, Moon, Bell, Sparkles } from "lucide-react";
+import { Monitor, Sun, Moon, Bell, BellOff, Smartphone, MessageSquare, Sparkles } from "lucide-react";
 import type { Role } from "@/types";
+
+type NotificationChannel = "off" | "in_app" | "sms";
+
+const CHANNEL_OPTIONS: { value: NotificationChannel; label: string; icon: typeof Bell }[] = [
+  { value: "off", label: "כבוי", icon: BellOff },
+  { value: "in_app", label: "אפליקציה", icon: Smartphone },
+  { value: "sms", label: "SMS", icon: MessageSquare },
+];
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "מערכת", icon: Monitor },
@@ -42,6 +50,7 @@ export default function ProfilePage() {
 
   // Push notification state
   const push = usePushSubscription();
+  const [channel, setChannel] = useState<NotificationChannel>("in_app");
   const [dailyTasksEnabled, setDailyTasksEnabled] = useState(true);
   const [requestAssignmentEnabled, setRequestAssignmentEnabled] = useState(true);
   const [activeRequestsEnabled, setActiveRequestsEnabled] = useState(true);
@@ -50,12 +59,15 @@ export default function ProfilePage() {
   const [reminderLeadMinutes, setReminderLeadMinutes] = useState<number | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
+  const hasPhone = Boolean(session?.user?.phone);
+
   // Load notification preferences from server
   useEffect(() => {
     fetch("/api/push/preferences")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) {
+          setChannel(data.channel ?? "in_app");
           setDailyTasksEnabled(data.dailyTasksEnabled);
           setRequestAssignmentEnabled(data.requestAssignmentEnabled);
           setActiveRequestsEnabled(data.activeRequestsEnabled);
@@ -69,7 +81,7 @@ export default function ProfilePage() {
   }, []);
 
   const updatePreference = useCallback(
-    async (field: string, value: boolean | number | null) => {
+    async (field: string, value: boolean | number | string | null) => {
       const res = await fetch("/api/push/preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -83,8 +95,10 @@ export default function ProfilePage() {
         else if (field === "activeRequestsEnabled") setActiveRequestsEnabled(!value);
         else if (field === "newAppointmentEnabled") setNewAppointmentEnabled(!value);
         else if (field === "severeIncidentEnabled") setSevereIncidentEnabled(!value);
-        // reminderLeadMinutes revert is handled at the call site
+        // channel and reminderLeadMinutes revert is handled at the call site
+        return false;
       }
+      return true;
     },
     [],
   );
@@ -195,12 +209,14 @@ export default function ProfilePage() {
           <Label>אימייל</Label>
           <Input value={session?.user?.email ?? ""} disabled dir="ltr" />
         </div>
-        {session?.user?.phone && (
-          <div className="space-y-1.5">
-            <Label>טלפון</Label>
-            <Input value={toIsraeliDisplay(session.user.phone)} disabled dir="ltr" />
-          </div>
-        )}
+        <div className="space-y-1.5">
+          <Label>טלפון</Label>
+          <Input
+            value={session?.user?.phone ? toIsraeliDisplay(session.user.phone) : ""}
+            disabled
+            dir="ltr"
+          />
+        </div>
 
         <Button type="submit" disabled={saving}>
           {saving ? "שומר..." : "שמור שינויים"}
@@ -258,37 +274,75 @@ export default function ProfilePage() {
           <Label className="text-base font-semibold">התראות</Label>
         </div>
 
-        {push.permission === "unsupported" ? (
-          <p className="text-sm text-muted-foreground">
-            הדפדפן אינו תומך בהתראות.
+        {/* Channel selector */}
+        <div className="flex gap-2">
+          {CHANNEL_OPTIONS.map(({ value, label, icon: Icon }) => {
+            const disabled = !prefsLoaded || (value === "sms" && !hasPhone);
+            const selected = channel === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                disabled={disabled}
+                onClick={async () => {
+                  const prev = channel;
+                  setChannel(value);
+                  const ok = await updatePreference("channel", value);
+                  if (!ok) setChannel(prev);
+                }}
+                className={`flex flex-1 flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  selected
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <Icon size={18} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {!hasPhone && (
+          <p className="text-xs text-muted-foreground">
+            כדי להפעיל התראות SMS, פנה למפקד או למנהל מערכת להוספת מספר טלפון.
           </p>
-        ) : push.iosRequiresInstall ? (
-          <p className="text-sm text-muted-foreground">
-            כדי לקבל התראות ב-iPhone, יש להוסיף את האפליקציה למסך הבית תחילה.
-          </p>
-        ) : push.permission === "denied" ? (
-          <p className="text-sm text-muted-foreground">
-            התראות חסומות. יש לאפשר התראות בהגדרות הדפדפן.
-          </p>
-        ) : !push.isSubscribed ? (
-          <div className="space-y-2">
+        )}
+
+        {channel === "in_app" && (
+          push.permission === "unsupported" ? (
             <p className="text-sm text-muted-foreground">
-              אפשר התראות כדי לקבל עדכונים על בקשות ודיווחים חסרים.
+              הדפדפן אינו תומך בהתראות.
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={push.loading}
-              onClick={async () => {
-                const ok = await push.subscribe();
-                if (ok) toast.success("התראות הופעלו בהצלחה");
-                else if (Notification.permission === "denied") toast.error("התראות חסומות בהגדרות הדפדפן");
-              }}
-            >
-              {push.loading ? "מפעיל..." : "הפעל התראות"}
-            </Button>
-          </div>
-        ) : (
+          ) : push.iosRequiresInstall ? (
+            <p className="text-sm text-muted-foreground">
+              כדי לקבל התראות ב-iPhone, יש להוסיף את האפליקציה למסך הבית תחילה.
+            </p>
+          ) : push.permission === "denied" ? (
+            <p className="text-sm text-muted-foreground">
+              התראות חסומות. יש לאפשר התראות בהגדרות הדפדפן.
+            </p>
+          ) : !push.isSubscribed ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                אפשר התראות כדי לקבל עדכונים על בקשות ודיווחים חסרים.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={push.loading}
+                onClick={async () => {
+                  const ok = await push.subscribe();
+                  if (ok) toast.success("התראות הופעלו בהצלחה");
+                  else if (Notification.permission === "denied") toast.error("התראות חסומות בהגדרות הדפדפן");
+                }}
+              >
+                {push.loading ? "מפעיל..." : "הפעל התראות"}
+              </Button>
+            </div>
+          ) : null
+        )}
+
+        {channel !== "off" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -373,8 +427,8 @@ export default function ProfilePage() {
                   const val = e.target.value === "" ? null : Number(e.target.value);
                   const prev = reminderLeadMinutes;
                   setReminderLeadMinutes(val);
-                  updatePreference("reminderLeadMinutes", val).then(undefined, () => {
-                    setReminderLeadMinutes(prev);
+                  updatePreference("reminderLeadMinutes", val).then((ok) => {
+                    if (!ok) setReminderLeadMinutes(prev);
                   });
                 }}
               >
@@ -386,18 +440,20 @@ export default function ProfilePage() {
                 <option value="180">3 שעות</option>
               </select>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              disabled={push.loading}
-              onClick={async () => {
-                await push.unsubscribe();
-                toast.success("התראות בוטלו");
-              }}
-            >
-              {push.loading ? "מבטל..." : "בטל התראות במכשיר זה"}
-            </Button>
+            {channel === "in_app" && push.isSubscribed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                disabled={push.loading}
+                onClick={async () => {
+                  await push.unsubscribe();
+                  toast.success("ההתראות במכשיר זה בוטלו");
+                }}
+              >
+                {push.loading ? "מבטל..." : "בטל התראות במכשיר זה"}
+              </Button>
+            )}
           </div>
         )}
       </div>
