@@ -151,6 +151,7 @@ const SHELL_ROUTES = [
   "/soldiers",
   "/requests",
   "/reports",        // report listing page
+  "/support",        // support/diagnostics — must work offline
   "/activities/_",   // detail page shell (dummy slug — same HTML for any ID)
   "/soldiers/_",     // detail page shell
   "/requests/_",     // request detail page shell
@@ -206,7 +207,7 @@ function resolveShellRoute(pathname: string, origin: string): {
   htmlKey: string;
 } | null {
   // List pages (exact path)
-  if (pathname === "/home" || pathname === "/activities" || pathname === "/soldiers" || pathname === "/requests" || pathname === "/reports") {
+  if (pathname === "/home" || pathname === "/activities" || pathname === "/soldiers" || pathname === "/requests" || pathname === "/reports" || pathname === "/support") {
     return { htmlKey: `${origin}${pathname}` };
   }
 
@@ -383,6 +384,14 @@ function offlineFallbackResponse(): Response {
 
 const serwist = new Serwist({
   precacheEntries,
+  // Vercel Skew Protection appends ?dpl=<deployment-id> to chunk URLs.
+  // Precache keys are stored without the query string, so without this
+  // option the runtime lookup misses and the SW falls through to network.
+  // When offline, that means ChunkLoadError on any not-yet-visited page.
+  // Issue #160.
+  precacheOptions: {
+    ignoreURLParametersMatching: [/^dpl$/],
+  },
   skipWaiting: true,
   clientsClaim: true,
   // navigationPreload is DISABLED. Safari (pre-18.5) has a critical bug where

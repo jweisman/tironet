@@ -360,11 +360,12 @@ async function sendActiveRequestNotifications(
         : `יש ${requestCount} בקשות פעילות ${label}`;
     const visible = userEvents.slice(0, MAX_DETAIL_ROWS);
     const remaining = userEvents.length - MAX_DETAIL_ROWS;
-    const more =
-      remaining > 0
-        ? `\nועוד ${hebrewCount(remaining, "בקשה", "בקשות")}`
-        : "";
-    const body = `${opener}\n${visible.map((e) => e.detail).join("\n")}${more}`;
+    const detailLines = visible.map((e) => e.detail);
+    if (remaining > 0 && detailLines.length > 0) {
+      const moreSuffix = remaining === 1 ? "ועוד אחת" : `ועוד ${remaining}`;
+      detailLines[detailLines.length - 1] = `${detailLines[detailLines.length - 1]} — ${moreSuffix}`;
+    }
+    const body = `${opener}\n${detailLines.join("\n")}`;
 
     total++;
     promises.push(

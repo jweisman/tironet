@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Send, CheckCircle, Loader2, RefreshCw, Bell } from "lucide-react";
+import { Send, CheckCircle, Loader2, RefreshCw, Bell, Copy, Mail } from "lucide-react";
 import { clearLocalDatabase } from "@/lib/powersync/clear-local-db";
 import { useSyncStatus, type SyncState } from "@/hooks/useSyncStatus";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { toast } from "sonner";
 import { usePowerSync } from "@powersync/react";
 import { useSession } from "next-auth/react";
@@ -466,18 +466,62 @@ async function collectDiagnostics(
   return diagnostics;
 }
 
+const SUPPORT_EMAIL = "support@tironet.org.il";
+
+/** Format a diagnostics object as plain-text for clipboard/mailto fallback. */
+function formatDiagnosticsAsText(
+  description: string,
+  diagnostics: Record<string, unknown>,
+): string {
+  const lines: string[] = [];
+  if (description) {
+    lines.push("תיאור:");
+    lines.push(description);
+    lines.push("");
+  }
+  for (const [section, data] of Object.entries(diagnostics)) {
+    lines.push(`=== ${section} ===`);
+    if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+      for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+        lines.push(`${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v ?? "—")}`);
+      }
+    } else {
+      lines.push(typeof data === "string" ? data : JSON.stringify(data, null, 2));
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
 export default function SupportPage() {
   const [description, setDescription] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  // When the POST fails (offline or server error), we hold onto the
+  // collected diagnostics so the user can copy/email them without
+  // triggering another expensive collection pass.
+  const [offlineDiagnostics, setOfflineDiagnostics] = useState<{
+    text: string;
+    reason: "offline" | "server-error";
+  } | null>(null);
   const db = usePowerSync();
   const { data: session, status: sessionStatus } = useSession();
   const { selectedCycleId, selectedAssignment, isLoading: cycleIsLoading } = useCycle();
 
   async function handleSubmit() {
     setSending(true);
+    setOfflineDiagnostics(null);
     try {
       const diagnostics = await collectDiagnostics(db, session, sessionStatus, selectedCycleId ?? null, selectedAssignment ?? null, cycleIsLoading);
+
+      // Detect offline upfront so we don't wait for the fetch timeout.
+      if (!navigator.onLine) {
+        setOfflineDiagnostics({
+          text: formatDiagnosticsAsText(description.trim(), diagnostics),
+          reason: "offline",
+        });
+        return;
+      }
 
       const res = await fetch("/api/support", {
         method: "POST",
@@ -489,10 +533,41 @@ export default function SupportPage() {
       setSent(true);
       toast.success("הדיווח נשלח בהצלחה");
     } catch {
-      toast.error("שגיאה בשליחת הדיווח. נסה שוב.");
+      // Fetch failed (network error or non-OK). Fall back to clipboard/mailto.
+      try {
+        const diagnostics = await collectDiagnostics(db, session, sessionStatus, selectedCycleId ?? null, selectedAssignment ?? null, cycleIsLoading);
+        setOfflineDiagnostics({
+          text: formatDiagnosticsAsText(description.trim(), diagnostics),
+          reason: navigator.onLine ? "server-error" : "offline",
+        });
+      } catch {
+        toast.error("שגיאה בשליחת הדיווח. נסה שוב.");
+      }
     } finally {
       setSending(false);
     }
+  }
+
+  async function handleCopy() {
+    if (!offlineDiagnostics) return;
+    try {
+      await navigator.clipboard.writeText(offlineDiagnostics.text);
+      toast.success("הדיווח הועתק. ניתן להדביק באימייל או ב-WhatsApp.");
+    } catch {
+      toast.error("העתקה נכשלה. נסה לבחור ולהעתיק ידנית.");
+    }
+  }
+
+  function buildMailto(): string {
+    if (!offlineDiagnostics) return "";
+    // mailto bodies are practically capped around 2KB on iOS. We send a
+    // short note + first lines of context, and ask the user to paste the
+    // full clipboard content into the message.
+    const shortBody = description.trim()
+      ? `תיאור הבעיה:\n${description.trim()}\n\n(פרטי האבחון המלאים בהעתקה — יש להדביק כאן)`
+      : "(פרטי האבחון בהעתקה — יש להדביק כאן)";
+    const subject = `[תמיכה] דיווח לא מקוון`;
+    return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(shortBody)}`;
   }
 
   if (sent) {
@@ -554,6 +629,40 @@ export default function SupportPage() {
       <p className="text-xs text-muted-foreground text-center">
         הדיווח כולל מידע טכני על המכשיר, הדפדפן, ומצב הסנכרון — ללא מידע אישי על חיילים.
       </p>
+
+      {offlineDiagnostics && (
+        <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            {offlineDiagnostics.reason === "offline"
+              ? "אין חיבור לרשת — לא ניתן לשלוח את הדיווח כעת"
+              : "השליחה לשרת נכשלה — ניתן לשלוח את הדיווח ידנית"}
+          </p>
+          <p className="text-xs text-amber-800 dark:text-amber-300">
+            ניתן להעתיק את פרטי הדיווח ולשלוח אותם בוואטסאפ, אימייל, או כל אמצעי אחר.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Button onClick={handleCopy} variant="outline" size="sm" className="w-full">
+              <Copy size={14} className="me-2" />
+              העתק דיווח
+            </Button>
+            <a
+              href={buildMailto()}
+              className={buttonVariants({ variant: "outline", size: "sm", className: "w-full" })}
+            >
+              <Mail size={14} className="me-2" />
+              פתח אימייל
+            </a>
+          </div>
+          <details className="text-xs">
+            <summary className="cursor-pointer text-amber-800 dark:text-amber-300">
+              תצוגה מקדימה
+            </summary>
+            <pre className="mt-2 max-h-48 overflow-auto rounded bg-white/50 dark:bg-black/30 p-2 text-[11px] leading-tight whitespace-pre-wrap break-all">
+              {offlineDiagnostics.text}
+            </pre>
+          </details>
+        </div>
+      )}
 
       <TestNotificationSection />
       <SyncStatusSection />
