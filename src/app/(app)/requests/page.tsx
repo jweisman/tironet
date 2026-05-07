@@ -255,8 +255,7 @@ export default function RequestsPage() {
   const { data: rawRequests, isLoading: requestsLoading } = useQuery<RawRequest>(REQUESTS_QUERY, queryParams);
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(
     (rawRequests ?? []).length > 0,
-    requestsLoading,
-    { page: "requests", selectedCycleId, role: rawRole || "none" }
+    requestsLoading
   );
 
   const isMedic = rawRole === "company_medic";

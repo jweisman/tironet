@@ -298,8 +298,7 @@ export default function HomePage() {
 
   const { showLoading, showEmpty, showConnectionError } = useSyncReady(
     (rawSquads ?? []).length > 0,
-    squadsLoading,
-    { page: "home", selectedCycleId, role: rawRole || "none", cycleLoading }
+    squadsLoading
   );
 
   // Build top-3-gaps map per squad from flat rows

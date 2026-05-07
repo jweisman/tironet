@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useSafeStatus } from "./useSafeStatus";
-import { recordConnectionError } from "@/lib/support/last-connection-error";
 
 /**
  * Determines whether a page should show a loading indicator vs "no data".
@@ -10,14 +9,14 @@ import { recordConnectionError } from "@/lib/support/last-connection-error";
  * @param hasData - whether the page's primary query returned any data
  * @param isLoading - the `isLoading` flag from `useQuery()` — true until
  *                    the first set of results is available
- * @param context - optional metadata captured into the diagnostic snapshot
- *                  when the connection-error state fires (e.g. selectedCycleId,
- *                  sessionStatus). Read by the support page's collectDiagnostics.
+ * @param _context - reserved for future diagnostic capture; currently unused.
+ *                   Kept in the signature so call sites that pass it don't
+ *                   need to change.
  */
 export function useSyncReady(
   hasData: boolean,
   isLoading: boolean,
-  context?: Record<string, unknown>,
+  _context?: Record<string, unknown>,
 ) {
   const syncStatus = useSafeStatus();
   const downloading = syncStatus.dataFlowStatus?.downloading ?? false;
@@ -46,59 +45,37 @@ export function useSyncReady(
     return () => clearTimeout(t);
   }, [hasData, syncStatus.hasSynced, downloading]);
 
-  // Decide what to render
-  let result: { showLoading: boolean; showEmpty: boolean; showConnectionError: boolean };
-  let trigger: "stale-sync" | "first-sync-timeout" | null = null;
-
+  // Data arrived → render it
   if (hasData) {
-    result = { showLoading: false, showEmpty: false, showConnectionError: false };
-  } else if (isLoading) {
-    result = { showLoading: true, showEmpty: false, showConnectionError: false };
-  } else if (syncStatus.hasSynced) {
-    if (downloading && !staleSyncTimedOut) {
-      result = { showLoading: true, showEmpty: false, showConnectionError: false };
-    } else if (downloading && staleSyncTimedOut) {
-      result = { showLoading: false, showEmpty: false, showConnectionError: true };
-      trigger = "stale-sync";
-    } else {
-      result = { showLoading: false, showEmpty: true, showConnectionError: false };
-    }
-  } else if (timedOut) {
-    result = { showLoading: false, showEmpty: false, showConnectionError: true };
-    trigger = "first-sync-timeout";
-  } else {
-    result = { showLoading: true, showEmpty: false, showConnectionError: false };
+    return { showLoading: false, showEmpty: false, showConnectionError: false };
   }
 
-  // Record a diagnostic snapshot the first time the connection-error state
-  // fires. The snapshot persists to localStorage so the user can navigate
-  // to /support and submit a report that includes the state at error time.
-  // We capture only on the rising edge (false → true) to avoid overwriting
-  // earlier snapshots if the same state churns.
-  const recordedRef = useRef(false);
-  useEffect(() => {
-    if (!result.showConnectionError) {
-      recordedRef.current = false;
-      return;
-    }
-    if (recordedRef.current) return;
-    if (typeof window === "undefined" || !trigger) return;
-    recordedRef.current = true;
-    recordConnectionError({
-      at: new Date().toISOString(),
-      page: window.location.pathname,
-      trigger,
-      online: navigator.onLine,
-      hasSynced: syncStatus.hasSynced ?? false,
-      downloading,
-      hasData,
-      context,
-    });
-    // context, hasSynced, downloading, hasData intentionally excluded from
-    // deps — we capture the snapshot at the moment the error first fires,
-    // not on later renders with newer state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result.showConnectionError, trigger]);
+  // Query still loading its first results
+  if (isLoading) {
+    return { showLoading: true, showEmpty: false, showConnectionError: false };
+  }
 
-  return result;
+  // Query returned empty and sync has completed
+  if (syncStatus.hasSynced) {
+    // Sync may have reset: downloading but no data yet.
+    // Show loading for 30s, then connection error.
+    // The `downloading` guard ensures this doesn't trigger when
+    // the sync is healthy and the table is genuinely empty —
+    // in that case downloading resolves quickly to false.
+    if (downloading && !staleSyncTimedOut) {
+      return { showLoading: true, showEmpty: false, showConnectionError: false };
+    }
+    if (downloading && staleSyncTimedOut) {
+      return { showLoading: false, showEmpty: false, showConnectionError: true };
+    }
+    return { showLoading: false, showEmpty: true, showConnectionError: false };
+  }
+
+  // Query returned empty, sync hasn't completed, timeout elapsed
+  if (timedOut) {
+    return { showLoading: false, showEmpty: false, showConnectionError: true };
+  }
+
+  // Query returned empty, sync still in progress
+  return { showLoading: true, showEmpty: false, showConnectionError: false };
 }

@@ -196,8 +196,7 @@ export default function ActivitiesPage() {
   const { data: rawSoldierCounts } = useQuery<RawSoldierCounts>(SOLDIER_COUNTS_QUERY, countsParams);
   const { showLoading, showConnectionError } = useSyncReady(
     (rawActivities ?? []).length > 0,
-    activitiesLoading,
-    { page: "activities", selectedCycleId, role: role || "none" }
+    activitiesLoading
   );
 
   const companyId = selectedAssignment?.unitType === "company" ? selectedAssignment.unitId : "";

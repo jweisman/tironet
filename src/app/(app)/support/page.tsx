@@ -9,10 +9,6 @@ import { toast } from "sonner";
 import { usePowerSync } from "@powersync/react";
 import { useSession } from "next-auth/react";
 import { useCycle } from "@/contexts/CycleContext";
-import {
-  readConnectionError,
-  clearConnectionError,
-} from "@/lib/support/last-connection-error";
 
 /** Race a promise against a timeout — returns the result or a timeout marker. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T | string> {
@@ -38,29 +34,6 @@ async function collectDiagnostics(
   cycleIsLoading: boolean,
 ) {
   const diagnostics: Record<string, unknown> = {};
-
-  // Last connection error — snapshot written by useSyncReady when the
-  // connection-error UI first rendered. Pulls in state from the broken
-  // page so support reports submitted later still capture it.
-  try {
-    const snapshot = readConnectionError();
-    if (snapshot) {
-      diagnostics["Last Connection Error"] = {
-        at: snapshot.at,
-        page: snapshot.page,
-        trigger: snapshot.trigger,
-        onlineAtError: snapshot.online,
-        hasSyncedAtError: snapshot.hasSynced,
-        downloadingAtError: snapshot.downloading,
-        hasDataAtError: snapshot.hasData,
-        ...(snapshot.context ?? {}),
-      };
-    } else {
-      diagnostics["Last Connection Error"] = "no recent error captured";
-    }
-  } catch (e) {
-    diagnostics["Last Connection Error"] = { error: String(e) };
-  }
 
   // Device & browser
   diagnostics["Device"] = {
@@ -558,7 +531,6 @@ export default function SupportPage() {
 
       if (!res.ok) throw new Error("Failed to send");
       setSent(true);
-      clearConnectionError();
       toast.success("הדיווח נשלח בהצלחה");
     } catch {
       // Fetch failed (network error or non-OK). Fall back to clipboard/mailto.
